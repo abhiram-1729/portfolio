@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+websockets
+supabase
+openai
+python-dotenv
+pydantic
+google-generativeai
+

@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Realtime AI Chat</title>
+    <style>
+        body { font-family: monospace; max-width: 800px; margin: 0 auto; padding: 20px; background-color: #f4f4f4; }
+        #chat-box { height: 400px; border: 1px solid #ccc; overflow-y: scroll; background: white; padding: 10px; margin-bottom: 10px; border-radius: 5px; }
+        .message { margin-bottom: 8px; }
+        .user { color: blue; font-weight: bold; }
+        .ai { color: green; }
+        #status { color: gray; font-size: 0.9em; margin-bottom: 5px; }
+        .input-area { display: flex; gap: 10px; }
+        input { flex-grow: 1; padding: 10px; border-radius: 5px; border: 1px solid #ccc; }
+        button { padding: 10px 20px; cursor: pointer; background: #333; color: white; border: none; border-radius: 5px; }
+        button:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <h1>Realtime AI Session</h1>
+    <div id="status">Status: Disconnected</div>
+    <div id="chat-box"></div>
+    <div class="input-area">
+        <input type="text" id="messageInput" placeholder="Type a message..." disabled />
+        <button id="sendBtn" disabled>Send</button>
+    </div>
+
+    <script>
+        const chatBox = document.getElementById('chat-box');
+        const messageInput = document.getElementById('messageInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const statusDiv = document.getElementById('status');
+        
+        // Generate a random session ID or use 'test'
+        const sessionId = "session-" + Math.floor(Math.random() * 10000);
+        const wsUrl = `ws://localhost:8000/ws/session/${sessionId}`;
+        
+        let ws;
+
+        function connect() {
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                statusDiv.innerText = `Status: Connected (ID: ${sessionId})`;
+                messageInput.disabled = false;
+                sendBtn.disabled = false;
+                appendSystemMessage("Connection established.");
+            };
+
+            ws.onmessage = (event) => {
+                const text = event.data;
+                // Simple logic: If text starts with "System:", it's a system message
+                if (text.startsWith("System:")) {
+                    appendSystemMessage(text);
+                } else {
+                    // It's AI content (streaming). 
+                    // We need to decide if we append to the last AI message or create new.
+                    // For simplicity, we just look at the last child. If it's an AI message that is "active", append.
+                    // But here, let's just use a simple approach: 
+                    // Since we don't have explicit "start of message" indicators in the stream from backend (yet),
+                    // We might assume that if the user sent something, the next incoming stuff is the response.
+                    
+                    // Actually, a better UI for streaming is:
+                    // 1. User sends message -> Create User bubble. Create empty AI bubble.
+                    // 2. Stream tokens into AI bubble.
+                    
+                    if (lastMessageWasUser) {
+                        currentAiMessageDiv = createMessageDiv("ai", "AI: ");
+                        chatBox.appendChild(currentAiMessageDiv);
+                        lastMessageWasUser = false;
+                    }
+                    if (currentAiMessageDiv) {
+                        currentAiMessageDiv.innerHTML += text; // Append text
+                        chatBox.scrollTop = chatBox.scrollHeight;
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                statusDiv.innerText = "Status: Disconnected";
+                messageInput.disabled = true;
+                sendBtn.disabled = true;
+                appendSystemMessage("Connection closed.");
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket Error:', error);
+                statusDiv.innerText = "Status: Error";
+            };
+        }
+
+        let lastMessageWasUser = false;
+        let currentAiMessageDiv = null;
+
+        function createMessageDiv(className, prefix) {
+            const div = document.createElement('div');
+            div.className = `message ${className}`;
+            div.innerHTML = `<strong>${prefix}</strong>`;
+            return div;
+        }
+
+        function appendSystemMessage(text) {
+            const div = document.createElement('div');
+            div.style.color = '#888';
+            div.style.fontStyle = 'italic';
+            div.innerText = text;
+            chatBox.appendChild(div);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function sendMessage() {
+            const text = messageInput.value;
+            if (text && ws && ws.readyState === WebSocket.OPEN) {
+                // Display User Message
+                const div = createMessageDiv("user", "You: ");
+                div.innerHTML += text;
+                chatBox.appendChild(div);
+                
+                // Send
+                ws.send(text);
+                messageInput.value = '';
+                
+                // Prepare state for incoming AI response
+                lastMessageWasUser = true;
+                currentAiMessageDiv = null; 
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }
+        }
+
+        sendBtn.addEventListener('click', sendMessage);
+        messageInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendMessage();
+        });
+
+        // Auto connect on load
+        connect();
+
+    </script>
+</body>
+</html>
