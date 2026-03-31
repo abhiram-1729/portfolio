@@ -1,0 +1,40 @@
+import api from './api';
+
+export const adminAPI = {
+  // Dashboard
+  getDashboardStats: () => api.get('/admin/dashboard'),
+
+  // Users
+  getUsers: () => api.get('/admin/users'),
+  createUser: (data) => api.post('/admin/users', data),
+  updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
+  deactivateUser: (id) => api.delete(`/admin/users/${id}`),
+
+  // Vehicles
+  getVehicles: () => api.get('/admin/vehicles'),
+  createVehicle: (data) => api.post('/admin/vehicles', data),
+  assignDriver: (id, userId) => api.put(`/admin/vehicles/${id}/assign`, { userId }),
+  getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
+
+  // Inventory
+  getItems: () => api.get('/admin/inventory/items'),
+  createItem: (data) => api.post('/admin/inventory/items', data),
+  updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data),
+  loadStock: (data) => api.post('/admin/inventory/load', data),
+  returnStock: (data) => api.post('/admin/inventory/return', data),
+  getVehicleInventory: (id) => api.get(`/admin/inventory/vehicle/${id}`),
+
+  // Sales
+  getSales: (params) => api.get('/admin/sales', { params }),
+
+  // Reports
+  getDailyReport: () => api.get('/admin/reports/daily'),
+  getTrendsReport: (params) => api.get('/admin/reports/trends', { params }),
+  getTopProducts: () => api.get('/admin/reports/top-products'),
+  getVehicleReport: (id) => api.get(`/admin/reports/vehicle/${id}`),
+  getItemReport: () => api.get('/admin/reports/item'),
+  getDateRangeReport: (params) => api.get('/admin/reports/date-range', { params }),
+  getReconciliationReport: (params) => api.get('/admin/reports/reconciliation', { params }),
+};
+
+export default adminAPI;
