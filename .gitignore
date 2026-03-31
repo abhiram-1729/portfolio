@@ -16,6 +16,8 @@ build/
 out/
 .next/
 
+# sjsj
+
 # Logs
 npm-debug.log*
 yarn-debug.log*
