@@ -405,8 +405,7 @@ export default function SuccessScreen() {
     if (!order) return;
 
     const invoiceNo = getInvoiceNumber(order);
-    const paymentLabel = order.paymentMode === 'CASH' ? 'Cash' : order.paymentMode === 'UPI' ? 'UPI' : 'Card';
-    const text = `✅ Invoice #VK-${invoiceNo}\nAmount: ₹${order.totalAmount.toFixed(2)}\nPayment: ${paymentLabel}\n\nThank you for shopping with VillagKart! 🚐`;
+    const text = `🚐 *VillagKart Invoice #VK-${invoiceNo}*\nAmount: ₹${order.totalAmount.toFixed(2)}\n\nThank you for shopping with us!`;
 
     try {
       setIsDownloading(true);
@@ -414,10 +413,9 @@ export default function SuccessScreen() {
       if (!pdf) return;
 
       const pdfBlob = pdf.output('blob');
-      const file = new File([pdfBlob], `VillagKart_Invoice_VK-${invoiceNo}.pdf`, {
-        type: 'application/pdf'
-      });
+      const file = new File([pdfBlob], `Invoice_VK-${invoiceNo}.pdf`, { type: 'application/pdf' });
 
+      // Check if browser supports sharing files (Available on most mobile browsers)
       if (navigator.canShare && navigator.canShare({ files: [file] })) {
         await navigator.share({
           files: [file],
@@ -425,17 +423,18 @@ export default function SuccessScreen() {
           text: text,
         });
       } else if (navigator.share) {
-        // Fallback to text share and then download
+        // Fallback to text-only share if files aren't supported
         await navigator.share({ text });
-        pdf.save(`VillagKart_Invoice_VK-${invoiceNo}.pdf`);
+        pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
+        toast.success('Text shared & PDF downloaded!');
       } else {
         // Ultimate fallback
+        pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
         await navigator.clipboard.writeText(text);
-        pdf.save(`VillagKart_Invoice_VK-${invoiceNo}.pdf`);
         toast.success('Invoice copied & downloaded!');
       }
-    } catch (error) {
-      console.error('Share error:', error);
+    } catch (err) {
+      console.error('Share error:', err);
       // Fail gracefully
       toast.error('Could not share document');
       // Still allow text share if basic share works
