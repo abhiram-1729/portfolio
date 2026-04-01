@@ -310,7 +310,7 @@ export default function SuccessScreen() {
       // Highlighted Savings Section
       pdf.setFillColor(255, 247, 237); // Light orange background
       pdf.roundedRect(totalsX - 3, rightY - 5, (pageWidth - margin) - totalsX + 6, 9, 1, 1, 'F');
-      
+
       pdf.setTextColor(...orangeAccent);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
@@ -324,10 +324,10 @@ export default function SuccessScreen() {
 
     pdf.setTextColor(...grayText);
     const totalTax = order.items?.reduce((sum, item) => {
-        const rate = item.gst || 0;
-        if (rate === 0) return sum;
-        const taxable = (item.price * item.quantity) / (1 + rate / 100);
-        return sum + ((item.price * item.quantity) - taxable);
+      const rate = item.gst || 0;
+      if (rate === 0) return sum;
+      const taxable = (item.price * item.quantity) / (1 + rate / 100);
+      return sum + ((item.price * item.quantity) - taxable);
     }, 0) || 0;
 
     pdf.setTextColor(...grayText);
@@ -416,14 +416,14 @@ export default function SuccessScreen() {
       if (order.mobile) {
         // PDF cannot be sent via link, so we download it and redirect
         pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
-        
+
         const phone = String(order.mobile).replace(/\D/g, '');
         const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(text)}`;
-        
+
         window.open(whatsappUrl, '_blank');
         toast.success('Opening WhatsApp & Downloading PDF...');
-      } 
+      }
       // 2. Otherwise, use standard share sheet
       else {
         const pdfBlob = pdf.output('blob');
@@ -510,8 +510,8 @@ export default function SuccessScreen() {
                   </div>
                   <div className="relative z-10 flex items-center justify-between px-1">
                     <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-white/70 uppercase tracking-[0.2em]">Extra Benefit</span>
-                        <h3 className="text-white font-black text-[10px] uppercase tracking-widest opacity-90">Total Savings</h3>
+                      <span className="text-[8px] font-black text-white/70 uppercase tracking-[0.2em]">Extra Benefit</span>
+                      <h3 className="text-white font-black text-[10px] uppercase tracking-widest opacity-90">Total Savings</h3>
                     </div>
                     <div className="flex items-baseline gap-0.5">
                       <span className="text-white text-xs font-bold">₹</span>
@@ -524,22 +524,22 @@ export default function SuccessScreen() {
               )}
               {(() => {
                 const totalTax = order.items?.reduce((sum, item) => {
-                    const rate = item.gst || 0;
-                    if (rate === 0) return sum;
-                    const taxable = (item.price * item.quantity) / (1 + rate / 100);
-                    return sum + ((item.price * item.quantity) - taxable);
+                  const rate = item.gst || 0;
+                  if (rate === 0) return sum;
+                  const taxable = (item.price * item.quantity) / (1 + rate / 100);
+                  return sum + ((item.price * item.quantity) - taxable);
                 }, 0) || 0;
-                
+
                 if (totalTax > 0) {
-                    return (
-                        <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100/30">
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Incl.)</span>
-                                <span className="text-[7px] font-bold text-blue-400 uppercase tracking-widest ml-1">CGST: ₹{(totalTax/2).toFixed(2)} | SGST: ₹{(totalTax/2).toFixed(2)}</span>
-                            </div>
-                            <span className="font-black text-base text-blue-600 tracking-tight">₹{totalTax.toFixed(2)}</span>
-                        </div>
-                    );
+                  return (
+                    <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100/30">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Incl.)</span>
+                        <span className="text-[7px] font-bold text-blue-400 uppercase tracking-widest ml-1">CGST: ₹{(totalTax / 2).toFixed(2)} | SGST: ₹{(totalTax / 2).toFixed(2)}</span>
+                      </div>
+                      <span className="font-black text-base text-blue-600 tracking-tight">₹{totalTax.toFixed(2)}</span>
+                    </div>
+                  );
                 }
                 return null;
               })()}
