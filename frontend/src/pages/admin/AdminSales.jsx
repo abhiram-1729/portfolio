@@ -17,7 +17,7 @@ export default function AdminSales() {
         params.fromDate = new Date().toISOString().split('T')[0];
       }
       // Add more filter logic if needed
-      
+
       const { data } = await adminAPI.getSales(params);
       setSales(data);
     } catch (error) {
@@ -55,9 +55,9 @@ export default function AdminSales() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
           <Search size={20} className="text-gray-400" />
-          <input 
-            type="text" 
-            placeholder="Search invoice or mobile..." 
+          <input
+            type="text"
+            placeholder="Search invoice or mobile..."
             className="flex-1 bg-transparent border-none focus:outline-none text-sm"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -65,7 +65,7 @@ export default function AdminSales() {
         </div>
         <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm px-4">
           <Calendar size={20} className="text-gray-400" />
-          <select 
+          <select
             value={filterDate}
             onChange={(e) => setFilterDate(e.target.value)}
             className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium appearance-none"
@@ -87,16 +87,22 @@ export default function AdminSales() {
           </div>
         ) : (
           sales
-            .filter(s => s.id.toLowerCase().includes(searchQuery.toLowerCase()) || (s.mobile && s.mobile.includes(searchQuery)))
+            .filter(s => {
+              const query = searchQuery.toLowerCase();
+              const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
+              return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery));
+            })
             .map((sale) => (
               <div key={sale.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                 <div className="flex justify-between items-start">
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-emerald-600">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
                       <ShoppingCart size={20} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900">{sale.id}</h3>
+                      <h3 className="text-sm font-bold text-gray-900 uppercase">
+                        {sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6) || Math.floor(Math.random() * 100000)}`}
+                      </h3>
                       <span className="text-[10px] text-gray-400 font-bold uppercase">
                         {new Date(sale.createdAt).toLocaleString()}
                       </span>
@@ -118,7 +124,9 @@ export default function AdminSales() {
                         {sale.vehicle?.vehicleNumber || 'No Vehicle'}
                       </span>
                     </div>
-                    <span className="text-xs font-medium text-gray-400 ml-5 italic">by {sale.user?.name || 'Unknown'}</span>
+                    <span className="text-xs font-medium text-gray-400 ml-5 italic">
+                      Driver: {sale.vehicle?.assignedUsers?.[0]?.name || 'No Driver'}
+                    </span>
                   </div>
                   <div className="flex items-center justify-end gap-1 text-emerald-600 group cursor-pointer">
                     <span className="text-xs font-bold uppercase tracking-wider">Details</span>

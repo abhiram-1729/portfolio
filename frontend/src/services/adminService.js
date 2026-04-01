@@ -18,8 +18,12 @@ export const adminAPI = {
 
   // Inventory
   getItems: () => api.get('/admin/inventory/items'),
-  createItem: (data) => api.post('/admin/inventory/items', data),
-  updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data),
+  createItem: (data) => api.post('/admin/inventory/items', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   loadStock: (data) => api.post('/admin/inventory/load', data),
   returnStock: (data) => api.post('/admin/inventory/return', data),
   getVehicleInventory: (id) => api.get(`/admin/inventory/vehicle/${id}`),

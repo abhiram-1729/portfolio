@@ -12,6 +12,8 @@ export default function SuccessScreen() {
   const [order, setOrder] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
+  const getInvoiceNumber = (o) => o?.orderNumber ? String(o.orderNumber) : String(o?.id).replace(/\D/g, '').slice(0, 6) || '000000';
+
   useEffect(() => {
     ordersAPI.getById(id)
       .then(({ data }) => setOrder(data))
@@ -25,8 +27,8 @@ export default function SuccessScreen() {
       const pdf = await generateInvoicePDF(order);
       if (!pdf) return;
 
-      const invoiceNo = order.id.slice(-8).toUpperCase();
-      pdf.save(`VillagKart_Invoice_${invoiceNo}.pdf`);
+      const invoiceNo = getInvoiceNumber(order);
+      pdf.save(`VillagKart_Invoice_VK-${invoiceNo}.pdf`);
       toast.success('Invoice PDF downloaded!');
     } catch (error) {
       console.error('PDF generation error:', error);
@@ -135,7 +137,7 @@ export default function SuccessScreen() {
     // ══════════════════════════════════════
     // INVOICE META — Two columns
     // ══════════════════════════════════════
-    const invoiceNo = order.id.slice(-8).toUpperCase();
+    const invoiceNo = getInvoiceNumber(order);
     const orderDate = new Date(order.createdAt);
     const dateStr = orderDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -148,7 +150,7 @@ export default function SuccessScreen() {
     pdf.setTextColor(...darkText);
     pdf.setFontSize(12);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`#VK${invoiceNo}`, margin, y + 6);
+    pdf.text(`#VK-${invoiceNo}`, margin, y + 6);
 
     pdf.setTextColor(...grayText);
     pdf.setFontSize(8);
@@ -367,9 +369,9 @@ export default function SuccessScreen() {
   const handleShare = async () => {
     if (!order) return;
 
-    const invoiceNo = order.id.slice(-8).toUpperCase();
+    const invoiceNo = getInvoiceNumber(order);
     const paymentLabel = order.paymentMode === 'CASH' ? 'Cash' : order.paymentMode === 'UPI' ? 'UPI' : 'Card';
-    const text = `✅ Invoice #${invoiceNo}\nAmount: ₹${order.totalAmount.toFixed(2)}\nPayment: ${paymentLabel}\n\nThank you for shopping with VillagKart! 🚐`;
+    const text = `✅ Invoice #VK-${invoiceNo}\nAmount: ₹${order.totalAmount.toFixed(2)}\nPayment: ${paymentLabel}\n\nThank you for shopping with VillagKart! 🚐`;
 
     try {
       setIsDownloading(true);
@@ -377,7 +379,7 @@ export default function SuccessScreen() {
       if (!pdf) return;
 
       const pdfBlob = pdf.output('blob');
-      const file = new File([pdfBlob], `VillagKart_Invoice_${invoiceNo}.pdf`, {
+      const file = new File([pdfBlob], `VillagKart_Invoice_VK-${invoiceNo}.pdf`, {
         type: 'application/pdf'
       });
 
@@ -390,11 +392,11 @@ export default function SuccessScreen() {
       } else if (navigator.share) {
         // Fallback to text share and then download
         await navigator.share({ text });
-        pdf.save(`VillagKart_Invoice_${invoiceNo}.pdf`);
+        pdf.save(`VillagKart_Invoice_VK-${invoiceNo}.pdf`);
       } else {
         // Ultimate fallback
         await navigator.clipboard.writeText(text);
-        pdf.save(`VillagKart_Invoice_${invoiceNo}.pdf`);
+        pdf.save(`VillagKart_Invoice_VK-${invoiceNo}.pdf`);
         toast.success('Invoice copied & downloaded!');
       }
     } catch (error) {
@@ -443,7 +445,7 @@ export default function SuccessScreen() {
           <div className="glass rounded-[2.5rem] p-8 shadow-2xl shadow-emerald-900/5 border border-white/80 bg-white/70 space-y-6">
             <div className="flex justify-between items-center pb-4 border-b border-emerald-100/50">
               <span className="text-[10px] font-black text-emerald-800/40 uppercase tracking-widest">Transaction ID</span>
-              <span className="font-mono font-black text-emerald-900 text-[0.9rem] bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100">#VK{order.id.slice(-8).toUpperCase()}</span>
+              <span className="font-mono font-black text-emerald-900 text-[0.9rem] bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100">#VK-{getInvoiceNumber(order)}</span>
             </div>
 
             <div className="space-y-4">

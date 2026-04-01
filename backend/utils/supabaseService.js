@@ -6,9 +6,10 @@ import supabase from './supabase.js';
  * @param {string} filename - The clean filename.
  * @param {string} mimetype - The MIME type for correct content-type.
  * @param {string} bucketName - The Supabase bucket name.
+ * @param {string} folder - The subfolder within the bucket.
  * @returns {Promise<string|null>} - The public URL of the uploaded file.
  */
-export const uploadToSupabase = async (buffer, filename, mimetype, bucketName = 'vehicles') => {
+export const uploadToSupabase = async (buffer, filename, mimetype, bucketName = 'vehicles', folder = 'documents') => {
   try {
     // 1. Ensure bucket exists (or at least list to check)
     // In production, buckets are usually pre-configured, but we'll attempt a list check.
@@ -27,7 +28,7 @@ export const uploadToSupabase = async (buffer, filename, mimetype, bucketName = 
     // Sanitize filename to avoid "Invalid key" errors with special characters/spaces
     const sanitizedFilename = filename.replace(/[^a-zA-Z0-9.-]/g, '_');
     const uniqueFilename = `${Date.now()}-${sanitizedFilename}`;
-    const filePath = `documents/${uniqueFilename}`;
+    const filePath = `${folder}/${uniqueFilename}`;
 
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from(bucketName)

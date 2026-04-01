@@ -36,39 +36,53 @@ export const getDailyReport = async (req, res) => {
 export const getTrendsReport = async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 7;
-    const results = [];
 
+    const endDate = new Date();
+    const startDate = new Date();
+    startDate.setDate(startDate.getDate() - (days - 1));
+    startDate.setHours(0, 0, 0, 0);
+
+    // Fetch all orders in the range with ONE query
+    const orders = await prisma.order.findMany({
+      where: {
+        createdAt: { gte: startDate, lte: endDate },
+        status: { not: 'CANCELLED' },
+      },
+      include: { items: true },
+    });
+
+    // Initialize map to guarantee zero-values for days without orders
+    const dailyStatsMap = new Map();
     for (let i = days - 1; i >= 0; i--) {
-      const dayStart = new Date();
-      dayStart.setDate(dayStart.getDate() - i);
-      dayStart.setHours(0, 0, 0, 0);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-
-      const orders = await prisma.order.findMany({
-        where: {
-          createdAt: { gte: dayStart, lt: dayEnd },
-          status: { not: 'CANCELLED' },
-        },
-        include: { items: true },
-      });
-
-      const revenue = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-      const profit = orders.reduce((sum, order) => {
-        return sum + order.items.reduce((itemSum, item) => {
-          return itemSum + ((item.price - (item.landingPrice || 0)) * item.quantity);
-        }, 0);
-      }, 0);
-
-      results.push({
-        date: dayStart.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' }),
-        revenue: Math.round(revenue),
-        profit: Math.round(profit),
-        orders: orders.length,
-      });
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateString = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+        dailyStatsMap.set(dateString, { date: dateString, revenue: 0, profit: 0, orders: 0 });
     }
 
-    res.json(results);
+    // Aggregate the payload
+    orders.forEach(order => {
+        const orderDateStr = order.createdAt.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
+        
+        if (dailyStatsMap.has(orderDateStr)) {
+            const stats = dailyStatsMap.get(orderDateStr);
+            stats.orders += 1;
+            stats.revenue += order.totalAmount;
+            
+            const profit = order.items.reduce((itemSum, item) => {
+                return itemSum + ((item.price - (item.landingPrice || 0)) * item.quantity);
+            }, 0);
+            stats.profit += profit;
+        }
+    });
+
+    const finalResults = Array.from(dailyStatsMap.values()).map(stat => ({
+        ...stat,
+        revenue: Math.round(stat.revenue),
+        profit: Math.round(stat.profit)
+    }));
+
+    res.json(finalResults);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching trends', error: error.message });
   }

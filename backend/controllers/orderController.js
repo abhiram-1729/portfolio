@@ -59,6 +59,8 @@ export const createOrderFromCart = async (req, res, next) => {
         const order = await prisma.$transaction(async (tx) => {
             const newOrder = await tx.order.create({
                 data: {
+                    userId: agentId,
+                    vehicleId: req.user.assignedVehicleId || null,
                     agentId: agentId,
                     totalAmount,
                     status: 'PENDING',

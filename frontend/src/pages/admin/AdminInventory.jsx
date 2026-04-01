@@ -1,15 +1,24 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2 } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
 export default function AdminInventory() {
   const [activeTab, setActiveTab] = useState('master');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('ALL');
+  const [filterStatus, setFilterStatus] = useState('ALL');
   const [items, setItems] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
+  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [editItem, setEditItem] = useState(null);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [selectedEditFile, setSelectedEditFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const [editPreviewUrl, setEditPreviewUrl] = useState(null);
   
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -65,12 +74,24 @@ export default function AdminInventory() {
   const handleCreateItem = async (e) => {
     e.preventDefault();
     try {
-      await adminAPI.createItem(newItem);
+      const formData = new FormData();
+      Object.keys(newItem).forEach(key => {
+        if (newItem[key] !== undefined && newItem[key] !== null) {
+          formData.append(key, newItem[key]);
+        }
+      });
+      
+      if (selectedFile) {
+        formData.append('image', selectedFile);
+      }
+
+      await adminAPI.createItem(formData);
       toast.success('Item added to master');
       setShowAddItemModal(false);
+      setSelectedFile(null);
+      setPreviewUrl(null);
       setNewItem({ 
         name: '', 
-        image: '', 
         description: '', 
         mrp: '', 
         price: '', 
@@ -83,6 +104,61 @@ export default function AdminInventory() {
       fetchData();
     } catch (error) {
       toast.error('Failed to add item');
+    }
+  };
+
+  const openEditModal = (item) => {
+    setEditItem({
+      id: item.id,
+      name: item.name || '',
+      description: item.description || '',
+      mrp: item.mrp?.toString() || '',
+      price: item.price?.toString() || '',
+      landingPrice: item.landingPrice?.toString() || '',
+      discount: item.discount?.toString() || '',
+      image: item.image || '',
+      status: item.status || 'ACTIVE',
+    });
+    setEditPreviewUrl(item.image || null);
+    setShowEditItemModal(true);
+  };
+
+  const handleUpdateItem = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new FormData();
+      Object.keys(editItem).forEach(key => {
+        if (key !== 'image' && editItem[key] !== undefined && editItem[key] !== null) {
+          formData.append(key, editItem[key]);
+        }
+      });
+
+      if (selectedEditFile) {
+        formData.append('image', selectedEditFile);
+      }
+
+      await adminAPI.updateItem(editItem.id, formData);
+      toast.success('Item updated successfully');
+      setShowEditItemModal(false);
+      setEditItem(null);
+      setSelectedEditFile(null);
+      setEditPreviewUrl(null);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to update item');
+    }
+  };
+
+  const handleFileChange = (e, isEdit = false) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (isEdit) {
+        setSelectedEditFile(file);
+        setEditPreviewUrl(URL.createObjectURL(file));
+      } else {
+        setSelectedFile(file);
+        setPreviewUrl(URL.createObjectURL(file));
+      }
     }
   };
 
@@ -110,6 +186,15 @@ export default function AdminInventory() {
     }
   };
 
+  const uniqueCategories = [...new Set(items.map(i => i.category?.name).filter(Boolean))];
+
+  const filteredItems = items.filter(item => {
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCategory = filterCategory === 'ALL' || item.category?.name === filterCategory;
+    const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
   const renderMaster = () => (
     <div className="space-y-4">
       <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
@@ -121,11 +206,58 @@ export default function AdminInventory() {
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
-        <Filter size={18} className="text-gray-400" />
+        <button 
+          onClick={() => setShowFilters(!showFilters)} 
+          className={`p-2 rounded-xl transition-colors ${showFilters ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-gray-50 text-gray-400'}`}
+        >
+           <Filter size={18} />
+        </button>
       </div>
 
+      {showFilters && (
+        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap gap-4 animate-in slide-in-from-top-2 duration-200">
+            <div className="space-y-1 flex-1 min-w-[150px]">
+               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
+               <select 
+                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                 value={filterCategory}
+                 onChange={(e) => setFilterCategory(e.target.value)}
+               >
+                 <option value="ALL">All Categories</option>
+                 {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+               </select>
+            </div>
+            <div className="space-y-1 flex-1 min-w-[150px]">
+               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
+               <select 
+                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                 value={filterStatus}
+                 onChange={(e) => setFilterStatus(e.target.value)}
+               >
+                 <option value="ALL">All Status</option>
+                 <option value="ACTIVE">Active</option>
+                 <option value="INACTIVE">Inactive</option>
+               </select>
+            </div>
+            <div className="flex items-end">
+               <button 
+                 onClick={() => { setFilterCategory('ALL'); setFilterStatus('ALL'); setSearchQuery(''); }}
+                 className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2"
+               >
+                 Clear Filters
+               </button>
+            </div>
+        </div>
+      )}
+
       <div className="space-y-3">
-        {items.filter(i => i.name.toLowerCase().includes(searchQuery.toLowerCase())).map((item) => (
+        {filteredItems.length === 0 ? (
+          <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
+             <Package size={32} className="mx-auto text-gray-200 mb-2" />
+             <p className="text-sm font-bold text-gray-400">No items match your filters</p>
+          </div>
+        ) : (
+          filteredItems.map((item) => (
           <div key={item.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-emerald-600 overflow-hidden border border-gray-100 shadow-inner">
@@ -158,9 +290,16 @@ export default function AdminInventory() {
                 </div>
               </div>
             </div>
-            <button className="text-emerald-600 text-xs font-bold p-2 hover:bg-emerald-50 rounded-lg">Edit</button>
+            <button 
+              onClick={() => openEditModal(item)}
+              className="text-emerald-600 text-xs font-bold p-2 hover:bg-emerald-50 rounded-lg flex items-center gap-1"
+            >
+              <Pencil size={14} />
+              Edit
+            </button>
           </div>
-        ))}
+          ))
+        )}
       </div>
     </div>
   );
@@ -356,14 +495,36 @@ export default function AdminInventory() {
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Image URL (Supabase)</label>
-                <input 
-                  type="text"
-                  placeholder="Paste Supabase public URL"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                  value={newItem.image || ''}
-                  onChange={(e) => setNewItem({...newItem, image: e.target.value})}
-                />
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Product Image</label>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-20 h-20 rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 overflow-hidden cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => document.getElementById('add-image-input').click()}
+                  >
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Plus size={24} />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input 
+                      id="add-image-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e, false)}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => document.getElementById('add-image-input').click()}
+                      className="text-emerald-600 text-xs font-bold px-3 py-1.5 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                    >
+                      {selectedFile ? 'Change Image' : 'Select Image'}
+                    </button>
+                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">Max 5MB (JPG, PNG)</p>
+                  </div>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -439,6 +600,156 @@ export default function AdminInventory() {
                 className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider"
               >
                 Add to Master
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Item Modal */}
+      {showEditItemModal && editItem && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900">Edit Item</h3>
+              <button 
+                onClick={() => { setShowEditItemModal(false); setEditItem(null); }}
+                className="p-2 hover:bg-gray-100 rounded-full text-gray-400"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateItem} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
+                <input 
+                  type="text"
+                  required
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                  value={editItem.name}
+                  onChange={(e) => setEditItem({...editItem, name: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Product Image</label>
+                <div className="flex items-center gap-4">
+                  <div 
+                    className="w-20 h-20 rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 overflow-hidden cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => document.getElementById('edit-image-input').click()}
+                  >
+                    {editPreviewUrl ? (
+                      <img src={editPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <Plus size={24} />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <input 
+                      id="edit-image-input"
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleFileChange(e, true)}
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => document.getElementById('edit-image-input').click()}
+                      className="text-emerald-600 text-xs font-bold px-3 py-1.5 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
+                    >
+                      Change Image
+                    </button>
+                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">Max 5MB (JPG, PNG)</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Landing Price (Cost)</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="₹"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                    value={editItem.landingPrice}
+                    onChange={(e) => setEditItem({...editItem, landingPrice: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">MRP (Original)</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="₹"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                    value={editItem.mrp}
+                    onChange={(e) => setEditItem({...editItem, mrp: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Discount (₹)</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="₹"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                    value={editItem.discount}
+                    onChange={(e) => {
+                      const d = parseFloat(e.target.value) || 0;
+                      const m = parseFloat(editItem.mrp) || 0;
+                      setEditItem({
+                        ...editItem, 
+                        discount: e.target.value,
+                        price: m > 0 ? (m - d).toString() : editItem.price
+                      });
+                    }}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="₹"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
+                    value={editItem.price}
+                    onChange={(e) => setEditItem({...editItem, price: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Status</label>
+                <select
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                  value={editItem.status}
+                  onChange={(e) => setEditItem({...editItem, status: e.target.value})}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Description</label>
+                <textarea 
+                  placeholder="Optional details..."
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm h-20"
+                  value={editItem.description}
+                  onChange={(e) => setEditItem({...editItem, description: e.target.value})}
+                />
+              </div>
+
+              <button 
+                type="submit"
+                className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider"
+              >
+                Save Changes
               </button>
             </form>
           </div>

@@ -20,7 +20,7 @@ export const getSalesHistory = async (req, res) => {
       where: whereClause,
       include: {
         user: { select: { id: true, name: true, mobile: true, role: true } },
-        vehicle: { select: { id: true, vehicleNumber: true } },
+        vehicle: { select: { id: true, vehicleNumber: true, vehicleName: true, assignedUsers: { select: { id: true, name: true, mobile: true } } } },
         items: {
           include: {
             product: { select: { id: true, name: true } }

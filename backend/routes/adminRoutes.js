@@ -42,8 +42,14 @@ router.get('/vehicles/:id/sales', vehicleCtr.getVehicleSales);
 // Inventory (Item Master & Stocking)
 router.route('/inventory/items')
   .get(inventoryCtr.getItems)
-  .post(inventoryCtr.createItem);
-router.put('/inventory/items/:id', inventoryCtr.updateItem);
+  .post(
+    uploadMiddleware.single('image'),
+    inventoryCtr.createItem
+  );
+router.put('/inventory/items/:id',
+  uploadMiddleware.single('image'),
+  inventoryCtr.updateItem
+);
 
 router.post('/inventory/load', inventoryCtr.loadStock);
 router.post('/inventory/return', inventoryCtr.returnStock);

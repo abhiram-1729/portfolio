@@ -1,4 +1,5 @@
 import prisma from '../../utils/prisma.js';
+import { uploadToSupabase } from '../../utils/supabaseService.js';
 
 // Item Master
 export const getItems = async (req, res) => {
@@ -30,27 +31,84 @@ export const createItem = async (req, res) => {
       brandId 
     } = req.body;
     
-    // In a real scenario, handle default relations if category/sub/brand IDs aren't provided
-    // For now we assume they are provided or we handle a default one.
+    // Handle image upload to Supabase if file is present
+    let imageUrl = image || null;
+    if (req.file) {
+      imageUrl = await uploadToSupabase(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        'product-images',
+        'products'
+      );
+      if (!imageUrl) {
+        return res.status(500).json({ message: 'Failed to upload image to storage' });
+      }
+    }
+
+    // Convert strings to floats safely, returning undefined for empty strings so Prisma ignores them
+    const parseNumber = (val) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    };
+
+    // Handle default relations since they are required in Prisma Schema
+    let finalCategoryId = categoryId;
+    let finalSubCategoryId = subCategoryId;
+    let finalBrandId = brandId;
+
+    if (!finalCategoryId || finalCategoryId === 'default') {
+      const defaultCategory = await prisma.category.upsert({
+        where: { name: 'Uncategorized' },
+        update: {},
+        create: { name: 'Uncategorized' }
+      });
+      finalCategoryId = defaultCategory.id;
+    }
+
+    if (!finalSubCategoryId || finalSubCategoryId === 'default') {
+      let defaultSub = await prisma.subCategory.findFirst({
+        where: { name: 'Uncategorized', categoryId: finalCategoryId }
+      });
+      if (!defaultSub) {
+        defaultSub = await prisma.subCategory.create({
+          data: { name: 'Uncategorized', categoryId: finalCategoryId }
+        });
+      }
+      finalSubCategoryId = defaultSub.id;
+    }
+
+    if (!finalBrandId || finalBrandId === 'default') {
+      const defaultBrand = await prisma.brand.upsert({
+        where: { name: 'Unbranded' },
+        update: {},
+        create: { name: 'Unbranded' }
+      });
+      finalBrandId = defaultBrand.id;
+    }
+
+    const itemData = {
+      name,
+      description,
+      mrp: parseNumber(mrp),
+      price: parseNumber(price) || 0,
+      landingPrice: parseNumber(landingPrice),
+      discount: parseNumber(discount),
+      status: status || 'ACTIVE',
+      image: imageUrl,
+      categoryId: finalCategoryId,
+      subCategoryId: finalSubCategoryId,
+      brandId: finalBrandId,
+    };
 
     const item = await prisma.product.create({
-      data: {
-        name,
-        description,
-        mrp: mrp ? parseFloat(mrp) : undefined,
-        price: parseFloat(price),
-        landingPrice: landingPrice ? parseFloat(landingPrice) : undefined,
-        discount: discount ? parseFloat(discount) : undefined,
-        status: status || 'ACTIVE',
-        image,
-        categoryId,
-        subCategoryId,
-        brandId,
-      }
+      data: itemData
     });
 
     res.status(201).json({ message: 'Item created successfully', item });
   } catch (error) {
+    console.error('❌ Create Item Error:', error);
     res.status(500).json({ message: 'Error creating item', error: error.message });
   }
 };
@@ -68,21 +126,45 @@ export const updateItem = async (req, res) => {
       image 
     } = req.body;
 
+    // Handle image upload to Supabase if file is present
+    let imageUrl = image || undefined;
+    if (req.file) {
+      imageUrl = await uploadToSupabase(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        'product-images',
+        'products'
+      );
+      if (!imageUrl) {
+        return res.status(500).json({ message: 'Failed to upload image to storage' });
+      }
+    }
+
+    const parseNumber = (val) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    };
+
+    const updateData = {
+      name,
+      mrp: parseNumber(mrp),
+      price: parseNumber(price),
+      landingPrice: parseNumber(landingPrice),
+      discount: parseNumber(discount),
+      status,
+      image: imageUrl,
+    };
+
     const item = await prisma.product.update({
       where: { id },
-      data: {
-        name,
-        mrp: mrp ? parseFloat(mrp) : undefined,
-        price: price ? parseFloat(price) : undefined,
-        landingPrice: landingPrice ? parseFloat(landingPrice) : undefined,
-        discount: discount ? parseFloat(discount) : undefined,
-        status,
-        image,
-      }
+      data: updateData
     });
 
     res.json({ message: 'Item updated successfully', item });
   } catch (error) {
+    console.error('❌ Update Item Error:', error);
     res.status(500).json({ message: 'Error updating item', error: error.message });
   }
 };

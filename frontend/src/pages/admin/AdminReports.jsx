@@ -34,74 +34,90 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('overview');
-  const [loading, setLoading] = useState(true);
+  
+  // Data States
   const [dailyReport, setDailyReport] = useState(null);
-  const [trendsData, setTrendsData] = useState([]);
-  const [topProducts, setTopProducts] = useState([]);
+  const [trendsData, setTrendsData] = useState(null);
+  const [topProducts, setTopProducts] = useState(null);
   const [reconReport, setReconReport] = useState(null);
-  const [vehicles, setVehicles] = useState([]);
+  const [vehicles, setVehicles] = useState(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
-  const fetchDailyReport = async () => {
+  // Loading States
+  const [isOverviewLoading, setIsOverviewLoading] = useState(false);
+  const [isDailyLoading, setIsDailyLoading] = useState(false);
+  const [isReconLoading, setIsReconLoading] = useState(false);
+
+  const fetchVehicles = async () => {
+    try {
+      const { data } = await adminAPI.getVehicles();
+      setVehicles(data);
+    } catch (error) {
+      console.error('Failed to fetch vehicles:', error);
+    }
+  };
+
+  const loadDailyData = async () => {
+    if (dailyReport) return; // Cache hit
+    setIsDailyLoading(true);
     try {
       const { data } = await adminAPI.getDailyReport();
       setDailyReport(data);
     } catch (error) {
       toast.error('Failed to fetch daily report');
+    } finally {
+      setIsDailyLoading(false);
     }
   };
 
-  const fetchTrends = async () => {
+  const loadOverviewData = async () => {
+    if (trendsData && topProducts && dailyReport) return; // Cache hit
+    setIsOverviewLoading(true);
     try {
-      const { data } = await adminAPI.getTrendsReport({ days: 7 });
-      setTrendsData(data);
+      const [trendRes, topRes, dailyRes] = await Promise.all([
+        trendsData ? Promise.resolve({ data: trendsData }) : adminAPI.getTrendsReport({ days: 7 }),
+        topProducts ? Promise.resolve({ data: topProducts }) : adminAPI.getTopProducts(),
+        dailyReport ? Promise.resolve({ data: dailyReport }) : adminAPI.getDailyReport()
+      ]);
+      setTrendsData(trendRes.data);
+      setTopProducts(topRes.data);
+      setDailyReport(dailyRes.data);
     } catch (error) {
-      console.error('Trends error:', error);
+      console.error('Overview data error:', error);
+      toast.error('Failed to load overview data');
+    } finally {
+      setIsOverviewLoading(false);
     }
   };
 
-  const fetchTopProducts = async () => {
-    try {
-      const { data } = await adminAPI.getTopProducts();
-      setTopProducts(data);
-    } catch (error) {
-      console.error('Top products error:', error);
+  const loadReconData = async () => {
+    if (!vehicles) {
+       await fetchVehicles();
     }
-  };
-
-  const fetchInitialData = async () => {
-    setLoading(true);
-    await Promise.all([
-      fetchVehicles(),
-      fetchDailyReport(),
-      fetchTrends(),
-      fetchTopProducts()
-    ]);
-    setLoading(false);
   };
 
   const fetchReconciliation = async (vId) => {
     try {
-      setLoading(true);
+      setIsReconLoading(true);
       const { data } = await adminAPI.getReconciliationReport({ vehicleId: vId });
       setReconReport(data);
     } catch (error) {
       toast.error('Failed to fetch reconciliation report');
     } finally {
-      setLoading(false);
+      setIsReconLoading(false);
     }
   };
 
   useEffect(() => {
-    fetchInitialData();
+    // Initial load relies on the active tab
+    if (activeTab === 'overview') loadOverviewData();
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'daily') fetchDailyReport();
-    if (activeTab === 'overview') {
-        fetchTrends();
-        fetchTopProducts();
-    }
+    // Only load if it's the active tab and data isn't already loaded
+    if (activeTab === 'daily') loadDailyData();
+    if (activeTab === 'overview') loadOverviewData();
+    if (activeTab === 'recon') loadReconData();
   }, [activeTab]);
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, bgColor }) => (
@@ -117,27 +133,37 @@ export default function AdminReports() {
     </div>
   );
 
-  const renderOverview = () => (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Primary Stats */}
-      <div className="grid grid-cols-2 gap-4">
-        <StatCard 
-            icon={TrendingUp} 
-            label="Total Revenue" 
-            value={`₹${dailyReport?.totalSales?.toLocaleString() || 0}`} 
-            subValue="Today's Earnings"
-            color="text-emerald-700" 
-            bgColor="bg-emerald-500" 
-        />
-        <StatCard 
-            icon={Target} 
-            label="Net Profit" 
-            value={`₹${dailyReport?.totalProfit?.toLocaleString() || 0}`} 
-            subValue="Today's Margin"
-            color="text-orange-600" 
-            bgColor="bg-orange-500" 
-        />
-      </div>
+  const renderOverview = () => {
+    if (isOverviewLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="text-emerald-900/40 text-[10px] font-black uppercase tracking-widest mt-2">Loading Overview...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Primary Stats */}
+        <div className="grid grid-cols-2 gap-4">
+          <StatCard 
+              icon={TrendingUp} 
+              label="Total Revenue" 
+              value={`₹${dailyReport?.totalSales?.toLocaleString() || 0}`} 
+              subValue="Today's Earnings"
+              color="text-emerald-700" 
+              bgColor="bg-emerald-500" 
+          />
+          <StatCard 
+              icon={Target} 
+              label="Net Profit" 
+              value={`₹${dailyReport?.totalProfit?.toLocaleString() || 0}`} 
+              subValue="Today's Margin"
+              color="text-orange-600" 
+              bgColor="bg-orange-500" 
+          />
+        </div>
 
       {/* Main Chart */}
       <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden">
@@ -216,51 +242,62 @@ export default function AdminReports() {
             <h3 className="text-lg font-black text-gray-900 tracking-tight">Top Products</h3>
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Ranked by Revenue Contributions</p>
           </div>
-          <button className="p-2.5 rounded-xl bg-gray-50 text-gray-400">
-            <ArrowUpRight size={18} />
-          </button>
-        </div>
+            <button className="p-2.5 rounded-xl bg-gray-50 text-gray-400">
+              <ArrowUpRight size={18} />
+            </button>
+          </div>
 
-        <div className="space-y-4">
-          {topProducts.map((p, idx) => (
-            <div key={idx} className="flex items-center justify-between group p-1 transition-all">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shadow-sm group-hover:scale-105 transition-transform">
-                  {p.image ? (
-                    <img src={p.image} alt="" className="w-full h-full object-cover" />
-                  ) : (
-                    <Package size={20} className="text-gray-300" />
-                  )}
+          <div className="space-y-4">
+            {topProducts?.map((p, idx) => (
+              <div key={idx} className="flex items-center justify-between group p-1 transition-all">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center overflow-hidden shadow-sm group-hover:scale-105 transition-transform">
+                    {p.image ? (
+                      <img src={p.image} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                      <Package size={20} className="text-gray-300" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="text-[0.9rem] font-bold text-gray-900 leading-tight">{p.name}</p>
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter mt-0.5">{p.totalQty} Units Sold</p>
+                  </div>
                 </div>
-                <div>
-                  <p className="text-[0.9rem] font-bold text-gray-900 leading-tight">{p.name}</p>
-                  <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter mt-0.5">{p.totalQty} Units Sold</p>
+                <div className="text-right">
+                  <p className="font-black text-gray-900 text-[1rem] tracking-tighter leading-none">₹{p.totalRevenue.toLocaleString()}</p>
+                  <div className="flex items-center justify-end gap-1 mt-1">
+                     <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
+                     <p className="text-[10px] font-bold text-orange-600 line-none tracking-tighter">₹{p.totalProfit.toLocaleString()}</p>
+                  </div>
                 </div>
               </div>
-              <div className="text-right">
-                <p className="font-black text-gray-900 text-[1rem] tracking-tighter leading-none">₹{p.totalRevenue.toLocaleString()}</p>
-                <div className="flex items-center justify-end gap-1 mt-1">
-                   <div className="w-1.5 h-1.5 rounded-full bg-orange-400" />
-                   <p className="text-[10px] font-bold text-orange-600 line-none tracking-tighter">₹{p.totalProfit.toLocaleString()}</p>
-                </div>
+            ))}
+            {(!topProducts || topProducts.length === 0) && (
+              <div className="py-10 text-center">
+                <ShoppingCart size={32} className="mx-auto text-gray-200 mb-2" />
+                <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">No Sales Found Today</p>
               </div>
-            </div>
-          ))}
-          {topProducts.length === 0 && (
-            <div className="py-10 text-center">
-              <ShoppingCart size={32} className="mx-auto text-gray-200 mb-2" />
-              <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">No Sales Found Today</p>
-            </div>
-          )}
+            )}
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderDaily = () => (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 text-center">
-        <TrendingUp size={48} className="mx-auto text-emerald-500" />
+  const renderDaily = () => {
+    if (isDailyLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="text-emerald-900/40 text-[10px] font-black uppercase tracking-widest mt-2">Loading Daily Data...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-6 text-center">
+          <TrendingUp size={48} className="mx-auto text-emerald-500" />
         <div className="flex flex-col gap-1">
           <h3 className="text-xl font-bold text-gray-900">Today's Performance</h3>
           <p className="text-xs text-gray-400 font-medium">Summary for {new Date().toDateString()}</p>
@@ -291,96 +328,106 @@ export default function AdminReports() {
         </div>
 
         <div className="space-y-3 text-left">
-          <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
-            <CreditCard size={14} />
-            Payment Splits
-          </h4>
-          <div className="grid grid-cols-3 gap-2">
-            {['CASH', 'UPI', 'CARD'].map(mode => (
-              <div key={mode} className="bg-white p-3 rounded-xl border border-gray-100 text-center shadow-sm">
-                <span className="text-[10px] font-bold text-gray-400 block">{mode}</span>
-                <span className="text-xs font-bold text-gray-800">₹{dailyReport?.paymentSplits?.[mode]?.toLocaleString() || 0}</span>
-              </div>
-            ))}
+            <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider flex items-center gap-2">
+              <CreditCard size={14} />
+              Payment Splits
+            </h4>
+            <div className="grid grid-cols-3 gap-2">
+              {['CASH', 'UPI', 'CARD'].map(mode => (
+                <div key={mode} className="bg-white p-3 rounded-xl border border-gray-100 text-center shadow-sm">
+                  <span className="text-[10px] font-bold text-gray-400 block">{mode}</span>
+                  <span className="text-xs font-bold text-gray-800">₹{dailyReport?.paymentSplits?.[mode]?.toLocaleString() || 0}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderReconciliation = () => (
-    <div className="space-y-6">
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-          <div className="space-y-1">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle for Recon</label>
-            <div className="relative">
-              <select 
-                value={selectedVehicleId}
-                onChange={(e) => {
-                  setSelectedVehicleId(e.target.value);
-                  if (e.target.value) fetchReconciliation(e.target.value);
-                }}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none"
-              >
-                <option value="">Select Vehicle...</option>
-                {vehicles.map(v => (
-                  <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
-                ))}
-              </select>
-              <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-
-        {selectedVehicleId && (
-          <div className="space-y-4">
-            <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-start gap-4">
-              <AlertTriangle size={24} className="text-amber-500 shrink-0" />
-              <div className="flex flex-col gap-1">
-                <h4 className="text-sm font-bold text-amber-900">Reconciliation Note</h4>
-                <p className="text-xs text-amber-700 leading-relaxed">Calculated based on: Sold = Loaded - Returned. Differences indicate discrepancies.</p>
+  const renderReconciliation = () => {
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+            <div className="space-y-1">
+              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle for Recon</label>
+              <div className="relative">
+                <select 
+                  value={selectedVehicleId}
+                  onChange={(e) => {
+                    setSelectedVehicleId(e.target.value);
+                    if (e.target.value) fetchReconciliation(e.target.value);
+                  }}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none"
+                >
+                  <option value="">Select Vehicle...</option>
+                  {vehicles?.map(v => (
+                    <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
+                  ))}
+                </select>
+                <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
               </div>
             </div>
-
-            {reconReport?.report?.length === 0 ? (
-              <p className="text-center text-gray-500 py-8">No transactions found for this vehicle today</p>
-            ) : (
-              reconReport?.report?.map((item, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h4 className="text-sm font-bold text-gray-900">{item.product}</h4>
-                    {item.difference === 0 ? (
-                        <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
-                          <CheckCircle2 size={12} /> Matched
-                        </span>
-                    ) : (
-                        <span className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1">
-                          <AlertTriangle size={12} /> {item.difference > 0 ? `Loss (${item.difference})` : `Excess (${Math.abs(item.difference)})`}
-                        </span>
-                    )}
-                  </div>
-
-                  <div className="grid grid-cols-3 gap-2">
-                      <div className="bg-gray-50 p-2 rounded-lg text-center">
-                        <span className="text-[8px] uppercase font-bold text-gray-400">Loaded</span>
-                        <p className="text-sm font-bold text-gray-800">{item.loadedQty}</p>
-                      </div>
-                      <div className="bg-gray-50 p-2 rounded-lg text-center">
-                        <span className="text-[8px] uppercase font-bold text-gray-400">Sold</span>
-                        <p className="text-sm font-bold text-gray-800">{item.soldQty}</p>
-                      </div>
-                      <div className="bg-gray-50 p-2 rounded-lg text-center">
-                        <span className="text-[8px] uppercase font-bold text-gray-400">Returned</span>
-                        <p className="text-sm font-bold text-gray-800">{item.returnedQty}</p>
-                      </div>
-                  </div>
-                </div>
-              ))
-            )}
           </div>
-        )}
-    </div>
-  );
+
+          {selectedVehicleId && isReconLoading && (
+             <div className="flex flex-col items-center justify-center py-10 gap-3">
+               <Loader2 className="animate-spin text-emerald-600" size={30} />
+               <span className="text-xs font-bold text-gray-400 uppercase">Fetching Math Data...</span>
+             </div>
+          )}
+
+          {selectedVehicleId && !isReconLoading && (
+            <div className="space-y-4">
+              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-start gap-4">
+                <AlertTriangle size={24} className="text-amber-500 shrink-0" />
+                <div className="flex flex-col gap-1">
+                  <h4 className="text-sm font-bold text-amber-900">Reconciliation Note</h4>
+                  <p className="text-xs text-amber-700 leading-relaxed">Calculated based on: Sold = Loaded - Returned. Differences indicate discrepancies.</p>
+                </div>
+              </div>
+
+              {reconReport?.report?.length === 0 ? (
+                <p className="text-center text-gray-500 py-8 font-medium text-sm">No transactions found for this vehicle today</p>
+              ) : (
+                reconReport?.report?.map((item, idx) => (
+                  <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-sm font-bold text-gray-900">{item.product}</h4>
+                      {item.difference === 0 ? (
+                          <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
+                            <CheckCircle2 size={12} /> Matched
+                          </span>
+                      ) : (
+                          <span className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1">
+                            <AlertTriangle size={12} /> {item.difference > 0 ? `Loss (${item.difference})` : `Excess (${Math.abs(item.difference)})`}
+                          </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2">
+                        <div className="bg-gray-50 p-2 rounded-lg text-center">
+                          <span className="text-[8px] uppercase font-bold text-gray-400">Loaded</span>
+                          <p className="text-sm font-bold text-gray-800">{item.loadedQty}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded-lg text-center">
+                          <span className="text-[8px] uppercase font-bold text-gray-400">Sold</span>
+                          <p className="text-sm font-bold text-gray-800">{item.soldQty}</p>
+                        </div>
+                        <div className="bg-gray-50 p-2 rounded-lg text-center">
+                          <span className="text-[8px] uppercase font-bold text-gray-400">Returned</span>
+                          <p className="text-sm font-bold text-gray-800">{item.returnedQty}</p>
+                        </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          )}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6 pb-20">
@@ -413,21 +460,11 @@ export default function AdminReports() {
         ))}
       </div>
 
-      {loading ? (
-        <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
-          <div className="relative">
-            <Loader2 className="animate-spin text-emerald-600" size={40} />
-            <div className="absolute inset-0 bg-emerald-500/20 blur-xl rounded-full scale-150 animate-pulse" />
-          </div>
-          <p className="text-emerald-900/40 text-[10px] font-black uppercase tracking-widest mt-2">Assembling Analytics...</p>
-        </div>
-      ) : (
-        <div className="transition-all duration-300">
-          {activeTab === 'overview' && renderOverview()}
-          {activeTab === 'daily' && renderDaily()}
-          {activeTab === 'recon' && renderReconciliation()}
-        </div>
-      )}
+      <div className="transition-all duration-300">
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'daily' && renderDaily()}
+        {activeTab === 'recon' && renderReconciliation()}
+      </div>
     </div>
   );
 }
