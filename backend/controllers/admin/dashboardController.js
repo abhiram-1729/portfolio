@@ -2,32 +2,28 @@ import prisma from '../../utils/prisma.js';
 
 export const getDashboardStats = async (req, res) => {
   try {
-    // 1. Active Vehicles
-    const activeVehicles = await prisma.vehicle.count({ where: { status: true } });
-
-    // 2. Active Users (assume non-consumer roles count or just total users)
-    const activeUsers = await prisma.user.count({ where: { role: { not: 'CONSUMER' } } });
-
-    // 3. Orders Today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    const ordersToday = await prisma.order.count({
-      where: {
-        createdAt: { gte: today }
-      }
-    });
 
-    // 4. Sales Today & Payment Splits
-    const todayOrders = await prisma.order.findMany({
-      where: {
-        createdAt: { gte: today },
-        status: { not: 'CANCELLED' }
-      },
-      select: {
-        totalAmount: true,
-        paymentMode: true
-      }
-    });
+    const [activeVehicles, activeUsers, ordersToday, todayOrders] = await Promise.all([
+      // 1. Active Vehicles
+      prisma.vehicle.count({ where: { status: true } }),
+      // 2. Active Users
+      prisma.user.count({ where: { role: { not: 'CONSUMER' } } }),
+      // 3. Orders Today (Count)
+      prisma.order.count({ where: { createdAt: { gte: today } } }),
+      // 4. Sales Today & Payment Splits (Data)
+      prisma.order.findMany({
+        where: {
+          createdAt: { gte: today },
+          status: { not: 'CANCELLED' }
+        },
+        select: {
+          totalAmount: true,
+          paymentMode: true
+        }
+      })
+    ]);
 
     let totalSales = 0;
     const paymentSplits = { CASH: 0, UPI: 0, CARD: 0 };

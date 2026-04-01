@@ -10,6 +10,13 @@ export default function ProductCard({ product }) {
     <div className="glass rounded-[1.25rem] p-2 flex flex-col gap-2 hover:shadow-xl transition-all duration-400 animate-slide-up bg-white/60 border border-white/80">
       {/* Product Image */}
       <div className="rounded-xl overflow-hidden bg-gradient-to-br from-slate-50 to-slate-100 h-24 flex items-center justify-center relative shadow-inner">
+        {/* Stock Badge */}
+        {product.stock !== undefined && product.stock !== null && (
+          <div className="absolute top-2 right-2 z-10 bg-emerald-900/80 backdrop-blur-md text-white text-[0.6rem] font-black px-2 py-1 rounded-lg border border-white/20 shadow-lg">
+            {product.stock} IN STOCK
+          </div>
+        )}
+        
         {product.image ? (
           <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
         ) : (

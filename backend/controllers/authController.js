@@ -11,6 +11,7 @@ export const loginUser = async (req, res, next) => {
 
         const user = await prisma.user.findUnique({
             where: { mobile },
+            include: { assignedVehicle: true },
         });
 
         if (user && (await bcrypt.compare(password, user.password))) {
@@ -20,9 +21,7 @@ export const loginUser = async (req, res, next) => {
                 email: user.email,
                 mobile: user.mobile,
                 role: user.role,
-                assignedVehicle: await prisma.vehicle.findUnique({
-                  where: { id: user.assignedVehicleId || '' }
-                }),
+                assignedVehicle: user.assignedVehicle,
                 token: generateToken(user.id),
             });
         } else {

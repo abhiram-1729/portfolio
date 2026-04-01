@@ -5,7 +5,7 @@ import prisma from '../utils/prisma.js';
 // @access  Private
 export const getProducts = async (req, res, next) => {
     try {
-        const { search, categoryId, warehouseId } = req.query;
+        const { search, categoryId, warehouseId, vehicleId } = req.query;
 
         const query = {
             where: {},
@@ -28,18 +28,37 @@ export const getProducts = async (req, res, next) => {
             query.where.categoryId = categoryId;
         }
 
-        // If warehouseId is provided, only return products that have inventory in that warehouse
+        // Filter by Warehouse
         if (warehouseId) {
             query.where.WarehouseInventory = {
-                some: {
-                    warehouseId: warehouseId,
-                    quantity: { gt: 0 }
-                }
+                some: { warehouseId, quantity: { gt: 0 } }
+            };
+            query.include.WarehouseInventory = {
+                where: { warehouseId }
+            };
+        }
+
+        // Filter by Vehicle Stock
+        if (vehicleId) {
+            query.where.vehicleStocks = {
+                some: { vehicleId, quantity: { gt: 0 } }
+            };
+            query.include.vehicleStocks = {
+                where: { vehicleId }
             };
         }
 
         const products = await prisma.product.findMany(query);
-        res.json(products);
+        
+        // Flatten stock info for easier frontend consumption
+        const result = products.map(p => ({
+            ...p,
+            stock: vehicleId 
+                ? (p.vehicleStocks?.[0]?.quantity || 0) 
+                : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : null)
+        }));
+
+        res.json(result);
     } catch (error) {
         next(error);
     }

@@ -28,15 +28,13 @@ export default function SalesEntry() {
   }, []);
 
   const loadProducts = async () => {
-    if (productCache) {
-      setProducts(productCache);
-      setFiltered(productCache);
-      setLoading(false);
-      return;
-    }
     try {
-      const { data } = await productsAPI.getAll();
-      productCache = data;
+      const params = {};
+      if (user?.assignedVehicleId) {
+        params.vehicleId = user.assignedVehicleId;
+      }
+      
+      const { data } = await productsAPI.getAll(params);
       setProducts(data);
       setFiltered(data);
     } catch (err) {

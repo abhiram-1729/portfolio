@@ -167,15 +167,25 @@ export const getItemWiseReport = async (req, res) => {
       }
     });
 
-    const results = await Promise.all(orderItems.map(async (item) => {
-      const product = await prisma.product.findUnique({ where: { id: item.productId }, select: { name: true } });
-      const totalAmount = item._sum.quantity * item._sum.price; // or calculate from detailed order logic
+    const productIds = orderItems.map(item => item.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, name: true }
+    });
+
+    const productLookup = products.reduce((acc, p) => {
+      acc[p.id] = p.name;
+      return acc;
+    }, {});
+
+    const results = orderItems.map((item) => {
+      const totalAmount = (item._sum.quantity || 0) * (item._sum.price || 0);
       return {
-        itemName: product?.name || 'Unknown',
+        itemName: productLookup[item.productId] || 'Unknown',
         totalQty: item._sum.quantity,
         revenue: totalAmount 
       };
-    }));
+    });
 
     res.json({ title: 'Item Wise Report', data: results });
   } catch (error) {
@@ -211,37 +221,43 @@ export const getReconciliationReport = async (req, res) => {
     dateQuery.setHours(0, 0, 0, 0);
     // If specific date passed, parse it.
 
-    const items = await prisma.product.findMany({ select: { id: true, name: true } });
-    
-    // Loaded
-    const loads = await prisma.stockTransaction.findMany({
-      where: { vehicleId, type: 'LOAD', date: { gte: dateQuery } }
-    });
-
-    // Returned
-    const returns = await prisma.stockTransaction.findMany({
-      where: { vehicleId, type: 'RETURN', date: { gte: dateQuery } }
-    });
-
-    // Sold
-    const sales = await prisma.orderItem.findMany({
-      where: {
-        order: {
-          vehicleId,
-          createdAt: { gte: dateQuery },
-          status: { not: 'CANCELLED' }
+    const [items, loads, returns, sales] = await Promise.all([
+      prisma.product.findMany({ select: { id: true, name: true } }),
+      prisma.stockTransaction.findMany({
+        where: { vehicleId, type: 'LOAD', date: { gte: dateQuery } }
+      }),
+      prisma.stockTransaction.findMany({
+        where: { vehicleId, type: 'RETURN', date: { gte: dateQuery } }
+      }),
+      prisma.orderItem.findMany({
+        where: {
+          order: {
+            vehicleId,
+            createdAt: { gte: dateQuery },
+            status: { not: 'CANCELLED' }
+          }
         }
-      }
-    });
+      })
+    ]);
+
+    // Pre-aggregate data into maps for O(1) lookup
+    const loadMap = {};
+    loads.forEach(l => loadMap[l.productId] = (loadMap[l.productId] || 0) + l.quantity);
+
+    const returnMap = {};
+    returns.forEach(r => returnMap[r.productId] = (returnMap[r.productId] || 0) + r.quantity);
+
+    const saleMap = {};
+    sales.forEach(s => saleMap[s.productId] = (saleMap[s.productId] || 0) + s.quantity);
 
     const report = items.map(product => {
       const pid = product.id;
-      const loadedQty = loads.filter(l => l.productId === pid).reduce((sum, l) => sum + l.quantity, 0);
-      const returnedQty = returns.filter(r => r.productId === pid).reduce((sum, r) => sum + r.quantity, 0);
-      const soldQty = sales.filter(s => s.productId === pid).reduce((sum, s) => sum + s.quantity, 0);
+      const loadedQty = loadMap[pid] || 0;
+      const returnedQty = returnMap[pid] || 0;
+      const soldQty = saleMap[pid] || 0;
       
       const expectedRemaining = loadedQty - soldQty;
-      const difference = expectedRemaining - returnedQty; // +ve means missed returning or lost; -ve means returned more (error)
+      const difference = expectedRemaining - returnedQty;
 
       return {
         product: product.name,
