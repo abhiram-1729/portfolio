@@ -28,7 +28,8 @@ export const createItem = async (req, res) => {
       image, 
       categoryId, 
       subCategoryId, 
-      brandId 
+      brandId,
+      gst
     } = req.body;
     
     // Handle image upload to Supabase if file is present
@@ -100,6 +101,7 @@ export const createItem = async (req, res) => {
       categoryId: finalCategoryId,
       subCategoryId: finalSubCategoryId,
       brandId: finalBrandId,
+      gst: parseNumber(gst) || 0,
     };
 
     const item = await prisma.product.create({
@@ -123,7 +125,8 @@ export const updateItem = async (req, res) => {
       landingPrice, 
       discount, 
       status, 
-      image 
+      image,
+      gst 
     } = req.body;
 
     // Handle image upload to Supabase if file is present
@@ -155,6 +158,7 @@ export const updateItem = async (req, res) => {
       discount: parseNumber(discount),
       status,
       image: imageUrl,
+      gst: parseNumber(gst),
     };
 
     const item = await prisma.product.update({

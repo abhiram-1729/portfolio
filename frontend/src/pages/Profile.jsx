@@ -20,11 +20,16 @@ export default function Profile() {
   return (
     <div className="min-h-screen bg-slate-50 animate-fade-in pb-[calc(var(--safe-bottom)+2rem)]">
       {/* Header */}
-      <div className="glass sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center gap-4 border-b border-emerald-100/50 max-w-lg mx-auto transition-all duration-300">
-        <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
-          <ArrowLeft size={22} strokeWidth={2.5} />
+      <div className="sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center justify-between bg-white border-b border-gray-100 max-w-lg mx-auto transition-all duration-300">
+        <div className="flex items-center gap-4">
+          <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
+            <ArrowLeft size={22} strokeWidth={2.5} />
+          </button>
+          <h1 className="text-xl font-black text-emerald-950 tracking-tight">Agent Profile</h1>
+        </div>
+        <button onClick={handleLogout} className="p-2.5 rounded-2xl hover:bg-orange-50 active:scale-90 transition-all bg-white shadow-sm border border-orange-100 text-orange-600">
+          <LogOut size={22} strokeWidth={2.5} />
         </button>
-        <h1 className="text-xl font-black text-emerald-950 tracking-tight">Agent Profile</h1>
       </div>
 
       <div className="max-w-lg mx-auto px-5 pt-6 space-y-6">

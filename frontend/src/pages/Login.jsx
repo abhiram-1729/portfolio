@@ -68,7 +68,7 @@ export default function Login() {
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-500/0 via-emerald-500/20 to-emerald-500/0" />
 
           <div className="mb-8">
-            <h2 className="text-2xl font-black text-emerald-900 text-center tracking-tight">Agent Sign In</h2>
+            <h2 className="text-2xl font-black text-emerald-900 text-center tracking-tight">Sign In</h2>
             <p className="text-center text-emerald-600/60 text-sm font-bold mt-1 uppercase tracking-wider">Access Secured</p>
           </div>
 

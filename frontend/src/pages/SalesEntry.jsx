@@ -18,7 +18,7 @@ export default function SalesEntry() {
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
   const { user } = useUserStore();
-  const { items, customerMobile, setCustomerMobile } = useCartStore();
+  const { items, customerMobile, setCustomerMobile, customerName, setCustomerName } = useCartStore();
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const searchRef = useRef(null);
@@ -33,7 +33,7 @@ export default function SalesEntry() {
       if (user?.assignedVehicleId) {
         params.vehicleId = user.assignedVehicleId;
       }
-      
+
       const { data } = await productsAPI.getAll(params);
       setProducts(data);
       setFiltered(data);
@@ -56,23 +56,40 @@ export default function SalesEntry() {
   return (
     <div className="min-h-screen pb-28">
       <Header />
-      
+
       {/* Sticky Combined Input Section */}
       <div className="sticky top-[56px] z-20 bg-slate-50/90 backdrop-blur-xl border-b border-emerald-100/30 pb-4 pt-4 shadow-sm">
         <div className="max-w-lg mx-auto px-5 space-y-4">
-          {/* Customer Mobile */}
-          <div className="glass rounded-[1.25rem] p-1 flex items-center gap-3 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all">
-            <div className="bg-emerald-50 p-2 rounded-xl text-emerald-500 ml-1">
-              <Smartphone size={20} strokeWidth={2.5} />
+          <div className="grid grid-cols-2 gap-3">
+            {/* Customer Name */}
+            <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
+                <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
+                    <Smartphone size={16} strokeWidth={2.5} />
+                </div>
+                <input
+                    id="customer-name"
+                    type="text"
+                    placeholder="Name (Optional)"
+                    value={customerName}
+                    onChange={(e) => setCustomerName(e.target.value)}
+                    className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
+                />
             </div>
-            <input
-              id="customer-mobile"
-              type="tel"
-              placeholder="Customer mobile (optional)"
-              value={customerMobile}
-              onChange={(e) => setCustomerMobile(e.target.value)}
-              className="flex-1 bg-transparent py-2.5 pr-4 outline-none text-emerald-950 text-[1.05rem] placeholder-slate-950/40 font-bold"
-            />
+
+            {/* Customer Mobile */}
+            <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
+                <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
+                    <Smartphone size={16} strokeWidth={2.5} />
+                </div>
+                <input
+                    id="customer-mobile"
+                    type="tel"
+                    placeholder="Mobile (Opt)"
+                    value={customerMobile}
+                    onChange={(e) => setCustomerMobile(e.target.value)}
+                    className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
+                />
+            </div>
           </div>
 
           {/* Search */}
@@ -99,29 +116,9 @@ export default function SalesEntry() {
       </div>
 
       <div className="max-w-lg mx-auto px-5 pt-2 space-y-5">
-
-        {/* Vehicle Context Badge */}
-        {user?.assignedVehicle && (
-          <div className="bg-emerald-600/5 border border-emerald-100 rounded-2xl p-4 flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-                <Truck size={20} strokeWidth={2.5} />
-              </div>
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-800/40 leading-none mb-1">Active Fleet Unit</span>
-                <span className="text-sm font-black text-emerald-950 tracking-tight leading-none">{user.assignedVehicle.vehicleNumber}</span>
-              </div>
-            </div>
-            <div className="flex flex-col items-end">
-              <span className="text-[9px] font-black uppercase text-emerald-600 leading-none mb-1">Operational</span>
-              <span className="text-[10px] font-bold text-gray-500 leading-none">{user.assignedVehicle.vehicleName || 'Standard'}</span>
-            </div>
-          </div>
-        )}
-
         {/* Product Grid */}
         <div className="pb-4">
-            <ProductGrid products={filtered} loading={loading} />
+          <ProductGrid products={filtered} loading={loading} />
         </div>
       </div>
 

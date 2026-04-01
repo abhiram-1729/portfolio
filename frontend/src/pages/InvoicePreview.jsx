@@ -3,7 +3,7 @@ import { useCartStore } from '../store/cartStore';
 import { ArrowLeft, ArrowRight, Package, Smartphone } from 'lucide-react';
 
 export default function InvoicePreview() {
-  const { items, customerMobile } = useCartStore();
+  const { items, customerMobile, customerName } = useCartStore();
   const navigate = useNavigate();
   const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const totalMRP = items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0);
@@ -17,7 +17,7 @@ export default function InvoicePreview() {
   return (
     <div className="min-h-screen bg-slate-50 animate-fade-in pb-[calc(var(--safe-bottom)+8rem)]">
       {/* Header */}
-      <div className="glass sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center gap-4 border-b border-emerald-100/50 max-w-lg mx-auto transition-all duration-300">
+      <div className="sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center gap-4 bg-white border-b border-gray-100 max-w-lg mx-auto transition-all duration-300">
         <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
           <ArrowLeft size={22} strokeWidth={2.5} />
         </button>
@@ -35,10 +35,25 @@ export default function InvoicePreview() {
             <div className="w-12 h-12 rounded-[1.25rem] bg-emerald-100 text-emerald-600 flex items-center justify-center shadow-sm">
                 <Smartphone size={22} strokeWidth={3} />
             </div>
-            <div>
-                <p className="font-black text-emerald-950 text-[1.1rem] leading-none">
-                    {customerMobile ? customerMobile : 'Walk-in Customer'}
-                </p>
+            <div className="flex-1">
+                <div className="flex flex-col">
+                  {customerName ? (
+                    <>
+                      <p className="font-black text-emerald-950 text-[1.1rem] leading-none capitalize mb-1">
+                          {customerName}
+                      </p>
+                      {customerMobile && (
+                        <p className="text-sm font-bold text-emerald-900/60 tracking-tight flex items-center gap-1">
+                          <Smartphone size={12} strokeWidth={3} /> {customerMobile}
+                        </p>
+                      )}
+                    </>
+                  ) : (
+                    <p className="font-black text-emerald-950 text-[1.1rem] leading-none">
+                        {customerMobile ? customerMobile : 'Walk-in Customer'}
+                    </p>
+                  )}
+                </div>
                 <p className="text-[10px] font-bold text-emerald-600/50 uppercase tracking-widest mt-1.5">Direct Sale</p>
             </div>
           </div>

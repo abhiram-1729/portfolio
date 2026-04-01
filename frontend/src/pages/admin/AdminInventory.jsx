@@ -24,6 +24,7 @@ export default function AdminInventory() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [stockQuantities, setStockQuantities] = useState({}); // { productId: quantity }
   const [vehicleInventory, setVehicleInventory] = useState([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -35,6 +36,7 @@ export default function AdminInventory() {
     categoryId: 'default',
     subCategoryId: 'default',
     brandId: 'default',
+    gst: '0',
   });
 
   const fetchData = async () => {
@@ -71,8 +73,17 @@ export default function AdminInventory() {
     }
   };
 
+  const calculateFinalPrice = (mrp, discount, gst) => {
+    const m = parseFloat(mrp) || 0;
+    const d = parseFloat(discount) || 0;
+    const g = parseFloat(gst) || 0;
+    const base = m - d;
+    return (base * (1 + g / 100)).toFixed(2);
+  };
+
   const handleCreateItem = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
       Object.keys(newItem).forEach(key => {
@@ -99,11 +110,15 @@ export default function AdminInventory() {
         discount: '',
         categoryId: 'default', 
         subCategoryId: 'default', 
-        brandId: 'default' 
+        brandId: 'default',
+        gst: '0'
       });
       fetchData();
     } catch (error) {
-      toast.error('Failed to add item');
+      console.error('Create item error:', error);
+      toast.error(error.response?.data?.message || 'Failed to add item');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -118,6 +133,7 @@ export default function AdminInventory() {
       discount: item.discount?.toString() || '',
       image: item.image || '',
       status: item.status || 'ACTIVE',
+      gst: item.gst?.toString() || '0',
     });
     setEditPreviewUrl(item.image || null);
     setShowEditItemModal(true);
@@ -125,6 +141,7 @@ export default function AdminInventory() {
 
   const handleUpdateItem = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       const formData = new FormData();
       Object.keys(editItem).forEach(key => {
@@ -145,7 +162,10 @@ export default function AdminInventory() {
       setEditPreviewUrl(null);
       fetchData();
     } catch (error) {
-      toast.error('Failed to update item');
+      console.error('Update item error:', error);
+      toast.error(error.response?.data?.message || 'Failed to update item');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -286,6 +306,10 @@ export default function AdminInventory() {
                   <div className="flex flex-col border-l border-gray-100 pl-3">
                     <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Lnd. Price</span>
                     <span className="text-[10px] text-slate-500 font-bold">₹{item.landingPrice || 0}</span>
+                  </div>
+                  <div className="flex flex-col border-l border-gray-100 pl-3">
+                    <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">GST</span>
+                    <span className="text-[10px] text-blue-600 font-bold">{item.gst || 0}%</span>
                   </div>
                 </div>
               </div>
@@ -547,7 +571,14 @@ export default function AdminInventory() {
                     placeholder="₹"
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
                     value={newItem.mrp}
-                    onChange={(e) => setNewItem({...newItem, mrp: e.target.value})}
+                    onChange={(e) => {
+                      const m = e.target.value;
+                      setNewItem({
+                        ...newItem, 
+                        mrp: m,
+                        price: calculateFinalPrice(m, newItem.discount, newItem.gst)
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -562,15 +593,34 @@ export default function AdminInventory() {
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
                     value={newItem.discount}
                     onChange={(e) => {
-                      const d = parseFloat(e.target.value) || 0;
-                      const m = parseFloat(newItem.mrp) || 0;
+                      const d = e.target.value;
                       setNewItem({
                         ...newItem, 
-                        discount: e.target.value,
-                        price: m > 0 ? (m - d).toString() : newItem.price
+                        discount: d,
+                        price: calculateFinalPrice(newItem.mrp, d, newItem.gst)
                       });
                     }}
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">GST Slab (%)</label>
+                  <select 
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none font-bold"
+                    value={newItem.gst}
+                    onChange={(e) => {
+                      const g = e.target.value;
+                      setNewItem({
+                        ...newItem, 
+                        gst: g,
+                        price: calculateFinalPrice(newItem.mrp, newItem.discount, g)
+                      });
+                    }}
+                  >
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>
@@ -597,9 +647,15 @@ export default function AdminInventory() {
 
               <button 
                 type="submit"
-                className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider"
+                disabled={isSubmitting}
+                className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Add to Master
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Adding...
+                  </>
+                ) : 'Add to Master'}
               </button>
             </form>
           </div>
@@ -685,7 +741,14 @@ export default function AdminInventory() {
                     placeholder="₹"
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
                     value={editItem.mrp}
-                    onChange={(e) => setEditItem({...editItem, mrp: e.target.value})}
+                    onChange={(e) => {
+                      const m = e.target.value;
+                      setEditItem({
+                        ...editItem, 
+                        mrp: m,
+                        price: calculateFinalPrice(m, editItem.discount, editItem.gst)
+                      });
+                    }}
                   />
                 </div>
               </div>
@@ -700,15 +763,34 @@ export default function AdminInventory() {
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20"
                     value={editItem.discount}
                     onChange={(e) => {
-                      const d = parseFloat(e.target.value) || 0;
-                      const m = parseFloat(editItem.mrp) || 0;
+                      const d = e.target.value;
                       setEditItem({
                         ...editItem, 
-                        discount: e.target.value,
-                        price: m > 0 ? (m - d).toString() : editItem.price
+                        discount: d,
+                        price: calculateFinalPrice(editItem.mrp, d, editItem.gst)
                       });
                     }}
                   />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">GST Slab (%)</label>
+                  <select 
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none font-bold"
+                    value={editItem.gst}
+                    onChange={(e) => {
+                      const g = e.target.value;
+                      setEditItem({
+                        ...editItem, 
+                        gst: g,
+                        price: calculateFinalPrice(editItem.mrp, editItem.discount, g)
+                      });
+                    }}
+                  >
+                    <option value="0">0%</option>
+                    <option value="5">5%</option>
+                    <option value="12">12%</option>
+                    <option value="18">18%</option>
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>
@@ -747,9 +829,15 @@ export default function AdminInventory() {
 
               <button 
                 type="submit"
-                className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider"
+                disabled={isSubmitting}
+                className="w-full bg-emerald-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                Save Changes
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Saving Changes...
+                  </>
+                ) : 'Save Changes'}
               </button>
             </form>
           </div>

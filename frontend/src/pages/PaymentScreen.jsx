@@ -15,7 +15,7 @@ const PAYMENT_MODES = [
 export default function PaymentScreen() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
-  const { items, customerMobile, clearCart } = useCartStore();
+  const { items, customerMobile, customerName, clearCart } = useCartStore();
   const { user } = useUserStore();
   const navigate = useNavigate();
   const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
@@ -41,6 +41,7 @@ export default function PaymentScreen() {
       // Step 1: Create order from cart
       const { data: order } = await ordersAPI.createFromCart({
         mobile: customerMobile || undefined,
+        customerName: customerName || undefined,
         items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
       });
 
@@ -62,7 +63,7 @@ export default function PaymentScreen() {
   return (
     <div className="min-h-screen bg-slate-50 animate-fade-in pb-[calc(var(--safe-bottom)+2rem)]">
       {/* Header with Safe Area */}
-      <div className="glass sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center gap-4 border-b border-emerald-100/50 max-w-lg mx-auto transition-all duration-300">
+      <div className="sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center gap-4 bg-white border-b border-gray-100 max-w-lg mx-auto transition-all duration-300">
         <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
           <ArrowLeft size={22} strokeWidth={2.5} />
         </button>
@@ -77,12 +78,19 @@ export default function PaymentScreen() {
           
           <p className="text-emerald-800/40 font-black uppercase tracking-[0.2em] text-[10px] mb-2 relative z-10">Payable Amount</p>
           <p className="text-[3.5rem] font-black text-emerald-950 tracking-tighter leading-none relative z-10">₹{totalAmount.toFixed(2)}</p>
-          {customerMobile && (
-            <div className="inline-flex items-center gap-2 mt-6 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100 relative z-10">
-                <Smartphone size={14} className="text-emerald-500" />
-                <span className="text-sm font-black text-emerald-900">{customerMobile}</span>
-            </div>
-          )}
+          <div className="flex flex-wrap justify-center gap-2 mt-6 relative z-10">
+            {customerName && (
+              <div className="inline-flex items-center gap-2 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100">
+                  <span className="text-sm font-black text-emerald-900 capitalize">{customerName}</span>
+              </div>
+            )}
+            {customerMobile && (
+              <div className="inline-flex items-center gap-2 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100">
+                  <Smartphone size={14} className="text-emerald-500" />
+                  <span className="text-sm font-black text-emerald-900">{customerMobile}</span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Payment Options Grid */}

@@ -16,7 +16,7 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-40 glass border-b border-white/60 pt-[calc(var(--safe-top)+0.5rem)] pb-2 transition-all duration-300">
+    <header className="sticky top-0 z-40 bg-white border-b border-gray-100 pt-[calc(var(--safe-top)+0.5rem)] pb-2 transition-all duration-300">
       <div className="max-w-lg mx-auto px-5 flex items-center justify-between">
         <Link to="/" className="flex items-center gap-3 group">
           <div className="relative">
@@ -45,18 +45,18 @@ export default function Header() {
               <LayoutDashboard size={20} strokeWidth={2.5} />
             </Link>
           )}
-          <Link to="/reports" className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all text-emerald-700 bg-white/40 backdrop-blur-sm shadow-sm border border-white/60">
+          <Link to="/reports" className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all text-emerald-700 bg-white shadow-sm border border-gray-100">
             <BarChart size={20} strokeWidth={2.5} />
           </Link>
-          <Link to="/profile" className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all text-emerald-700 bg-white/40 backdrop-blur-sm shadow-sm border border-white/60">
+          <Link to="/profile" className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all text-emerald-700 bg-white shadow-sm border border-gray-100">
             <User size={20} strokeWidth={2.5} />
           </Link>
-          <button
+          {/* <button
             onClick={handleLogout}
-            className="p-2.5 rounded-2xl hover:bg-orange-50 active:scale-90 transition-all text-orange-600 bg-white/40 backdrop-blur-sm shadow-sm border border-white/60"
+            className="p-2.5 rounded-2xl hover:bg-orange-50 active:scale-90 transition-all text-orange-600 bg-white shadow-sm border border-gray-100"
           >
             <LogOut size={20} strokeWidth={2.5} />
-          </button>
+          </button> */}
         </div>
       </div>
     </header>

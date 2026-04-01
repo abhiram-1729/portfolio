@@ -14,6 +14,7 @@ export default function AdminUsers() {
     mobile: '',
     role: 'SALES_AGENT',
   });
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchUsers = async () => {
     try {
@@ -32,6 +33,7 @@ export default function AdminUsers() {
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
+    setIsSubmitting(true);
     try {
       await adminAPI.createUser(newUser);
       toast.success('User created successfully');
@@ -40,6 +42,8 @@ export default function AdminUsers() {
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create user');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -227,9 +231,15 @@ export default function AdminUsers() {
 
               <button 
                 type="submit"
-                className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 active:scale-[0.98] transition-all text-sm"
+                disabled={isSubmitting}
+                className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
               >
-                Confirm Membership
+                {isSubmitting ? (
+                  <>
+                    <Loader2 size={16} className="animate-spin" />
+                    Processing...
+                  </>
+                ) : 'Confirm Membership'}
               </button>
             </form>
           </div>

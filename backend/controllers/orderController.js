@@ -5,7 +5,7 @@ import prisma from '../utils/prisma.js';
 // @access  Private
 export const createOrderFromCart = async (req, res, next) => {
     try {
-        const { mobile, items } = req.body;
+        const { mobile, customerName, items } = req.body;
         const agentId = req.user.id;
 
         let cartItems = [];
@@ -28,14 +28,22 @@ export const createOrderFromCart = async (req, res, next) => {
             cartId = cart.id;
         }
 
-        // 2. Fetch product details and calculate totals
+        // 2. Bulk fetch product details and calculate totals
+        const productIds = cartItems.map((i) => i.productId);
+        const products = await prisma.product.findMany({
+            where: { id: { in: productIds } },
+        });
+
+        const productMap = products.reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+        }, {});
+
         let totalAmount = 0;
         const orderItemsData = [];
 
         for (const item of cartItems) {
-            const product = await prisma.product.findUnique({
-                where: { id: item.productId },
-            });
+            const product = productMap[item.productId];
 
             if (!product) {
                 res.status(400);
@@ -52,6 +60,7 @@ export const createOrderFromCart = async (req, res, next) => {
                 mrp: product.mrp,
                 discount: product.discount,
                 landingPrice: product.landingPrice,
+                gst: product.gst || 0,
             });
         }
 
@@ -65,6 +74,7 @@ export const createOrderFromCart = async (req, res, next) => {
                     totalAmount,
                     status: 'PENDING',
                     mobile: mobile || null,
+                    customerName: customerName || null,
                     items: {
                         create: orderItemsData,
                     },
@@ -180,16 +190,22 @@ export const getOrderById = async (req, res, next) => {
             throw new Error('Order not found');
         }
 
-        // Enrich items with product details
-        const enrichedItems = await Promise.all(
-            order.items.map(async (item) => {
-                const product = await prisma.product.findUnique({
-                    where: { id: item.productId },
-                    select: { name: true, image: true },
-                });
-                return { ...item, product };
-            })
-        );
+        // Bulk enrich items with product details
+        const enrichedProductIds = order.items.map((i) => i.productId);
+        const enrichedProducts = await prisma.product.findMany({
+            where: { id: { in: enrichedProductIds } },
+            select: { id: true, name: true, image: true },
+        });
+
+        const enrichedProductMap = enrichedProducts.reduce((acc, p) => {
+            acc[p.id] = p;
+            return acc;
+        }, {});
+
+        const enrichedItems = order.items.map((item) => ({
+            ...item,
+            product: enrichedProductMap[item.productId] || null,
+        }));
 
         res.json({ ...order, items: enrichedItems });
     } catch (error) {

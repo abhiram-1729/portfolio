@@ -6,8 +6,10 @@ export const useCartStore = create(
     (set, get) => ({
       items: [], // { productId, name, price, quantity, image }
       customerMobile: '',
+      customerName: '',
 
       setCustomerMobile: (mobile) => set({ customerMobile: mobile }),
+      setCustomerName: (name) => set({ customerName: name }),
 
       addItem: (product, quantity = 1) => {
         const items = get().items;
@@ -54,7 +56,7 @@ export const useCartStore = create(
         });
       },
 
-      clearCart: () => set({ items: [], customerMobile: '' }),
+      clearCart: () => set({ items: [], customerName: '', customerMobile: '' }),
 
       get totalItems() {
         return get().items.reduce((sum, i) => sum + i.quantity, 0);

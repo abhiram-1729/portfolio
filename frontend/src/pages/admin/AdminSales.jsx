@@ -90,7 +90,8 @@ export default function AdminSales() {
             .filter(s => {
               const query = searchQuery.toLowerCase();
               const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
-              return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery));
+              const customerName = s.customerName ? s.customerName.toLowerCase() : '';
+              return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery)) || customerName.includes(query);
             })
             .map((sale) => (
               <div key={sale.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
@@ -100,11 +101,18 @@ export default function AdminSales() {
                       <ShoppingCart size={20} />
                     </div>
                     <div>
-                      <h3 className="text-sm font-bold text-gray-900 uppercase">
-                        {sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6) || Math.floor(Math.random() * 100000)}`}
-                      </h3>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-gray-900 uppercase">
+                          {sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6) || Math.floor(Math.random() * 100000)}`}
+                        </h3>
+                        {sale.customerName && (
+                          <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-black uppercase tracking-tight">
+                            {sale.customerName}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[10px] text-gray-400 font-bold uppercase">
-                        {new Date(sale.createdAt).toLocaleString()}
+                        {sale.mobile ? `${sale.mobile} • ` : ''}{new Date(sale.createdAt).toLocaleString()}
                       </span>
                     </div>
                   </div>

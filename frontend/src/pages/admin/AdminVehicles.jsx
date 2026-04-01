@@ -75,6 +75,7 @@ export default function AdminVehicles() {
   };
 
   const handleAssignDriver = async (userId) => {
+    setIsSubmitting(true);
     try {
       await adminAPI.assignDriver(selectedVehicle.id, userId);
       toast.success('Driver assigned successfully');
@@ -83,6 +84,8 @@ export default function AdminVehicles() {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to assign driver');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -330,19 +333,20 @@ export default function AdminVehicles() {
               {users.map(user => (
                 <button
                   key={user.id}
+                  disabled={isSubmitting}
                   onClick={() => handleAssignDriver(user.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group"
+                  className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50"
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
-                      <User size={20} />
+                      {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="font-bold text-gray-900 text-sm">{user.name}</span>
                       <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
                     </div>
                   </div>
-                  <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
+                  {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
                 </button>
               ))}
             </div>

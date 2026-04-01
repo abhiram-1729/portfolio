@@ -172,15 +172,21 @@ export default function SuccessScreen() {
     pdf.setFont('helvetica', 'bold');
     pdf.text(paymentLabel, pageWidth - margin, y + 6, { align: 'right' });
 
-    if (order.mobile) {
+    if (order.customerName || order.mobile) {
       pdf.setTextColor(...grayText);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('CUSTOMER MOBILE', pageWidth - margin, y + 16, { align: 'right' });
+      pdf.text('BILL TO / CUSTOMER', pageWidth - margin, y + 16, { align: 'right' });
       pdf.setTextColor(...darkText);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
-      pdf.text(order.mobile, pageWidth - margin, y + 22, { align: 'right' });
+      let customerInfo = '';
+      if (order.customerName && order.mobile) {
+        customerInfo = `${order.customerName.toUpperCase()} (${order.mobile})`;
+      } else {
+        customerInfo = order.customerName ? order.customerName.toUpperCase() : order.mobile;
+      }
+      pdf.text(customerInfo, pageWidth - margin, y + 22, { align: 'right' });
     }
 
     y += 34;
@@ -196,10 +202,11 @@ export default function SuccessScreen() {
     // ══════════════════════════════════════
     const colX = {
       sno: margin,
-      item: margin + 12,
-      qty: margin + contentWidth * 0.45,
-      mrp: margin + contentWidth * 0.58,
-      price: margin + contentWidth * 0.72,
+      item: margin + 10,
+      qty: margin + contentWidth * 0.40,
+      gst: margin + contentWidth * 0.52,
+      mrp: margin + contentWidth * 0.62,
+      price: margin + contentWidth * 0.74,
       amount: pageWidth - margin,
     };
 
@@ -212,6 +219,7 @@ export default function SuccessScreen() {
     pdf.text('S.NO', colX.sno, y + 2);
     pdf.text('ITEM DESCRIPTION', colX.item, y + 2);
     pdf.text('QTY', colX.qty, y + 2);
+    pdf.text('GST%', colX.gst, y + 2);
     pdf.text('MRP', colX.mrp, y + 2);
     pdf.text('OFFER', colX.price, y + 2);
     pdf.text('AMOUNT', colX.amount, y + 2, { align: 'right' });
@@ -225,6 +233,7 @@ export default function SuccessScreen() {
       const price = item.price || 0;
       const mrpValue = item.mrp || price;
       const amount = qty * price;
+      const gstRate = item.gst || 0;
 
       if (index % 2 === 0) {
         pdf.setFillColor(255, 255, 255);
@@ -235,7 +244,7 @@ export default function SuccessScreen() {
 
       pdf.setTextColor(...darkText);
       pdf.setFontSize(9);
-      pdf.setFont('helvetica', 'normal');
+      pdf.setFont('helvetica', 'bold');
       pdf.text(`${index + 1}`, colX.sno, y + 1);
 
       const maxNameWidth = colX.qty - colX.item - 5;
@@ -246,6 +255,7 @@ export default function SuccessScreen() {
       pdf.text(displayName, colX.item, y + 1);
 
       pdf.text(`${qty}`, colX.qty, y + 1);
+      pdf.text(`${gstRate}%`, colX.gst, y + 1);
 
       pdf.setTextColor(...grayText);
       pdf.setFontSize(7);
@@ -290,23 +300,48 @@ export default function SuccessScreen() {
 
     pdf.setTextColor(...grayText);
     pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
+    pdf.setFont('helvetica', 'bold');
     pdf.text('Subtotal (MRP)', totalsX, rightY);
     pdf.setTextColor(...darkText);
     pdf.text(`Rs.${subTotalMRP.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
     rightY += 7;
 
     if (savings > 0) {
+      // Highlighted Savings Section
+      pdf.setFillColor(255, 247, 237); // Light orange background
+      pdf.roundedRect(totalsX - 3, rightY - 5, (pageWidth - margin) - totalsX + 6, 9, 1, 1, 'F');
+      
       pdf.setTextColor(...orangeAccent);
-      pdf.text('Instant Savings', totalsX, rightY);
-      pdf.text(`- Rs.${savings.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
-      rightY += 7;
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('TOTAL SAVINGS', totalsX, rightY + 1.5);
+      pdf.setFontSize(11);
+      pdf.text(`- Rs.${savings.toFixed(2)}`, colX.amount, rightY + 1.5, { align: 'right' });
+      rightY += 9;
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'normal');
     }
 
     pdf.setTextColor(...grayText);
-    pdf.text('Tax (Inclusive)', totalsX, rightY);
+    const totalTax = order.items?.reduce((sum, item) => {
+        const rate = item.gst || 0;
+        if (rate === 0) return sum;
+        const taxable = (item.price * item.quantity) / (1 + rate / 100);
+        return sum + ((item.price * item.quantity) - taxable);
+    }, 0) || 0;
+
+    pdf.setTextColor(...grayText);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Taxable Value', totalsX, rightY);
     pdf.setTextColor(...darkText);
-    pdf.text('Rs.0.00', colX.amount, rightY, { align: 'right' });
+    pdf.text(`Rs.${(order.totalAmount - totalTax).toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    rightY += 7;
+
+    pdf.setTextColor(...grayText);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`CGST / SGST (Included)`, totalsX, rightY);
+    pdf.setTextColor(...darkText);
+    pdf.text(`Rs.${(totalTax / 2).toFixed(2)} x 2`, colX.amount, rightY, { align: 'right' });
     rightY += 4;
 
     pdf.setDrawColor(...lightLine);
@@ -420,64 +455,104 @@ export default function SuccessScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 relative overflow-hidden">
+    <div className="h-screen bg-slate-50 flex flex-col items-center justify-center p-4 relative overflow-hidden">
       {/* Immersive Background Effects */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-emerald-500/10 blur-[100px] animate-pulse" />
         <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-orange-500/10 blur-[80px]" />
       </div>
 
-      <div className="z-10 max-w-sm w-full space-y-8 animate-slide-up">
+      <div className="z-10 max-w-sm w-full space-y-4 animate-slide-up flex flex-col items-center">
         {/* Success Icon */}
-        <div className="flex flex-col items-center justify-center">
-          <div className="w-28 h-28 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-6 border-4 border-white relative">
-            <CheckCircle size={56} className="text-white drop-shadow-md relative z-10" strokeWidth={2.5} />
+        <div className="flex flex-col items-center justify-center shrink-0">
+          <div className="w-20 h-20 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center shadow-2xl shadow-emerald-500/30 mb-3 border-4 border-white relative">
+            <CheckCircle size={40} className="text-white drop-shadow-md relative z-10" strokeWidth={2.5} />
             <div className="absolute inset-0 bg-white/20 blur-xl rounded-full scale-125 animate-pulse" />
           </div>
           <div className="text-center">
-            <h1 className="text-3xl font-black text-emerald-950 tracking-tight">Payment Successful!</h1>
-            <p className="text-emerald-600 font-bold uppercase tracking-widest text-[0.7rem] mt-2 opacity-60">Verified & Synchronized</p>
+            <h1 className="text-2xl font-black text-emerald-950 tracking-tight">Payment Successful!</h1>
           </div>
         </div>
 
         {/* Order Details */}
         {order ? (
-          <div className="glass rounded-[2.5rem] p-8 shadow-2xl shadow-emerald-900/5 border border-white/80 bg-white/70 space-y-6">
-            <div className="flex justify-between items-center pb-4 border-b border-emerald-100/50">
+          <div className="glass rounded-[2rem] p-5 shadow-2xl shadow-emerald-900/5 border border-white/80 bg-white/70 space-y-3 w-full">
+            <div className="flex justify-between items-center pb-2 border-b border-emerald-100/50">
               <span className="text-[10px] font-black text-emerald-800/40 uppercase tracking-widest">Transaction ID</span>
-              <span className="font-mono font-black text-emerald-900 text-[0.9rem] bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-100">#VK-{getInvoiceNumber(order)}</span>
+              <span className="font-mono font-black text-emerald-900 text-[0.8rem] bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">#VK-{getInvoiceNumber(order)}</span>
             </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-black text-emerald-800/40 uppercase tracking-widest">Order Amount</span>
-                <span className="font-black text-3xl text-emerald-950 tracking-tighter">₹{order.totalAmount?.toFixed(2)}</span>
+            <div className="space-y-3">
+              <div className="flex justify-between items-center px-1">
+                <span className="text-[10px] font-black text-emerald-800/40 uppercase tracking-widest">Order Amount</span>
+                <span className="font-black text-2xl text-emerald-950 tracking-tighter">₹{order.totalAmount?.toFixed(2)}</span>
               </div>
-              <div className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-2xl border border-emerald-50">
-                <span className="text-xs font-black text-emerald-800/50 uppercase tracking-widest ml-1">Payment</span>
-                <div className="flex items-center gap-2 font-black text-emerald-900 bg-white border border-emerald-100 px-3 py-1.5 rounded-xl text-xs shadow-sm shadow-emerald-900/5">
+              <div className="flex items-center justify-between p-2 bg-emerald-50/50 rounded-xl border border-emerald-50/50">
+                <span className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">Payment</span>
+                <div className="flex items-center gap-2 font-black text-emerald-900 bg-white border border-emerald-100 px-2 py-1 rounded-lg text-[10px] shadow-sm shadow-emerald-900/5">
                   {getPaymentIcon(order.paymentMode)}
                   <span className="capitalize">{order.paymentMode?.toLowerCase()}</span>
                 </div>
               </div>
               {order.items?.some(i => i.mrp > i.price) && (
-                <div className="flex justify-between items-center bg-orange-50/50 p-3 rounded-2xl border border-orange-100/50">
-                  <span className="text-xs font-black text-orange-600 uppercase tracking-widest ml-1">Total Savings</span>
-                  <span className="font-black text-lg text-orange-600 tracking-tight">₹{(order.items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - order.totalAmount).toFixed(2)}</span>
-                </div>
-              )}
-              {order.mobile && (
-                <div className="flex justify-between items-center px-1">
-                  <span className="text-xs font-black text-emerald-800/40 uppercase tracking-widest">Customer</span>
-                  <div className="flex items-center gap-2 font-black text-emerald-900">
-                    <Smartphone size={16} className="text-emerald-400" />
-                    <span>{order.mobile}</span>
+                <div className="relative overflow-hidden bg-gradient-to-br from-emerald-500 to-teal-600 p-3 rounded-2xl shadow-xl shadow-emerald-500/10 border border-emerald-400 group">
+                  <div className="absolute top-0 right-0 p-2 opacity-10 transform translate-x-1 -translate-y-1">
+                    <CheckCircle size={40} strokeWidth={1} />
+                  </div>
+                  <div className="relative z-10 flex items-center justify-between px-1">
+                    <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-white/70 uppercase tracking-[0.2em]">Extra Benefit</span>
+                        <h3 className="text-white font-black text-[10px] uppercase tracking-widest opacity-90">Total Savings</h3>
+                    </div>
+                    <div className="flex items-baseline gap-0.5">
+                      <span className="text-white text-xs font-bold">₹</span>
+                      <span className="text-2xl font-black text-white tracking-tighter">
+                        {(order.items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - order.totalAmount).toFixed(2)}
+                      </span>
+                    </div>
                   </div>
                 </div>
               )}
+              {(() => {
+                const totalTax = order.items?.reduce((sum, item) => {
+                    const rate = item.gst || 0;
+                    if (rate === 0) return sum;
+                    const taxable = (item.price * item.quantity) / (1 + rate / 100);
+                    return sum + ((item.price * item.quantity) - taxable);
+                }, 0) || 0;
+                
+                if (totalTax > 0) {
+                    return (
+                        <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100/30">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Incl.)</span>
+                                <span className="text-[7px] font-bold text-blue-400 uppercase tracking-widest ml-1">CGST: ₹{(totalTax/2).toFixed(2)} | SGST: ₹{(totalTax/2).toFixed(2)}</span>
+                            </div>
+                            <span className="font-black text-base text-blue-600 tracking-tight">₹{totalTax.toFixed(2)}</span>
+                        </div>
+                    );
+                }
+                return null;
+              })()}
+              {/* {(order.customerName || order.mobile) && (
+                <div className="flex justify-between items-center px-1">
+                  <span className="text-xs font-black text-emerald-800/40 uppercase tracking-widest">Customer</span>
+                  <div className="flex flex-col items-end gap-1 font-black text-emerald-900">
+                    <div className="flex items-center gap-2">
+                        {order.customerName && <span className="capitalize">{order.customerName}</span>}
+                        {order.mobile && (
+                            <>
+                                <Smartphone size={14} className="text-emerald-400" />
+                                <span>{order.mobile}</span>
+                            </>
+                        )}
+                    </div>
+                  </div>
+                </div>
+              )} */}
             </div>
 
-            <div className="pt-4 border-t border-emerald-100/50 text-[10px] font-black text-emerald-800/30 text-center uppercase tracking-widest">
+            <div className="pt-2 border-t border-emerald-100/50 text-[9px] font-black text-emerald-800/30 text-center uppercase tracking-widest">
               {new Date(order.createdAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
             </div>
           </div>
@@ -488,32 +563,34 @@ export default function SuccessScreen() {
         )}
 
         {/* Actions */}
-        <div className="flex flex-col gap-4 pt-4">
+        <div className="flex flex-col gap-3 pt-2 w-full">
           {order && (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-3">
               <button
                 onClick={handleShare}
-                className="w-full bg-white text-emerald-700 font-black text-sm sm:text-lg py-4 rounded-[1.75rem] active:scale-[0.98] transition-all shadow-xl shadow-emerald-900/5 border border-emerald-100 hover:bg-emerald-50 flex items-center justify-center gap-2"
+                className="w-full bg-white text-emerald-700 font-black text-sm py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-emerald-900/5 border border-emerald-100 hover:bg-emerald-50 flex items-center justify-center gap-2"
               >
-                <Share2 size={20} strokeWidth={3} /> Share
+                <Share2 size={18} strokeWidth={3} />
+                <span>Share</span>
               </button>
               <button
                 onClick={handleDownloadPDF}
                 disabled={isDownloading}
-                className="w-full bg-white text-emerald-700 font-black text-sm sm:text-lg py-4 rounded-[1.75rem] active:scale-[0.98] transition-all shadow-xl shadow-emerald-900/5 border border-emerald-100 hover:bg-emerald-50 flex items-center justify-center gap-2 disabled:opacity-50 flex-col sm:flex-row"
+                className="w-full bg-white text-emerald-700 font-black text-sm py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-emerald-900/5 border border-emerald-100 hover:bg-emerald-50 flex items-center justify-center gap-2 disabled:opacity-50"
               >
-                <Download size={20} strokeWidth={3} /> {isDownloading ? 'Saving...' : 'PDF'}
+                <Download size={18} strokeWidth={3} />
+                <span>{isDownloading ? 'Saving...' : 'PDF'}</span>
               </button>
             </div>
           )}
           <button
             id="new-sale-btn"
             onClick={() => navigate('/')}
-            className="w-full bg-emerald-600 text-white font-black text-lg py-5 rounded-[1.75rem] active:scale-[0.98] transition-all shadow-2xl shadow-emerald-600/30 flex items-center justify-center gap-3 relative overflow-hidden group"
+            className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl active:scale-[0.98] transition-all shadow-2xl shadow-emerald-600/30 flex items-center justify-center gap-2 relative overflow-hidden group"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            <span className="relative z-10 flex items-center gap-3 uppercase text-xs tracking-[0.2em]">
-              <Home size={18} strokeWidth={3} /> Process New Sale
+            <Home size={18} strokeWidth={3} className="relative z-10" />
+            <span className="relative z-10 uppercase text-[10px] tracking-[0.2em] font-black">
+              Process New Sale
             </span>
           </button>
         </div>
