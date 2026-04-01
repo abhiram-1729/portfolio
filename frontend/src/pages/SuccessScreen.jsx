@@ -412,33 +412,43 @@ export default function SuccessScreen() {
       const pdf = await generateInvoicePDF(order);
       if (!pdf) return;
 
-      const pdfBlob = pdf.output('blob');
-      const file = new File([pdfBlob], `Invoice_VK-${invoiceNo}.pdf`, { type: 'application/pdf' });
+      // 1. If mobile exists, redirect to WhatsApp directly
+      if (order.mobile) {
+        // PDF cannot be sent via link, so we download it and redirect
+        pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
+        
+        const phone = String(order.mobile).replace(/\D/g, '');
+        const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
+        const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(text)}`;
+        
+        window.open(whatsappUrl, '_blank');
+        toast.success('Opening WhatsApp & Downloading PDF...');
+      } 
+      // 2. Otherwise, use standard share sheet
+      else {
+        const pdfBlob = pdf.output('blob');
+        const file = new File([pdfBlob], `Invoice_VK-${invoiceNo}.pdf`, { type: 'application/pdf' });
 
-      // Check if browser supports sharing files (Available on most mobile browsers)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: 'VillagKart Invoice',
-          text: text,
-        });
-      } else if (navigator.share) {
-        // Fallback to text-only share if files aren't supported
-        await navigator.share({ text });
-        pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
-        toast.success('Text shared & PDF downloaded!');
-      } else {
-        // Ultimate fallback
-        pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
-        await navigator.clipboard.writeText(text);
-        toast.success('Invoice copied & downloaded!');
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'VillagKart Invoice',
+            text: text,
+          });
+        } else if (navigator.share) {
+          await navigator.share({ text });
+          pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
+          toast.success('Text shared & PDF downloaded!');
+        } else {
+          pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
+          await navigator.clipboard.writeText(text);
+          toast.success('Invoice copied & downloaded!');
+        }
       }
     } catch (err) {
       console.error('Share error:', err);
-      // Fail gracefully
       toast.error('Could not share document');
-      // Still allow text share if basic share works
-      if (navigator.share) navigator.share({ text });
+      if (navigator.share && !order.mobile) navigator.share({ text });
     } finally {
       setIsDownloading(false);
     }
