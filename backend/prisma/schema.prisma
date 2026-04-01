@@ -53,6 +53,8 @@ model User {
 
   orders Order[]
   carts  Cart[]
+  openingCash OpeningCash[]
+  closingCash ClosingCash[]
 }
 
 model Category {
@@ -200,6 +202,9 @@ model Vehicle {
   stocks        VehicleStock[]
   transactions  StockTransaction[]
   orders        Order[]
+  openingCash OpeningCash[]
+  closingCash ClosingCash[]
+  dailySummaries DailyCashSummary[]
 }
 
 model VehicleStock {
@@ -222,4 +227,55 @@ model StockTransaction {
   productId String
   product   Product         @relation(fields: [productId], references: [id])
   quantity  Int
+}
+
+model OpeningCash {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  date             String   // YYYY-MM-DD
+  denominations    Json     // Counts of 500, 200, 100, 50, 20, 10
+  totalOpeningCash Float
+  status           String   @default("SUBMITTED")
+  createdAt        DateTime @default(now())
+
+  @@unique([vehicleId, date])
+}
+
+model ClosingCash {
+  id            String   @id @default(cuid())
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  date          String   // YYYY-MM-DD
+  openingCash   Float
+  cashSales     Float
+  expectedCash  Float
+  actualCash    Float
+  difference    Float
+  denominations Json     // Counts of 500, 200, 100, 50, 20, 10
+  remark        String?
+  status        String   @default("SUBMITTED")
+  createdAt     DateTime @default(now())
+
+  @@unique([vehicleId, date])
+}
+
+model DailyCashSummary {
+  id           String   @id @default(cuid())
+  vehicleId    String
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+  date         String   // YYYY-MM-DD
+  openingCash  Float    @default(0)
+  cashSales    Float    @default(0)
+  expectedCash Float    @default(0)
+  actualCash   Float    @default(0)
+  difference   Float    @default(0)
+  status       String   @default("PENDING") // MATCHED, MISMATCHED, PENDING
+  updatedAt    DateTime @updatedAt
+
+  @@unique([vehicleId, date])
 }

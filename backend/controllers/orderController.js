@@ -149,6 +149,9 @@ export const completePayment = async (req, res, next) => {
             }
 
             return updated;
+        }, {
+            maxWait: 10000,
+            timeout: 15000,
         });
 
         res.json(updatedOrder);

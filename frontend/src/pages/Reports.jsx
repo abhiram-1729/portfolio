@@ -53,7 +53,7 @@ export default function Reports() {
     <div className="min-h-screen bg-slate-50 animate-fade-in pb-[calc(var(--safe-bottom)+2rem)]">
       {/* Header */}
       <div className="glass sticky top-0 z-40 px-5 pt-[calc(var(--safe-top)+0.5rem)] pb-3 flex items-center gap-4 border-b border-emerald-100/50 max-w-lg mx-auto transition-all duration-300">
-        <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
+        <button onClick={() => navigate('/')} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
           <ArrowLeft size={22} strokeWidth={2.5} />
         </button>
         <div>

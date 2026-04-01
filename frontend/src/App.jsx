@@ -8,6 +8,8 @@ import PaymentScreen from './pages/PaymentScreen';
 import SuccessScreen from './pages/SuccessScreen';
 import Reports from './pages/Reports';
 import Profile from './pages/Profile';
+import OpeningCashEntry from './pages/OpeningCashEntry';
+import ClosingCashEntry from './pages/ClosingCashEntry';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -15,6 +17,7 @@ import AdminVehicles from './pages/admin/AdminVehicles';
 import AdminInventory from './pages/admin/AdminInventory';
 import AdminSales from './pages/admin/AdminSales';
 import AdminReports from './pages/admin/AdminReports';
+import AdminCashManagement from './pages/admin/AdminCashManagement';
 import AdminSettings from './pages/admin/AdminSettings';
 
 function PrivateRoute({ children }) {
@@ -51,6 +54,8 @@ export default function App() {
         <Route path="/success/:id" element={<PrivateRoute><SuccessScreen /></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/opening-cash" element={<PrivateRoute><OpeningCashEntry /></PrivateRoute>} />
+        <Route path="/closing-cash" element={<PrivateRoute><ClosingCashEntry /></PrivateRoute>} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
@@ -60,6 +65,7 @@ export default function App() {
           <Route path="inventory" element={<AdminInventory />} />
           <Route path="sales" element={<AdminSales />} />
           <Route path="reports" element={<AdminReports />} />
+          <Route path="cash" element={<AdminCashManagement />} />
           <Route path="settings" element={<AdminSettings />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

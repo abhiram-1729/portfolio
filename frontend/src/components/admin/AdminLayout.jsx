@@ -10,7 +10,8 @@ import {
   LogOut,
   Menu,
   X,
-  ShoppingCart
+  ShoppingCart,
+  Coins
 } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
 import { clsx } from 'clsx';
@@ -38,6 +39,7 @@ export default function AdminLayout() {
     { to: '/admin/inventory', icon: Package, label: 'Inventory' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
+    { to: '/admin/cash', icon: Coins, label: 'Cash Management' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 

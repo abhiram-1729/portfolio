@@ -6,7 +6,9 @@ import { useCartStore } from '../store/cartStore';
 import Header from '../components/Header';
 import ProductGrid from '../components/ProductGrid';
 import CartDrawer from '../components/CartDrawer';
+import { getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
+import { useNavigate } from 'react-router-dom';
 
 // Cache products after first load
 let productCache = null;
@@ -22,10 +24,34 @@ export default function SalesEntry() {
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const searchRef = useRef(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
+    if (user) {
+      checkCashStatus();
+    }
     loadProducts();
-  }, []);
+  }, [user]);
+
+  const checkCashStatus = async () => {
+    if (user?.role !== 'SALES_AGENT') return;
+    
+    try {
+      const status = await getCashStatus();
+      console.log('Cash Status Response:', status);
+      if (status.vehicleAssigned === false) {
+        toast.error('No vehicle assigned to your profile');
+        return;
+      }
+      if (!status.openingSubmitted) {
+        console.log('Redirecting to opening-cash');
+        navigate('/opening-cash', { replace: true });
+      }
+    } catch (err) {
+      console.error('Error checking cash status:', err);
+      toast.error('Failed to verify cash status');
+    }
+  };
 
   const loadProducts = async () => {
     if (productCache) {
