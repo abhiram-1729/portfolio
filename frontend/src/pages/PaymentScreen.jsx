@@ -121,7 +121,7 @@ export default function PaymentScreen() {
             disabled={!selected || loading}
             className={`w-full font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative overflow-hidden group ${
                 !selected || loading 
-                ? 'bg-emerald-50 text-emerald-200 cursor-not-allowed shadow-none border border-emerald-100'
+                ? 'bg-emerald-500 text-white/90 cursor-not-allowed opacity-70 shadow-none border border-emerald-400'
                 : 'bg-emerald-600 text-white shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700'
             }`}
             >
