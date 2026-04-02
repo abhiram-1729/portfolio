@@ -314,7 +314,12 @@ export default function AdminInventory() {
                 )}
               </div>
               <div className="flex flex-col">
-                <h3 className="text-sm font-bold text-gray-900">{item.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-bold text-gray-900">{item.name}</h3>
+                  {item.isFree && (
+                    <span className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Promotional Gift</span>
+                  )}
+                </div>
                 <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{item.category?.name || 'Uncategorized'}</span>
                 <div className="flex items-center gap-3 mt-1 flex-wrap">
                   <div className="flex flex-col">

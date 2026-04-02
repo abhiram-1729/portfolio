@@ -15,12 +15,13 @@ const calculateTotals = (items) => {
   // --- DEBUG LOGS FOR USER TO COPY ---
   console.log('--- [DEBUG] CART SNAPSHOT ---');
   console.table(items.map(i => ({
+    id: i.productId,
     name: i.name,
     qty: i.quantity,
     price: i.price,
     isFree: i.isFree,
     min: i.minShopAmount,
-    contributesToSubtotal: !(i.isFree === true || i.isFree === 'true')
+    contributes: !(i.isFree === true || i.isFree === 'true')
   })));
   console.log(`[DEBUG] Subtotal (Calculated): ₹${subtotal}`);
 

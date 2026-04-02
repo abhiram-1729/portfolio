@@ -30,7 +30,7 @@ export default function ProductCard({ product }) {
             <div className={`flex items-center gap-1 px-2 py-1 rounded-lg backdrop-blur-md border shadow-lg ${isCurrentlyFree ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-orange-500 text-white border-orange-400'}`}>
               <Gift size={12} strokeWidth={3} />
               <span className="text-[10px] font-black uppercase tracking-tight">
-                {isCurrentlyFree ? 'READY TO CLAIM' : 'FREE GIFT'}
+                {isCurrentlyFree ? 'CLAIM' : 'FREE GIFT'}
               </span>
             </div>
 
@@ -61,6 +61,13 @@ export default function ProductCard({ product }) {
 
       {/* Product Content */}
       <div className="px-1.5 py-1">
+        <div className="flex items-center gap-1 mb-1">
+          {isFreeProduct ? (
+            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tight">FREE GIFT ITEM</span>
+          ) : (
+            <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tight">REGULAR PRODUCT</span>
+          )}
+        </div>
         <h3 className="text-[0.85rem] font-black text-emerald-950 leading-tight line-clamp-2 min-h-[2.4rem] mb-2 tracking-tight">
           {product.name}
         </h3>
@@ -115,12 +122,12 @@ export default function ProductCard({ product }) {
           <button
             onClick={() => addItem(product)}
             className={`w-full font-black py-3 rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-[0.7rem] uppercase tracking-widest shadow-lg ${isCurrentlyFree
-                ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-700'
-                : 'bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700'
+              ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-700'
+              : 'bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700'
               }`}
           >
             <Plus size={16} strokeWidth={3} />
-            {isCurrentlyFree ? 'Claim Gift' : 'Add'}
+            {isCurrentlyFree ? 'Claim' : 'Add'}
           </button>
         ) : (
           <div className="flex items-center justify-between bg-emerald-100/50 backdrop-blur-sm rounded-2xl p-1.5 border border-emerald-200/30">
