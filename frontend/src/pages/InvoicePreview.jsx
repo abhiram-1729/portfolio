@@ -7,10 +7,11 @@ export default function InvoicePreview() {
   const navigate = useNavigate();
   
   // Calculate subtotal for free item threshold comparison
-  const subtotal = items.reduce((sum, i) => {
+  const subtotalRaw = items.reduce((sum, i) => {
     const isFree = i.isFree === true || i.isFree === 'true';
     return !isFree ? sum + Number(i.price || 0) * i.quantity : sum;
   }, 0);
+  const subtotal = Math.round(subtotalRaw * 100) / 100;
   
   const totalMRP = items.reduce((sum, i) => sum + (Number(i.mrp || 0) || Number(i.price || 0)) * i.quantity, 0);
   const totalSavings = totalMRP - totalAmount;
@@ -74,10 +75,6 @@ export default function InvoicePreview() {
           </div>
           <div className="divide-y divide-emerald-50">
             {items
-              .filter(item => {
-                const isFree = item.isFree === true || item.isFree === 'true';
-                return !isFree || subtotal >= Number(item.minShopAmount || 0);
-              })
               .map((item) => {
                 const isFree = item.isFree === true || item.isFree === 'true';
                 const qualifies = subtotal >= Number(item.minShopAmount || 0);

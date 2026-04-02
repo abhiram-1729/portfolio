@@ -78,8 +78,8 @@ export const createOrderFromCart = async (req, res, next) => {
                     finalPrice = 0;
                     isItemFree = true;
                 } else {
-                    console.warn(`[OrderCreate] Skip: Threshold NOT met for GIFT: ${product.name} (Need ₹${threshold - subtotalForComparison} more).`);
-                    continue; 
+                    console.warn(`[OrderCreate] Threshold NOT met for GIFT: ${product.name}. Charging regular price.`);
+                    // Fall back to regular price instead of skipping
                 }
             }
 

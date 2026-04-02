@@ -3,27 +3,35 @@ import { persist } from 'zustand/middleware';
 
 const calculateTotals = (items) => {
   // Subtotal of non-free items
-  const subtotal = items.reduce((sum, i) => {
+  const subtotalRaw = items.reduce((sum, i) => {
     const isFree = i.isFree === true || i.isFree === 'true';
     if (!isFree) return sum + Number(i.price || 0) * i.quantity;
     return sum;
   }, 0);
 
+  // Round subtotal for precision matching with backend
+  const subtotal = Math.round(subtotalRaw * 100) / 100;
+
   // Grand total calculation:
-  // isFree items are ONLY counted if subtotal >= minShopAmount
-  // and if they are counted, their price is 0.
+  // isFree items are 0 ONLY if subtotal >= minShopAmount
+  // Otherwise, they are charged at their regular price.
   const totalAmount = items.reduce((sum, i) => {
     const isFree = i.isFree === true || i.isFree === 'true';
-    if (isFree) {
-      if (subtotal >= Number(i.minShopAmount || 0)) return sum + 0;
-      return sum; 
+    const threshold = Number(i.minShopAmount || 0);
+    
+    if (isFree && subtotal >= threshold) {
+      return sum; // Free!
     }
+    // Regular price (either it's not a free item, or threshold not met)
     return sum + Number(i.price || 0) * i.quantity;
   }, 0);
 
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
-  return { totalAmount, totalItems };
+  return { 
+    totalAmount: Math.round(totalAmount * 100) / 100, 
+    totalItems 
+  };
 };
 
 export const useCartStore = create(
@@ -41,12 +49,20 @@ export const useCartStore = create(
       addItem: (product, quantity = 1) => {
         const items = get().items;
         const existing = items.find((i) => i.productId === product.id);
+        const isFree = product.isFree === true || product.isFree === 'true';
         let newItems;
 
         if (existing) {
+          // IMPORTANT: Even for existing items, we refresh their info 
+          // (Legacy data might have missing isFree or minShopAmount)
           newItems = items.map((i) =>
             i.productId === product.id
-              ? { ...i, quantity: i.quantity + quantity }
+              ? { 
+                  ...i, 
+                  quantity: i.quantity + (isFree ? 0 : quantity), // Don't let users increment free gifts manually? No, keep it for now.
+                  isFree: isFree,
+                  minShopAmount: Number(product.minShopAmount || 0)
+                }
               : i
           );
         } else {
@@ -60,7 +76,7 @@ export const useCartStore = create(
               discount: Number(product.discount || 0),
               landingPrice: Number(product.landingPrice || 0),
               image: product.image,
-              isFree: product.isFree === true || product.isFree === 'true',
+              isFree: isFree,
               minShopAmount: Number(product.minShopAmount || 0),
               quantity,
             },

@@ -131,8 +131,8 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                     </button>
                   </div>
                 )}
-                <p className={`text-base font-black w-20 text-right tracking-tighter ${item.isFree && subtotal < Number(item.minShopAmount || 0) ? 'text-emerald-950/20' : 'text-emerald-950'}`}>
-                  ₹{((item.isFree && subtotal >= Number(item.minShopAmount || 0) ? 0 : (item.isFree ? 0 : Number(item.price || 0))) * item.quantity).toFixed(2)}
+                <p className={`text-base font-black w-20 text-right tracking-tighter ${item.isFree && subtotal < Number(item.minShopAmount || 0) ? 'text-emerald-950/60 font-bold' : 'text-emerald-950'}`}>
+                  ₹{((item.isFree && subtotal >= Number(item.minShopAmount || 0)) ? 0 : Number(item.price || 0) * item.quantity).toFixed(2)}
                 </p>
               </div>
             ))
