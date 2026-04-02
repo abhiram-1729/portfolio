@@ -6,7 +6,10 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
   const { items, addItem, updateQuantity, removeItem, clearCart, totalAmount } = useCartStore();
   
   // Calculate subtotal for free item threshold comparison
-  const subtotal = items.reduce((sum, i) => !i.isFree ? sum + Number(i.price || 0) * i.quantity : sum, 0);
+  const subtotal = items.reduce((sum, i) => {
+    const isFree = i.isFree === true || i.isFree === 'true';
+    return !isFree ? sum + Number(i.price || 0) * i.quantity : sum;
+  }, 0);
 
   const navigate = useNavigate();
 
@@ -70,12 +73,14 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                 <p className="text-emerald-600/30 text-xs mt-2 font-bold tracking-tight">Ready for fresh picks!</p>
             </div>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const isItemFree = item.isFree === true || item.isFree === 'true';
+              return (
               <div key={item.productId} className="flex items-center gap-4 p-4 mx-3 my-2 bg-white/70 border border-emerald-50 shadow-sm rounded-2xl animate-fade-in group hover:bg-white transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="text-[0.95rem] font-black text-emerald-950 truncate mb-1 leading-tight">{item.name}</p>
                   <div className="flex items-center gap-2">
-                    {item.isFree ? (
+                    {isItemFree ? (
                       subtotal >= Number(item.minShopAmount || 0) ? (
                         <div className="flex items-center gap-1.5">
                           <span className="text-[0.7rem] text-emerald-900/30 font-bold line-through">₹{item.price.toFixed(2)}</span>
@@ -105,7 +110,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                     )}
                   </div>
                 </div>
-                {item.isFree ? (
+                {isItemFree ? (
                   <div className="flex items-center justify-center bg-orange-50 border border-orange-100 rounded-xl p-1.5 shadow-inner">
                     <button
                       onClick={() => removeItem(item.productId)}
@@ -131,11 +136,12 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                     </button>
                   </div>
                 )}
-                <p className={`text-base font-black w-20 text-right tracking-tighter ${item.isFree && subtotal < Number(item.minShopAmount || 0) ? 'text-emerald-950/60 font-bold' : 'text-emerald-950'}`}>
-                  ₹{((item.isFree && subtotal >= Number(item.minShopAmount || 0)) ? 0 : Number(item.price || 0) * item.quantity).toFixed(2)}
+                <p className={`text-base font-black w-20 text-right tracking-tighter ${(isItemFree && subtotal < Number(item.minShopAmount || 0)) ? 'text-emerald-950/60 font-bold' : 'text-emerald-950'}`}>
+                  ₹{((isItemFree && subtotal >= Number(item.minShopAmount || 0)) ? 0 : Number(item.price || 0) * item.quantity).toFixed(2)}
                 </p>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
