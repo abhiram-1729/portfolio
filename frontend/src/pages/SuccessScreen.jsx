@@ -5,7 +5,7 @@ import adminAPI from '../services/adminService';
 import { CheckCircle, Home, Share2, Smartphone, Banknote, CreditCard, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
-import villagKartLogo from '../assets/VillagKart_Logo.png';
+import villagKartLogo from './../../vk.jpeg';
 
 export default function SuccessScreen() {
   const { id } = useParams();
@@ -17,7 +17,7 @@ export default function SuccessScreen() {
   const getInvoiceNumber = (o) => o?.orderNumber ? String(o.orderNumber) : String(o?.id).replace(/\D/g, '').slice(0, 6) || '000000';
 
   useEffect(() => {
-    
+
     // 1. Fetch Order Details (Critical)
     ordersAPI.getById(id)
       .then(({ data }) => {

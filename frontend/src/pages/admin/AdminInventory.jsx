@@ -41,6 +41,7 @@ export default function AdminInventory() {
     gst: '0',
     isFree: false,
     minShopAmount: '0',
+    status: 'ACTIVE',
   });
 
   const fetchData = async () => {
@@ -81,12 +82,11 @@ export default function AdminInventory() {
     }
   };
 
-  const calculateFinalPrice = (mrp, discount, gst) => {
+  const calculateFinalPrice = (mrp, discount) => {
     const m = parseFloat(mrp) || 0;
     const d = parseFloat(discount) || 0;
-    const g = parseFloat(gst) || 0;
     const base = m - d;
-    return (base * (1 + g / 100)).toFixed(2);
+    return base.toFixed(2);
   };
 
   const handleCreateItem = async (e) => {
@@ -178,6 +178,20 @@ export default function AdminInventory() {
       toast.error(error.response?.data?.message || 'Failed to update item');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (item) => {
+    try {
+      const updatedStatus = item.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+      const formData = new FormData();
+      formData.append('status', updatedStatus);
+      
+      await adminAPI.updateItem(item.id, formData);
+      toast.success(`Item marked as ${updatedStatus.toLowerCase()}`);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to update item status');
     }
   };
 
@@ -316,6 +330,9 @@ export default function AdminInventory() {
               <div className="flex flex-col">
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-bold text-gray-900">{item.name}</h3>
+                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : 'bg-blue-100 text-blue-600'}`}>
+                    {item.status || 'ACTIVE'}
+                  </span>
                   {item.isFree && (
                     <span className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Promotional Gift</span>
                   )}
@@ -353,8 +370,15 @@ export default function AdminInventory() {
             </div>
               <div className="flex items-center gap-1">
               <button 
+                onClick={() => handleToggleStatus(item)}
+                className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
+              >
+                {item.status === 'INACTIVE' ? 'Mark Active' : 'Mark Inactive'}
+              </button>
+              <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
+              <button 
                 onClick={() => openEditModal(item)}
-                className="text-emerald-600 text-xs font-bold p-2 hover:bg-emerald-50 rounded-lg flex items-center gap-1"
+                className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
               >
                 <Pencil size={14} />
                 Edit
@@ -625,7 +649,7 @@ export default function AdminInventory() {
                       setNewItem({
                         ...newItem, 
                         mrp: m,
-                        price: calculateFinalPrice(m, newItem.discount, newItem.gst)
+                        price: calculateFinalPrice(m, newItem.discount)
                       });
                     }}
                   />
@@ -646,7 +670,7 @@ export default function AdminInventory() {
                       setNewItem({
                         ...newItem, 
                         discount: d,
-                        price: calculateFinalPrice(newItem.mrp, d, newItem.gst)
+                        price: calculateFinalPrice(newItem.mrp, d)
                       });
                     }}
                   />
@@ -661,7 +685,7 @@ export default function AdminInventory() {
                       setNewItem({
                         ...newItem, 
                         gst: g,
-                        price: calculateFinalPrice(newItem.mrp, newItem.discount, g)
+                        price: calculateFinalPrice(newItem.mrp, newItem.discount)
                       });
                     }}
                   >
@@ -706,6 +730,18 @@ export default function AdminInventory() {
                     />
                   </div>
                 )}
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Status</label>
+                <select 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none font-bold"
+                  value={newItem.status}
+                  onChange={(e) => setNewItem({...newItem, status: e.target.value})}
+                >
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                </select>
               </div>
 
               <div className="space-y-1">
@@ -819,7 +855,7 @@ export default function AdminInventory() {
                       setEditItem({
                         ...editItem, 
                         mrp: m,
-                        price: calculateFinalPrice(m, editItem.discount, editItem.gst)
+                        price: calculateFinalPrice(m, editItem.discount)
                       });
                     }}
                   />
@@ -840,7 +876,7 @@ export default function AdminInventory() {
                       setEditItem({
                         ...editItem, 
                         discount: d,
-                        price: calculateFinalPrice(editItem.mrp, d, editItem.gst)
+                        price: calculateFinalPrice(editItem.mrp, d)
                       });
                     }}
                   />
@@ -855,7 +891,7 @@ export default function AdminInventory() {
                       setEditItem({
                         ...editItem, 
                         gst: g,
-                        price: calculateFinalPrice(editItem.mrp, editItem.discount, g)
+                        price: calculateFinalPrice(editItem.mrp, editItem.discount)
                       });
                     }}
                   >

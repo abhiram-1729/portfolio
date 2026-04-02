@@ -96,6 +96,19 @@ export default function AdminVehicles() {
     }
   };
 
+  // ── Toggle Status ───────────────────────────────────────────────
+  const handleToggleStatus = async (vehicle) => {
+    try {
+      const fd = new FormData();
+      fd.append('status', !vehicle.status);
+      await adminAPI.updateVehicle(vehicle.id, fd);
+      toast.success(`Vehicle marked ${!vehicle.status ? 'Active' : 'Inactive'}`);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to update vehicle status');
+    }
+  };
+
   // ── Delete ───────────────────────────────────────────────
   const handleDeleteVehicle = async (vehicle) => {
     if (!window.confirm(`Delete vehicle "${vehicle.vehicleNumber}"?\n\nThis will remove all stock records for this vehicle. Order history will be preserved.`)) return;
@@ -206,6 +219,10 @@ export default function AdminVehicles() {
 
                 {/* Action buttons */}
                 <div className="flex items-center gap-1">
+                  <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                    className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                    {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                  </button>
                   <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
                     className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
                     <Pencil size={16} />

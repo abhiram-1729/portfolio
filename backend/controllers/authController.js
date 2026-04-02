@@ -24,6 +24,11 @@ export const loginUser = async (req, res, next) => {
             throw new Error('Account is suspended. Please contact your administrator.');
         }
 
+        if (user.role === 'SALES_AGENT' && user.assignedVehicle && user.assignedVehicle.status === false) {
+            res.status(403);
+            throw new Error('Your assigned vehicle is currently marked as Inactive. Please contact your administrator.');
+        }
+
         if (await bcrypt.compare(password, user.password)) {
             res.json({
                 id: user.id,

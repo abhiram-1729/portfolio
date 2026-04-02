@@ -62,7 +62,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
         </div>
 
         {/* Items */}
-        <div className="overflow-y-auto max-h-[50vh] px-2 py-3 no-scrollbar">
+        <div className="overflow-y-auto max-h-[30vh] px-2 py-2 no-scrollbar">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-emerald-200">
                 <div className="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center mb-6">
@@ -146,13 +146,13 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
 
         {/* Promotional Suggestions */}
         {items.length > 0 && products.length > 0 && (
-          <div className="px-6 py-5 border-t border-emerald-50 bg-emerald-50/20">
+          <div className="px-6 py-3 border-t border-emerald-50 bg-emerald-50/20 max-h-[30vh] overflow-y-auto no-scrollbar">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles size={18} className="text-orange-500 fill-orange-500" />
               <span className="text-xs font-black text-emerald-800 tracking-[0.1em] uppercase">Recommended Gifts</span>
             </div>
             
-            <div className="space-y-3">
+            <div className="space-y-2">
               {products
                 .filter(p => {
                   const isFree = checkIsFree(p.isFree);
@@ -162,34 +162,34 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                 .map((p) => {
                   const qualifies = subtotal >= Number(p.minShopAmount || 0);
                   return (
-                    <div key={p.id} className={`flex items-center gap-4 p-3 bg-white border rounded-2xl transition-all shadow-sm group hover:scale-[1.02] ${qualifies ? 'border-emerald-200' : 'border-slate-100 shadow-none opacity-80'}`}>
+                    <div key={p.id} className={`flex items-center gap-3 p-2 bg-white border rounded-xl transition-all shadow-sm group hover:scale-[1.02] ${qualifies ? 'border-emerald-200' : 'border-slate-100 shadow-none opacity-80'}`}>
                       {/* Product Image */}
-                      <div className="w-14 h-14 rounded-xl bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-100 shadow-inner">
+                      <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-100 shadow-inner">
                         {p.image ? (
                           <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
                         ) : (
-                          <Package size={20} className="text-slate-300" />
+                          <Package size={16} className="text-slate-300" />
                         )}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
-                          <p className="text-[0.9rem] font-black text-emerald-950 truncate leading-tight">{p.name}</p>
+                          <p className="text-[0.8rem] font-black text-emerald-950 truncate leading-tight">{p.name}</p>
                           {qualifies && (
                             <div className="flex items-center gap-0.5 text-emerald-600">
-                                <Sparkles size={10} className="fill-emerald-600" />
-                                <span className="text-[8px] font-black uppercase tracking-tighter">READY</span>
+                                <Sparkles size={8} className="fill-emerald-600" />
+                                <span className="text-[7px] font-black uppercase tracking-tighter">READY</span>
                             </div>
                           )}
                         </div>
                         
                         <div className="flex flex-col">
                           {qualifies ? (
-                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">CLAIM FOR ₹0</span>
+                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">CLAIM FOR ₹0</span>
                           ) : (
                             <div className="flex items-center gap-1.5">
-                                <span className="text-[9px] font-black text-slate-400">ABOVE ₹{p.minShopAmount}</span>
-                                <span className="text-[9px] font-bold text-orange-500 uppercase">Need ₹{(Number(p.minShopAmount || 0) - subtotal).toFixed(0)} more</span>
+                                <span className="text-[8px] font-black text-slate-400">ABOVE ₹{p.minShopAmount}</span>
+                                <span className="text-[8px] font-bold text-orange-500 uppercase">Need ₹{(Number(p.minShopAmount || 0) - subtotal).toFixed(0)} more</span>
                             </div>
                           )}
                         </div>
@@ -197,13 +197,13 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
 
                       <button
                         onClick={() => addItem(p)}
-                        className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all active:scale-90 flex-shrink-0 ${
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 flex-shrink-0 ${
                           qualifies 
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20 hover:bg-emerald-700' 
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-700' 
                             : 'bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100'
                         }`}
                       >
-                        <Plus size={20} strokeWidth={3} />
+                        <Plus size={16} strokeWidth={3} />
                       </button>
                     </div>
                   );
@@ -214,14 +214,14 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
 
         {/* Footer */}
         {items.length > 0 && (
-          <div className="px-6 pt-6 border-t border-emerald-100/50 bg-white/40 backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-6 px-2">
+          <div className="px-6 pt-4 border-t border-emerald-100/50 bg-white/40 backdrop-blur-xl">
+            <div className="flex items-center justify-between mb-4 px-2">
               <span className="text-emerald-600/60 font-black tracking-[0.2em] uppercase text-[10px]">Grand Total</span>
               <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
             </div>
             <button
               onClick={handleProceed}
-              className="w-full bg-emerald-600 text-white font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all shadow-2xl shadow-emerald-600/20 flex items-center justify-center gap-3 hover:bg-emerald-700 relative overflow-hidden group mb-4"
+              className="w-full bg-emerald-600 text-white font-black text-lg py-4 rounded-[2rem] active:scale-[0.98] transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3 hover:bg-emerald-700 relative overflow-hidden group mb-2"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <span className="relative z-10 flex items-center gap-2">

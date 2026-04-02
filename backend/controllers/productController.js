@@ -8,7 +8,10 @@ export const getProducts = async (req, res, next) => {
         const { search, categoryId, warehouseId, vehicleId } = req.query;
 
         const query = {
-            where: {},
+            where: {
+                status: 'ACTIVE'
+            },
+
             include: {
                 category: true,
                 subCategory: true,

@@ -29,7 +29,7 @@ export default function ProductCard({ product }) {
             <div className={`flex items-center gap-1 px-2 py-1 rounded-lg backdrop-blur-md border shadow-lg ${isCurrentlyFree ? 'bg-emerald-500 text-white border-emerald-400' : 'bg-orange-500 text-white border-orange-400'}`}>
               <Gift size={12} strokeWidth={3} />
               <span className="text-[10px] font-black uppercase tracking-tight">
-                {isCurrentlyFree ? 'CLAIM' : 'FREE GIFT'}
+                {isCurrentlyFree ? 'CLAIM' : 'FREE'}
               </span>
             </div>
 
