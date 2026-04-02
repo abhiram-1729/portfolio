@@ -115,8 +115,8 @@ export default function ProductCard({ product }) {
           <button
             onClick={() => addItem(product)}
             className={`w-full font-black py-3 rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-[0.7rem] uppercase tracking-widest shadow-lg ${isCurrentlyFree
-              ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-700'
-              : 'bg-white text-emerald-600 border border-emerald-100 hover:bg-emerald-50 shadow-emerald-900/5'
+                ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-700'
+                : 'bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700'
               }`}
           >
             <Plus size={16} strokeWidth={3} />
