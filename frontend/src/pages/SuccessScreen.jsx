@@ -17,13 +17,30 @@ export default function SuccessScreen() {
   const getInvoiceNumber = (o) => o?.orderNumber ? String(o.orderNumber) : String(o?.id).replace(/\D/g, '').slice(0, 6) || '000000';
 
   useEffect(() => {
+    console.log('[SuccessScreen] Fetching data for Order ID:', id);
     Promise.all([
-      ordersAPI.getById(id),
-      adminAPI.getSettings()
+      ordersAPI.getById(id).catch(err => {
+        console.error('[SuccessScreen] Order Fetch Failed:', err.response?.status, err.response?.data);
+        throw err;
+      }),
+      adminAPI.getSettings().catch(err => {
+        console.error('[SuccessScreen] Settings Fetch Failed:', err.response?.status, err.response?.data);
+        // Don't throw here, we can survive without settings
+        return { data: { success: false } };
+      })
     ]).then(([{ data: orderData }, { data: settingsData }]) => {
+      console.log('[SuccessScreen] Data Loaded Successfully:', { 
+        orderId: orderData?.id, 
+        hasSettings: settingsData?.success 
+      });
       setOrder(orderData);
       if (settingsData.success) setSettings(settingsData.data);
-    }).catch(() => toast.error('Could not load order or settings details'));
+    }).catch((err) => {
+      if (err.response?.status === 401) {
+        console.error('[SuccessScreen] AUTH ERROR: Redirecting might happen due to 401 Interceptor.');
+      }
+      toast.error('Could not load order details');
+    });
   }, [id]);
 
   const handleDownloadPDF = async () => {
@@ -283,14 +300,16 @@ export default function SuccessScreen() {
       pdf.setFontSize(7);
       pdf.text(`Rs.${mrpValue.toFixed(2)}`, colX.mrp, y + 1, { align: 'left' });
 
-      pdf.setTextColor(...emerald);
-      pdf.setFontSize(8);
+      const isItemFree = price === 0;
+
+      pdf.setTextColor(...(isItemFree ? orangeAccent : emerald));
+      pdf.setFontSize(isItemFree ? 7 : 8);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(`Rs.${price.toFixed(2)}`, colX.price, y + 1);
+      pdf.text(isItemFree ? 'GIFT/FREE' : `Rs.${price.toFixed(2)}`, colX.price, y + 1);
 
       pdf.setTextColor(...darkText);
       pdf.setFontSize(9);
-      pdf.text(`Rs.${amount.toFixed(2)}`, colX.amount, y + 1, { align: 'right' });
+      pdf.text(isItemFree ? 'Rs.0.00' : `Rs.${amount.toFixed(2)}`, colX.amount, y + 1, { align: 'right' });
 
       y += 9;
     });

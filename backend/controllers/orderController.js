@@ -52,6 +52,8 @@ export const createOrderFromCart = async (req, res, next) => {
             return sum;
         }, 0);
 
+        console.log(`[OrderCreate] Paid Subtotal: ₹${paidSubtotal} | Total Items: ${cartItems.length}`);
+
         for (const item of cartItems) {
             const product = productMap[item.productId];
 
@@ -66,11 +68,15 @@ export const createOrderFromCart = async (req, res, next) => {
             let isItemFree = false;
             
             if (isFreeProduct) {
-                if (paidSubtotal >= Number(product.minShopAmount || 0)) {
+                const threshold = Number(product.minShopAmount || 0);
+                console.log(`[OrderCreate] Evaluating Free Item: ${product.name} | Threshold: ₹${threshold} | Current Subtotal: ₹${paidSubtotal}`);
+                
+                if (paidSubtotal >= threshold) {
+                    console.log(`[OrderCreate] ✓ Threshold met for ${product.name}`);
                     finalPrice = 0;
                     isItemFree = true;
                 } else {
-                    // Item is free-only and threshold not met? Skip it.
+                    console.warn(`[OrderCreate] ✗ Threshold NOT met for ${product.name}. Skipping item.`);
                     continue; 
                 }
             }
