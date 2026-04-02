@@ -1,5 +1,5 @@
 import { Plus, Minus, Package, Gift, Lock, Unlock, Zap } from 'lucide-react';
-import { useCartStore } from '../store/cartStore';
+import { useCartStore, checkIsFree } from '../store/cartStore';
 
 export default function ProductCard({ product }) {
   const { items, addItem, updateQuantity } = useCartStore();
@@ -8,12 +8,11 @@ export default function ProductCard({ product }) {
 
   // Calculate if it's currently free in the store
   const subtotal = items.reduce((sum, i) => {
-    const isFree = i.isFree === true || i.isFree === 'true';
-    if (!isFree) return sum + Number(i.price || 0) * i.quantity;
+    if (!checkIsFree(i.isFree)) return sum + Number(i.price || 0) * i.quantity;
     return sum;
   }, 0);
 
-  const isFreeProduct = product.isFree === true || product.isFree === 'true';
+  const isFreeProduct = checkIsFree(product.isFree);
   const minAmount = Number(product.minShopAmount || 0);
   const qualifies = subtotal >= minAmount;
   const isCurrentlyFree = isFreeProduct && qualifies;

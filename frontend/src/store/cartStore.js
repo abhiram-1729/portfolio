@@ -1,11 +1,12 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export const checkIsFree = (val) => val === true || val === 'true' || val === 1 || val === '1';
+
 const calculateTotals = (items) => {
   // Subtotal of non-free items
   const subtotalRaw = items.reduce((sum, i) => {
-    const isFree = i.isFree === true || i.isFree === 'true';
-    if (!isFree) return sum + Number(i.price || 0) * i.quantity;
+    if (!checkIsFree(i.isFree)) return sum + Number(i.price || 0) * i.quantity;
     return sum;
   }, 0);
 
@@ -29,10 +30,10 @@ const calculateTotals = (items) => {
   // isFree items are 0 ONLY if subtotal >= minShopAmount
   // Otherwise, they are charged at their regular price.
   const totalAmount = items.reduce((sum, i) => {
-    const isFree = i.isFree === true || i.isFree === 'true';
+    const isFreeInCart = checkIsFree(i.isFree);
     const threshold = Number(i.minShopAmount || 0);
     
-    if (isFree && subtotal >= threshold) {
+    if (isFreeInCart && subtotal >= threshold) {
       return sum; // Free!
     }
     // Regular price (either it's not a free item, or threshold not met)
@@ -62,7 +63,7 @@ export const useCartStore = create(
       addItem: (product, quantity = 1) => {
         const items = get().items;
         const existing = items.find((i) => i.productId === product.id);
-        const isFree = product.isFree === true || product.isFree === 'true';
+        const isFree = checkIsFree(product.isFree);
         let newItems;
 
         if (existing) {

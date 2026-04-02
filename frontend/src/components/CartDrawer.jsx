@@ -1,5 +1,5 @@
 import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus, Sparkles, Gift } from 'lucide-react';
-import { useCartStore } from '../store/cartStore';
+import { useCartStore, checkIsFree } from '../store/cartStore';
 import { useNavigate } from 'react-router-dom';
 
 export default function CartDrawer({ isOpen, onClose, products = [] }) {
@@ -7,8 +7,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
   
   // Calculate subtotal for free item threshold comparison
   const subtotal = items.reduce((sum, i) => {
-    const isFree = i.isFree === true || i.isFree === 'true';
-    return !isFree ? sum + Number(i.price || 0) * i.quantity : sum;
+    return !checkIsFree(i.isFree) ? sum + Number(i.price || 0) * i.quantity : sum;
   }, 0);
 
   const navigate = useNavigate();
@@ -74,7 +73,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
             </div>
           ) : (
             items.map((item) => {
-              const isItemFree = item.isFree === true || item.isFree === 'true';
+              const isItemFree = checkIsFree(item.isFree);
               return (
               <div key={item.productId} className="flex items-center gap-4 p-4 mx-3 my-2 bg-white/70 border border-emerald-50 shadow-sm rounded-2xl animate-fade-in group hover:bg-white transition-colors">
                 <div className="flex-1 min-w-0">
@@ -156,7 +155,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
             <div className="space-y-3">
               {products
                 .filter(p => {
-                  const isFree = p.isFree === true || p.isFree === 'true';
+                  const isFree = checkIsFree(p.isFree);
                   const inCart = items.some(i => i.productId === p.id);
                   return isFree && !inCart;
                 })

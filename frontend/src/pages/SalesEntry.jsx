@@ -35,6 +35,7 @@ export default function SalesEntry() {
 
       const { data } = await productsAPI.getAll(params);
       console.log('--- GLOBAL PRODUCT LIST ---');
+      console.log(`[DEBUG] Found ${data.filter(p => p.isFree === true || p.isFree === 'true' || p.isFree === 1 || p.isFree === '1').length} free items in a list of ${data.length} total products.`);
       console.table(data.map(p => ({ id: p.id, name: p.name, isFree: p.isFree, price: p.price, min: p.minShopAmount })));
       setProducts(data);
       setFiltered(data);
