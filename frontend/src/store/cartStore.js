@@ -71,7 +71,7 @@ export const useCartStore = create(
             i.productId === product.id
               ? { 
                   ...i, 
-                  quantity: i.quantity + (isFree ? 0 : quantity), // Don't let users increment free gifts manually? No, keep it for now.
+                  quantity: i.quantity + quantity, 
                   isFree: isFree,
                   minShopAmount: Number(product.minShopAmount || 0)
                 }
