@@ -52,7 +52,9 @@ export const createOrderFromCart = async (req, res, next) => {
             return sum;
         }, 0);
 
-        console.log(`[OrderCreate] Paid Subtotal: ₹${paidSubtotal} | Total Items: ${cartItems.length}`);
+        // Ensure subtotal is rounded to 2 decimal places to avoid floating point errors in comparison
+        const subtotalForComparison = Math.round(paidSubtotal * 100) / 100;
+        console.log(`[OrderCreate] Paid Subtotal: ₹${subtotalForComparison} | Total Items: ${cartItems.length}`);
 
         for (const item of cartItems) {
             const product = productMap[item.productId];
@@ -69,14 +71,14 @@ export const createOrderFromCart = async (req, res, next) => {
             
             if (isFreeProduct) {
                 const threshold = Number(product.minShopAmount || 0);
-                console.log(`[OrderCreate] Evaluating Free Item: ${product.name} | Threshold: ₹${threshold} | Current Subtotal: ₹${paidSubtotal}`);
+                console.log(`[OrderCreate] Evaluating Gift: ${product.name} | Threshold: ₹${threshold} | Cart Subtotal: ₹${subtotalForComparison}`);
                 
-                if (paidSubtotal >= threshold) {
-                    console.log(`[OrderCreate] ✓ Threshold met for ${product.name}`);
+                if (subtotalForComparison >= threshold) {
+                    console.log(`[OrderCreate] Success: Threshold met for GIFT: ${product.name}`);
                     finalPrice = 0;
                     isItemFree = true;
                 } else {
-                    console.warn(`[OrderCreate] ✗ Threshold NOT met for ${product.name}. Skipping item.`);
+                    console.warn(`[OrderCreate] Skip: Threshold NOT met for GIFT: ${product.name} (Need ₹${threshold - subtotalForComparison} more).`);
                     continue; 
                 }
             }

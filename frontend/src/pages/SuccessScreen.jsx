@@ -18,29 +18,30 @@ export default function SuccessScreen() {
 
   useEffect(() => {
     console.log('[SuccessScreen] Fetching data for Order ID:', id);
-    Promise.all([
-      ordersAPI.getById(id).catch(err => {
-        console.error('[SuccessScreen] Order Fetch Failed:', err.response?.status, err.response?.data);
-        throw err;
-      }),
-      adminAPI.getSettings().catch(err => {
-        console.error('[SuccessScreen] Settings Fetch Failed:', err.response?.status, err.response?.data);
-        // Don't throw here, we can survive without settings
-        return { data: { success: false } };
+    
+    // 1. Fetch Order Details (Critical)
+    ordersAPI.getById(id)
+      .then(({ data }) => {
+        console.log('[SuccessScreen] Order Loaded:', data.id);
+        setOrder(data);
       })
-    ]).then(([{ data: orderData }, { data: settingsData }]) => {
-      console.log('[SuccessScreen] Data Loaded Successfully:', { 
-        orderId: orderData?.id, 
-        hasSettings: settingsData?.success 
+      .catch((err) => {
+        console.error('[SuccessScreen] Order Fetch Failed:', err.response?.status);
+        toast.error('Could not load order details');
       });
-      setOrder(orderData);
-      if (settingsData.success) setSettings(settingsData.data);
-    }).catch((err) => {
-      if (err.response?.status === 401) {
-        console.error('[SuccessScreen] AUTH ERROR: Redirecting might happen due to 401 Interceptor.');
-      }
-      toast.error('Could not load order details');
-    });
+
+    // 2. Fetch Business Settings (Optional - Don't block order)
+    adminAPI.getSettings()
+      .then(({ data }) => {
+        if (data && data.success) {
+          console.log('[SuccessScreen] Settings Loaded');
+          setSettings(data.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[SuccessScreen] Settings Fetch Failed (Likely Permission):', err.response?.status);
+        // We don't toast error here because the app survives without these
+      });
   }, [id]);
 
   const handleDownloadPDF = async () => {
@@ -450,7 +451,7 @@ export default function SuccessScreen() {
 
     try {
       setIsDownloading(true);
-      const pdf = await generateInvoicePDF(order);
+      const pdf = await generateInvoicePDF(order, settings);
       if (!pdf) return;
 
       const pdfBlob = pdf.output('blob');

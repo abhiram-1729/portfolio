@@ -25,6 +25,13 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
+      // Logic: If we are on the Success page, DON'T redirect immediately.
+      // This prevents the 'Redirect to Login' issue where a background fetch fails.
+      if (window.location.pathname.includes('/success')) {
+        console.warn('[API Interceptor] 401 Error on Success page. Skipping logout to preserve order view.');
+        return Promise.reject(error);
+      }
+
       localStorage.removeItem('token');
       window.location.href = '/login';
     }
