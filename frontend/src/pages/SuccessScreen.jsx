@@ -5,7 +5,7 @@ import adminAPI from '../services/adminService';
 import { CheckCircle, Home, Share2, Smartphone, Banknote, CreditCard, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
-import villagKartLogo from './../../vk.jpeg';
+import villagKartLogo from '../assets/vk.png'
 
 export default function SuccessScreen() {
   const { id } = useParams();
@@ -105,32 +105,37 @@ export default function SuccessScreen() {
     // ══════════════════════════════════════
     // HEADER — Company branding
     // ══════════════════════════════════════
-    pdf.setFillColor(...emerald);
-    pdf.rect(0, 0, pageWidth, 42, 'F');
+    const headerHeight = 55;
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageWidth, headerHeight, 'F');
 
     // Logo
-    const logoSize = 18;
+    const logoWidth = 30;
+    const logoHeight = 30; // giving a slightly rectangular aspect ratio assuming a typical logo, but keeping it large 
     const logoX = margin;
-    const logoY = 9;
-    let textStartX = margin;
+    const logoY = 5;
     if (logoBase64) {
-      // White circle behind logo for contrast
-      pdf.setFillColor(255, 255, 255);
-      // pdf.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F');
-      pdf.addImage(logoBase64, 'PNG', logoX, logoY, logoSize, logoSize);
-      textStartX = logoX + logoSize + 2;
+      pdf.addImage(logoBase64, 'PNG', logoX, logoY, logoWidth, logoHeight);
     }
 
-    // Slogans
-    pdf.setTextColor(255, 255, 255);
+    // Slogans placed directly below the logo (side by side)
+    pdf.setTextColor(...darkText);
     pdf.setFont('helvetica', 'bold');
-    pdf.setFontSize(15);
-    pdf.text('Shop any Time', textStartX, 17);
-    pdf.text('Save Everytime', textStartX, 24);
+    pdf.setFontSize(5);
+    const text1 = 'Shop any Time,';
+    const text2 = 'Save Everytime';
+    const textYPosition = logoY + logoHeight + 2;
+    const textBaseX = margin + 1.5; // Offset slightly to the right to center under logo
+    pdf.text(text1, textBaseX, textYPosition);
+
+    // Calculate width to place the second text next to it with a small divider/space
+    const text1Width = pdf.getTextWidth(`${text1} `);
+    pdf.text(` ${text2}`, textBaseX + text1Width - pdf.getTextWidth(' '), textYPosition);
 
     // Invoice label (right-aligned)
     pdf.setFontSize(28);
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...darkText);
     pdf.text('INVOICE', pageWidth - margin, 20, { align: 'right' });
 
     pdf.setFontSize(9);
@@ -139,9 +144,9 @@ export default function SuccessScreen() {
 
     // Orange accent strip
     pdf.setFillColor(...orangeAccent);
-    pdf.rect(0, 42, pageWidth, 2, 'F');
+    pdf.rect(0, headerHeight, pageWidth, 2, 'F');
 
-    y = 55;
+    y = headerHeight + 10;
 
     // ══════════════════════════════════════
     // INVOICE META — Two columns
@@ -247,21 +252,27 @@ export default function SuccessScreen() {
       amount: pageWidth - margin,
     };
 
-    pdf.setFillColor(248, 250, 252);
-    pdf.rect(margin, y - 4, contentWidth, 10, 'F');
+    const maxPageHeight = pdf.internal.pageSize.getHeight() - 20;
 
-    pdf.setTextColor(...grayText);
-    pdf.setFontSize(7.5);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('S.NO', colX.sno, y + 2);
-    pdf.text('ITEM DESCRIPTION', colX.item, y + 2);
-    pdf.text('QTY', colX.qty, y + 2);
-    pdf.text('GST%', colX.gst, y + 2);
-    pdf.text('MRP', colX.mrp, y + 2);
-    pdf.text('VK PRICE', colX.price, y + 2);
-    pdf.text('AMOUNT', colX.amount, y + 2, { align: 'right' });
+    const drawTableHeaders = (currentY) => {
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(margin, currentY - 4, contentWidth, 10, 'F');
 
-    y += 10;
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('S.NO', colX.sno, currentY + 2);
+      pdf.text('ITEM DESCRIPTION', colX.item, currentY + 2);
+      pdf.text('QTY', colX.qty, currentY + 2);
+      pdf.text('GST%', colX.gst, currentY + 2);
+      pdf.text('MRP', colX.mrp, currentY + 2);
+      pdf.text('VK PRICE', colX.price, currentY + 2);
+      pdf.text('AMOUNT', colX.amount, currentY + 2, { align: 'right' });
+
+      return currentY + 10;
+    };
+
+    y = drawTableHeaders(y);
 
     const items = order.items || [];
     items.forEach((item, index) => {
@@ -271,6 +282,23 @@ export default function SuccessScreen() {
       const mrpValue = item.mrp || price;
       const amount = qty * price;
       const gstRate = item.gst || 0;
+
+      // Handle Page Break
+      if (y > maxPageHeight - 10) {
+        pdf.addPage();
+        y = 20;
+
+        pdf.setTextColor(...grayText);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text(`Invoice #VK-${invoiceNo} (Continued)`, margin, y);
+
+        pdf.setFillColor(...orangeAccent);
+        pdf.rect(margin, y + 2, contentWidth, 0.5, 'F');
+
+        y += 12;
+        y = drawTableHeaders(y);
+      }
 
       if (index % 2 === 0) {
         pdf.setFillColor(255, 255, 255);
@@ -330,6 +358,20 @@ export default function SuccessScreen() {
     // ══════════════════════════════════════
     // TOTALS & PAYMENT STATUS
     // ══════════════════════════════════════
+    if (y > maxPageHeight - 65) {
+      pdf.addPage();
+      y = 20;
+
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'italic');
+      pdf.text(`Invoice #VK-${invoiceNo} (Continued)`, margin, y);
+
+      pdf.setFillColor(...orangeAccent);
+      pdf.rect(margin, y + 2, contentWidth, 0.5, 'F');
+
+      y += 12;
+    }
     const totalsX = margin + contentWidth * 0.55;
     const startY = y;
     let rightY = startY;

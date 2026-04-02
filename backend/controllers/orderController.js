@@ -123,7 +123,7 @@ export const createOrderFromCart = async (req, res, next) => {
             }
 
             return newOrder;
-        });
+        }, { maxWait: 5000, timeout: 20000 });
 
         res.status(201).json(order);
     } catch (error) {
@@ -194,7 +194,7 @@ export const completePayment = async (req, res, next) => {
             }
 
             return updated;
-        });
+        }, { maxWait: 5000, timeout: 20000 });
 
         res.json(updatedOrder);
     } catch (error) {
