@@ -293,3 +293,245 @@ enum OrderStatus {
   COMPLETED
   CANCELLED
 }
+
+model User {
+  id                String   @id @default(cuid())
+  name              String?
+  email             String   @unique
+  password          String
+  mobile            String?  @unique
+  role              UserRole @default(CONSUMER)
+  assignedVehicleId String?
+  assignedVehicle   Vehicle? @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
+  dailyTarget       Float    @default(10000)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  orders Order[]
+  carts  Cart[]
+  openingCash OpeningCash[]
+  closingCash ClosingCash[]
+}
+
+model Category {
+  id            String        @id @default(cuid())
+  name          String        @unique
+  subCategories SubCategory[]
+  products      Product[]
+}
+
+model SubCategory {
+  id         String    @id @default(cuid())
+  name       String
+  categoryId String
+  category   Category  @relation(fields: [categoryId], references: [id])
+  products   Product[]
+}
+
+model Brand {
+  id       String    @id @default(cuid())
+  name     String    @unique
+  products Product[]
+}
+
+model Product {
+  id            String           @id @default(cuid())
+  name          String
+  description   String?
+  mrp           Float?
+  price         Float
+  landingPrice  Float?
+  discount      Float?
+  status        ItemStatus       @default(ACTIVE)
+  image         String?
+  categoryId    String
+  category      Category         @relation(fields: [categoryId], references: [id])
+  subCategoryId String
+  subCategory   SubCategory      @relation(fields: [subCategoryId], references: [id])
+  brandId       String
+  brand         Brand            @relation(fields: [brandId], references: [id])
+  variants      ProductVariant[]
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+
+  WarehouseInventory WarehouseInventory[]
+  vehicleStocks      VehicleStock[]
+  stockTransactions  StockTransaction[]
+  orderItems         OrderItem[]
+}
+
+model ProductVariant {
+  id        String  @id @default(cuid())
+  name      String
+  price     Float
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+}
+
+model Warehouse {
+  id        String               @id @default(cuid())
+  name      String
+  location  String?
+  inventory WarehouseInventory[]
+}
+
+model WarehouseInventory {
+  id          String    @id @default(cuid())
+  warehouseId String
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id])
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+  quantity    Int       @default(0)
+
+  @@unique([warehouseId, productId])
+}
+
+model Cart {
+  id        String     @id @default(cuid())
+  userId    String
+  user      User       @relation(fields: [userId], references: [id])
+  items     CartItem[]
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model CartItem {
+  id        String @id @default(cuid())
+  cartId    String
+  cart      Cart   @relation(fields: [cartId], references: [id])
+  productId String
+  quantity  Int
+}
+
+model Order {
+  id          String       @id @default(cuid())
+  orderNumber Int          @unique @default(autoincrement())
+  userId      String?
+  user        User?        @relation(fields: [userId], references: [id])
+  agentId     String?
+  vehicleId   String?
+  vehicle     Vehicle?     @relation(fields: [vehicleId], references: [id])
+  totalAmount Float
+  status      OrderStatus  @default(PENDING)
+  paymentMode PaymentMode?
+  mobile      String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  items   OrderItem[]
+  payment Payment?
+}
+
+model OrderItem {
+  id        String @id @default(cuid())
+  orderId   String
+  order     Order  @relation(fields: [orderId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int
+  price     Float
+  mrp       Float?
+  discount  Float?
+  landingPrice Float?
+}
+
+model Payment {
+  id          String      @id @default(cuid())
+  orderId     String      @unique
+  order       Order       @relation(fields: [orderId], references: [id])
+  paymentMode PaymentMode
+  amount      Float
+  status      String
+  createdAt   DateTime    @default(now())
+}
+
+model Vehicle {
+  id                String  @id @default(cuid())
+  vehicleNumber     String  @unique
+  vehicleName       String?
+  status            Boolean @default(true) // true: Active, false: Inactive
+  rcDocument        String?
+  insuranceDocument String?
+  permitDocument    String?
+
+  assignedUsers User[]             @relation("UserVehicle")
+  stocks        VehicleStock[]
+  transactions  StockTransaction[]
+  orders        Order[]
+  openingCash OpeningCash[]
+  closingCash ClosingCash[]
+  dailySummaries DailyCashSummary[]
+}
+
+model VehicleStock {
+  id        String  @id @default(cuid())
+  vehicleId String
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(0)
+
+  @@unique([vehicleId, productId])
+}
+
+model StockTransaction {
+  id        String          @id @default(cuid())
+  date      DateTime        @default(now())
+  type      TransactionType
+  vehicleId String
+  vehicle   Vehicle         @relation(fields: [vehicleId], references: [id])
+  productId String
+  product   Product         @relation(fields: [productId], references: [id])
+  quantity  Int
+}
+
+model OpeningCash {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  userId           String
+  user             User     @relation(fields: [userId], references: [id])
+  date             String   // YYYY-MM-DD
+  denominations    Json     // Counts of 500, 200, 100, 50, 20, 10
+  totalOpeningCash Float
+  status           String   @default("SUBMITTED")
+  createdAt        DateTime @default(now())
+
+  @@unique([vehicleId, date])
+}
+
+model ClosingCash {
+  id            String   @id @default(cuid())
+  vehicleId     String
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  userId        String
+  user          User     @relation(fields: [userId], references: [id])
+  date          String   // YYYY-MM-DD
+  openingCash   Float
+  cashSales     Float
+  expectedCash  Float
+  actualCash    Float
+  difference    Float
+  denominations Json     // Counts of 500, 200, 100, 50, 20, 10
+  remark        String?
+  status        String   @default("SUBMITTED")
+  createdAt     DateTime @default(now())
+
+  @@unique([vehicleId, date])
+}
+
+model DailyCashSummary {
+  id           String   @id @default(cuid())
+  vehicleId    String
+  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+  date         String   // YYYY-MM-DD
+  openingCash  Float    @default(0)
+  cashSales    Float    @default(0)
+  expectedCash Float    @default(0)
+  actualCash   Float    @default(0)
+  difference   Float    @default(0)
+  status       String   @default("PENDING") // MATCHED, MISMATCHED, PENDING
+  updatedAt    DateTime @updatedAt
+
+  @@unique([vehicleId, date])
+}

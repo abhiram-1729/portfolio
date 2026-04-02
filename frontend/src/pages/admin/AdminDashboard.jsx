@@ -6,28 +6,36 @@ import {
   DollarSign, 
   CreditCard,
   TrendingUp,
-  Loader2
+  Loader2,
+  Coins
 } from 'lucide-react';
 import adminAPI from '../../services/adminService';
+import { getAdminReconciliation } from '../../services/cashService';
+import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
+  const [cashStats, setCashStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchStats = async () => {
+    const fetchData = async () => {
       try {
-        const { data } = await adminAPI.getDashboardStats();
-        setStats(data);
+        const [statsRes, cashRes] = await Promise.all([
+          adminAPI.getDashboardStats(),
+          getAdminReconciliation(format(new Date(), 'yyyy-MM-dd'))
+        ]);
+        setStats(statsRes.data);
+        setCashStats(cashRes);
       } catch (error) {
-        toast.error('Failed to load dashboard stats');
+        toast.error('Failed to load dashboard data');
         console.error(error);
       } finally {
         setLoading(false);
       }
     };
-    fetchStats();
+    fetchData();
   }, []);
 
   if (loading) {
@@ -75,26 +83,62 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
-          <CreditCard size={20} className="text-emerald-500" />
-          Payment Split
-        </h3>
-        <div className="space-y-4">
-          {paymentData.map((item) => (
-            <div key={item.mode} className="space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="font-medium text-gray-700">{item.mode}</span>
-                <span className="font-bold text-gray-900">₹{item.amount.toLocaleString()}</span>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Payment Split Chart */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <CreditCard size={20} className="text-emerald-500" />
+            Payment Split
+          </h3>
+          <div className="space-y-4">
+            {paymentData.map((item) => (
+              <div key={item.mode} className="space-y-2">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium text-gray-700">{item.mode}</span>
+                  <span className="font-bold text-gray-900">₹{item.amount.toLocaleString()}</span>
+                </div>
+                <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
+                    style={{ width: `${(item.amount / totalSales) * 100}%` }}
+                  />
+                </div>
               </div>
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
-                  style={{ width: `${(item.amount / totalSales) * 100}%` }}
-                />
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
+        </div>
+
+        {/* Cash Reconciliation Status Widget */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
+            <Coins size={20} className="text-emerald-500" />
+            Cash Reconciliation Status
+          </h3>
+          <div className="space-y-3">
+            {cashStats.length === 0 ? (
+              <p className="text-sm text-gray-400 font-bold text-center py-4 italic">No cash records found for today</p>
+            ) : (
+              cashStats.slice(0, 5).map((summary) => (
+                <div key={summary.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-gray-900">{summary.vehicle.vehicleNumber}</span>
+                    <span className="text-[10px] text-gray-400 uppercase font-bold">{summary.status}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs font-black text-slate-800">₹{summary.actualCash.toLocaleString()}</span>
+                    <span className={`text-[10px] font-black ${summary.difference === 0 ? 'text-gray-300' : summary.difference > 0 ? 'text-blue-500' : 'text-rose-500'}`}>
+                      {summary.difference === 0 ? 'MATCHED' : summary.difference > 0 ? `+₹${summary.difference}` : `-₹${Math.abs(summary.difference)}`}
+                    </span>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          {cashStats.length > 5 && (
+            <p className="text-[10px] text-center text-gray-400 mt-4 font-bold uppercase tracking-widest">
+              + {cashStats.length - 5} more vehicles
+            </p>
+          )}
         </div>
       </div>
     </div>
