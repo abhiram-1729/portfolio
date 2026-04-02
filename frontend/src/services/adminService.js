@@ -46,7 +46,13 @@ export const adminAPI = {
   getReconciliationReport: (params) => api.get('/admin/reports/reconciliation', { params }),
   
   // Settings
-  getSettings: () => api.get('/admin/settings'),
+  getSettings: () => api.get('/admin/settings').catch(err => {
+    if (err.response?.status === 404) {
+      console.warn('[System] Admin settings route not found on server yet. Using defaults.');
+      return { data: { success: true, data: { businessName: 'VillagKart', taxRates: '0,5,12,18' } } };
+    }
+    throw err;
+  }),
   updateSettings: (data) => api.put('/admin/settings', data),
 };
 

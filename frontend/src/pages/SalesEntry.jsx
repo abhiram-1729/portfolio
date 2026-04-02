@@ -34,6 +34,8 @@ export default function SalesEntry() {
       }
 
       const { data } = await productsAPI.getAll(params);
+      console.log('--- GLOBAL PRODUCT LIST ---');
+      console.table(data.map(p => ({ id: p.id, name: p.name, isFree: p.isFree, price: p.price, min: p.minShopAmount })));
       setProducts(data);
       setFiltered(data);
     } catch (err) {
