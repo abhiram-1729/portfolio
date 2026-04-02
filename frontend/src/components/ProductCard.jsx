@@ -49,6 +49,10 @@ export default function ProductCard({ product }) {
           </div>
         )}
 
+        <div className="absolute bottom-2 left-2 z-10 opacity-20 hover:opacity-100 transition-opacity">
+          <span className="text-[6px] font-mono whitespace-nowrap bg-black text-white px-1">ID: {product.id}</span>
+        </div>
+
         {product.image ? (
           <img src={product.image} alt={product.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
         ) : (
