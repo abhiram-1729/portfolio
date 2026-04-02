@@ -229,9 +229,6 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
               </span>
             </button>
             <div className="pb-2 px-4 opacity-30 hover:opacity-100 transition-opacity flex justify-between items-center text-[8px] font-mono text-emerald-900 border-t border-emerald-100/50 pt-2">
-               <span>SYS_DBG_SUB: ₹{subtotal}</span>
-               <span>SYS_DBG_TOTAL: ₹{totalAmount}</span>
-               <span>COUNT: {items.length}</span>
             </div>
           </div>
         )}

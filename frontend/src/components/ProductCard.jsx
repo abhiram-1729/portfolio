@@ -48,9 +48,7 @@ export default function ProductCard({ product }) {
           </div>
         )}
 
-        <div className="absolute bottom-2 left-2 z-10 opacity-20 hover:opacity-100 transition-opacity">
-          <span className="text-[6px] font-mono whitespace-nowrap bg-black text-white px-1">ID: {product.id}</span>
-        </div>
+
 
         {product.image ? (
           <img src={product.image} alt={product.name} className="h-full w-full object-cover group-hover:scale-110 transition-transform duration-700" />
@@ -66,9 +64,9 @@ export default function ProductCard({ product }) {
       <div className="px-1.5 py-1">
         <div className="flex items-center gap-1 mb-1">
           {isFreeProduct ? (
-            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tight">FREE GIFT ITEM</span>
+            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tight"></span>
           ) : (
-            <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tight">REGULAR PRODUCT</span>
+            <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tight"></span>
           )}
         </div>
         <h3 className="text-[0.85rem] font-black text-emerald-950 leading-tight line-clamp-2 min-h-[2.4rem] mb-2 tracking-tight">

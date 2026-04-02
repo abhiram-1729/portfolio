@@ -17,12 +17,10 @@ export default function SuccessScreen() {
   const getInvoiceNumber = (o) => o?.orderNumber ? String(o.orderNumber) : String(o?.id).replace(/\D/g, '').slice(0, 6) || '000000';
 
   useEffect(() => {
-    console.log('[SuccessScreen] Fetching data for Order ID:', id);
     
     // 1. Fetch Order Details (Critical)
     ordersAPI.getById(id)
       .then(({ data }) => {
-        console.log('[SuccessScreen] Order Loaded:', data.id);
         setOrder(data);
       })
       .catch((err) => {
@@ -34,7 +32,6 @@ export default function SuccessScreen() {
     adminAPI.getSettings()
       .then(({ data }) => {
         if (data && data.success) {
-          console.log('[SuccessScreen] Settings Loaded');
           setSettings(data.data);
         }
       })

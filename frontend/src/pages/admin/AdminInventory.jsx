@@ -353,12 +353,6 @@ export default function AdminInventory() {
             </div>
               <div className="flex items-center gap-1">
               <button 
-                onClick={() => alert(`RAW DATA VIEW:\n\nID: ${item.id}\nName: ${item.name}\nIsFree: ${item.isFree}\nMin: ${item.minShopAmount}\nFull Object: ${JSON.stringify(item, null, 2)}`)}
-                className="text-[10px] text-gray-400 font-black uppercase hover:text-emerald-600 transition-colors mr-2 px-1 border border-gray-100 rounded"
-              >
-                Inspect
-              </button>
-              <button 
                 onClick={() => openEditModal(item)}
                 className="text-emerald-600 text-xs font-bold p-2 hover:bg-emerald-50 rounded-lg flex items-center gap-1"
               >
