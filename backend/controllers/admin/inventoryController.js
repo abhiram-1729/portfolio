@@ -29,7 +29,9 @@ export const createItem = async (req, res) => {
       categoryId, 
       subCategoryId, 
       brandId,
-      gst
+      gst,
+      isFree,
+      minShopAmount
     } = req.body;
     
     // Handle image upload to Supabase if file is present
@@ -102,6 +104,8 @@ export const createItem = async (req, res) => {
       subCategoryId: finalSubCategoryId,
       brandId: finalBrandId,
       gst: parseNumber(gst) || 0,
+      isFree: isFree === 'true' || isFree === true,
+      minShopAmount: parseNumber(minShopAmount) || 0,
     };
 
     const item = await prisma.product.create({
@@ -126,7 +130,9 @@ export const updateItem = async (req, res) => {
       discount, 
       status, 
       image,
-      gst 
+      gst,
+      isFree,
+      minShopAmount
     } = req.body;
 
     // Handle image upload to Supabase if file is present
@@ -159,6 +165,8 @@ export const updateItem = async (req, res) => {
       status,
       image: imageUrl,
       gst: parseNumber(gst),
+      isFree: isFree === undefined ? undefined : (isFree === 'true' || isFree === true),
+      minShopAmount: parseNumber(minShopAmount),
     };
 
     const item = await prisma.product.update({
@@ -170,6 +178,27 @@ export const updateItem = async (req, res) => {
   } catch (error) {
     console.error('❌ Update Item Error:', error);
     res.status(500).json({ message: 'Error updating item', error: error.message });
+  }
+};
+
+export const deleteItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const item = await prisma.product.findUnique({ where: { id } });
+    if (!item) return res.status(404).json({ message: 'Item not found' });
+
+    // Cascade delete all child records in dependency order
+    await prisma.orderItem.deleteMany({ where: { productId: id } });
+    await prisma.stockTransaction.deleteMany({ where: { productId: id } });
+    await prisma.vehicleStock.deleteMany({ where: { productId: id } });
+    await prisma.warehouseInventory.deleteMany({ where: { productId: id } });
+    await prisma.productVariant.deleteMany({ where: { productId: id } });
+    await prisma.product.delete({ where: { id } });
+
+    res.json({ message: 'Item deleted successfully' });
+  } catch (error) {
+    console.error('❌ Error deleting item:', error.message);
+    res.status(500).json({ message: 'Error deleting item', error: error.message });
   }
 };
 

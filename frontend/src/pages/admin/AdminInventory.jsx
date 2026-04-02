@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2 } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -25,6 +25,8 @@ export default function AdminInventory() {
   const [stockQuantities, setStockQuantities] = useState({}); // { productId: quantity }
   const [vehicleInventory, setVehicleInventory] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [taxRates, setTaxRates] = useState(['0', '5', '12', '18']);
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -37,16 +39,22 @@ export default function AdminInventory() {
     subCategoryId: 'default',
     brandId: 'default',
     gst: '0',
+    isFree: false,
+    minShopAmount: '0',
   });
 
   const fetchData = async () => {
     try {
-      const [iRes, vRes] = await Promise.all([
+      const [iRes, vRes, sRes] = await Promise.all([
         adminAPI.getItems(),
-        adminAPI.getVehicles()
+        adminAPI.getVehicles(),
+        adminAPI.getSettings()
       ]);
       setItems(iRes.data);
       setVehicles(vRes.data);
+      if (sRes.data?.success && sRes.data?.data?.taxRates) {
+        setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
+      }
     } catch (error) {
       toast.error('Failed to fetch inventory data');
     } finally {
@@ -111,7 +119,9 @@ export default function AdminInventory() {
         categoryId: 'default', 
         subCategoryId: 'default', 
         brandId: 'default',
-        gst: '0'
+        gst: '0',
+        isFree: false,
+        minShopAmount: '0',
       });
       fetchData();
     } catch (error) {
@@ -134,6 +144,8 @@ export default function AdminInventory() {
       image: item.image || '',
       status: item.status || 'ACTIVE',
       gst: item.gst?.toString() || '0',
+      isFree: item.isFree || false,
+      minShopAmount: item.minShopAmount?.toString() || '0',
     });
     setEditPreviewUrl(item.image || null);
     setShowEditItemModal(true);
@@ -166,6 +178,20 @@ export default function AdminInventory() {
       toast.error(error.response?.data?.message || 'Failed to update item');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleDeleteItem = async (item) => {
+    if (!window.confirm(`Delete "${item.name}" from inventory? This cannot be undone.`)) return;
+    setDeletingId(item.id);
+    try {
+      await adminAPI.deleteItem(item.id);
+      toast.success('Item deleted successfully');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete item');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -311,16 +337,34 @@ export default function AdminInventory() {
                     <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">GST</span>
                     <span className="text-[10px] text-blue-600 font-bold">{item.gst || 0}%</span>
                   </div>
+                  {item.isFree && (
+                    <div className="flex flex-col border-l border-gray-100 pl-3">
+                      <span className="text-[10px] text-emerald-600 uppercase font-black tracking-tighter">Free Above</span>
+                      <span className="text-[10px] text-emerald-600 font-bold">₹{item.minShopAmount || 0}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-            <button 
-              onClick={() => openEditModal(item)}
-              className="text-emerald-600 text-xs font-bold p-2 hover:bg-emerald-50 rounded-lg flex items-center gap-1"
-            >
-              <Pencil size={14} />
-              Edit
-            </button>
+              <div className="flex items-center gap-1">
+              <button 
+                onClick={() => openEditModal(item)}
+                className="text-emerald-600 text-xs font-bold p-2 hover:bg-emerald-50 rounded-lg flex items-center gap-1"
+              >
+                <Pencil size={14} />
+                Edit
+              </button>
+              <button
+                onClick={() => handleDeleteItem(item)}
+                title="Delete Item"
+                disabled={deletingId === item.id}
+                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingId === item.id
+                  ? <Loader2 size={14} className="animate-spin text-rose-400" />
+                  : <Trash2 size={14} />}
+              </button>
+            </div>
           </div>
           ))
         )}
@@ -616,10 +660,9 @@ export default function AdminInventory() {
                       });
                     }}
                   >
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="12">12%</option>
-                    <option value="18">18%</option>
+                    {taxRates.map(rate => (
+                      <option key={`add-gst-${rate}`} value={rate}>{rate}%</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -633,6 +676,31 @@ export default function AdminInventory() {
                     onChange={(e) => setNewItem({...newItem, price: e.target.value})}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 items-center bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    id="isFree-add"
+                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                    checked={newItem.isFree}
+                    onChange={(e) => setNewItem({...newItem, isFree: e.target.checked})}
+                  />
+                  <label htmlFor="isFree-add" className="text-sm font-bold text-emerald-700 cursor-pointer">Set as Free Item</label>
+                </div>
+                {newItem.isFree && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Min Shop Amount</label>
+                    <input 
+                      type="number"
+                      placeholder="₹ Amount"
+                      className="w-full bg-white border border-emerald-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
+                      value={newItem.minShopAmount}
+                      onChange={(e) => setNewItem({...newItem, minShopAmount: e.target.value})}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">
@@ -786,10 +854,9 @@ export default function AdminInventory() {
                       });
                     }}
                   >
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="12">12%</option>
-                    <option value="18">18%</option>
+                    {taxRates.map(rate => (
+                      <option key={`edit-gst-${rate}`} value={rate}>{rate}%</option>
+                    ))}
                   </select>
                 </div>
                 <div className="space-y-1">
@@ -803,6 +870,31 @@ export default function AdminInventory() {
                     onChange={(e) => setEditItem({...editItem, price: e.target.value})}
                   />
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4 items-center bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
+                <div className="flex items-center gap-2">
+                  <input 
+                    type="checkbox"
+                    id="isFree-edit"
+                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
+                    checked={editItem.isFree}
+                    onChange={(e) => setEditItem({...editItem, isFree: e.target.checked})}
+                  />
+                  <label htmlFor="isFree-edit" className="text-sm font-bold text-emerald-700 cursor-pointer">Set as Free Item</label>
+                </div>
+                {editItem.isFree && (
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Min Shop Amount</label>
+                    <input 
+                      type="number"
+                      placeholder="₹ Amount"
+                      className="w-full bg-white border border-emerald-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
+                      value={editItem.minShopAmount}
+                      onChange={(e) => setEditItem({...editItem, minShopAmount: e.target.value})}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="space-y-1">

@@ -18,9 +18,8 @@ export default function SalesEntry() {
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
   const { user } = useUserStore();
-  const { items, customerMobile, setCustomerMobile, customerName, setCustomerName } = useCartStore();
+  const { items, customerMobile, setCustomerMobile, customerName, setCustomerName, totalAmount } = useCartStore();
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
   const searchRef = useRef(null);
 
   useEffect(() => {
@@ -146,7 +145,7 @@ export default function SalesEntry() {
       )}
 
       {/* Cart Drawer */}
-      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} />
+      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} products={products} />
     </div>
   );
 }

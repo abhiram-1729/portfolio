@@ -14,7 +14,17 @@ export const loginUser = async (req, res, next) => {
             include: { assignedVehicle: true },
         });
 
-        if (user && (await bcrypt.compare(password, user.password))) {
+        if (!user) {
+            res.status(401);
+            throw new Error('Invalid mobile or password');
+        }
+
+        if (user.status === 'SUSPENDED') {
+            res.status(403);
+            throw new Error('Account is suspended. Please contact your administrator.');
+        }
+
+        if (await bcrypt.compare(password, user.password)) {
             res.json({
                 id: user.id,
                 name: user.name,

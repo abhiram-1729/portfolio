@@ -3,10 +3,16 @@ import { useCartStore } from '../store/cartStore';
 import { ArrowLeft, ArrowRight, Package, Smartphone } from 'lucide-react';
 
 export default function InvoicePreview() {
-  const { items, customerMobile, customerName } = useCartStore();
+  const { items, customerMobile, customerName, totalAmount } = useCartStore();
   const navigate = useNavigate();
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
-  const totalMRP = items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0);
+  
+  // Calculate subtotal for free item threshold comparison
+  const subtotal = items.reduce((sum, i) => {
+    const isFree = i.isFree === true || i.isFree === 'true';
+    return !isFree ? sum + Number(i.price || 0) * i.quantity : sum;
+  }, 0);
+  
+  const totalMRP = items.reduce((sum, i) => sum + (Number(i.mrp || 0) || Number(i.price || 0)) * i.quantity, 0);
   const totalSavings = totalMRP - totalAmount;
 
   if (items.length === 0) {
@@ -67,25 +73,40 @@ export default function InvoicePreview() {
             <span className="w-20 text-right">Subtotal</span>
           </div>
           <div className="divide-y divide-emerald-50">
-            {items.map((item) => (
-                <div key={item.productId} className="px-6 py-5 flex items-center gap-2 group hover:bg-white transition-colors">
-                <div className="flex-1 min-w-0">
-                    <p className="text-[0.95rem] font-black text-emerald-950 truncate leading-tight">{item.name}</p>
-                    <div className="flex items-center gap-2 mt-1.5">
-                        <span className="text-xs font-black text-emerald-600 tracking-tight">₹{item.price.toFixed(2)}</span>
-                        {item.mrp > item.price && (
-                            <span className="text-[10px] font-bold text-emerald-900/30 line-through">₹{item.mrp.toFixed(2)}</span>
-                        )}
+            {items
+              .filter(item => {
+                const isFree = item.isFree === true || item.isFree === 'true';
+                return !isFree || subtotal >= Number(item.minShopAmount || 0);
+              })
+              .map((item) => {
+                const isFree = item.isFree === true || item.isFree === 'true';
+                const qualifies = subtotal >= Number(item.minShopAmount || 0);
+                return (
+                  <div key={item.productId} className="px-6 py-5 flex items-center gap-2 group hover:bg-white transition-colors">
+                    <div className="flex-1 min-w-0">
+                        <p className="text-[0.95rem] font-black text-emerald-950 truncate leading-tight">{item.name}</p>
+                        <div className="flex items-center gap-2 mt-1.5">
+                            {isFree && qualifies ? (
+                                <span className="text-xs font-black text-orange-600 tracking-tight flex items-center gap-1">
+                                    FREE <span className="text-[8px] bg-orange-100 px-1 rounded animate-pulse">OFFER</span>
+                                </span>
+                            ) : (
+                                <span className="text-xs font-black text-emerald-600 tracking-tight">₹{Number(item.price || 0).toFixed(2)}</span>
+                            )}
+                            {item.mrp > item.price && (
+                                <span className="text-[10px] font-bold text-emerald-900/30 line-through">₹{Number(item.mrp || 0).toFixed(2)}</span>
+                            )}
+                        </div>
                     </div>
-                </div>
-                <div className="w-16 flex justify-center">
-                    <span className="bg-emerald-50 text-emerald-900 px-3 py-1.5 rounded-xl text-xs font-black border border-emerald-100 shadow-inner">{item.quantity}</span>
-                </div>
-                <span className="w-20 text-right text-[1rem] font-black text-emerald-950 tracking-tighter">
-                    ₹{(item.price * item.quantity).toFixed(2)}
-                </span>
-                </div>
-            ))}
+                    <div className="w-16 flex justify-center">
+                        <span className="bg-emerald-50 text-emerald-900 px-3 py-1.5 rounded-xl text-xs font-black border border-emerald-100 shadow-inner">{item.quantity}</span>
+                    </div>
+                    <span className="w-20 text-right text-[1rem] font-black text-emerald-950 tracking-tighter">
+                        ₹{((isFree && qualifies ? 0 : Number(item.price || 0)) * item.quantity).toFixed(2)}
+                    </span>
+                  </div>
+                );
+              })}
           </div>
         </div>
 

@@ -42,6 +42,16 @@ export const createOrderFromCart = async (req, res, next) => {
         let totalAmount = 0;
         const orderItemsData = [];
 
+        // Pre-calculate subtotal for non-free items to determine 'Free' eligibility
+        const paidSubtotal = cartItems.reduce((sum, item) => {
+            const product = productMap[item.productId];
+            const isFree = product.isFree === true || product.isFree === 'true';
+            if (product && !isFree) {
+                return sum + Number(product.price || 0) * item.quantity;
+            }
+            return sum;
+        }, 0);
+
         for (const item of cartItems) {
             const product = productMap[item.productId];
 
@@ -50,15 +60,30 @@ export const createOrderFromCart = async (req, res, next) => {
                 throw new Error(`Product ${item.productId} not found`);
             }
 
-            const itemTotal = product.price * item.quantity;
+            // Apply free product logic: skip or price becomes 0
+            const isFreeProduct = product.isFree === true || product.isFree === 'true';
+            let finalPrice = Number(product.price || 0);
+            let isItemFree = false;
+            
+            if (isFreeProduct) {
+                if (paidSubtotal >= Number(product.minShopAmount || 0)) {
+                    finalPrice = 0;
+                    isItemFree = true;
+                } else {
+                    // Item is free-only and threshold not met? Skip it.
+                    continue; 
+                }
+            }
+
+            const itemTotal = finalPrice * item.quantity;
             totalAmount += itemTotal;
 
             orderItemsData.push({
                 productId: item.productId,
                 quantity: item.quantity,
-                price: product.price,
+                price: finalPrice, // Save as 0 if free
                 mrp: product.mrp,
-                discount: product.discount,
+                discount: isItemFree ? product.price : product.discount, // Use full price as discount if free
                 landingPrice: product.landingPrice,
                 gst: product.gst || 0,
             });
