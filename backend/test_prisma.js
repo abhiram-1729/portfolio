@@ -1,8 +1,4 @@
 import prisma from './utils/prisma.js';
-
-async function check() {
-  console.log('Prisma keys:', Object.keys(prisma).filter(k => !k.startsWith('_')));
-  process.exit(0);
-}
-
-check();
+prisma.businessSettings.findFirst()
+  .then(res => { console.log("SUCCESS:", res); process.exit(0); })
+  .catch(err => { console.error("ERRRR:", err); process.exit(1); });
