@@ -264,7 +264,7 @@ export default function SuccessScreen() {
       pdf.text('S.NO', colX.sno, currentY + 2);
       pdf.text('ITEM DESCRIPTION', colX.item, currentY + 2);
       pdf.text('QTY', colX.qty, currentY + 2);
-      pdf.text('GST%', colX.gst, currentY + 2);
+      pdf.text('GST', colX.gst, currentY + 2);
       pdf.text('MRP', colX.mrp, currentY + 2);
       pdf.text('VK PRICE', colX.price, currentY + 2);
       pdf.text('AMOUNT', colX.amount, currentY + 2, { align: 'right' });
@@ -282,6 +282,8 @@ export default function SuccessScreen() {
       const mrpValue = item.mrp || price;
       const amount = qty * price;
       const gstRate = item.gst || 0;
+      const itemTaxable = amount / (1 + gstRate / 100);
+      const itemGstAmt = amount - itemTaxable;
 
       // Handle Page Break
       if (y > maxPageHeight - 10) {
@@ -320,7 +322,7 @@ export default function SuccessScreen() {
       pdf.text(displayName, colX.item, y + 1);
 
       pdf.text(`${qty}`, colX.qty, y + 1);
-      pdf.text(`${gstRate}%`, colX.gst, y + 1);
+      pdf.text(`${itemGstAmt.toFixed(2)}`, colX.gst, y + 1);
 
       pdf.setTextColor(...grayText);
       pdf.setFontSize(7);
@@ -420,9 +422,9 @@ export default function SuccessScreen() {
 
     pdf.setTextColor(...grayText);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`CGST / SGST (Included)`, totalsX, rightY);
+    pdf.text(`Total GST (Incl.)`, totalsX, rightY);
     pdf.setTextColor(...darkText);
-    pdf.text(`Rs.${(totalTax / 2).toFixed(2)} x 2`, colX.amount, rightY, { align: 'right' });
+    pdf.text(`Rs.${totalTax.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
     rightY += 4;
 
     pdf.setDrawColor(...lightLine);
@@ -497,28 +499,9 @@ export default function SuccessScreen() {
       const fileName = `Invoice_VK-${invoiceNo}.pdf`;
       const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
 
-      // 1. Try modern Web Share API with actual file sharing (Works on mobile)
-      if (navigator.canShare && navigator.canShare({ files: [file] })) {
-        try {
-          await navigator.share({
-            files: [file],
-            title: `VillagKart Invoice #VK-${invoiceNo}`,
-            text: text,
-          });
-          toast.success('Invoice shared successfully!');
-          return; // Success! No need to proceed to fallbacks
-        } catch (shareError) {
-          // If the user cancelled or another error occurred, proceed to fallbacks unless it was an AbortError
-          if (shareError.name === 'AbortError') {
-            return; // User cancelled, don't show error toast or fallback
-          }
-          console.warn('Navigator share failed, falling back:', shareError);
-        }
-      }
-
-      // 2. Fallback for mobile numbers (Redirect to WhatsApp directly)
+      // 1. Direct WhatsApp Sharing if mobile number exists
       if (order.mobile) {
-        // PDF cannot be sent via link directly, so we download it to locally and then open WhatsApp
+        // PDF cannot be sent via link directly, so we download it locally and then open WhatsApp
         pdf.save(fileName);
 
         const phone = String(order.mobile).replace(/\D/g, '');
@@ -527,9 +510,27 @@ export default function SuccessScreen() {
 
         window.open(whatsappUrl, '_blank');
         toast.success('Opening WhatsApp & Downloading PDF...');
+        return;
       }
-      // 3. Last fallback (Standard share text or Clipboard copy)
-      else if (navigator.share) {
+
+      // 2. Fallback to modern Web Share API if no mobile
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
+          await navigator.share({
+            files: [file],
+            title: `VillagKart Invoice #VK-${invoiceNo}`,
+            text: text,
+          });
+          toast.success('Invoice shared successfully!');
+          return;
+        } catch (shareError) {
+          if (shareError.name === 'AbortError') return;
+          console.warn('Navigator share failed, falling back:', shareError);
+        }
+      }
+
+      // 3. Final fallback (Standard share text or Clipboard copy)
+      if (navigator.share) {
         await navigator.share({ text });
         pdf.save(fileName);
         toast.success('Text shared & PDF downloaded!');
@@ -626,8 +627,7 @@ export default function SuccessScreen() {
                   return (
                     <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100/30">
                       <div className="flex flex-col">
-                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Incl.)</span>
-                        <span className="text-[7px] font-bold text-blue-400 uppercase tracking-widest ml-1">CGST: ₹{(totalTax / 2).toFixed(2)} | SGST: ₹{(totalTax / 2).toFixed(2)}</span>
+                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Included)</span>
                       </div>
                       <span className="font-black text-base text-blue-600 tracking-tight">₹{totalTax.toFixed(2)}</span>
                     </div>
