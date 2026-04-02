@@ -56,8 +56,10 @@ export const createOrderFromCart = async (req, res, next) => {
         const subtotalForComparison = Math.round(paidSubtotal * 100) / 100;
         console.log(`[OrderCreate] Paid Subtotal: ₹${subtotalForComparison} | Total Items: ${cartItems.length}`);
 
+        console.log(`[OrderCreate] Starting Processing. Total Items: ${cartItems.length}`);
         for (const item of cartItems) {
             const product = productMap[item.productId];
+            console.log(`[OrderCreate] Processing: ${product?.name} | Qty: ${item.quantity} | isFree: ${product?.isFree} | Min: ${product?.minShopAmount}`);
 
             if (!product) {
                 res.status(400);

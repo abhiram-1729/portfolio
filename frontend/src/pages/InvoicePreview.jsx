@@ -12,6 +12,7 @@ export default function InvoicePreview() {
     return !isFree ? sum + Number(i.price || 0) * i.quantity : sum;
   }, 0);
   const subtotal = Math.round(subtotalRaw * 100) / 100;
+  console.log('[DEBUG] Invoice Preview Subtotal:', subtotal);
   
   const totalMRP = items.reduce((sum, i) => sum + (Number(i.mrp || 0) || Number(i.price || 0)) * i.quantity, 0);
   const totalSavings = totalMRP - totalAmount;

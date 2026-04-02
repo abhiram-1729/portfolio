@@ -12,6 +12,18 @@ const calculateTotals = (items) => {
   // Round subtotal for precision matching with backend
   const subtotal = Math.round(subtotalRaw * 100) / 100;
 
+  // --- DEBUG LOGS FOR USER TO COPY ---
+  console.log('--- [DEBUG] CART SNAPSHOT ---');
+  console.table(items.map(i => ({
+    name: i.name,
+    qty: i.quantity,
+    price: i.price,
+    isFree: i.isFree,
+    min: i.minShopAmount,
+    contributesToSubtotal: !(i.isFree === true || i.isFree === 'true')
+  })));
+  console.log(`[DEBUG] Subtotal (Calculated): ₹${subtotal}`);
+
   // Grand total calculation:
   // isFree items are 0 ONLY if subtotal >= minShopAmount
   // Otherwise, they are charged at their regular price.
