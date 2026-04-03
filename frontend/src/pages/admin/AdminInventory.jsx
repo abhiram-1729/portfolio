@@ -36,6 +36,7 @@ export default function AdminInventory() {
     price: '',
     landingPrice: '',
     discount: '',
+    discountType: 'RUPEE',
     categoryId: 'default',
     subCategoryId: 'default',
     brandId: 'default',
@@ -83,10 +84,17 @@ export default function AdminInventory() {
     }
   };
 
-  const calculateFinalPrice = (mrp, discount) => {
+  const calculateFinalPrice = (mrp, discount, type = 'RUPEE') => {
     const m = parseFloat(mrp) || 0;
     const d = parseFloat(discount) || 0;
-    const base = m - d;
+
+    let base;
+    if (type === 'PERCENT') {
+      base = m - (m * (d / 100));
+    } else {
+      base = m - d;
+    }
+
     return base.toFixed(2);
   };
 
@@ -117,6 +125,7 @@ export default function AdminInventory() {
         price: '',
         landingPrice: '',
         discount: '',
+        discountType: 'RUPEE',
         categoryId: 'default',
         subCategoryId: 'default',
         brandId: 'default',
@@ -142,6 +151,7 @@ export default function AdminInventory() {
       price: item.price?.toString() || '',
       landingPrice: item.landingPrice?.toString() || '',
       discount: item.discount?.toString() || '',
+      discountType: item.discountType || 'RUPEE',
       image: item.image || '',
       status: item.status || 'ACTIVE',
       gst: item.gst?.toString() || '0',
@@ -463,22 +473,53 @@ export default function AdminInventory() {
             <ArrowUpCircle size={18} className="text-emerald-500" />
             Stock Loading (Morning)
           </h4>
+
+          <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-100">
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Loading Value</span>
+              <span className="text-xl font-black text-emerald-900">₹{
+                items.reduce((acc, item) => {
+                  const qty = parseFloat(stockQuantities[item.id]) || 0;
+                  return acc + (qty * (parseFloat(item.price) || 0));
+                }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+              }</span>
+            </div>
+            <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/10">
+              <Truck className="text-emerald-600" size={24} />
+            </div>
+          </div>
+
           <div className="space-y-6">
             {items.filter(i => !i.isFree).length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
-                {items.filter(i => !i.isFree).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold"
-                      value={stockQuantities[item.id] || ''}
-                      onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                    />
-                  </div>
-                ))}
+                {items.filter(i => !i.isFree).map((item) => {
+                  const qty = parseFloat(stockQuantities[item.id]) || 0;
+                  const itemAmount = qty * (parseFloat(item.price) || 0);
+                  return (
+                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-emerald-200 transition-colors">
+                      <div className="flex flex-col flex-1">
+                        <span className="text-sm font-medium text-gray-700">{item.name}</span>
+                        {qty > 0 && (
+                          <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in slide-in-from-left-1 duration-200">Amount: ₹{itemAmount.toFixed(2)}</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex flex-col items-end mr-2">
+                          <span className="text-[8px] font-black text-gray-400 uppercase">Rate</span>
+                          <span className="text-[10px] font-bold text-gray-500">₹{item.price}</span>
+                        </div>
+                        <input
+                          type="number"
+                          placeholder="0"
+                          className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 outline-none transition-all"
+                          value={stockQuantities[item.id] || ''}
+                          onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             )}
             {items.filter(i => i.isFree).length > 0 && (
@@ -545,24 +586,53 @@ export default function AdminInventory() {
           <div className="space-y-6">
             {selectedVehicleId ? (
               <>
+                <div className="flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">In-Vehicle Inventory Value</span>
+                    <span className="text-xl font-black text-blue-900">₹{
+                      items.reduce((acc, item) => {
+                        const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
+                        return acc + (currentStock * (parseFloat(item.price) || 0));
+                      }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                    }</span>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/10">
+                    <Package className="text-blue-600" size={24} />
+                  </div>
+                </div>
+
                 {items.filter(i => !i.isFree).length > 0 && (
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
                     {items.filter(i => !i.isFree).map((item) => {
                       const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
+                      const returnQty = parseFloat(stockQuantities[item.id]) || 0;
+                      const currentStockAmount = currentStock * (parseFloat(item.price) || 0);
+
                       return (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                          <div className="flex flex-col">
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-orange-200 transition-colors">
+                          <div className="flex flex-col flex-1">
                             <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                            <span className="text-[10px] text-gray-400 font-bold uppercase">In Vehicle: {currentStock}</span>
+                            <div className="flex gap-4">
+                              <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600">Stock: {currentStock}</span>
+                              <span className="text-[10px] text-blue-400 font-bold uppercase">₹{currentStockAmount.toFixed(2)}</span>
+                            </div>
                           </div>
-                          <input
-                            type="number"
-                            placeholder="Qty"
-                            className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold"
-                            value={stockQuantities[item.id] || ''}
-                            onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                          />
+                          <div className="flex items-center gap-3">
+                            {returnQty > 0 && (
+                              <div className="flex flex-col items-end mr-1 animate-in fade-in slide-in-from-right-1 duration-200">
+                                <span className="text-[8px] font-black text-orange-400 uppercase">Return Value</span>
+                                <span className="text-[10px] font-bold text-orange-600">₹{(returnQty * (parseFloat(item.price) || 0)).toFixed(2)}</span>
+                              </div>
+                            )}
+                            <input
+                              type="number"
+                              placeholder="0"
+                              className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none transition-all"
+                              value={stockQuantities[item.id] || ''}
+                              onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
+                            />
+                          </div>
                         </div>
                       );
                     })}
@@ -745,7 +815,7 @@ export default function AdminInventory() {
                       setNewItem({
                         ...newItem,
                         mrp: m,
-                        price: calculateFinalPrice(m, newItem.discount)
+                        price: calculateFinalPrice(m, newItem.discount, newItem.discountType)
                       });
                     }}
                   />
@@ -753,23 +823,44 @@ export default function AdminInventory() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={newItem.discount}
-                    onChange={(e) => {
-                      const d = e.target.value;
-                      setNewItem({
-                        ...newItem,
-                        discount: d,
-                        price: calculateFinalPrice(newItem.mrp, d)
-                      });
-                    }}
-                  />
+                <div className="grid grid-cols-2 gap-2 flex-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount Type</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                      value={newItem.discountType}
+                      onChange={(e) => {
+                        const type = e.target.value;
+                        setNewItem({
+                          ...newItem,
+                          discountType: type,
+                          price: calculateFinalPrice(newItem.mrp, newItem.discount, type)
+                        });
+                      }}
+                    >
+                      <option value="RUPEE">₹</option>
+                      <option value="PERCENT">%</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Value</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      placeholder={newItem.discountType === 'PERCENT' ? '%' : '₹'}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                      value={newItem.discount}
+                      onChange={(e) => {
+                        const d = Math.max(0, parseFloat(e.target.value) || 0);
+                        setNewItem({
+                          ...newItem,
+                          discount: d.toString(),
+                          price: calculateFinalPrice(newItem.mrp, d, newItem.discountType)
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>
@@ -964,7 +1055,7 @@ export default function AdminInventory() {
                       setEditItem({
                         ...editItem,
                         mrp: m,
-                        price: calculateFinalPrice(m, editItem.discount)
+                        price: calculateFinalPrice(m, editItem.discount, editItem.discountType)
                       });
                     }}
                   />
@@ -972,23 +1063,44 @@ export default function AdminInventory() {
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={editItem.discount}
-                    onChange={(e) => {
-                      const d = e.target.value;
-                      setEditItem({
-                        ...editItem,
-                        discount: d,
-                        price: calculateFinalPrice(editItem.mrp, d)
-                      });
-                    }}
-                  />
+                <div className="grid grid-cols-2 gap-2 flex-1">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount Type</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                      value={editItem.discountType}
+                      onChange={(e) => {
+                        const type = e.target.value;
+                        setEditItem({
+                          ...editItem,
+                          discountType: type,
+                          price: calculateFinalPrice(editItem.mrp, editItem.discount, type)
+                        });
+                      }}
+                    >
+                      <option value="RUPEE">Rupees (₹)</option>
+                      <option value="PERCENT">Percent (%)</option>
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount Value</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      placeholder={editItem.discountType === 'PERCENT' ? '%' : '₹'}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                      value={editItem.discount}
+                      onChange={(e) => {
+                        const d = Math.max(0, parseFloat(e.target.value) || 0);
+                        setEditItem({
+                          ...editItem,
+                          discount: d.toString(),
+                          price: calculateFinalPrice(editItem.mrp, d, editItem.discountType)
+                        });
+                      }}
+                    />
+                  </div>
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>

@@ -15,9 +15,12 @@ const PAYMENT_MODES = [
 export default function PaymentScreen() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [cashReceived, setCashReceived] = useState('');
   const { items, customerMobile, customerName, clearCart, totalAmount } = useCartStore();
   const { user } = useUserStore();
   const navigate = useNavigate();
+
+  const changeDue = (parseFloat(cashReceived) || 0) - totalAmount;
 
   // Fix: Move navigation out of render cycle
   useEffect(() => {
@@ -71,12 +74,12 @@ export default function PaymentScreen() {
 
       <div className="max-w-lg mx-auto px-5 pt-6 space-y-6">
         {/* Amount Card */}
-        <div className="glass rounded-[2rem] p-8 text-center bg-white/70 border-white shadow-sm relative overflow-hidden">
+        <div className="glass rounded-[1.5rem] p-6 text-center bg-white/70 border-white shadow-sm relative overflow-hidden">
           {/* Decorative background blur */}
           <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-emerald-500/10 to-transparent blur-[40px] pointer-events-none" />
           
-          <p className="text-emerald-800/40 font-black uppercase tracking-[0.2em] text-[10px] mb-2 relative z-10">Payable Amount</p>
-          <p className="text-[3.5rem] font-black text-emerald-950 tracking-tighter leading-none relative z-10">₹{totalAmount.toFixed(2)}</p>
+          <p className="text-emerald-800/40 font-black uppercase tracking-[0.2em] text-[9px] mb-2 relative z-10">Payable Amount</p>
+          <p className="text-[2.5rem] font-black text-emerald-950 tracking-tighter leading-none relative z-10">₹{totalAmount.toFixed(2)}</p>
           <div className="flex flex-wrap justify-center gap-2 mt-6 relative z-10">
             {customerName && (
               <div className="inline-flex items-center gap-2 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100">
@@ -103,7 +106,10 @@ export default function PaymentScreen() {
                 <button
                   key={mode.id}
                   id={`payment-${mode.id.toLowerCase()}`}
-                  onClick={() => setSelected(mode.id)}
+                  onClick={() => {
+                    setSelected(mode.id);
+                    if (mode.id !== 'CASH') setCashReceived('');
+                  }}
                   className={`flex flex-col items-center gap-4 p-5 rounded-[2rem] transition-all duration-300 active:scale-95 border ${
                     isSelected
                       ? `bg-gradient-to-br ${mode.color} text-white shadow-xl scale-105 border-transparent ${mode.shadow}`
@@ -120,21 +126,47 @@ export default function PaymentScreen() {
           </div>
         </div>
 
+        {/* Cash Calculator Wrapper */}
+        {selected === 'CASH' && (
+          <div className="space-y-3 animate-in slide-in-from-top-4 duration-300">
+            {/* Input & Return Display */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className="bg-white rounded-[1.5rem] p-3.5 border border-emerald-100/50 shadow-sm relative group">
+                <p className="text-[9px] font-black text-emerald-800/40 uppercase tracking-[0.2em] mb-1">Customer Given Cash</p>
+                <div className="flex items-center gap-1">
+                  <span className="text-lg font-black text-emerald-950">₹</span>
+                  <input
+                    type="number"
+                    value={cashReceived}
+                    onChange={(e) => setCashReceived(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full text-xl font-black text-emerald-950 bg-transparent border-none outline-none focus:ring-0 placeholder:text-emerald-100/50"
+                    autoFocus
+                  />
+                </div>
+              </div>
+              <div className={`rounded-[1.5rem] p-3.5 border transition-all duration-300 shadow-sm ${changeDue >= 0 ? 'bg-orange-50 border-orange-100/50' : 'bg-slate-50 border-slate-200 opacity-50'}`}>
+                <p className={`text-[9px] font-black uppercase tracking-[0.2em] mb-1 ${changeDue >= 0 ? 'text-orange-800/40' : 'text-slate-400'}`}>Return Amount</p>
+                <div className={`text-xl font-black ${changeDue >= 0 ? 'text-orange-600' : 'text-slate-400'}`}>
+                  ₹{changeDue > 0 ? changeDue.toFixed(2) : '0.00'}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Confirm Button */}
-        <div className="pt-4">
+        <div className="pt-4 pb-8">
             <button
             id="confirm-payment-btn"
             onClick={handlePayment}
-            disabled={!selected || loading}
+            disabled={!selected || loading || (selected === 'CASH' && (parseFloat(cashReceived) || 0) < totalAmount)}
             className={`w-full font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative overflow-hidden group ${
-                !selected || loading 
-                ? 'bg-emerald-500 text-white/90 cursor-not-allowed opacity-70 shadow-none border border-emerald-400'
+                !selected || loading || (selected === 'CASH' && (parseFloat(cashReceived) || 0) < totalAmount)
+                ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70 shadow-none'
                 : 'bg-emerald-600 text-white shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700'
             }`}
             >
-            {selected && !loading && (
-                <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-            )}
             <span className="relative z-10 flex items-center gap-3 uppercase text-xs tracking-[0.2em]">
                 {loading ? (
                     <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />

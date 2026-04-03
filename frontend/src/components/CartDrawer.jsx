@@ -79,26 +79,14 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                 <div className="flex-1 min-w-0">
                   <p className="text-[0.95rem] font-black text-emerald-950 truncate mb-1 leading-tight">{item.name}</p>
                   <div className="flex items-center gap-2">
-                    {isItemFree ? (
-                      subtotal >= Number(item.minShopAmount || 0) ? (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[0.7rem] text-emerald-900/30 font-bold line-through">₹{item.price.toFixed(2)}</span>
-                          <span className="text-sm font-black text-orange-600 tracking-tight flex items-center gap-1">
-                            FREE
-                            <span className="text-[10px] bg-orange-100 px-1 rounded animate-pulse">OFFER</span>
-                          </span>
-                        </div>
-                      ) : (
-                        <div className="flex flex-col gap-0.5">
-                          <div className="flex items-center gap-1.5">
-                            <span className="text-sm font-black text-emerald-950/40 tracking-tight">₹{item.price.toFixed(2)}</span>
-                            <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-slate-200">Locked</span>
-                          </div>
-                          <span className="text-[9px] font-bold text-orange-500 uppercase tracking-tight">
-                            Add ₹{(Number(item.minShopAmount || 0) - subtotal).toFixed(0)} more to get free
-                          </span>
-                        </div>
-                      )
+                    {isItemFree && subtotal >= Number(item.minShopAmount || 0) ? (
+                      <>
+                        <span className="text-[0.7rem] text-emerald-900/30 font-bold line-through">₹{item.price.toFixed(2)}</span>
+                        <span className="text-sm font-black text-orange-600 tracking-tight flex items-center gap-1">
+                          FREE
+                          <span className="text-[10px] bg-orange-100 px-1 rounded animate-pulse">OFFER</span>
+                        </span>
+                      </>
                     ) : (
                       <>
                         <p className="text-sm font-black text-emerald-600 tracking-tight">₹{item.price.toFixed(2)}</p>
@@ -109,33 +97,24 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                     )}
                   </div>
                 </div>
-                {isItemFree ? (
-                  <div className="flex items-center justify-center bg-orange-50 border border-orange-100 rounded-xl p-1.5 shadow-inner">
-                    <button
-                      onClick={() => removeItem(item.productId)}
-                      className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-orange-500 active:scale-90 shadow-sm hover:bg-orange-100 transition-all border border-orange-100"
-                    >
-                      <Trash2 size={18} strokeWidth={2.5} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-[1.25rem] p-1.5 shadow-inner">
-                    <button
-                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                      className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 active:scale-90 shadow-sm hover:bg-emerald-100 transition-all border border-emerald-100"
-                    >
-                      <Minus size={14} strokeWidth={4} />
-                    </button>
-                    <span className="w-6 text-center text-[0.95rem] font-black text-emerald-900">{item.quantity}</span>
-                    <button
-                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                      className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white active:scale-90 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
-                    >
-                      <Plus size={14} strokeWidth={4} />
-                    </button>
-                  </div>
-                )}
-                <p className={`text-base font-black w-20 text-right tracking-tighter ${(isItemFree && subtotal < Number(item.minShopAmount || 0)) ? 'text-emerald-950/60 font-bold' : 'text-emerald-950'}`}>
+
+                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-[1.25rem] p-1.5 shadow-inner">
+                  <button
+                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                    className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 active:scale-90 shadow-sm hover:bg-emerald-100 transition-all border border-emerald-100"
+                  >
+                    {item.quantity <= 1 ? <Trash2 size={14} strokeWidth={4} /> : <Minus size={14} strokeWidth={4} />}
+                  </button>
+                  <span className="w-6 text-center text-[0.95rem] font-black text-emerald-900">{item.quantity}</span>
+                  <button
+                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                    className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white active:scale-90 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+                  >
+                    <Plus size={14} strokeWidth={4} />
+                  </button>
+                </div>
+
+                <p className="text-base font-black w-20 text-right tracking-tighter text-emerald-950">
                   ₹{((isItemFree && subtotal >= Number(item.minShopAmount || 0)) ? 0 : Number(item.price || 0) * item.quantity).toFixed(2)}
                 </p>
               </div>
@@ -157,8 +136,21 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                 .filter(p => {
                   const isFree = checkIsFree(p.isFree);
                   const inCart = items.some(i => i.productId === p.id);
-                  return isFree && !inCart;
+                  if (!isFree || inCart) return false;
+                  
+                  const minAmount = Number(p.minShopAmount || 0);
+                  
+                  // Simplified Logic: Only show gifts within a +/- 500 range of current subtotal
+                  // This focuses strictly on the most relevant nearest gifts
+                  const range = 500;
+                  const isNear = minAmount >= (subtotal - range) && minAmount <= (subtotal + range);
+                  
+                  // If subtotal is very low, show gifts from the starting tier up to 500
+                  if (subtotal < range) return minAmount <= range;
+                  
+                  return isNear;
                 })
+                .sort((a, b) => Number(a.minShopAmount) - Number(b.minShopAmount))
                 .map((p) => {
                   const qualifies = subtotal >= Number(p.minShopAmount || 0);
                   return (
@@ -197,10 +189,11 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
 
                       <button
                         onClick={() => addItem(p)}
+                        disabled={!qualifies}
                         className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 flex-shrink-0 ${
                           qualifies 
                             ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-700' 
-                            : 'bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100'
+                            : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed opacity-50'
                         }`}
                       >
                         <Plus size={16} strokeWidth={3} />

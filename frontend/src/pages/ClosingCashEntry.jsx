@@ -5,7 +5,7 @@ import { useUserStore } from '../store/userStore';
 import { submitClosingCash, getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
 
-const DENOMINATIONS = [500, 200, 100, 50, 20, 10];
+const DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
 export default function ClosingCashEntry() {
   const navigate = useNavigate();

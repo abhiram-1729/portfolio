@@ -71,33 +71,62 @@ export default function AgentInventory() {
             <p className="text-[10px] font-bold text-emerald-600 mt-2 uppercase tracking-tighter">Stock may not be assigned yet.</p>
           </div>
         ) : (
-          filteredInventory.map((item) => (
-            <div key={item.id} className="glass rounded-xl p-2.5 bg-white/70 border border-emerald-50 shadow-sm flex items-center gap-3">
-              <div className="w-12 h-12 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-500 overflow-hidden border border-emerald-100/50 shadow-inner shrink-0">
-                {item.product?.image ? (
-                  <img src={item.product?.image} alt={item.product?.name} className="w-full h-full object-cover" />
-                ) : (
-                  <Package size={20} strokeWidth={2} />
-                )}
-              </div>
-              <div className="flex-1 flex flex-col justify-center">
-                <h3 className="text-sm font-black text-emerald-950 tracking-tight leading-tight line-clamp-1 mb-1">{item.product?.name}</h3>
-                <div className="flex items-center gap-2">
-                  <span className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700">
-                    {item.product?.category?.name || 'Item'}
-                  </span>
-                  <span className="text-[10px] font-black text-emerald-700">₹{item.product?.price}</span>
+          <>
+            {/* Total Value Card */}
+            <div className="bg-blue-600 rounded-[2rem] p-6 shadow-xl shadow-blue-600/20 relative overflow-hidden group">
+              <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-white/20 to-transparent blur-[40px] pointer-events-none group-hover:scale-110 transition-transform duration-700" />
+              <div className="relative flex justify-between items-center text-white">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Total Inventory Value</p>
+                  <p className="text-3xl font-black tracking-tighter">₹{
+                    filteredInventory.reduce((acc, item) => acc + (item.quantity * (item.product?.price || 0)), 0)
+                      .toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                  }</p>
                 </div>
-              </div>
-
-              <div className="flex flex-col items-end pl-3 border-l border-emerald-50">
-                <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Qty</span>
-                <div className="flex items-baseline gap-0.5">
-                  <span className="text-lg font-black text-emerald-950 tracking-tighter leading-none">{item.quantity}</span>
+                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                  <Package size={28} strokeWidth={2.5} />
                 </div>
               </div>
             </div>
-          ))
+
+            {/* Inventory List */}
+            <div className="space-y-3">
+              {filteredInventory.map((item) => {
+                const itemAmount = item.quantity * (item.product?.price || 0);
+                return (
+                  <div key={item.id} className="glass rounded-xl p-3 bg-white shadow-sm flex items-center gap-3 border border-gray-100/50 hover:border-emerald-200 transition-all active:scale-[0.99]">
+                    <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 overflow-hidden border border-emerald-100/50 shadow-inner shrink-0 leading-none">
+                      {item.product?.image ? (
+                        <img src={item.product?.image} alt={item.product?.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <Package size={20} strokeWidth={2} />
+                      )}
+                    </div>
+                    <div className="flex-1 flex flex-col justify-center min-w-0">
+                      <h3 className="text-sm font-black text-emerald-950 tracking-tight leading-tight line-clamp-1 mb-1">{item.product?.name}</h3>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100/30">
+                          {item.product?.category?.name || 'Item'}
+                        </span>
+                        <span className="text-[9px] font-black text-blue-500/60 uppercase tracking-tighter">₹{item.product?.price} / Unit</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-4 pl-4 border-l border-gray-100/50">
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Amt</span>
+                        <span className="text-xs font-black text-emerald-700">₹{itemAmount.toFixed(0)}</span>
+                      </div>
+                      <div className="flex flex-col items-end">
+                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Qty</span>
+                        <span className="text-lg font-black text-emerald-950 tracking-tighter leading-none">{item.quantity}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     </div>

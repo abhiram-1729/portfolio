@@ -62,6 +62,66 @@ export const submitOpeningCash = async (req, res, next) => {
     }
 };
 
+// @desc    Admin: Submit opening cash for any vehicle/agent
+// @route   POST /api/cash/admin/opening
+// @access  Admin
+export const adminSubmitOpeningCash = async (req, res, next) => {
+    try {
+        const { vehicleId, denominations, totalOpeningCash, userId } = req.body;
+        const dateString = format(new Date(), 'yyyy-MM-dd');
+
+        if (!vehicleId || !userId || totalOpeningCash === undefined) {
+            res.status(400);
+            throw new Error('Vehicle ID, User ID, and total are required');
+        }
+
+        const openingCash = await prisma.openingCash.upsert({
+            where: {
+                vehicleId_date: {
+                    vehicleId,
+                    date: dateString,
+                },
+            },
+            update: {
+                denominations: denominations || {},
+                totalOpeningCash,
+                userId,
+            },
+            create: {
+                vehicleId,
+                userId,
+                date: dateString,
+                denominations: denominations || {},
+                totalOpeningCash,
+            },
+        });
+
+        // Also update or create daily summary
+        await prisma.dailyCashSummary.upsert({
+            where: {
+                vehicleId_date: {
+                    vehicleId,
+                    date: dateString,
+                },
+            },
+            update: {
+                openingCash: totalOpeningCash,
+                expectedCash: totalOpeningCash,
+            },
+            create: {
+                vehicleId,
+                date: dateString,
+                openingCash: totalOpeningCash,
+                expectedCash: totalOpeningCash,
+            },
+        });
+
+        res.status(201).json(openingCash);
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Submit closing cash for a vehicle
 // @route   POST /api/cash/closing
 // @access  Private
@@ -257,6 +317,86 @@ export const getAdminCashSummary = async (req, res, next) => {
         });
 
         res.json(summaries);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Update/Edit reconciliation for a vehicle
+// @route   PUT /api/cash/admin/reconciliation
+// @access  Admin
+export const adminUpdateReconciliation = async (req, res, next) => {
+    try {
+        const { vehicleId, date, actualCash, denominations, remark } = req.body;
+
+        if (!vehicleId || !date || actualCash === undefined) {
+            res.status(400);
+            throw new Error('Vehicle ID, Date, and Actual Cash are required');
+        }
+
+        // 1. Get current summary to calculate status/difference
+        const summary = await prisma.dailyCashSummary.findUnique({
+            where: {
+                vehicleId_date: { vehicleId, date }
+            }
+        });
+
+        if (!summary) {
+            res.status(404);
+            throw new Error('Summary not found for this date/vehicle');
+        }
+
+        const difference = actualCash - summary.expectedCash;
+        const status = difference === 0 ? 'MATCHED' : 'MISMATCHED';
+
+        // 2. Update DailyCashSummary
+        const updatedSummary = await prisma.dailyCashSummary.update({
+            where: {
+                vehicleId_date: { vehicleId, date }
+            },
+            data: {
+                actualCash,
+                difference,
+                status
+            },
+            include: {
+                vehicle: {
+                    select: {
+                        vehicleNumber: true,
+                        vehicleName: true,
+                    }
+                }
+            }
+        });
+
+        // 3. Update or create ClosingCash record for audit trial
+        await prisma.closingCash.upsert({
+            where: {
+                vehicleId_date: { vehicleId, date }
+            },
+            update: {
+                actualCash,
+                difference,
+                denominations: denominations || {},
+                remark: remark || 'Updated by admin',
+                status
+            },
+            create: {
+                vehicleId,
+                date,
+                userId: req.user.id,
+                openingCash: summary.openingCash,
+                cashSales: summary.cashSales,
+                expectedCash: summary.expectedCash,
+                actualCash,
+                difference,
+                denominations: denominations || {},
+                remark: remark || 'Manually created by admin',
+                status
+            }
+        });
+
+        res.json(updatedSummary);
     } catch (error) {
         next(error);
     }

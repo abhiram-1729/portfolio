@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Truck, Coins, ArrowRight, Info, ArrowLeft, Pencil } from 'lucide-react';
+import { Truck, Coins, ArrowRight, Info, ArrowLeft } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { submitOpeningCash, getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
 
-const DENOMINATIONS = [500, 200, 100, 50, 20, 10];
+const DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
 export default function OpeningCashEntry() {
   const navigate = useNavigate();
@@ -17,7 +17,6 @@ export default function OpeningCashEntry() {
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
   const [openingSubmitted, setOpeningSubmitted] = useState(false);
-  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     if (!user?.assignedVehicle) {
@@ -67,9 +66,8 @@ export default function OpeningCashEntry() {
         denominations: counts,
         totalOpeningCash: totalAmount,
       });
-      toast.success(isEditing ? 'Opening cash updated successfully' : 'Opening cash submitted successfully');
+      toast.success('Opening cash submitted successfully');
       setOpeningSubmitted(true);
-      setIsEditing(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to submit opening cash');
     } finally {
@@ -170,10 +168,10 @@ export default function OpeningCashEntry() {
                       inputMode="numeric"
                       placeholder="0"
                       value={counts[denom]}
-                      disabled={openingSubmitted && !isEditing}
+                      disabled={openingSubmitted}
                       onChange={(e) => handleCountChange(denom, e.target.value)}
                       className={`w-24 bg-slate-50 border-2 border-transparent outline-none rounded-xl py-3 px-4 text-right font-black transition-all text-lg ${
-                        openingSubmitted && !isEditing
+                        openingSubmitted
                           ? 'opacity-50 cursor-not-allowed text-slate-500' 
                           : 'focus:border-emerald-500 focus:bg-white text-slate-950'
                       }`}
@@ -199,26 +197,15 @@ export default function OpeningCashEntry() {
             </div>
           </div>
 
-          {openingSubmitted && !isEditing ? (
-            <div className="space-y-3">
-              <button
-                type="button"
-                onClick={() => navigate('/', { replace: true })}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
-              >
-                Continue to Sales
-                <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setIsEditing(true)}
-                className="w-full bg-white border-2 border-slate-200 text-slate-500 hover:bg-slate-50 font-black text-lg py-4 rounded-[1.25rem] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
-              >
-                <Pencil size={18} />
-                Edit Opening Cash
-              </button>
-            </div>
+          {openingSubmitted ? (
+            <button
+              type="button"
+              onClick={() => navigate('/', { replace: true })}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+            >
+              Continue to Sales
+              <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
+            </button>
           ) : (
             <button
               type="submit"
@@ -227,7 +214,7 @@ export default function OpeningCashEntry() {
             >
               {loading ? 'Submitting...' : (
                 <>
-                  {isEditing ? 'Update Cash Float' : 'Confirm & Start Sales'}
+                  Confirm & Start Sales
                   <ArrowRight className="group-hover:translate-x-1 transition-transform" />
                 </>
               )}
