@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 export default function AdminInventory() {
   const [activeTab, setActiveTab] = useState('master');
@@ -20,6 +21,8 @@ export default function AdminInventory() {
   const [selectedEditFile, setSelectedEditFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState(null);
   const [editPreviewUrl, setEditPreviewUrl] = useState(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedItems, setSelectedItems] = useState([]); // [id, id, ...]
 
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -96,6 +99,95 @@ export default function AdminInventory() {
     }
 
     return base.toFixed(2);
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          toast.error('Excel file is empty');
+          setIsUploading(false);
+          return;
+        }
+
+        const products = data
+          .map((row) => {
+            // Identify columns case-insensitively
+            const keys = Object.keys(row);
+            const findKey = (search) => keys.find(k => k.toLowerCase().includes(search.toLowerCase()));
+
+            const nameKey = findKey('product name') || findKey('name') || keys[0];
+            const landingPriceKey = findKey('landing price') || findKey('landing');
+            const mrpKey = findKey('mrp');
+            const discountValueKey = findKey('discount value') || findKey('discount');
+            const gstKey = findKey('gst slab') || findKey('gst') || findKey('tax');
+            const descriptionKey = findKey('description');
+
+            if (!row[nameKey]) return null;
+
+            // Identify discount type from column name containing "discount"
+            let discountType = 'RUPEE';
+            if (discountValueKey && (discountValueKey.includes('%') || discountValueKey.toLowerCase().includes('percent'))) {
+              discountType = 'PERCENT';
+            } else {
+              // check if there's any other column that specifies type
+              const dTypeKey = findKey('discount type');
+              if (row[dTypeKey] && (row[dTypeKey].toString().includes('%') || row[dTypeKey].toString().toLowerCase().includes('percent'))) {
+                discountType = 'PERCENT';
+              }
+            }
+
+            const mrp = parseFloat(row[mrpKey]) || 0;
+            const discount = parseFloat(row[discountValueKey]) || 0;
+            const gst = parseFloat(row[gstKey]) || 0;
+            const price = calculateFinalPrice(mrp, discount, discountType);
+
+            return {
+              name: row[nameKey],
+              landingPrice: parseFloat(row[landingPriceKey]) || 0,
+              mrp,
+              discount,
+              discountType,
+              gst,
+              description: row[descriptionKey] || '',
+              price: parseFloat(price),
+              status: 'ACTIVE',
+              isFree: false
+            };
+          })
+          .filter(p => p && p.name);
+
+        if (products.length === 0) {
+          toast.error('No valid products found in Excel');
+          setIsUploading(false);
+          return;
+        }
+
+        await adminAPI.bulkCreateItems(products);
+        toast.success(`Successfully uploaded ${products.length} products`);
+        fetchData();
+      } catch (error) {
+        console.error('Excel upload error:', error);
+        toast.error('Failed to process Excel file');
+      } finally {
+        setIsUploading(false);
+        e.target.value = ''; // Reset input
+      }
+    };
+
+    reader.readAsBinaryString(file);
   };
 
   const handleCreateItem = async (e) => {
@@ -220,6 +312,37 @@ export default function AdminInventory() {
     }
   };
 
+  const handleBulkDelete = async () => {
+    if (selectedItems.length === 0) return;
+    if (!window.confirm(`Delete ${selectedItems.length} selected items? This cannot be undone.`)) return;
+    
+    setIsUploading(true);
+    try {
+      await adminAPI.bulkDeleteItems(selectedItems);
+      toast.success(`Successfully deleted ${selectedItems.length} items`);
+      setSelectedItems([]);
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to delete selected items');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const toggleSelectItem = (id) => {
+    setSelectedItems(prev => 
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAll = (filteredItems) => {
+    if (selectedItems.length === filteredItems.length && filteredItems.length > 0) {
+      setSelectedItems([]);
+    } else {
+      setSelectedItems(filteredItems.map(i => i.id));
+    }
+  };
+
   const handleFileChange = (e, isEdit = false) => {
     const file = e.target.files[0];
     if (file) {
@@ -271,89 +394,112 @@ export default function AdminInventory() {
   });
 
   const renderMaster = () => {
-    const renderProductCard = (item) => (
-      <div key={item.id} className={`bg-white p-4 rounded-2xl border ${item.isFree ? 'border-emerald-100 bg-emerald-50/20' : 'border-gray-100'} shadow-sm flex items-center justify-between`}>
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden border shadow-inner ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
-            {item.image ? (
-              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-            ) : (
-              item.isFree ? <Gift size={24} /> : <Package size={24} />
-            )}
-          </div>
-          <div className="flex flex-col">
-            <div className="flex items-center gap-2">
-              <h3 className={`text-sm font-bold ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
-              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600')}`}>
-                {item.status || 'ACTIVE'}
-              </span>
-              {item.isFree && (
-                <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Gift</span>
+    const renderProductCard = (item) => {
+      const isSelected = selectedItems.includes(item.id);
+      return (
+        <div 
+          key={item.id} 
+          className={`bg-white p-4 rounded-2xl border transition-all duration-200 ${isSelected ? 'border-emerald-500 bg-emerald-50/10' : item.isFree ? 'border-emerald-100 bg-emerald-50/20' : 'border-gray-100'} shadow-sm flex items-center justify-between group relative`}
+        >
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => toggleSelectItem(item.id)}
+              className={`p-1 rounded-md transition-colors ${isSelected ? 'text-emerald-600' : 'text-gray-300'}`}
+            >
+              {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+            </button>
+            <div className={`w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden border shadow-inner ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+              {item.image ? (
+                <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+              ) : (
+                item.isFree ? <Gift size={24} /> : <Package size={24} />
               )}
             </div>
-            <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{item.category?.name || 'Uncategorized'}</span>
-            <div className="flex items-center gap-3 mt-1 flex-wrap">
-              <div className="flex flex-col">
-                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Selling</span>
-                <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
+            <div className="flex flex-col">
+              <div className="flex items-center gap-2">
+                <h3 className={`text-sm font-bold ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
+                <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600')}`}>
+                  {item.status || 'ACTIVE'}
+                </span>
+                {item.isFree && (
+                  <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Gift</span>
+                )}
               </div>
-              <div className="flex flex-col border-l border-gray-100 pl-3">
-                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">MRP</span>
-                <span className="text-[10px] text-gray-400 line-through">₹{item.mrp || 0}</span>
-              </div>
-              <div className="flex flex-col border-l border-gray-100 pl-3">
-                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Discount</span>
-                <span className="text-[10px] text-orange-600 font-bold">₹{item.discount || 0}</span>
-              </div>
-              <div className="flex flex-col border-l border-gray-100 pl-3">
-                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Lnd. Price</span>
-                <span className="text-[10px] text-slate-500 font-bold">₹{item.landingPrice || 0}</span>
-              </div>
-              <div className="flex flex-col border-l border-gray-100 pl-3">
-                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">GST</span>
-                <span className="text-[10px] text-blue-600 font-bold">{item.gst || 0}%</span>
-              </div>
-              {item.isFree && (
-                <div className="flex flex-col border-l border-gray-100 pl-3">
-                  <span className="text-[10px] text-emerald-600 uppercase font-black tracking-tighter">Free Above</span>
-                  <span className="text-[10px] text-emerald-600 font-bold">₹{item.minShopAmount || 0}</span>
+              <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{item.category?.name || 'Uncategorized'}</span>
+              <div className="flex items-center gap-3 mt-1 flex-wrap">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Selling</span>
+                  <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
                 </div>
-              )}
+                <div className="flex flex-col border-l border-gray-100 pl-3">
+                  <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">MRP</span>
+                  <span className="text-[10px] text-gray-400 line-through">₹{item.mrp || 0}</span>
+                </div>
+                <div className="flex flex-col border-l border-gray-100 pl-3">
+                  <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Discount</span>
+                  <span className="text-[10px] text-orange-600 font-bold">₹{item.discount || 0}</span>
+                </div>
+                <div className="flex flex-col border-l border-gray-100 pl-3">
+                  <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Lnd. Price</span>
+                  <span className="text-[10px] text-slate-500 font-bold">₹{item.landingPrice || 0}</span>
+                </div>
+                <div className="flex flex-col border-l border-gray-100 pl-3">
+                  <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">GST</span>
+                  <span className="text-[10px] text-blue-600 font-bold">{item.gst || 0}%</span>
+                </div>
+                {item.isFree && (
+                  <div className="flex flex-col border-l border-gray-100 pl-3">
+                    <span className="text-[10px] text-emerald-600 uppercase font-black tracking-tighter">Free Above</span>
+                    <span className="text-[10px] text-emerald-600 font-bold">₹{item.minShopAmount || 0}</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => handleToggleStatus(item)}
+              className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
+            >
+              {item.status === 'INACTIVE' ? '' : ''}
+            </button>
+            <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
+            <button
+              onClick={() => openEditModal(item)}
+              className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
+            >
+              <Pencil size={14} />
+            </button>
+            <button
+              onClick={() => handleDeleteItem(item)}
+              title="Delete Item"
+              disabled={deletingId === item.id}
+              className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {deletingId === item.id
+                ? <Loader2 size={14} className="animate-spin text-rose-400" />
+                : <Trash2 size={14} />}
+            </button>
+          </div>
         </div>
-        <div className="flex items-center gap-1">
-          <button
-            onClick={() => handleToggleStatus(item)}
-            className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
-          >
-            {item.status === 'INACTIVE' ? '' : ''}
-          </button>
-          <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
-          <button
-            onClick={() => openEditModal(item)}
-            className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
-          >
-            <Pencil size={14} />
-          </button>
-          <button
-            onClick={() => handleDeleteItem(item)}
-            title="Delete Item"
-            disabled={deletingId === item.id}
-            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {deletingId === item.id
-              ? <Loader2 size={14} className="animate-spin text-rose-400" />
-              : <Trash2 size={14} />}
-          </button>
-        </div>
-      </div>
-    );
+      );
+    }
+
+    const allSelected = filteredItems.length > 0 && selectedItems.length === filteredItems.length;
 
     return (
       <div className="space-y-4">
-        <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex-1 flex items-center gap-2 pl-2">
+        <div className="flex items-center gap-3">
+          <div className="flex-1 flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="flex items-center gap-2 pl-2">
+              <button 
+                onClick={() => handleSelectAll(filteredItems)}
+                className={`p-1 rounded-md transition-colors ${allSelected ? 'text-emerald-600' : 'text-gray-300'}`}
+                title="Select All"
+              >
+                {allSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+              </button>
+            </div>
             <Search size={18} className="text-gray-400 shrink-0" />
             <input
               type="text"
@@ -362,22 +508,32 @@ export default function AdminInventory() {
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
             />
+            <div className="flex items-center gap-1.5 shrink-0 border-l border-gray-100 pl-2">
+              <button
+                onClick={() => setFilterFreeOnly(!filterFreeOnly)}
+                className={`px-2.5 py-1.5 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all border ${filterFreeOnly ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
+              >
+                {filterFreeOnly ? '✓ Free Only' : 'Free'}
+              </button>
+              <button
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-1.5 rounded-xl transition-colors border ${showFilters ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm' : 'bg-white border-transparent hover:bg-gray-50 text-gray-400'}`}
+                title="Advanced Filters"
+              >
+                <Filter size={16} />
+              </button>
+            </div>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0 border-l border-gray-100 pl-2">
+          {selectedItems.length > 0 && (
             <button
-              onClick={() => setFilterFreeOnly(!filterFreeOnly)}
-              className={`px-2.5 py-1.5 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all border ${filterFreeOnly ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
+              onClick={handleBulkDelete}
+              disabled={isUploading}
+              className="bg-rose-50 text-rose-600 px-4 py-3 rounded-2xl border border-rose-100 shadow-sm hover:bg-rose-100 transition-all flex items-center gap-2 font-bold text-sm"
             >
-              {filterFreeOnly ? '✓ Free Only' : 'Free'}
+              <Trash2 size={18} />
+              <span>Delete {selectedItems.length}</span>
             </button>
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`p-1.5 rounded-xl transition-colors border ${showFilters ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm' : 'bg-white border-transparent hover:bg-gray-50 text-gray-400'}`}
-              title="Advanced Filters"
-            >
-              <Filter size={16} />
-            </button>
-          </div>
+          )}
         </div>
 
         {showFilters && (
@@ -415,7 +571,9 @@ export default function AdminInventory() {
               </button>
             </div>
           </div>
-        )}      <div className="space-y-6">
+        )}
+
+        <div className="space-y-6">
           {filteredItems.length === 0 ? (
             <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
               <Package size={32} className="mx-auto text-gray-200 mb-2" />
@@ -695,12 +853,31 @@ export default function AdminInventory() {
           <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
         </div>
         {activeTab === 'master' && (
-          <button
-            onClick={() => setShowAddItemModal(true)}
-            className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
-          >
-            <Plus size={24} />
-          </button>
+          <div className="flex gap-2">
+            <input
+              type="file"
+              id="excel-upload"
+              accept=".xlsx, .xls, .csv"
+              className="hidden"
+              onChange={handleExcelUpload}
+              disabled={isUploading}
+            />
+            <button
+              onClick={() => document.getElementById('excel-upload').click()}
+              disabled={isUploading}
+              className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
+              title="Bulk Upload Excel"
+            >
+              {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
+              <span className="hidden md:block">Bulk Upload</span>
+            </button>
+            <button
+              onClick={() => setShowAddItemModal(true)}
+              className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
+            >
+              <Plus size={24} />
+            </button>
+          </div>
         )}
       </div>
 
