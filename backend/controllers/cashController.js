@@ -225,6 +225,8 @@ export const getCashStatus = async (req, res, next) => {
             openingSubmitted: !!opening,
             closingSubmitted: !!closing,
             openingCash: opening?.totalOpeningCash || 0,
+            openingDenominations: opening?.denominations || null,
+            closingDenominations: closing?.denominations || null,
             cashSales: cashSalesResult._sum.totalAmount || 0,
         });
     } catch (error) {

@@ -43,7 +43,6 @@ export default function Header() {
           {user?.role === 'SALES_AGENT' && (
             <Link to="/closing-cash" className="p-2.5 rounded-2xl bg-orange-600 text-white shadow-lg shadow-orange-600/20 active:scale-90 transition-all border border-orange-500 flex items-center gap-2 px-3 mr-1">
               <Truck size={18} strokeWidth={2.5} />
-              <span className="text-[9px] font-black uppercase tracking-widest leading-none">End Day</span>
             </Link>
           )}
           {user?.role === 'ADMIN' && (

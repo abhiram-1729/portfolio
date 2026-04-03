@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Truck, Coins, ArrowRight, Info } from 'lucide-react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { Truck, Coins, ArrowRight, Info, ArrowLeft, Pencil } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { submitOpeningCash, getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
@@ -9,22 +9,33 @@ const DENOMINATIONS = [500, 200, 100, 50, 20, 10];
 
 export default function OpeningCashEntry() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useUserStore();
   const [counts, setCounts] = useState(
     DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {})
   );
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [openingSubmitted, setOpeningSubmitted] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
+    if (!user?.assignedVehicle) {
+      toast.error('No vehicle assigned. Access denied.', { id: 'no-vehicle' });
+      navigate('/', { replace: true });
+      return;
+    }
     checkStatus();
-  }, []);
+  }, [user?.assignedVehicle, navigate]);
 
   const checkStatus = async () => {
     try {
       const status = await getCashStatus();
       if (status.openingSubmitted) {
-        navigate('/', { replace: true });
+        setOpeningSubmitted(true);
+        if (status.openingDenominations) {
+          setCounts(status.openingDenominations);
+        }
       }
     } catch (err) {
       console.error(err);
@@ -56,8 +67,9 @@ export default function OpeningCashEntry() {
         denominations: counts,
         totalOpeningCash: totalAmount,
       });
-      toast.success('Opening cash submitted successfully');
-      navigate('/', { replace: true });
+      toast.success(isEditing ? 'Opening cash updated successfully' : 'Opening cash submitted successfully');
+      setOpeningSubmitted(true);
+      setIsEditing(false);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to submit opening cash');
     } finally {
@@ -68,7 +80,16 @@ export default function OpeningCashEntry() {
   if (checking) return null;
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col p-5 pb-10">
+    <div className="min-h-screen bg-slate-50 flex flex-col p-5 pb-10 relative">
+      {openingSubmitted && (
+        <button 
+          onClick={() => navigate('/')} 
+          className="absolute top-5 left-5 p-2 bg-white rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors z-10 shadow-sm"
+        >
+          <ArrowLeft size={20} />
+        </button>
+      )}
+
       <div className="max-w-lg mx-auto w-full space-y-8">
         {/* Header Section */}
         <div className="text-center space-y-2 mt-8">
@@ -78,6 +99,34 @@ export default function OpeningCashEntry() {
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Start Your Day</h1>
           <p className="text-slate-500 font-bold">Please record your opening cash float</p>
         </div>
+
+        {/* Tab Navigation */}
+        {openingSubmitted && (
+          <div className="flex gap-2 bg-slate-200/50 p-1.5 rounded-2xl">
+            <button
+              type="button"
+              onClick={() => navigate('/opening-cash')}
+              className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                location.pathname === '/opening-cash'
+                  ? "bg-white text-emerald-600 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Start Day
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/closing-cash')}
+              className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
+                location.pathname === '/closing-cash'
+                  ? "bg-white text-slate-900 shadow-sm"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              End Day
+            </button>
+          </div>
+        )}
 
         {/* Vehicle Info Card */}
         {user?.assignedVehicle && (
@@ -121,8 +170,13 @@ export default function OpeningCashEntry() {
                       inputMode="numeric"
                       placeholder="0"
                       value={counts[denom]}
+                      disabled={openingSubmitted && !isEditing}
                       onChange={(e) => handleCountChange(denom, e.target.value)}
-                      className="w-24 bg-slate-50 border-2 border-transparent focus:border-emerald-500 focus:bg-white outline-none rounded-xl py-3 px-4 text-right font-black text-slate-950 transition-all text-lg"
+                      className={`w-24 bg-slate-50 border-2 border-transparent outline-none rounded-xl py-3 px-4 text-right font-black transition-all text-lg ${
+                        openingSubmitted && !isEditing
+                          ? 'opacity-50 cursor-not-allowed text-slate-500' 
+                          : 'focus:border-emerald-500 focus:bg-white text-slate-950'
+                      }`}
                     />
                     <div className="w-24 text-right">
                       <span className="text-xs font-black text-slate-400 block leading-none mb-1">Total</span>
@@ -145,18 +199,40 @@ export default function OpeningCashEntry() {
             </div>
           </div>
 
-          <button
-            type="submit"
-            disabled={loading || totalAmount <= 0}
-            className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
-          >
-            {loading ? 'Submitting...' : (
-              <>
-                Confirm & Start Sales
-                <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-              </>
-            )}
-          </button>
+          {openingSubmitted && !isEditing ? (
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => navigate('/', { replace: true })}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+              >
+                Continue to Sales
+                <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsEditing(true)}
+                className="w-full bg-white border-2 border-slate-200 text-slate-500 hover:bg-slate-50 font-black text-lg py-4 rounded-[1.25rem] transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+              >
+                <Pencil size={18} />
+                Edit Opening Cash
+              </button>
+            </div>
+          ) : (
+            <button
+              type="submit"
+              disabled={loading || totalAmount <= 0}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+            >
+              {loading ? 'Submitting...' : (
+                <>
+                  {isEditing ? 'Update Cash Float' : 'Confirm & Start Sales'}
+                  <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                </>
+              )}
+            </button>
+          )}
         </form>
       </div>
     </div>

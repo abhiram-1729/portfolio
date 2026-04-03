@@ -34,6 +34,22 @@ export default function AdminUsers() {
     fetchUsers();
   }, []);
 
+  const handleCreateUser = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await adminAPI.createUser(newUser);
+      toast.success('User created successfully');
+      setShowAddModal(false);
+      setNewUser({ name: '', email: '', password: '', mobile: '', role: 'SALES_AGENT' });
+      fetchUsers();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to create user');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleUpdateUser = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
