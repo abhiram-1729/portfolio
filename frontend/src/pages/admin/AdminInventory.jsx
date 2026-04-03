@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,7 @@ export default function AdminInventory() {
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
+  const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [items, setItems] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -231,6 +232,7 @@ export default function AdminInventory() {
 
     if (actionItems.length === 0) return toast.error('Please enter quantities');
 
+    setIsSubmitting(true);
     try {
       if (type === 'LOAD') {
         await adminAPI.loadStock({ vehicleId: selectedVehicleId, items: actionItems });
@@ -243,6 +245,8 @@ export default function AdminInventory() {
       if (type === 'RETURN') fetchVehicleInventory(selectedVehicleId);
     } catch (error) {
       toast.error(`Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -252,154 +256,181 @@ export default function AdminInventory() {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = filterCategory === 'ALL' || item.category?.name === filterCategory;
     const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
-    return matchesSearch && matchesCategory && matchesStatus;
+    const matchesFree = !filterFreeOnly || item.isFree;
+    return matchesSearch && matchesCategory && matchesStatus && matchesFree;
   });
 
-  const renderMaster = () => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
-        <Search size={20} className="text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search items..."
-          className="flex-1 bg-transparent border-none focus:outline-none text-sm"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        <button
-          onClick={() => setShowFilters(!showFilters)}
-          className={`p-2 rounded-xl transition-colors ${showFilters ? 'bg-emerald-50 text-emerald-600' : 'hover:bg-gray-50 text-gray-400'}`}
-        >
-          <Filter size={18} />
-        </button>
+  const renderMaster = () => {
+    const renderProductCard = (item) => (
+      <div key={item.id} className={`bg-white p-4 rounded-2xl border ${item.isFree ? 'border-emerald-100 bg-emerald-50/20' : 'border-gray-100'} shadow-sm flex items-center justify-between`}>
+        <div className="flex items-center gap-4">
+          <div className={`w-12 h-12 rounded-xl flex items-center justify-center overflow-hidden border shadow-inner ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+            {item.image ? (
+              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+            ) : (
+              item.isFree ? <Gift size={24} /> : <Package size={24} />
+            )}
+          </div>
+          <div className="flex flex-col">
+            <div className="flex items-center gap-2">
+              <h3 className={`text-sm font-bold ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
+              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600')}`}>
+                {item.status || 'ACTIVE'}
+              </span>
+              {item.isFree && (
+                <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Gift</span>
+              )}
+            </div>
+            <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{item.category?.name || 'Uncategorized'}</span>
+            <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <div className="flex flex-col">
+                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Selling</span>
+                <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
+              </div>
+              <div className="flex flex-col border-l border-gray-100 pl-3">
+                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">MRP</span>
+                <span className="text-[10px] text-gray-400 line-through">₹{item.mrp || 0}</span>
+              </div>
+              <div className="flex flex-col border-l border-gray-100 pl-3">
+                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Discount</span>
+                <span className="text-[10px] text-orange-600 font-bold">₹{item.discount || 0}</span>
+              </div>
+              <div className="flex flex-col border-l border-gray-100 pl-3">
+                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Lnd. Price</span>
+                <span className="text-[10px] text-slate-500 font-bold">₹{item.landingPrice || 0}</span>
+              </div>
+              <div className="flex flex-col border-l border-gray-100 pl-3">
+                <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">GST</span>
+                <span className="text-[10px] text-blue-600 font-bold">{item.gst || 0}%</span>
+              </div>
+              {item.isFree && (
+                <div className="flex flex-col border-l border-gray-100 pl-3">
+                  <span className="text-[10px] text-emerald-600 uppercase font-black tracking-tighter">Free Above</span>
+                  <span className="text-[10px] text-emerald-600 font-bold">₹{item.minShopAmount || 0}</span>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => handleToggleStatus(item)}
+            className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
+          >
+            {item.status === 'INACTIVE' ? '' : ''}
+          </button>
+          <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
+          <button
+            onClick={() => openEditModal(item)}
+            className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
+          >
+            <Pencil size={14} />
+          </button>
+          <button
+            onClick={() => handleDeleteItem(item)}
+            title="Delete Item"
+            disabled={deletingId === item.id}
+            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {deletingId === item.id
+              ? <Loader2 size={14} className="animate-spin text-rose-400" />
+              : <Trash2 size={14} />}
+          </button>
+        </div>
       </div>
+    );
 
-      {showFilters && (
-        <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap gap-4 animate-in slide-in-from-top-2 duration-200">
-          <div className="space-y-1 flex-1 min-w-[150px]">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
-            <select
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-            >
-              <option value="ALL">All Categories</option>
-              {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex-1 flex items-center gap-2 pl-2">
+            <Search size={18} className="text-gray-400 shrink-0" />
+            <input
+              type="text"
+              placeholder="Search items..."
+              className="w-full bg-transparent border-none focus:outline-none text-sm min-w-0"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
           </div>
-          <div className="space-y-1 flex-1 min-w-[150px]">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
-            <select
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="ALL">All Status</option>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-            </select>
-          </div>
-          <div className="flex items-end">
+          <div className="flex items-center gap-1.5 shrink-0 border-l border-gray-100 pl-2">
             <button
-              onClick={() => { setFilterCategory('ALL'); setFilterStatus('ALL'); setSearchQuery(''); }}
-              className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2"
+              onClick={() => setFilterFreeOnly(!filterFreeOnly)}
+              className={`px-2.5 py-1.5 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all border ${filterFreeOnly ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
             >
-              Clear Filters
+              {filterFreeOnly ? '✓ Free Only' : 'Free'}
+            </button>
+            <button
+              onClick={() => setShowFilters(!showFilters)}
+              className={`p-1.5 rounded-xl transition-colors border ${showFilters ? 'bg-emerald-50 border-emerald-100 text-emerald-600 shadow-sm' : 'bg-white border-transparent hover:bg-gray-50 text-gray-400'}`}
+              title="Advanced Filters"
+            >
+              <Filter size={16} />
             </button>
           </div>
         </div>
-      )}
 
-      <div className="space-y-3">
-        {filteredItems.length === 0 ? (
-          <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
-            <Package size={32} className="mx-auto text-gray-200 mb-2" />
-            <p className="text-sm font-bold text-gray-400">No items match your filters</p>
-          </div>
-        ) : (
-          filteredItems.map((item) => (
-            <div key={item.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center text-emerald-600 overflow-hidden border border-gray-100 shadow-inner">
-                  {item.image ? (
-                    <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                  ) : (
-                    <Package size={24} />
-                  )}
-                </div>
-                <div className="flex flex-col">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-bold text-gray-900">{item.name}</h3>
-                    <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : 'bg-blue-100 text-blue-600'}`}>
-                      {item.status || 'ACTIVE'}
-                    </span>
-                    {item.isFree && (
-                      <span className="bg-emerald-600 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Promotional Gift</span>
-                    )}
-                  </div>
-                  <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{item.category?.name || 'Uncategorized'}</span>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <div className="flex flex-col">
-                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Selling</span>
-                      <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
-                    </div>
-                    <div className="flex flex-col border-l border-gray-100 pl-3">
-                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">MRP</span>
-                      <span className="text-[10px] text-gray-400 line-through">₹{item.mrp || 0}</span>
-                    </div>
-                    <div className="flex flex-col border-l border-gray-100 pl-3">
-                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Discount</span>
-                      <span className="text-[10px] text-orange-600 font-bold">₹{item.discount || 0}</span>
-                    </div>
-                    <div className="flex flex-col border-l border-gray-100 pl-3">
-                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Lnd. Price</span>
-                      <span className="text-[10px] text-slate-500 font-bold">₹{item.landingPrice || 0}</span>
-                    </div>
-                    <div className="flex flex-col border-l border-gray-100 pl-3">
-                      <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">GST</span>
-                      <span className="text-[10px] text-blue-600 font-bold">{item.gst || 0}%</span>
-                    </div>
-                    {item.isFree && (
-                      <div className="flex flex-col border-l border-gray-100 pl-3">
-                        <span className="text-[10px] text-emerald-600 uppercase font-black tracking-tighter">Free Above</span>
-                        <span className="text-[10px] text-emerald-600 font-bold">₹{item.minShopAmount || 0}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-1">
-                <button
-                  onClick={() => handleToggleStatus(item)}
-                  className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
-                >
-                  {item.status === 'INACTIVE' ? '' : ''}
-                </button>
-                <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
-                <button
-                  onClick={() => openEditModal(item)}
-                  className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
-                >
-                  <Pencil size={14} />
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDeleteItem(item)}
-                  title="Delete Item"
-                  disabled={deletingId === item.id}
-                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {deletingId === item.id
-                    ? <Loader2 size={14} className="animate-spin text-rose-400" />
-                    : <Trash2 size={14} />}
-                </button>
-              </div>
+        {showFilters && (
+          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap gap-4 animate-in slide-in-from-top-2 duration-200">
+            <div className="space-y-1 flex-1 min-w-[150px]">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
+              <select
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                value={filterCategory}
+                onChange={(e) => setFilterCategory(e.target.value)}
+              >
+                <option value="ALL">All Categories</option>
+                {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
             </div>
-          ))
-        )}
+            <div className="space-y-1 flex-1 min-w-[150px]">
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
+              <select
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="ALL">All Status</option>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+              </select>
+            </div>
+
+            <div className="flex items-end">
+              <button
+                onClick={() => { setFilterCategory('ALL'); setFilterStatus('ALL'); setSearchQuery(''); setFilterFreeOnly(false); }}
+                className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2"
+              >
+                Clear Filters
+              </button>
+            </div>
+          </div>
+        )}      <div className="space-y-6">
+          {filteredItems.length === 0 ? (
+            <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
+              <Package size={32} className="mx-auto text-gray-200 mb-2" />
+              <p className="text-sm font-bold text-gray-400">No items match your filters</p>
+            </div>
+          ) : (
+            <>
+              {filteredItems.filter(i => !i.isFree).length > 0 && (
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Regular Products</h4>
+                  {filteredItems.filter(i => !i.isFree).map(renderProductCard)}
+                </div>
+              )}
+              {filteredItems.filter(i => i.isFree).length > 0 && (
+                <div className="space-y-3 mt-4">
+                  <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-2 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                  {filteredItems.filter(i => i.isFree).map(renderProductCard)}
+                </div>
+              )}
+            </>
+          )}
+        </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderLoading = () => (
     <div className="space-y-6">
@@ -413,9 +444,15 @@ export default function AdminInventory() {
               className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               <option value="">Select Vehicle No.</option>
-              {vehicles.map(v => (
-                <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
-              ))}
+              {vehicles.map(v => {
+                const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
+                const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
+                return (
+                  <option key={v.id} value={v.id}>
+                    {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
+                  </option>
+                );
+              })}
             </select>
             <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
@@ -426,25 +463,48 @@ export default function AdminInventory() {
             <ArrowUpCircle size={18} className="text-emerald-500" />
             Stock Loading (Morning)
           </h4>
-          <div className="space-y-3">
-            {items.map((item) => (
-              <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                <input
-                  type="number"
-                  placeholder="Qty"
-                  className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold"
-                  value={stockQuantities[item.id] || ''}
-                  onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                />
+          <div className="space-y-6">
+            {items.filter(i => !i.isFree).length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
+                {items.filter(i => !i.isFree).map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                    <span className="text-sm font-medium text-gray-700">{item.name}</span>
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold"
+                      value={stockQuantities[item.id] || ''}
+                      onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
+                    />
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
+            {items.filter(i => i.isFree).length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                {items.filter(i => i.isFree).map((item) => (
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                    <span className="text-sm font-bold text-emerald-900">{item.name}</span>
+                    <input
+                      type="number"
+                      placeholder="Qty"
+                      className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1 text-sm text-center font-bold text-emerald-700"
+                      value={stockQuantities[item.id] || ''}
+                      onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           <button
             onClick={() => handleStockAction('LOAD')}
-            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+            disabled={isSubmitting}
+            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
           >
-            Submit Loading
+            {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : 'Submit Loading'}
           </button>
         </div>
       </div>
@@ -463,9 +523,15 @@ export default function AdminInventory() {
               className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
             >
               <option value="">Select Vehicle No.</option>
-              {vehicles.map(v => (
-                <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
-              ))}
+              {vehicles.map(v => {
+                const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
+                const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
+                return (
+                  <option key={v.id} value={v.id}>
+                    {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
+                  </option>
+                );
+              })}
             </select>
             <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
           </div>
@@ -476,36 +542,66 @@ export default function AdminInventory() {
             <ArrowDownCircle size={18} className="text-orange-500" />
             Stock Return (Evening)
           </h4>
-          <div className="space-y-3">
+          <div className="space-y-6">
             {selectedVehicleId ? (
-              items.map((item) => {
-                const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
-                return (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    <div className="flex flex-col">
-                      <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase">In Vehicle: {currentStock}</span>
-                    </div>
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold"
-                      value={stockQuantities[item.id] || ''}
-                      onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                    />
+              <>
+                {items.filter(i => !i.isFree).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
+                    {items.filter(i => !i.isFree).map((item) => {
+                      const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
+                      return (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-medium text-gray-700">{item.name}</span>
+                            <span className="text-[10px] text-gray-400 font-bold uppercase">In Vehicle: {currentStock}</span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="Qty"
+                            className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-sm text-center font-bold"
+                            value={stockQuantities[item.id] || ''}
+                            onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })
+                )}
+                {items.filter(i => i.isFree).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                    {items.filter(i => i.isFree).map((item) => {
+                      const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
+                      return (
+                        <div key={item.id} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-emerald-900">{item.name}</span>
+                            <span className="text-[10px] text-emerald-600 font-bold uppercase">In Vehicle: {currentStock}</span>
+                          </div>
+                          <input
+                            type="number"
+                            placeholder="Qty"
+                            className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1 text-sm text-center font-bold text-emerald-700"
+                            value={stockQuantities[item.id] || ''}
+                            onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </>
             ) : (
               <p className="text-center text-gray-400 text-sm py-4">Select a vehicle to see current stock</p>
             )}
           </div>
           <button
             onClick={() => handleStockAction('RETURN')}
-            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50"
-            disabled={!selectedVehicleId}
+            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+            disabled={!selectedVehicleId || isSubmitting}
           >
-            Submit Return
+            {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : 'Submit Return'}
           </button>
         </div>
       </div>

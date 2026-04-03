@@ -8,6 +8,7 @@ import PaymentScreen from './pages/PaymentScreen';
 import SuccessScreen from './pages/SuccessScreen';
 import Reports from './pages/Reports';
 import Profile from './pages/Profile';
+import AgentInventory from './pages/AgentInventory';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -51,6 +52,7 @@ export default function App() {
         <Route path="/success/:id" element={<PrivateRoute><SuccessScreen /></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
+        <Route path="/agent-inventory/:vehicleId" element={<PrivateRoute><AgentInventory /></PrivateRoute>} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

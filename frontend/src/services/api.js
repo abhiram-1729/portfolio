@@ -48,6 +48,7 @@ export const authAPI = {
 export const productsAPI = {
   getAll: (params) => api.get('/products', { params }),
   getById: (id) => api.get(`/products/${id}`),
+  getVehicleInventory: (id) => api.get(`/products/vehicle-inventory/${id}`),
 };
 
 export const cartAPI = {
