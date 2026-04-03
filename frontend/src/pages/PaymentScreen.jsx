@@ -15,10 +15,9 @@ const PAYMENT_MODES = [
 export default function PaymentScreen() {
   const [selected, setSelected] = useState(null);
   const [loading, setLoading] = useState(false);
-  const { items, customerMobile, customerName, clearCart } = useCartStore();
+  const { items, customerMobile, customerName, clearCart, totalAmount } = useCartStore();
   const { user } = useUserStore();
   const navigate = useNavigate();
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
 
   // Fix: Move navigation out of render cycle
   useEffect(() => {

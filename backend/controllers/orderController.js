@@ -42,23 +42,58 @@ export const createOrderFromCart = async (req, res, next) => {
         let totalAmount = 0;
         const orderItemsData = [];
 
+        // Pre-calculate subtotal for non-free items to determine 'Free' eligibility
+        const paidSubtotal = cartItems.reduce((sum, item) => {
+            const product = productMap[item.productId];
+            const isFree = product.isFree === true || product.isFree === 'true';
+            if (product && !isFree) {
+                return sum + Number(product.price || 0) * item.quantity;
+            }
+            return sum;
+        }, 0);
+
+        // Ensure subtotal is rounded to 2 decimal places to avoid floating point errors in comparison
+        const subtotalForComparison = Math.round(paidSubtotal * 100) / 100;
+        console.log(`[OrderCreate] Paid Subtotal: ₹${subtotalForComparison} | Total Items: ${cartItems.length}`);
+
+        console.log(`[OrderCreate] Starting Processing. Total Items: ${cartItems.length}`);
         for (const item of cartItems) {
             const product = productMap[item.productId];
+            console.log(`[OrderCreate] Processing: ${product?.name} | Qty: ${item.quantity} | isFree: ${product?.isFree} | Min: ${product?.minShopAmount}`);
 
             if (!product) {
                 res.status(400);
                 throw new Error(`Product ${item.productId} not found`);
             }
 
-            const itemTotal = product.price * item.quantity;
+            // Apply free product logic: skip or price becomes 0
+            const isFreeProduct = product.isFree === true || product.isFree === 'true';
+            let finalPrice = Number(product.price || 0);
+            let isItemFree = false;
+
+            if (isFreeProduct) {
+                const threshold = Number(product.minShopAmount || 0);
+                console.log(`[OrderCreate] Evaluating Gift: ${product.name} | Threshold: ₹${threshold} | Cart Subtotal: ₹${subtotalForComparison}`);
+
+                if (subtotalForComparison >= threshold) {
+                    console.log(`[OrderCreate] Success: Threshold met for GIFT: ${product.name}`);
+                    finalPrice = 0;
+                    isItemFree = true;
+                } else {
+                    console.warn(`[OrderCreate] Threshold NOT met for GIFT: ${product.name}. Charging regular price.`);
+                    // Fall back to regular price instead of skipping
+                }
+            }
+
+            const itemTotal = finalPrice * item.quantity;
             totalAmount += itemTotal;
 
             orderItemsData.push({
                 productId: item.productId,
                 quantity: item.quantity,
-                price: product.price,
+                price: finalPrice, // Save as 0 if free
                 mrp: product.mrp,
-                discount: product.discount,
+                discount: isItemFree ? product.price : product.discount, // Use full price as discount if free
                 landingPrice: product.landingPrice,
                 gst: product.gst || 0,
             });
@@ -88,7 +123,7 @@ export const createOrderFromCart = async (req, res, next) => {
             }
 
             return newOrder;
-        });
+        }, { maxWait: 5000, timeout: 20000 });
 
         res.status(201).json(order);
     } catch (error) {
@@ -159,10 +194,7 @@ export const completePayment = async (req, res, next) => {
             }
 
             return updated;
-        }, {
-            maxWait: 10000,
-            timeout: 15000,
-        });
+        }, { maxWait: 5000, timeout: 20000 });
 
         res.json(updatedOrder);
     } catch (error) {

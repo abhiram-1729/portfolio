@@ -1,30 +1,51 @@
 import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ordersAPI } from '../services/api';
+import adminAPI from '../services/adminService';
 import { CheckCircle, Home, Share2, Smartphone, Banknote, CreditCard, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
-import villagKartLogo from '../assets/VillagKart_Logo.png';
+import villagKartLogo from '../assets/vk.png'
 
 export default function SuccessScreen() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [order, setOrder] = useState(null);
+  const [settings, setSettings] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
 
   const getInvoiceNumber = (o) => o?.orderNumber ? String(o.orderNumber) : String(o?.id).replace(/\D/g, '').slice(0, 6) || '000000';
 
   useEffect(() => {
+
+    // 1. Fetch Order Details (Critical)
     ordersAPI.getById(id)
-      .then(({ data }) => setOrder(data))
-      .catch(() => toast.error('Could not load order details'));
+      .then(({ data }) => {
+        setOrder(data);
+      })
+      .catch((err) => {
+        console.error('[SuccessScreen] Order Fetch Failed:', err.response?.status);
+        toast.error('Could not load order details');
+      });
+
+    // 2. Fetch Business Settings (Optional - Don't block order)
+    adminAPI.getSettings()
+      .then(({ data }) => {
+        if (data && data.success) {
+          setSettings(data.data);
+        }
+      })
+      .catch((err) => {
+        console.warn('[SuccessScreen] Settings Fetch Failed (Likely Permission):', err.response?.status);
+        // We don't toast error here because the app survives without these
+      });
   }, [id]);
 
   const handleDownloadPDF = async () => {
     if (!order) return;
     try {
       setIsDownloading(true);
-      const pdf = await generateInvoicePDF(order);
+      const pdf = await generateInvoicePDF(order, settings);
       if (!pdf) return;
 
       const invoiceNo = getInvoiceNumber(order);
@@ -56,8 +77,9 @@ export default function SuccessScreen() {
     });
   };
 
-  const generateInvoicePDF = async (order) => {
+  const generateInvoicePDF = async (order, bizSettings) => {
     if (!order) return null;
+    const settings = bizSettings || { businessName: 'VillagKart' };
 
     // Load logo as base64
     let logoBase64 = null;
@@ -83,45 +105,37 @@ export default function SuccessScreen() {
     // ══════════════════════════════════════
     // HEADER — Company branding
     // ══════════════════════════════════════
-    pdf.setFillColor(...emerald);
-    pdf.rect(0, 0, pageWidth, 42, 'F');
+    const headerHeight = 55;
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageWidth, headerHeight, 'F');
 
     // Logo
-    const logoSize = 18;
+    const logoWidth = 30;
+    const logoHeight = 30; // giving a slightly rectangular aspect ratio assuming a typical logo, but keeping it large 
     const logoX = margin;
-    const logoY = 6;
-    let textStartX = margin;
+    const logoY = 5;
     if (logoBase64) {
-      // White circle behind logo for contrast
-      pdf.setFillColor(255, 255, 255);
-      pdf.circle(logoX + logoSize / 2, logoY + logoSize / 2, logoSize / 2 + 1, 'F');
-      pdf.addImage(logoBase64, 'PNG', logoX, logoY, logoSize, logoSize);
-      textStartX = logoX + logoSize + 4;
+      pdf.addImage(logoBase64, 'PNG', logoX, logoY, logoWidth, logoHeight);
     }
 
-    // Company name
-    pdf.setTextColor(255, 255, 255);
-    pdf.setFontSize(24);
+    // Slogans placed directly below the logo (side by side)
+    pdf.setTextColor(...darkText);
     pdf.setFont('helvetica', 'bold');
-    // Default color (black)
-    pdf.setTextColor(255, 255, 255);
-    pdf.text('Villag', textStartX, 18);
+    pdf.setFontSize(5);
+    const text1 = 'Shop any Time,';
+    const text2 = 'Save Everytime';
+    const textYPosition = logoY + logoHeight + 2;
+    const textBaseX = margin + 1.5; // Offset slightly to the right to center under logo
+    pdf.text(text1, textBaseX, textYPosition);
 
-    // Orange color for "Kart"
-    pdf.setTextColor(239, 90, 6); // RGB for orange
-    pdf.text('Kart', textStartX + pdf.getTextWidth('Villag'), 18);
-
-    // Optional: reset color back to black
-    pdf.setTextColor(255, 255, 255);
-
-    // Tagline
-    pdf.setFontSize(9);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text('Shop any Time, Save Everytime', textStartX, 25);
+    // Calculate width to place the second text next to it with a small divider/space
+    const text1Width = pdf.getTextWidth(`${text1} `);
+    pdf.text(` ${text2}`, textBaseX + text1Width - pdf.getTextWidth(' '), textYPosition);
 
     // Invoice label (right-aligned)
     pdf.setFontSize(28);
     pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...darkText);
     pdf.text('INVOICE', pageWidth - margin, 20, { align: 'right' });
 
     pdf.setFontSize(9);
@@ -130,9 +144,9 @@ export default function SuccessScreen() {
 
     // Orange accent strip
     pdf.setFillColor(...orangeAccent);
-    pdf.rect(0, 42, pageWidth, 2, 'F');
+    pdf.rect(0, headerHeight, pageWidth, 2, 'F');
 
-    y = 55;
+    y = headerHeight + 10;
 
     // ══════════════════════════════════════
     // INVOICE META — Two columns
@@ -142,7 +156,7 @@ export default function SuccessScreen() {
     const dateStr = orderDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
     const timeStr = orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
 
-    // Left column
+    // Left column - Seller Details
     pdf.setTextColor(...grayText);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'bold');
@@ -152,14 +166,33 @@ export default function SuccessScreen() {
     pdf.setFont('helvetica', 'bold');
     pdf.text(`#VK-${invoiceNo}`, margin, y + 6);
 
+    // Seller Info (Dynamic)
+    let sellerY = y + 15;
     pdf.setTextColor(...grayText);
-    pdf.setFontSize(8);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('DATE & TIME', margin, y + 16);
+    pdf.setFontSize(7);
+    pdf.text('SOLD BY:', margin, sellerY);
     pdf.setTextColor(...darkText);
-    pdf.setFontSize(10);
-    pdf.setFont('helvetica', 'normal');
-    pdf.text(`${dateStr}  |  ${timeStr}`, margin, y + 22);
+    pdf.setFontSize(8.5);
+    pdf.text(settings.businessName.toUpperCase(), margin, sellerY + 4.5);
+
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...grayText);
+    let sellerDetailsY = sellerY + 9;
+    if (settings.gstNo) {
+      pdf.text(`GSTIN: ${settings.gstNo}`, margin, sellerDetailsY);
+      sellerDetailsY += 4;
+    }
+    if (settings.contactNo) {
+      pdf.text(`Ph: ${settings.contactNo}`, margin, sellerDetailsY);
+      sellerDetailsY += 4;
+    }
+    if (settings.address) {
+      const splitAddr = pdf.splitTextToSize(settings.address, contentWidth * 0.45);
+      pdf.text(splitAddr, margin, sellerDetailsY);
+      sellerDetailsY += (splitAddr.length * 3.5);
+    }
+
+    const leftColBottom = sellerDetailsY + 2;
 
     // Right column
     const paymentLabel = order.paymentMode === 'CASH' ? 'Cash' : order.paymentMode === 'UPI' ? 'UPI' : 'Card';
@@ -172,11 +205,20 @@ export default function SuccessScreen() {
     pdf.setFont('helvetica', 'bold');
     pdf.text(paymentLabel, pageWidth - margin, y + 6, { align: 'right' });
 
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DATE & TIME', pageWidth - margin, y + 16, { align: 'right' });
+    pdf.setTextColor(...darkText);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${dateStr} | ${timeStr}`, pageWidth - margin, y + 22, { align: 'right' });
+
     if (order.customerName || order.mobile) {
       pdf.setTextColor(...grayText);
       pdf.setFontSize(8);
       pdf.setFont('helvetica', 'bold');
-      pdf.text('BILL TO / CUSTOMER', pageWidth - margin, y + 16, { align: 'right' });
+      pdf.text('BILL TO / CUSTOMER', pageWidth - margin, y + 32, { align: 'right' });
       pdf.setTextColor(...darkText);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'normal');
@@ -186,10 +228,10 @@ export default function SuccessScreen() {
       } else {
         customerInfo = order.customerName ? order.customerName.toUpperCase() : order.mobile;
       }
-      pdf.text(customerInfo, pageWidth - margin, y + 22, { align: 'right' });
+      pdf.text(customerInfo, pageWidth - margin, y + 38, { align: 'right' });
     }
 
-    y += 34;
+    y = Math.max(leftColBottom, y + 46);
 
     // Divider
     pdf.setDrawColor(...lightLine);
@@ -210,21 +252,27 @@ export default function SuccessScreen() {
       amount: pageWidth - margin,
     };
 
-    pdf.setFillColor(248, 250, 252);
-    pdf.rect(margin, y - 4, contentWidth, 10, 'F');
+    const maxPageHeight = pdf.internal.pageSize.getHeight() - 20;
 
-    pdf.setTextColor(...grayText);
-    pdf.setFontSize(7.5);
-    pdf.setFont('helvetica', 'bold');
-    pdf.text('S.NO', colX.sno, y + 2);
-    pdf.text('ITEM DESCRIPTION', colX.item, y + 2);
-    pdf.text('QTY', colX.qty, y + 2);
-    pdf.text('GST%', colX.gst, y + 2);
-    pdf.text('MRP', colX.mrp, y + 2);
-    pdf.text('OFFER', colX.price, y + 2);
-    pdf.text('AMOUNT', colX.amount, y + 2, { align: 'right' });
+    const drawTableHeaders = (currentY) => {
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(margin, currentY - 4, contentWidth, 10, 'F');
 
-    y += 10;
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('S.NO', colX.sno, currentY + 2);
+      pdf.text('ITEM DESCRIPTION', colX.item, currentY + 2);
+      pdf.text('QTY', colX.qty, currentY + 2);
+      pdf.text('GST (₹)', colX.gst, currentY + 2);
+      pdf.text('MRP', colX.mrp, currentY + 2);
+      pdf.text('VK PRICE', colX.price, currentY + 2);
+      pdf.text('AMOUNT', colX.amount, currentY + 2, { align: 'right' });
+
+      return currentY + 10;
+    };
+
+    y = drawTableHeaders(y);
 
     const items = order.items || [];
     items.forEach((item, index) => {
@@ -234,6 +282,25 @@ export default function SuccessScreen() {
       const mrpValue = item.mrp || price;
       const amount = qty * price;
       const gstRate = item.gst || 0;
+      const itemTaxable = amount / (1 + gstRate / 100);
+      const itemGstAmt = amount - itemTaxable;
+
+      // Handle Page Break
+      if (y > maxPageHeight - 10) {
+        pdf.addPage();
+        y = 20;
+
+        pdf.setTextColor(...grayText);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text(`Invoice #VK-${invoiceNo} (Continued)`, margin, y);
+
+        pdf.setFillColor(...orangeAccent);
+        pdf.rect(margin, y + 2, contentWidth, 0.5, 'F');
+
+        y += 12;
+        y = drawTableHeaders(y);
+      }
 
       if (index % 2 === 0) {
         pdf.setFillColor(255, 255, 255);
@@ -255,20 +322,22 @@ export default function SuccessScreen() {
       pdf.text(displayName, colX.item, y + 1);
 
       pdf.text(`${qty}`, colX.qty, y + 1);
-      pdf.text(`${gstRate}%`, colX.gst, y + 1);
+      pdf.text(`${itemGstAmt.toFixed(2)}`, colX.gst, y + 1);
 
       pdf.setTextColor(...grayText);
       pdf.setFontSize(7);
       pdf.text(`Rs.${mrpValue.toFixed(2)}`, colX.mrp, y + 1, { align: 'left' });
 
-      pdf.setTextColor(...emerald);
-      pdf.setFontSize(8);
+      const isItemFree = price === 0;
+
+      pdf.setTextColor(...(isItemFree ? orangeAccent : emerald));
+      pdf.setFontSize(isItemFree ? 7 : 8);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(`Rs.${price.toFixed(2)}`, colX.price, y + 1);
+      pdf.text(isItemFree ? 'GIFT/FREE' : `Rs.${price.toFixed(2)}`, colX.price, y + 1);
 
       pdf.setTextColor(...darkText);
       pdf.setFontSize(9);
-      pdf.text(`Rs.${amount.toFixed(2)}`, colX.amount, y + 1, { align: 'right' });
+      pdf.text(isItemFree ? 'Rs.0.00' : `Rs.${amount.toFixed(2)}`, colX.amount, y + 1, { align: 'right' });
 
       y += 9;
     });
@@ -291,6 +360,20 @@ export default function SuccessScreen() {
     // ══════════════════════════════════════
     // TOTALS & PAYMENT STATUS
     // ══════════════════════════════════════
+    if (y > maxPageHeight - 65) {
+      pdf.addPage();
+      y = 20;
+
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'italic');
+      pdf.text(`Invoice #VK-${invoiceNo} (Continued)`, margin, y);
+
+      pdf.setFillColor(...orangeAccent);
+      pdf.rect(margin, y + 2, contentWidth, 0.5, 'F');
+
+      y += 12;
+    }
     const totalsX = margin + contentWidth * 0.55;
     const startY = y;
     let rightY = startY;
@@ -310,7 +393,7 @@ export default function SuccessScreen() {
       // Highlighted Savings Section
       pdf.setFillColor(255, 247, 237); // Light orange background
       pdf.roundedRect(totalsX - 3, rightY - 5, (pageWidth - margin) - totalsX + 6, 9, 1, 1, 'F');
-      
+
       pdf.setTextColor(...orangeAccent);
       pdf.setFontSize(10);
       pdf.setFont('helvetica', 'bold');
@@ -324,10 +407,10 @@ export default function SuccessScreen() {
 
     pdf.setTextColor(...grayText);
     const totalTax = order.items?.reduce((sum, item) => {
-        const rate = item.gst || 0;
-        if (rate === 0) return sum;
-        const taxable = (item.price * item.quantity) / (1 + rate / 100);
-        return sum + ((item.price * item.quantity) - taxable);
+      const rate = item.gst || 0;
+      if (rate === 0) return sum;
+      const taxable = (item.price * item.quantity) / (1 + rate / 100);
+      return sum + ((item.price * item.quantity) - taxable);
     }, 0) || 0;
 
     pdf.setTextColor(...grayText);
@@ -339,9 +422,9 @@ export default function SuccessScreen() {
 
     pdf.setTextColor(...grayText);
     pdf.setFont('helvetica', 'bold');
-    pdf.text(`CGST / SGST (Included)`, totalsX, rightY);
+    pdf.text(`Total GST (Incl.)`, totalsX, rightY);
     pdf.setTextColor(...darkText);
-    pdf.text(`Rs.${(totalTax / 2).toFixed(2)} x 2`, colX.amount, rightY, { align: 'right' });
+    pdf.text(`Rs.${totalTax.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
     rightY += 4;
 
     pdf.setDrawColor(...lightLine);
@@ -409,46 +492,56 @@ export default function SuccessScreen() {
 
     try {
       setIsDownloading(true);
-      const pdf = await generateInvoicePDF(order);
+      const pdf = await generateInvoicePDF(order, settings);
       if (!pdf) return;
 
-      // 1. If mobile exists, redirect to WhatsApp directly
+      const pdfBlob = pdf.output('blob');
+      const fileName = `Invoice_VK-${invoiceNo}.pdf`;
+      const file = new File([pdfBlob], fileName, { type: 'application/pdf' });
+
+      // 1. Direct WhatsApp Sharing if mobile number exists
       if (order.mobile) {
-        // PDF cannot be sent via link, so we download it and redirect
-        pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
-        
+        // PDF cannot be sent via link directly, so we download it locally and then open WhatsApp
+        pdf.save(fileName);
+
         const phone = String(order.mobile).replace(/\D/g, '');
         const formattedPhone = phone.length === 10 ? `91${phone}` : phone;
         const whatsappUrl = `https://api.whatsapp.com/send?phone=${formattedPhone}&text=${encodeURIComponent(text)}`;
-        
+
         window.open(whatsappUrl, '_blank');
         toast.success('Opening WhatsApp & Downloading PDF...');
-      } 
-      // 2. Otherwise, use standard share sheet
-      else {
-        const pdfBlob = pdf.output('blob');
-        const file = new File([pdfBlob], `Invoice_VK-${invoiceNo}.pdf`, { type: 'application/pdf' });
+        return;
+      }
 
-        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      // 2. Fallback to modern Web Share API if no mobile
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        try {
           await navigator.share({
             files: [file],
-            title: 'VillagKart Invoice',
+            title: `VillagKart Invoice #VK-${invoiceNo}`,
             text: text,
           });
-        } else if (navigator.share) {
-          await navigator.share({ text });
-          pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
-          toast.success('Text shared & PDF downloaded!');
-        } else {
-          pdf.save(`Invoice_VK-${invoiceNo}.pdf`);
-          await navigator.clipboard.writeText(text);
-          toast.success('Invoice copied & downloaded!');
+          toast.success('Invoice shared successfully!');
+          return;
+        } catch (shareError) {
+          if (shareError.name === 'AbortError') return;
+          console.warn('Navigator share failed, falling back:', shareError);
         }
+      }
+
+      // 3. Final fallback (Standard share text or Clipboard copy)
+      if (navigator.share) {
+        await navigator.share({ text });
+        pdf.save(fileName);
+        toast.success('Text shared & PDF downloaded!');
+      } else {
+        pdf.save(fileName);
+        await navigator.clipboard.writeText(text);
+        toast.success('Invoice copied & downloaded!');
       }
     } catch (err) {
       console.error('Share error:', err);
       toast.error('Could not share document');
-      if (navigator.share && !order.mobile) navigator.share({ text });
     } finally {
       setIsDownloading(false);
     }
@@ -510,8 +603,8 @@ export default function SuccessScreen() {
                   </div>
                   <div className="relative z-10 flex items-center justify-between px-1">
                     <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-white/70 uppercase tracking-[0.2em]">Extra Benefit</span>
-                        <h3 className="text-white font-black text-[10px] uppercase tracking-widest opacity-90">Total Savings</h3>
+                      <span className="text-[8px] font-black text-white/70 uppercase tracking-[0.2em]">Extra Benefit</span>
+                      <h3 className="text-white font-black text-[10px] uppercase tracking-widest opacity-90">Total Savings</h3>
                     </div>
                     <div className="flex items-baseline gap-0.5">
                       <span className="text-white text-xs font-bold">₹</span>
@@ -524,22 +617,21 @@ export default function SuccessScreen() {
               )}
               {(() => {
                 const totalTax = order.items?.reduce((sum, item) => {
-                    const rate = item.gst || 0;
-                    if (rate === 0) return sum;
-                    const taxable = (item.price * item.quantity) / (1 + rate / 100);
-                    return sum + ((item.price * item.quantity) - taxable);
+                  const rate = item.gst || 0;
+                  if (rate === 0) return sum;
+                  const taxable = (item.price * item.quantity) / (1 + rate / 100);
+                  return sum + ((item.price * item.quantity) - taxable);
                 }, 0) || 0;
-                
+
                 if (totalTax > 0) {
-                    return (
-                        <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100/30">
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Incl.)</span>
-                                <span className="text-[7px] font-bold text-blue-400 uppercase tracking-widest ml-1">CGST: ₹{(totalTax/2).toFixed(2)} | SGST: ₹{(totalTax/2).toFixed(2)}</span>
-                            </div>
-                            <span className="font-black text-base text-blue-600 tracking-tight">₹{totalTax.toFixed(2)}</span>
-                        </div>
-                    );
+                  return (
+                    <div className="flex justify-between items-center bg-blue-50/50 p-2 rounded-xl border border-blue-100/30">
+                      <div className="flex flex-col">
+                        <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest ml-1">Total GST (Included)</span>
+                      </div>
+                      <span className="font-black text-base text-blue-600 tracking-tight">₹{totalTax.toFixed(2)}</span>
+                    </div>
+                  );
                 }
                 return null;
               })()}

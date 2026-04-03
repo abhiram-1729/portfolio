@@ -56,8 +56,11 @@ model User {
   openingCash     OpeningCash[]
   closingCash     ClosingCash[]
 
+  status            UserStatus @default(ACTIVE)
+
   @@index([assignedVehicleId])
   @@index([role])
+  @@index([status])
 }
 
 model Category {
@@ -82,22 +85,23 @@ model Brand {
 }
 
 model Product {
-  id            String     @id @default(cuid())
-  name          String
-  description   String?
-  price         Float
-  mrp           Float?
-  image         String?
-  categoryId    String
-  subCategoryId String
-  brandId       String
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  status        ItemStatus @default(ACTIVE)
-  discount      Float?
-  landingPrice  Float?
-  gst           Float?     @default(0)
-
+  id                 String               @id @default(cuid())
+  name               String
+  description        String?
+  price              Float
+  image              String?
+  categoryId         String
+  subCategoryId      String
+  brandId            String
+  createdAt          DateTime             @default(now())
+  updatedAt          DateTime             @updatedAt
+  mrp                Float?
+  status             ItemStatus           @default(ACTIVE)
+  discount           Float?
+  landingPrice       Float?
+  gst                Float?               @default(0)
+  isFree             Boolean              @default(false)
+  minShopAmount      Float                @default(0)
   category           Category             @relation(fields: [categoryId], references: [id])
   subCategory        SubCategory          @relation(fields: [subCategoryId], references: [id])
   brand              Brand                @relation(fields: [brandId], references: [id])
@@ -287,9 +291,19 @@ model ClosingCash {
   remark        String?
   status        String   @default("SUBMITTED")
   createdAt     DateTime @default(now())
-
   @@unique([vehicleId, date])
 }
+model BusinessSettings {
+  id           String   @id @default("singleton")
+  businessName String   @default("VillagKart")
+  gstNo        String?
+  contactNo    String?
+  email        String?
+  address      String?  @db.Text
+  taxRates     String   @default("0,5,12,18")
+  updatedAt    DateTime @updatedAt
+}
+
 
 model DailyCashSummary {
   id           String   @id @default(cuid())
@@ -305,4 +319,9 @@ model DailyCashSummary {
   updatedAt    DateTime @updatedAt
 
   @@unique([vehicleId, date])
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
 }

@@ -8,7 +8,10 @@ export const getProducts = async (req, res, next) => {
         const { search, categoryId, warehouseId, vehicleId } = req.query;
 
         const query = {
-            where: {},
+            where: {
+                status: 'ACTIVE'
+            },
+
             include: {
                 category: true,
                 subCategory: true,
@@ -30,9 +33,10 @@ export const getProducts = async (req, res, next) => {
 
         // Filter by Warehouse
         if (warehouseId) {
-            query.where.WarehouseInventory = {
-                some: { warehouseId, quantity: { gt: 0 } }
-            };
+            query.where.OR = [
+                { WarehouseInventory: { some: { warehouseId, quantity: { gt: 0 } } } },
+                { isFree: true }
+            ];
             query.include.WarehouseInventory = {
                 where: { warehouseId }
             };
@@ -40,9 +44,25 @@ export const getProducts = async (req, res, next) => {
 
         // Filter by Vehicle Stock
         if (vehicleId) {
-            query.where.vehicleStocks = {
-                some: { vehicleId, quantity: { gt: 0 } }
+            // Use AND to combine previous filters (like search) with this OR stock/gift check
+            const stockFilter = {
+                OR: [
+                    { vehicleStocks: { some: { vehicleId, quantity: { gt: 0 } } } },
+                    { isFree: true }
+                ]
             };
+            
+            if (query.where.OR) {
+                // If there's already an OR (from warehouse), we MUST combine carefully
+                query.where.AND = [
+                    { OR: query.where.OR },
+                    stockFilter
+                ];
+                delete query.where.OR;
+            } else {
+                query.where.OR = stockFilter.OR;
+            }
+
             query.include.vehicleStocks = {
                 where: { vehicleId }
             };

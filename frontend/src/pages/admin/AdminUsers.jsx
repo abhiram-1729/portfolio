@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,9 @@ export default function AdminUsers() {
     role: 'SALES_AGENT',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
+  const [deletingId, setDeletingId] = useState(null);
 
   const fetchUsers = async () => {
     try {
@@ -31,19 +34,48 @@ export default function AdminUsers() {
     fetchUsers();
   }, []);
 
-  const handleCreateUser = async (e) => {
+  const handleUpdateUser = async (e) => {
     e.preventDefault();
     setIsSubmitting(true);
     try {
-      await adminAPI.createUser(newUser);
-      toast.success('User created successfully');
-      setShowAddModal(false);
-      setNewUser({ name: '', email: '', password: '', mobile: '', role: 'SALES_AGENT' });
+      await adminAPI.updateUser(editingUser.id, editingUser);
+      toast.success('User updated successfully');
+      setShowEditModal(false);
       fetchUsers();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to create user');
+      toast.error(error.response?.data?.message || 'Failed to update user');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleToggleStatus = async (user) => {
+    const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
+    const originalStatus = user.status;
+    
+    // Optimistic UI update
+    setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
+    
+    try {
+      await adminAPI.updateUser(user.id, { status: newStatus });
+      toast.success(`User ${newStatus === 'ACTIVE' ? 'activated' : 'suspended'}`);
+    } catch (error) {
+      setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: originalStatus } : u));
+      toast.error('Failed to update status');
+    }
+  };
+
+  const handleDeleteUser = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this staff member? This action cannot be undone.')) return;
+    setDeletingId(id);
+    try {
+      await adminAPI.deactivateUser(id);
+      toast.success('Staff member removed');
+      fetchUsers();
+    } catch (error) {
+      toast.error('Failed to remove user');
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -62,6 +94,18 @@ export default function AdminUsers() {
         {r.label}
       </span>
     );
+  };
+
+  const getStatusBadge = (status) => {
+    if (status === 'SUSPENDED') {
+      return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border border-rose-100 bg-rose-50 text-rose-600 uppercase tracking-tighter">
+          <Pause size={8} />
+          Suspended
+        </span>
+      );
+    }
+    return null;
   };
 
   const getInitials = (name) => {
@@ -115,43 +159,74 @@ export default function AdminUsers() {
             {users.map((user) => (
               <div 
                 key={user.id} 
-                className="group relative flex flex-col md:grid md:grid-cols-12 md:items-center gap-2 md:gap-4 px-4 py-3 md:px-6 md:py-4 transition-colors hover:bg-gray-50/30"
+                className={`group relative flex flex-col md:grid md:grid-cols-12 md:items-center gap-2 md:gap-4 px-4 py-3 md:px-6 md:py-4 transition-colors hover:bg-gray-50/30 ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80' : ''}`}
               >
-                {/* Information Column (Combined Name, Role, Mobile, Vehicle in one row-ish layout) */}
-                <div className="col-span-11 flex items-start gap-3">
+                {/* Information Column */}
+                <div className="col-span-10 flex items-start gap-3">
                   {/* Avatar */}
-                  <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center text-gray-500 font-bold text-xs border border-gray-200 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100 transition-colors">
+                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs border transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-100 text-gray-500 border-gray-200 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100'}`}>
                     {getInitials(user.name)}
                   </div>
                   
                   <div className="flex-1 min-w-0">
-                    {/* Top Row: Name, Role Badge, and Vehicle (on desktop) */}
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-bold text-gray-900 text-sm whitespace-nowrap">{user.name}</h3>
+                      <h3 className={`font-bold text-sm whitespace-nowrap ${user.status === 'SUSPENDED' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{user.name}</h3>
                       {getRoleBadge(user.role)}
-                      
-                      {/* Vehicle Assignment (in same row) */}
+                      {getStatusBadge(user.status)}
+                    </div>
+
+                    <div className={`flex items-center gap-2 mt-1 text-[11px] font-medium flex-wrap ${user.status === 'SUSPENDED' ? 'text-gray-400' : 'text-emerald-600'}`}>
+                      <span className="flex items-center gap-1">
+                        <Phone size={11} />
+                        {user.mobile || 'No mobile added'}
+                      </span>
                       <div className="flex items-center gap-1 px-1.5 py-0 bg-gray-50 rounded-md text-[9px] font-bold text-gray-400 border border-gray-100 uppercase tracking-tighter">
                         <Truck size={10} className="text-gray-300" />
                         <span>{user.assignedVehicle?.vehicleNumber || 'None'}</span>
                       </div>
                     </div>
 
-                    {/* Bottom Row: Mobile Number */}
-                    <div className="flex items-center gap-1.5 mt-1 text-[11px] font-medium text-emerald-600">
-                      <Phone size={11} />
-                      <span>{user.mobile || 'No mobile added'}</span>
-                    </div>
-
-                    {/* Desktop-only email (subtle) */}
                     <p className="hidden md:block text-[10px] text-gray-400 truncate mt-0.5">{user.email}</p>
                   </div>
                 </div>
 
-                {/* Actions (Static for both mobile/desktop) */}
-                <div className="absolute top-4 right-3 md:static md:col-span-1 flex justify-end">
-                  <button className="p-1.5 text-gray-300 hover:text-gray-600 hover:bg-white hover:border-gray-100 border border-transparent rounded-lg transition-all">
-                    <MoreVertical size={18} />
+                {/* Actions */}
+                <div className="absolute top-4 right-3 md:static md:col-span-2 flex items-center justify-end gap-1.5">
+                  {/* Edit Button */}
+                  <button 
+                    onClick={() => {
+                      setEditingUser(user);
+                      setShowEditModal(true);
+                    }}
+                    title="Edit Member"
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                  >
+                    <Pencil size={15} />
+                  </button>
+
+                  {/* Suspend/Unsuspend Button */}
+                  <button 
+                    onClick={() => handleToggleStatus(user)}
+                    title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
+                    className={`p-2 rounded-xl transition-all ${
+                      user.status === 'ACTIVE' 
+                        ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' 
+                        : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
+                    }`}
+                  >
+                    {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                  </button>
+
+                  {/* Delete Button */}
+                  <button 
+                    onClick={() => handleDeleteUser(user.id)}
+                    title="Delete Account"
+                    disabled={deletingId === user.id}
+                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {deletingId === user.id
+                      ? <Loader2 size={15} className="animate-spin text-rose-400" />
+                      : <Trash2 size={15} />}
                   </button>
                 </div>
               </div>
@@ -241,6 +316,100 @@ export default function AdminUsers() {
                   </>
                 ) : 'Confirm Membership'}
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Edit User Modal */}
+      {showEditModal && editingUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
+          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-200 border border-indigo-50">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <UserCog size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">Edit Member</h3>
+                  <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Update Access & Details</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="p-2 hover:bg-gray-50 rounded-full text-gray-400 transition-colors"
+                type="button"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Full Name</label>
+                <input 
+                  type="text"
+                  required
+                  placeholder="Full Name"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
+                  value={editingUser.name}
+                  onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Email</label>
+                  <input 
+                    type="email"
+                    required
+                    placeholder="Email"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none cursor-not-allowed opacity-70"
+                    value={editingUser.email}
+                    disabled
+                    title="Email cannot be changed"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Mobile</label>
+                  <input 
+                    type="tel"
+                    required
+                    placeholder="Mobile"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
+                    value={editingUser.mobile}
+                    onChange={(e) => setEditingUser({...editingUser, mobile: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Role</label>
+                <select 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all"
+                  value={editingUser.role}
+                  onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
+                >
+                  <option value="SALES_AGENT">Sales Agent</option>
+                  <option value="SUPERVISOR">Supervisor</option>
+                  <option value="HELPER">Helper</option>
+                  <option value="ADMIN">Admin</option>
+                </select>
+              </div>
+
+              <div className="pt-2">
+                <button 
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      Saving...
+                    </>
+                  ) : 'Save Changes'}
+                </button>
+              </div>
             </form>
           </div>
         </div>

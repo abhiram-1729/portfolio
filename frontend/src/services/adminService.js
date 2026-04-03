@@ -13,6 +13,10 @@ export const adminAPI = {
   // Vehicles
   getVehicles: () => api.get('/admin/vehicles'),
   createVehicle: (data) => api.post('/admin/vehicles', data),
+  updateVehicle: (id, data) => api.put(`/admin/vehicles/${id}`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  deleteVehicle: (id) => api.delete(`/admin/vehicles/${id}`),
   assignDriver: (id, userId) => api.put(`/admin/vehicles/${id}/assign`, { userId }),
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
 
@@ -24,6 +28,7 @@ export const adminAPI = {
   updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  deleteItem: (id) => api.delete(`/admin/inventory/items/${id}`),
   loadStock: (data) => api.post('/admin/inventory/load', data),
   returnStock: (data) => api.post('/admin/inventory/return', data),
   getVehicleInventory: (id) => api.get(`/admin/inventory/vehicle/${id}`),
@@ -39,6 +44,16 @@ export const adminAPI = {
   getItemReport: () => api.get('/admin/reports/item'),
   getDateRangeReport: (params) => api.get('/admin/reports/date-range', { params }),
   getReconciliationReport: (params) => api.get('/admin/reports/reconciliation', { params }),
+  
+  // Settings
+  getSettings: () => api.get('/admin/settings').catch(err => {
+    if (err.response?.status === 404) {
+      console.warn('[System] Admin settings route not found on server yet. Using defaults.');
+      return { data: { success: true, data: { businessName: 'VillagKart', taxRates: '0,5,12,18' } } };
+    }
+    throw err;
+  }),
+  updateSettings: (data) => api.put('/admin/settings', data),
 };
 
 export default adminAPI;

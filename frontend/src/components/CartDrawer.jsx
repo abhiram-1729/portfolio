@@ -1,10 +1,15 @@
-import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus } from 'lucide-react';
-import { useCartStore } from '../store/cartStore';
+import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus, Sparkles, Gift } from 'lucide-react';
+import { useCartStore, checkIsFree } from '../store/cartStore';
 import { useNavigate } from 'react-router-dom';
 
-export default function CartDrawer({ isOpen, onClose }) {
-  const { items, updateQuantity, removeItem, clearCart } = useCartStore();
-  const totalAmount = items.reduce((sum, i) => sum + i.price * i.quantity, 0);
+export default function CartDrawer({ isOpen, onClose, products = [] }) {
+  const { items, addItem, updateQuantity, removeItem, clearCart, totalAmount } = useCartStore();
+  
+  // Calculate subtotal for free item threshold comparison
+  const subtotal = items.reduce((sum, i) => {
+    return !checkIsFree(i.isFree) ? sum + Number(i.price || 0) * i.quantity : sum;
+  }, 0);
+
   const navigate = useNavigate();
 
   const handleProceed = () => {
@@ -57,7 +62,7 @@ export default function CartDrawer({ isOpen, onClose }) {
         </div>
 
         {/* Items */}
-        <div className="overflow-y-auto max-h-[50vh] px-2 py-3 no-scrollbar">
+        <div className="overflow-y-auto max-h-[30vh] px-2 py-2 no-scrollbar">
           {items.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 text-emerald-200">
                 <div className="w-24 h-24 rounded-full bg-emerald-50 flex items-center justify-center mb-6">
@@ -67,56 +72,164 @@ export default function CartDrawer({ isOpen, onClose }) {
                 <p className="text-emerald-600/30 text-xs mt-2 font-bold tracking-tight">Ready for fresh picks!</p>
             </div>
           ) : (
-            items.map((item) => (
+            items.map((item) => {
+              const isItemFree = checkIsFree(item.isFree);
+              return (
               <div key={item.productId} className="flex items-center gap-4 p-4 mx-3 my-2 bg-white/70 border border-emerald-50 shadow-sm rounded-2xl animate-fade-in group hover:bg-white transition-colors">
                 <div className="flex-1 min-w-0">
                   <p className="text-[0.95rem] font-black text-emerald-950 truncate mb-1 leading-tight">{item.name}</p>
                   <div className="flex items-center gap-2">
-                    <p className="text-sm font-black text-emerald-600 tracking-tight">₹{item.price.toFixed(2)}</p>
-                    {item.mrp > item.price && (
-                      <p className="text-[0.7rem] text-emerald-900/30 font-bold line-through">₹{item.mrp.toFixed(2)}</p>
+                    {isItemFree ? (
+                      subtotal >= Number(item.minShopAmount || 0) ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[0.7rem] text-emerald-900/30 font-bold line-through">₹{item.price.toFixed(2)}</span>
+                          <span className="text-sm font-black text-orange-600 tracking-tight flex items-center gap-1">
+                            FREE
+                            <span className="text-[10px] bg-orange-100 px-1 rounded animate-pulse">OFFER</span>
+                          </span>
+                        </div>
+                      ) : (
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-black text-emerald-950/40 tracking-tight">₹{item.price.toFixed(2)}</span>
+                            <span className="text-[9px] font-black bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-slate-200">Locked</span>
+                          </div>
+                          <span className="text-[9px] font-bold text-orange-500 uppercase tracking-tight">
+                            Add ₹{(Number(item.minShopAmount || 0) - subtotal).toFixed(0)} more to get free
+                          </span>
+                        </div>
+                      )
+                    ) : (
+                      <>
+                        <p className="text-sm font-black text-emerald-600 tracking-tight">₹{item.price.toFixed(2)}</p>
+                        {item.mrp > item.price && (
+                          <p className="text-[0.7rem] text-emerald-900/30 font-bold line-through">₹{item.mrp.toFixed(2)}</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-[1.25rem] p-1.5 shadow-inner">
-                  <button
-                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                    className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 active:scale-90 shadow-sm hover:bg-emerald-100 transition-all border border-emerald-100"
-                  >
-                    <Minus size={14} strokeWidth={4} />
-                  </button>
-                  <span className="w-6 text-center text-[0.95rem] font-black text-emerald-900">{item.quantity}</span>
-                  <button
-                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                    className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white active:scale-90 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
-                  >
-                    <Plus size={14} strokeWidth={4} />
-                  </button>
-                </div>
-                <p className="text-base font-black text-emerald-950 w-20 text-right tracking-tighter">
-                  ₹{(item.price * item.quantity).toFixed(2)}
+                {isItemFree ? (
+                  <div className="flex items-center justify-center bg-orange-50 border border-orange-100 rounded-xl p-1.5 shadow-inner">
+                    <button
+                      onClick={() => removeItem(item.productId)}
+                      className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-orange-500 active:scale-90 shadow-sm hover:bg-orange-100 transition-all border border-orange-100"
+                    >
+                      <Trash2 size={18} strokeWidth={2.5} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-[1.25rem] p-1.5 shadow-inner">
+                    <button
+                      onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                      className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 active:scale-90 shadow-sm hover:bg-emerald-100 transition-all border border-emerald-100"
+                    >
+                      <Minus size={14} strokeWidth={4} />
+                    </button>
+                    <span className="w-6 text-center text-[0.95rem] font-black text-emerald-900">{item.quantity}</span>
+                    <button
+                      onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                      className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white active:scale-90 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+                    >
+                      <Plus size={14} strokeWidth={4} />
+                    </button>
+                  </div>
+                )}
+                <p className={`text-base font-black w-20 text-right tracking-tighter ${(isItemFree && subtotal < Number(item.minShopAmount || 0)) ? 'text-emerald-950/60 font-bold' : 'text-emerald-950'}`}>
+                  ₹{((isItemFree && subtotal >= Number(item.minShopAmount || 0)) ? 0 : Number(item.price || 0) * item.quantity).toFixed(2)}
                 </p>
               </div>
-            ))
+              );
+            })
           )}
         </div>
 
+        {/* Promotional Suggestions */}
+        {items.length > 0 && products.length > 0 && (
+          <div className="px-6 py-3 border-t border-emerald-50 bg-emerald-50/20 max-h-[30vh] overflow-y-auto no-scrollbar">
+            <div className="flex items-center gap-2 mb-4">
+              <Sparkles size={18} className="text-orange-500 fill-orange-500" />
+              <span className="text-xs font-black text-emerald-800 tracking-[0.1em] uppercase">Recommended Gifts</span>
+            </div>
+            
+            <div className="space-y-2">
+              {products
+                .filter(p => {
+                  const isFree = checkIsFree(p.isFree);
+                  const inCart = items.some(i => i.productId === p.id);
+                  return isFree && !inCart;
+                })
+                .map((p) => {
+                  const qualifies = subtotal >= Number(p.minShopAmount || 0);
+                  return (
+                    <div key={p.id} className={`flex items-center gap-3 p-2 bg-white border rounded-xl transition-all shadow-sm group hover:scale-[1.02] ${qualifies ? 'border-emerald-200' : 'border-slate-100 shadow-none opacity-80'}`}>
+                      {/* Product Image */}
+                      <div className="w-10 h-10 rounded-lg bg-slate-50 flex items-center justify-center overflow-hidden flex-shrink-0 border border-slate-100 shadow-inner">
+                        {p.image ? (
+                          <img src={p.image} alt={p.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={16} className="text-slate-300" />
+                        )}
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <p className="text-[0.8rem] font-black text-emerald-950 truncate leading-tight">{p.name}</p>
+                          {qualifies && (
+                            <div className="flex items-center gap-0.5 text-emerald-600">
+                                <Sparkles size={8} className="fill-emerald-600" />
+                                <span className="text-[7px] font-black uppercase tracking-tighter">READY</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col">
+                          {qualifies ? (
+                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter">CLAIM FOR ₹0</span>
+                          ) : (
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-[8px] font-black text-slate-400">ABOVE ₹{p.minShopAmount}</span>
+                                <span className="text-[8px] font-bold text-orange-500 uppercase">Need ₹{(Number(p.minShopAmount || 0) - subtotal).toFixed(0)} more</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => addItem(p)}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all active:scale-90 flex-shrink-0 ${
+                          qualifies 
+                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20 hover:bg-emerald-700' 
+                            : 'bg-slate-50 text-slate-400 border border-slate-100 hover:bg-slate-100'
+                        }`}
+                      >
+                        <Plus size={16} strokeWidth={3} />
+                      </button>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
+
         {/* Footer */}
         {items.length > 0 && (
-          <div className="px-6 pt-6 border-t border-emerald-100/50 bg-white/40 backdrop-blur-xl">
-            <div className="flex items-center justify-between mb-6 px-2">
+          <div className="px-6 pt-4 border-t border-emerald-100/50 bg-white/40 backdrop-blur-xl">
+            <div className="flex items-center justify-between mb-4 px-2">
               <span className="text-emerald-600/60 font-black tracking-[0.2em] uppercase text-[10px]">Grand Total</span>
               <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
             </div>
             <button
               onClick={handleProceed}
-              className="w-full bg-emerald-600 text-white font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all shadow-2xl shadow-emerald-600/20 flex items-center justify-center gap-3 hover:bg-emerald-700 relative overflow-hidden group mb-4"
+              className="w-full bg-emerald-600 text-white font-black text-lg py-4 rounded-[2rem] active:scale-[0.98] transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3 hover:bg-emerald-700 relative overflow-hidden group mb-2"
             >
               <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
               <span className="relative z-10 flex items-center gap-2">
                 Continue to Invoice <ArrowRight size={22} strokeWidth={3} />
               </span>
             </button>
+            <div className="pb-2 px-4 opacity-30 hover:opacity-100 transition-opacity flex justify-between items-center text-[8px] font-mono text-emerald-900 border-t border-emerald-100/50 pt-2">
+            </div>
           </div>
         )}
       </div>
