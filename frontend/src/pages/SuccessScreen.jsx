@@ -264,7 +264,7 @@ export default function SuccessScreen() {
       pdf.text('S.NO', colX.sno, currentY + 2);
       pdf.text('ITEM DESCRIPTION', colX.item, currentY + 2);
       pdf.text('QTY', colX.qty, currentY + 2);
-      pdf.text('GST (₹)', colX.gst, currentY + 2);
+      pdf.text('GST', colX.gst, currentY + 2);
       pdf.text('MRP', colX.mrp, currentY + 2);
       pdf.text('VK PRICE', colX.price, currentY + 2);
       pdf.text('AMOUNT', colX.amount, currentY + 2, { align: 'right' });

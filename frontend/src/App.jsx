@@ -10,6 +10,7 @@ import Reports from './pages/Reports';
 import Profile from './pages/Profile';
 import OpeningCashEntry from './pages/OpeningCashEntry';
 import ClosingCashEntry from './pages/ClosingCashEntry';
+import AgentInventory from './pages/AgentInventory';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -56,6 +57,7 @@ export default function App() {
         <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
         <Route path="/opening-cash" element={<PrivateRoute><OpeningCashEntry /></PrivateRoute>} />
         <Route path="/closing-cash" element={<PrivateRoute><ClosingCashEntry /></PrivateRoute>} />
+        <Route path="/agent-inventory/:vehicleId" element={<PrivateRoute><AgentInventory /></PrivateRoute>} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>

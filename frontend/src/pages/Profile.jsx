@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
-import { ArrowLeft, User, Phone, Mail, Shield, Truck, LogOut, FileText, CheckCircle2, XCircle } from 'lucide-react';
+import { ArrowLeft, User, Phone, Mail, Shield, Truck, LogOut, FileText, CheckCircle2, XCircle, Package } from 'lucide-react';
 
 export default function Profile() {
   const { user, clearUser } = useUserStore();
@@ -144,6 +144,16 @@ export default function Profile() {
                       </a>
                     )}
                   </div>
+                </div>
+
+                <div className="pt-2">
+                  <button 
+                    onClick={() => navigate(`/agent-inventory/${user.assignedVehicle.id}`)}
+                    className="w-full bg-emerald-600 text-white p-3.5 rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest"
+                  >
+                    <Package size={18} />
+                    View Inventory
+                  </button>
                 </div>
               </div>
             ) : (
