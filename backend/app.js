@@ -9,7 +9,7 @@ import reportRoutes from './routes/reportRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import cashRoutes from './routes/cashRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
-
+// lslsks
 dotenv.config();
 
 const app = express();
