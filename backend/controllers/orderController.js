@@ -122,7 +122,7 @@ export const createOrderFromCart = async (req, res, next) => {
                     agentId: agentId,
                     user: agentId ? { connect: { id: agentId } } : undefined,
                     vehicle: vehicleId ? { connect: { id: vehicleId } } : undefined,
-                    routeId: routeTag.routeId,
+                    route: routeTag.routeId ? { connect: { id: routeTag.routeId } } : undefined,
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
                     items: {
