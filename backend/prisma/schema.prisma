@@ -20,6 +20,12 @@ enum ItemStatus {
   INACTIVE
 }
 
+enum RefillStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
 enum TransactionType {
   LOAD
   RETURN
@@ -71,6 +77,7 @@ model User {
   openingCash      OpeningCash[]
   closingCash      ClosingCash[]
   routeAssignments RouteAssignment[]
+  refillRequests   RefillRequest[]
 
   status UserStatus @default(ACTIVE)
 
@@ -126,6 +133,7 @@ model Product {
   vehicleStocks      VehicleStock[]
   stockTransactions  StockTransaction[]
   orderItems         OrderItem[]
+  refillItems        RefillItem[]
 
   @@index([status])
   @@index([categoryId])
@@ -253,6 +261,7 @@ model Vehicle {
   dailySummaries   DailyCashSummary[]
   routeAssignments RouteAssignment[]
   dailyCoverages   DailyCoverage[]
+  refillRequests   RefillRequest[]
 }
 
 model VehicleStock {
@@ -327,11 +336,11 @@ model RouteAssignment {
 }
 
 model Village {
-  id          String   @id @default(cuid())
-  name        String   @unique
-  status      Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id        String   @id @default(cuid())
+  name      String   @unique
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 model OpeningCash {
@@ -365,8 +374,10 @@ model ClosingCash {
   remark        String?
   status        String   @default("SUBMITTED")
   createdAt     DateTime @default(now())
+
   @@unique([vehicleId, date])
 }
+
 model BusinessSettings {
   id           String   @id @default("singleton")
   businessName String   @default("VillagKart")
@@ -377,7 +388,6 @@ model BusinessSettings {
   taxRates     String   @default("0,5,12,18")
   updatedAt    DateTime @updatedAt
 }
-
 
 model DailyCashSummary {
   id           String   @id @default(cuid())
@@ -405,7 +415,7 @@ model DailyCoverage {
   vehicleId   String
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
   routeId     String?
-  date        String   // YYYY-MM-DD
+  date        String // YYYY-MM-DD
   villageName String
   morningDone Boolean  @default(false)
   eveningDone Boolean  @default(false)
@@ -428,4 +438,34 @@ model Notification {
 
   @@index([userId, isRead])
   @@index([createdAt])
+}
+
+model RefillRequest {
+  id        String       @id @default(cuid())
+  vehicleId String
+  userId    String
+  status    RefillStatus @default(PENDING)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+
+  vehicle Vehicle      @relation(fields: [vehicleId], references: [id])
+  user    User         @relation(fields: [userId], references: [id])
+  items   RefillItem[]
+
+  @@index([vehicleId])
+  @@index([userId])
+  @@index([status])
+}
+
+model RefillItem {
+  id              String @id @default(cuid())
+  refillRequestId String
+  productId       String
+  quantity        Int
+
+  refillRequest RefillRequest @relation(fields: [refillRequestId], references: [id], onDelete: Cascade)
+  product       Product       @relation(fields: [productId], references: [id])
+
+  @@index([refillRequestId])
+  @@index([productId])
 }

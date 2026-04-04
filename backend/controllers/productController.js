@@ -109,3 +109,30 @@ export const getProductById = async (req, res, next) => {
         next(error);
     }
 };
+
+export const requestRefill = async (req, res, next) => {
+    try {
+        const { vehicleId, items } = req.body; // items: [{ productId, quantity }]
+
+        if (!vehicleId || !items || items.length === 0) {
+            return res.status(400).json({ message: 'Missing vehicle ID or items' });
+        }
+
+        const refillRequest = await prisma.refillRequest.create({
+            data: {
+                vehicleId,
+                userId: req.user.id,
+                items: {
+                    create: items.map(i => ({
+                        productId: i.productId,
+                        quantity: parseInt(i.quantity, 10)
+                    }))
+                }
+            }
+        });
+
+        res.status(201).json({ message: 'Refill requested successfully', refillRequest });
+    } catch (error) {
+        next(error);
+    }
+};

@@ -49,6 +49,7 @@ export const productsAPI = {
   getAll: (params) => api.get('/products', { params }),
   getById: (id) => api.get(`/products/${id}`),
   getVehicleInventory: (id) => api.get(`/products/vehicle-inventory/${id}`),
+  requestRefill: (data) => api.post('/products/refill', data),
 };
 
 export const cartAPI = {

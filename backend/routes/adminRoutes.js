@@ -73,6 +73,9 @@ router.route('/inventory/items/:id')
 router.post('/inventory/load', inventoryCtr.loadStock);
 router.post('/inventory/return', inventoryCtr.returnStock);
 router.get('/inventory/vehicle/:id', inventoryCtr.getVehicleInventory);
+router.get('/inventory/refills', inventoryCtr.getRefillRequests);
+router.put('/inventory/refills/:id/approve', inventoryCtr.approveRefillRequest);
+router.put('/inventory/refills/:id/reject', inventoryCtr.rejectRefillRequest);
 
 // Sales History
 router.get('/sales', salesCtr.getSalesHistory);

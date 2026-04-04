@@ -24,6 +24,8 @@ export default function AdminInventory() {
   const [editPreviewUrl, setEditPreviewUrl] = useState(null);
   const [isUploading, setIsUploading] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]); // [id, id, ...]
+  const [refillRequests, setRefillRequests] = useState([]);
+  const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
 
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -76,16 +78,30 @@ export default function AdminInventory() {
   }, []);
 
   useEffect(() => {
-    if (selectedVehicleId && activeTab === 'return') {
+    if (selectedVehicleId && activeTab === 'return' && subTab === 'return') {
       fetchVehicleInventory(selectedVehicleId);
     }
-  }, [selectedVehicleId, activeTab]);
+  }, [selectedVehicleId, activeTab, subTab]);
 
   useEffect(() => {
-    if (activeTab === 'tracking') {
-      loadAllVehiclesStock();
+    if (activeTab === 'return') {
+       if (subTab === 'tracking') {
+         loadAllVehiclesStock();
+       }
+       if (subTab === 'refills') {
+         loadRefillRequests();
+       }
     }
-  }, [activeTab, vehicles]);
+  }, [activeTab, subTab, vehicles]);
+
+  const loadRefillRequests = async () => {
+    try {
+      const { data } = await adminAPI.getRefillRequests();
+      setRefillRequests(data);
+    } catch (error) {
+      toast.error('Failed to load refill requests');
+    }
+  };
 
   const loadAllVehiclesStock = async () => {
     if (vehicles.length === 0) return;
@@ -357,7 +373,7 @@ export default function AdminInventory() {
   const handleBulkDelete = async () => {
     if (selectedItems.length === 0) return;
     if (!window.confirm(`Delete ${selectedItems.length} selected items? This cannot be undone.`)) return;
-    
+
     setIsUploading(true);
     try {
       await adminAPI.bulkDeleteItems(selectedItems);
@@ -372,7 +388,7 @@ export default function AdminInventory() {
   };
 
   const toggleSelectItem = (id) => {
-    setSelectedItems(prev => 
+    setSelectedItems(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
@@ -439,12 +455,12 @@ export default function AdminInventory() {
     const renderProductCard = (item) => {
       const isSelected = selectedItems.includes(item.id);
       return (
-        <div 
-          key={item.id} 
+        <div
+          key={item.id}
           className={`bg-white p-4 rounded-2xl border transition-all duration-200 ${isSelected ? 'border-emerald-500 bg-emerald-50/10' : item.isFree ? 'border-emerald-100 bg-emerald-50/20' : 'border-gray-100'} shadow-sm flex items-center justify-between group relative`}
         >
           <div className="flex items-center gap-4">
-            <button 
+            <button
               onClick={() => toggleSelectItem(item.id)}
               className={`p-1 rounded-md transition-colors ${isSelected ? 'text-emerald-600' : 'text-gray-300'}`}
             >
@@ -534,7 +550,7 @@ export default function AdminInventory() {
         <div className="flex items-center gap-3">
           <div className="flex-1 flex items-center gap-2 bg-white p-2.5 rounded-2xl border border-gray-100 shadow-sm">
             <div className="flex items-center gap-2 pl-2">
-              <button 
+              <button
                 onClick={() => handleSelectAll(filteredItems)}
                 className={`p-1 rounded-md transition-colors ${allSelected ? 'text-emerald-600' : 'text-gray-300'}`}
                 title="Select All"
@@ -882,7 +898,7 @@ export default function AdminInventory() {
     if (viewingVehicleId) {
       const v = vehicles.find(vh => vh.id === viewingVehicleId);
       if (!v) return null;
-      
+
       const inventory = allVehiclesStock[v.id] || [];
       const activeStock = inventory.filter(i => i.quantity > 0);
       const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
@@ -890,59 +906,59 @@ export default function AdminInventory() {
 
       return (
         <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-          <button 
+          <button
             onClick={() => setViewingVehicleId(null)}
             className="flex items-center gap-2 text-gray-500 hover:text-emerald-600 transition-colors font-bold text-sm bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm w-fit"
           >
             ← Back to Vehicles
           </button>
-          
+
           <div className="bg-white p-4 sm:p-5 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4 sm:gap-6">
-              <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-100 pb-4 gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
-                    <Truck size={24} />
-                  </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-lg font-black text-gray-900 leading-tight">{agentStr}</h3>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
-                  </div>
+            <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-100 pb-4 gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                  <Truck size={24} />
                 </div>
-                <div className="flex flex-col items-end bg-blue-50/50 p-2.5 rounded-xl border border-blue-100">
-                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Total Stock Value</span>
-                  <span className="text-base font-black text-blue-900">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                <div className="flex flex-col">
+                  <h3 className="text-lg font-black text-gray-900 leading-tight">{agentStr}</h3>
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
                 </div>
               </div>
-              
-              <div className="space-y-3">
-                <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm"><Package size={16} className="text-emerald-500"/> Loaded Inventory</h4>
-                {activeStock.length === 0 ? (
-                  <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                    <Package size={28} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-xs text-gray-400 font-bold">No active stock loaded</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {activeStock.map(item => (
-                      <div key={`track-item-${item.id}`} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-xl border border-gray-100 group">
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
-                             {item.product?.isFree ? <Gift size={16} className="text-emerald-500"/> : <Package size={16} className="text-gray-400 group-hover:text-emerald-500"/>}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="text-xs font-bold text-gray-800 line-clamp-1">{item.product?.name || 'Unknown'}</span>
-                            <span className="text-[9px] font-bold text-emerald-600 uppercase">Rate: ₹{item.product?.price || 0}</span>
-                          </div>
+              <div className="flex flex-col items-end bg-blue-50/50 p-2.5 rounded-xl border border-blue-100">
+                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Total Stock Value</span>
+                <span className="text-base font-black text-blue-900">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm"><Package size={16} className="text-emerald-500" /> Loaded Inventory</h4>
+              {activeStock.length === 0 ? (
+                <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <Package size={28} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-xs text-gray-400 font-bold">No active stock loaded</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {activeStock.map(item => (
+                    <div key={`track-item-${item.id}`} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-xl border border-gray-100 group">
+                      <div className="flex items-center gap-2">
+                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                          {item.product?.isFree ? <Gift size={16} className="text-emerald-500" /> : <Package size={16} className="text-gray-400 group-hover:text-emerald-500" />}
                         </div>
-                        <div className="flex flex-col items-end shrink-0 pl-2">
-                          <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400">Qty</span></span>
-                          <span className="text-[10px] font-black text-gray-500">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-bold text-gray-800 line-clamp-1">{item.product?.name || 'Unknown'}</span>
+                          <span className="text-[9px] font-bold text-emerald-600 uppercase">Rate: ₹{item.product?.price || 0}</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      <div className="flex flex-col items-end shrink-0 pl-2">
+                        <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400">Qty</span></span>
+                        <span className="text-[10px] font-black text-gray-500">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       );
@@ -958,8 +974,8 @@ export default function AdminInventory() {
             const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
 
             return (
-              <div 
-                key={`track-card-${v.id}`} 
+              <div
+                key={`track-card-${v.id}`}
                 onClick={() => setViewingVehicleId(v.id)}
                 className="bg-white p-4 rounded-[1.25rem] border border-gray-100 shadow-sm hover:border-emerald-300 hover:shadow-emerald-500/10 transition-all cursor-pointer group flex flex-col gap-3"
               >
@@ -973,18 +989,18 @@ export default function AdminInventory() {
                   </div>
                 </div>
                 <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-2.5 rounded-xl flex justify-between items-center border border-transparent group-hover:border-emerald-100">
-                   <div className="flex flex-col">
-                     <span className="text-[8px] font-black uppercase text-gray-400">Unique Items</span>
-                     <span className="text-xs font-bold text-gray-700 leading-none mt-0.5">{activeStock.length}</span>
-                   </div>
-                   <div className="flex flex-col items-end">
-                     <span className="text-[8px] font-black uppercase text-emerald-600/70">Total Value</span>
-                     <span className="text-xs font-black text-emerald-700 leading-none mt-0.5">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                   </div>
+                  <div className="flex flex-col">
+                    <span className="text-[8px] font-black uppercase text-gray-400">Unique Items</span>
+                    <span className="text-xs font-bold text-gray-700 leading-none mt-0.5">{activeStock.length}</span>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[8px] font-black uppercase text-emerald-600/70">Total Value</span>
+                    <span className="text-xs font-black text-emerald-700 leading-none mt-0.5">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                  </div>
                 </div>
                 <div className="flex items-center justify-between text-[9px] uppercase font-bold text-gray-400 group-hover:text-emerald-500 mt-1">
-                   <span>View Details</span>
-                   <span>→</span>
+                  <span>View Details</span>
+                  <span>→</span>
                 </div>
               </div>
             );
@@ -993,6 +1009,93 @@ export default function AdminInventory() {
       </div>
     );
   };
+
+  const handleApproveRefill = async (id) => {
+    try {
+      setIsSubmitting(true);
+      await adminAPI.approveRefillRequest(id);
+      toast.success('Refill approved and stock loaded successfully');
+      loadRefillRequests();
+    } catch (error) {
+      toast.error('Failed to approve refill');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectRefill = async (id) => {
+    try {
+      setIsSubmitting(true);
+      await adminAPI.rejectRefillRequest(id);
+      toast.success('Refill request rejected');
+      loadRefillRequests();
+    } catch (error) {
+      toast.error('Failed to reject refill');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const renderRefills = () => (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      {refillRequests.length === 0 ? (
+        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200 shadow-sm">
+          <Truck size={48} className="mx-auto text-gray-300 mb-4" />
+          <h3 className="text-lg font-black text-gray-900">No Refill Requests</h3>
+          <p className="text-sm text-gray-500 mt-2">Agents haven't requested any stock refills yet.</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {refillRequests.map(req => (
+            <div key={req.id} className="bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
+                    <Truck size={20} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="font-black text-gray-900 line-clamp-1">{req.user?.name || 'Unknown Agent'}</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{req.vehicle?.vehicleNumber}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end shrink-0">
+                  <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
+                    req.status === 'PENDING' ? 'bg-amber-50 text-amber-600' :
+                    req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
+                    'bg-red-50 text-red-600'
+                  }`}>
+                    {req.status}
+                  </span>
+                  <span className="text-[10px] font-bold text-gray-400 mt-1">{new Date(req.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+              <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
+                {req.items.map(item => (
+                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100/50">
+                    <div className="flex items-center gap-2">
+                       <Package size={14} className="text-emerald-500"/>
+                       <span className="text-xs font-bold text-gray-800">{item.product?.name}</span>
+                    </div>
+                    <span className="text-sm font-black text-gray-900">{item.quantity} <span className="text-[10px] text-gray-400">Qty</span></span>
+                  </div>
+                ))}
+              </div>
+              {req.status === 'PENDING' && (
+                <div className="flex gap-2 pt-3 border-t border-gray-100 mt-auto">
+                  <button onClick={() => handleRejectRefill(req.id)} disabled={isSubmitting} className="flex-1 py-2.5 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors disabled:opacity-50">
+                    Reject
+                  </button>
+                  <button onClick={() => handleApproveRefill(req.id)} disabled={isSubmitting} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex justify-center items-center gap-2">
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Approve'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 
   if (loading) {
     return (
@@ -1041,10 +1144,8 @@ export default function AdminInventory() {
 
       <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl flex-wrap">
         {[
-          { key: 'master', label: 'Item Master' },
-          { key: 'loading', label: 'Loading' },
-          { key: 'return', label: 'Return' },
-          { key: 'tracking', label: 'Vehicle Tracking' }
+          { key: 'master', label: 'Items' },
+          { key: 'return', label: 'Return & Stock Logs' }
         ].map((tab) => (
           <button
             key={tab.key}
@@ -1053,20 +1154,51 @@ export default function AdminInventory() {
               setStockQuantities({});
               setViewingVehicleId(null);
             }}
-            className={cn(
-              "flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200",
+            className={`flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
               activeTab === tab.key ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400"
-            )}
+            }`}
           >
             {tab.label}
           </button>
         ))}
       </div>
 
+      {activeTab === 'return' && (
+        <div className="flex gap-2 p-1 rounded-2xl flex-wrap border-b border-gray-100 mb-6 overflow-x-auto">
+          {[
+            { key: 'loading', label: 'Loading', icon: <ArrowUpCircle size={14}/> },
+            { key: 'return', label: 'Return', icon: <ArrowDownCircle size={14}/> },
+            { key: 'tracking', label: 'Tracking', icon: <Truck size={14}/> },
+            { key: 'refills', label: 'Refills', icon: <Package size={14}/> }
+          ].map((tab) => (
+            <button
+              key={`sub-${tab.key}`}
+              onClick={() => {
+                setSubTab(tab.key);
+                setStockQuantities({});
+                setViewingVehicleId(null);
+              }}
+              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 ${
+                subTab === tab.key ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "text-gray-400 hover:text-gray-600"
+              }`}
+            >
+              {tab.icon}
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {activeTab === 'master' && renderMaster()}
-      {activeTab === 'loading' && renderLoading()}
-      {activeTab === 'return' && renderReturn()}
-      {activeTab === 'tracking' && renderTracking()}
+      
+      {activeTab === 'return' && (
+        <>
+          {subTab === 'loading' && renderLoading()}
+          {subTab === 'return' && renderReturn()}
+          {subTab === 'tracking' && renderTracking()}
+          {subTab === 'refills' && renderRefills()}
+        </>
+      )}
 
       {/* Bulk Upload Modal */}
       {showBulkUploadModal && (
@@ -1074,8 +1206,8 @@ export default function AdminInventory() {
           <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                 <FileText className="text-emerald-500" />
-                 Bulk Upload
+                <FileText className="text-emerald-500" />
+                Bulk Upload
               </h3>
               <button
                 onClick={() => setShowBulkUploadModal(false)}
@@ -1086,7 +1218,7 @@ export default function AdminInventory() {
             </div>
 
             <div className="space-y-4">
-              <div 
+              <div
                 onClick={() => document.getElementById('excel-upload').click()}
                 className="w-full border-2 border-dashed border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
                 style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
@@ -1105,11 +1237,11 @@ export default function AdminInventory() {
               </div>
 
               <button
-                 onClick={handleDownloadSample}
-                 className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
+                onClick={handleDownloadSample}
+                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
               >
-                 <ArrowDownCircle size={18} className="text-gray-500" />
-                 Download Sample Excel
+                <ArrowDownCircle size={18} className="text-gray-500" />
+                Download Sample Excel
               </button>
             </div>
           </div>

@@ -395,3 +395,86 @@ export const getVehicleInventory = async (req, res) => {
     res.status(500).json({ message: 'Error fetching vehicle inventory', error: error.message });
   }
 };
+
+export const getRefillRequests = async (req, res) => {
+  try {
+    const requests = await prisma.refillRequest.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+        user: { select: { name: true } },
+        items: {
+          include: {
+            product: { select: { name: true, price: true, mrp: true } }
+          }
+        }
+      }
+    });
+    res.json(requests);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching refill requests', error: error.message });
+  }
+};
+
+export const approveRefillRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const request = await prisma.refillRequest.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!request) return res.status(404).json({ message: 'Refill request not found' });
+    if (request.status !== 'PENDING') return res.status(400).json({ message: 'Request is already processed' });
+
+    // Ensure atomic transaction
+    await prisma.$transaction(async (tx) => {
+      for (const item of request.items) {
+        // Log transaction
+        await tx.stockTransaction.create({
+          data: {
+            type: 'LOAD',
+            vehicleId: request.vehicleId,
+            productId: item.productId,
+            quantity: item.quantity
+          }
+        });
+
+        // Update vehicle stock
+        await tx.vehicleStock.upsert({
+          where: { vehicleId_productId: { vehicleId: request.vehicleId, productId: item.productId } },
+          update: { quantity: { increment: item.quantity } },
+          create: { vehicleId: request.vehicleId, productId: item.productId, quantity: item.quantity }
+        });
+      }
+
+      await tx.refillRequest.update({
+        where: { id },
+        data: { status: 'APPROVED' }
+      });
+    });
+
+    res.json({ message: 'Refill request approved and stock loaded successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error approving refill request', error: error.message });
+  }
+};
+
+export const rejectRefillRequest = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const request = await prisma.refillRequest.findUnique({ where: { id } });
+
+    if (!request) return res.status(404).json({ message: 'Refill request not found' });
+    if (request.status !== 'PENDING') return res.status(400).json({ message: 'Request is already processed' });
+
+    await prisma.refillRequest.update({
+      where: { id },
+      data: { status: 'REJECTED' }
+    });
+
+    res.json({ message: 'Refill request rejected' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error rejecting refill request', error: error.message });
+  }
+};
