@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma.js';
+import { fetchPlanForVehicle, getCoverageType } from './routeController.js';
 
 // @desc    Create order from cart
 // @route   POST /api/orders/create-from-cart
@@ -99,6 +100,17 @@ export const createOrderFromCart = async (req, res, next) => {
             });
         }
 
+        // 2.5 Fetch Route & Vehicle context for tagging
+        const vehicleId = req.user.assignedVehicleId;
+        const plan = await fetchPlanForVehicle(vehicleId);
+        const coverage = getCoverageType();
+
+        const routeTag = {
+            routeId: plan?.routeId || null,
+            villageName: plan?.villageName || (plan?.noVillage ? 'Unspecified Village' : 'No Active Plan'),
+            coverageType: coverage
+        };
+
         // 3. Create Order + OrderItems in a transaction
         const order = await prisma.$transaction(async (tx) => {
             const newOrder = await tx.order.create({
@@ -109,7 +121,10 @@ export const createOrderFromCart = async (req, res, next) => {
                     status: 'PENDING',
                     agentId: agentId,
                     user: agentId ? { connect: { id: agentId } } : undefined,
-                    vehicle: req.user.assignedVehicleId ? { connect: { id: req.user.assignedVehicleId } } : undefined,
+                    vehicle: vehicleId ? { connect: { id: vehicleId } } : undefined,
+                    routeId: routeTag.routeId,
+                    villageName: routeTag.villageName,
+                    coverageType: routeTag.coverageType,
                     items: {
                         create: orderItemsData,
                     },

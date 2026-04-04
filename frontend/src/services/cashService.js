@@ -29,3 +29,8 @@ export const adminUpdateReconciliation = async (data) => {
   const response = await api.put('/cash/admin/reconciliation', data);
   return response.data;
 };
+
+export const adminDeleteReconciliation = async (vehicleId, date) => {
+  const response = await api.delete(`/cash/admin/reconciliation/${vehicleId}/${date}`);
+  return response.data;
+};

@@ -5,7 +5,11 @@ import prisma from '../utils/prisma.js';
 // @access  Private
 export const getTodayReport = async (req, res, next) => {
     try {
-        const agentId = req.query.agentId || req.user.id;
+        const agentId = req.query.agentId || req?.user?.id;
+        if (!agentId) {
+            res.status(400);
+            throw new Error('Agent ID is required');
+        }
 
         const today = new Date();
         today.setHours(0, 0, 0, 0);
@@ -32,14 +36,14 @@ export const getTodayReport = async (req, res, next) => {
         });
 
         const totalOrders = orders.length;
-        const totalSales = orders.reduce((sum, o) => sum + o.totalAmount, 0);
-        const cashSales = orders.filter(o => o.paymentMode === 'CASH').reduce((sum, o) => sum + o.totalAmount, 0);
-        const upiSales = orders.filter(o => o.paymentMode === 'UPI').reduce((sum, o) => sum + o.totalAmount, 0);
-        const cardSales = orders.filter(o => o.paymentMode === 'CARD').reduce((sum, o) => sum + o.totalAmount, 0);
+        const totalSales = orders.reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+        const cashSales = orders.filter(o => o.paymentMode === 'CASH').reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+        const upiSales = orders.filter(o => o.paymentMode === 'UPI').reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
+        const cardSales = orders.filter(o => o.paymentMode === 'CARD').reduce((sum, o) => sum + Number(o.totalAmount || 0), 0);
 
         const totalProfit = orders.reduce((sum, order) => {
             const orderProfit = order.items.reduce((itemSum, item) => {
-                return itemSum + ((item.price - (item.landingPrice || 0)) * item.quantity);
+                return itemSum + ((Number(item.price || 0) - Number(item.landingPrice || 0)) * (item.quantity || 0));
             }, 0);
             return sum + orderProfit;
         }, 0);
@@ -57,6 +61,7 @@ export const getTodayReport = async (req, res, next) => {
             },
         });
     } catch (error) {
+        console.error('[TodayReport] CRASH:', error);
         next(error);
     }
 };

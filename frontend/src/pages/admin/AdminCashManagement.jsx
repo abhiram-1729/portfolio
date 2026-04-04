@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil } from 'lucide-react';
-import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation } from '../../services/cashService';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2 } from 'lucide-react';
+import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation } from '../../services/cashService';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -27,12 +27,17 @@ export default function AdminCashManagement() {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingSummary, setEditingSummary] = useState(null);
   const [editData, setEditData] = useState({
-    actualCash: 0,
+    openingCash: 0,
     remark: '',
     denominations: {
       "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0
     }
   });
+
+  // Delete Confirmation Modal
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deletingSummary, setDeletingSummary] = useState(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
@@ -45,7 +50,7 @@ export default function AdminCashManagement() {
     } else {
       const newDenoms = { ...editData.denominations, [denom]: qty };
       const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
-      setEditData({ ...editData, denominations: newDenoms, actualCash: total });
+      setEditData({ ...editData, denominations: newDenoms, openingCash: total });
     }
   };
 
@@ -121,9 +126,9 @@ export default function AdminCashManagement() {
   const handleOpenEdit = (summary) => {
     setEditingSummary(summary);
     setEditData({
-      actualCash: summary.actualCash,
+      openingCash: summary.openingCash,
       remark: 'Corrected by Admin',
-      denominations: summary.closingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+      denominations: summary.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
     });
     setShowEditModal(true);
   };
@@ -135,17 +140,32 @@ export default function AdminCashManagement() {
       await adminUpdateReconciliation({
         vehicleId: editingSummary.vehicleId,
         date: editingSummary.date,
-        actualCash: editData.actualCash,
+        openingCash: editData.openingCash,
         denominations: editData.denominations,
         remark: editData.remark
       });
-      toast.success('Reconciliation updated');
+      toast.success('Opening cash updated — expected & difference recalculated');
       setShowEditModal(false);
       fetchSummaries();
     } catch (error) {
-      toast.error('Failed to update reconciliation');
+      toast.error('Failed to update opening cash');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    setIsDeleting(true);
+    try {
+      await adminDeleteReconciliation(deletingSummary.vehicleId, deletingSummary.date);
+      toast.success(`Records deleted for ${deletingSummary.vehicle.vehicleNumber}`);
+      setShowDeleteModal(false);
+      setDeletingSummary(null);
+      fetchSummaries();
+    } catch (error) {
+      toast.error('Failed to delete records');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
@@ -292,6 +312,12 @@ export default function AdminCashManagement() {
                         >
                           <Pencil size={18} />
                         </button>
+                        <button
+                          onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }}
+                          className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"
+                        >
+                          <Trash2 size={18} />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -429,18 +455,18 @@ export default function AdminCashManagement() {
             <form onSubmit={handleUpdateReconciliation} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Current Expected</span>
-                  <span className="text-sm font-black text-gray-900">₹{editingSummary.expectedCash.toLocaleString()}</span>
+                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Current Opening</span>
+                  <span className="text-sm font-black text-gray-900">₹{editingSummary.openingCash.toLocaleString()}</span>
                 </div>
                 <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
-                  <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">New Total</span>
-                  <span className="text-sm font-black text-orange-700">₹{editData.actualCash.toLocaleString()}</span>
+                  <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">New Opening</span>
+                  <span className="text-sm font-black text-orange-700">₹{editData.openingCash.toLocaleString()}</span>
                 </div>
               </div>
 
               {/* Denominations Section - Compact Grid */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Corrected Actual Count</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Opening Cash Denominations</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
                   {denominationsList.map((denom) => (
                     <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-orange-200 transition-all">
@@ -462,6 +488,14 @@ export default function AdminCashManagement() {
                     </div>
                   ))}
                 </div>
+              </div>
+
+              {/* Info: what gets recalculated */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">What changes?</p>
+                <p className="text-xs text-blue-500 font-bold">
+                  Expected = New Opening + Cash Sales &nbsp;|&nbsp; Difference = Actual − Expected
+                </p>
               </div>
 
               <div className="space-y-2">
@@ -490,6 +524,72 @@ export default function AdminCashManagement() {
                 )}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      {showDeleteModal && deletingSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-rose-50 rounded-xl flex items-center justify-center text-rose-600">
+                  <Trash2 size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-gray-900 leading-tight">Delete Records</h3>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-tight">This action cannot be undone</p>
+                </div>
+              </div>
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeletingSummary(null); }}
+                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-4 space-y-2">
+              <p className="text-xs font-bold text-rose-700">
+                You are about to permanently delete all cash records for:
+              </p>
+              <div className="flex items-center gap-2 mt-1">
+                <div className="w-7 h-7 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
+                  <Truck size={14} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <p className="text-sm font-black text-gray-900 leading-none">{deletingSummary.vehicle.vehicleNumber}</p>
+                  <p className="text-[10px] text-gray-400 font-bold">{deletingSummary.date}</p>
+                </div>
+              </div>
+              <p className="text-[10px] text-rose-500 font-bold mt-2">
+                Opening cash, closing cash &amp; daily summary will all be removed.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeletingSummary(null); }}
+                className="flex-1 bg-gray-100 text-gray-600 font-black text-sm py-3 rounded-xl hover:bg-gray-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmDelete}
+                disabled={isDeleting}
+                className="flex-1 bg-rose-600 text-white font-black text-sm py-3 rounded-xl hover:bg-rose-700 transition-all shadow-lg shadow-rose-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <Loader2 className="animate-spin" size={18} />
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Delete
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       )}

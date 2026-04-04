@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Truck, Coins, ArrowRight, Info, ArrowLeft } from 'lucide-react';
+import { Truck, Coins, ArrowRight, Info, ArrowLeft, CheckCircle2 } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { submitOpeningCash, getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
@@ -198,27 +198,37 @@ export default function OpeningCashEntry() {
           </div>
 
           {openingSubmitted ? (
-            <button
-              type="button"
-              onClick={() => navigate('/', { replace: true })}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
-            >
-              Continue to Sales
-              <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
-            </button>
+            <div className="space-y-4">
+              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+                <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
+                <p className="text-xs font-bold text-emerald-800">The daily opening float has been assigned and confirmed by the administrator.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate('/', { replace: true })}
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+              >
+                Continue to Sales
+                <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </div>
           ) : (
-            <button
-              type="submit"
-              disabled={loading || totalAmount <= 0}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-100 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
-            >
-              {loading ? 'Submitting...' : (
-                <>
-                  Confirm & Start Sales
-                  <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-                </>
-              )}
-            </button>
+            <div className="bg-rose-50 border border-rose-100 rounded-3xl p-10 text-center space-y-4 shadow-xl shadow-rose-200/20">
+               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-rose-500 mx-auto shadow-sm border border-rose-50">
+                  <Info size={32} strokeWidth={2.5} />
+               </div>
+               <h3 className="text-xl font-black text-slate-900 tracking-tight">Access Restricted</h3>
+               <p className="text-sm font-bold text-slate-500 max-w-[240px] mx-auto leading-relaxed">
+                  Opening cash entry is now managed by the administrator. Please wait for the daily float to be assigned.
+               </p>
+               <button 
+                type="button"
+                onClick={() => navigate('/')}
+                className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest"
+               >
+                 Go Back
+               </button>
+            </div>
           )}
         </form>
       </div>

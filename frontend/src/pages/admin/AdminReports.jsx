@@ -40,6 +40,8 @@ export default function AdminReports() {
   const [trendsData, setTrendsData] = useState(null);
   const [topProducts, setTopProducts] = useState(null);
   const [reconReport, setReconReport] = useState(null);
+  const [routeData, setRouteData] = useState(null);
+  const [villageData, setVillageData] = useState(null);
   const [vehicles, setVehicles] = useState(null);
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
 
@@ -47,6 +49,7 @@ export default function AdminReports() {
   const [isOverviewLoading, setIsOverviewLoading] = useState(false);
   const [isDailyLoading, setIsDailyLoading] = useState(false);
   const [isReconLoading, setIsReconLoading] = useState(false);
+  const [isRouteLoading, setIsRouteLoading] = useState(false);
 
   const fetchVehicles = async () => {
     try {
@@ -90,6 +93,23 @@ export default function AdminReports() {
     }
   };
 
+  const loadRouteData = async () => {
+    if (routeData && villageData) return;
+    setIsRouteLoading(true);
+    try {
+        const [routeRes, villageRes] = await Promise.all([
+            adminAPI.getRouteWiseReport(),
+            adminAPI.getVillageWiseReport()
+        ]);
+        setRouteData(routeRes.data);
+        setVillageData(villageRes.data);
+    } catch (error) {
+        toast.error('Failed to fetch route analytics');
+    } finally {
+        setIsRouteLoading(false);
+    }
+  };
+
   const loadReconData = async () => {
     if (!vehicles) {
        await fetchVehicles();
@@ -118,6 +138,7 @@ export default function AdminReports() {
     if (activeTab === 'daily') loadDailyData();
     if (activeTab === 'overview') loadOverviewData();
     if (activeTab === 'recon') loadReconData();
+    if (activeTab === 'route') loadRouteData();
   }, [activeTab]);
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, bgColor }) => (
@@ -445,6 +466,7 @@ export default function AdminReports() {
         {[
           { key: 'overview', label: 'Overview' },
           { key: 'daily', label: 'Summary' },
+          { key: 'route', label: 'Geographical' },
           { key: 'recon', label: 'Recon' },
         ].map((tab) => (
           <button
@@ -463,11 +485,101 @@ export default function AdminReports() {
       <div className="transition-all duration-300">
         {activeTab === 'overview' && renderOverview()}
         {activeTab === 'daily' && renderDaily()}
+        {activeTab === 'route' && renderRouteReport()}
         {activeTab === 'recon' && renderReconciliation()}
       </div>
     </div>
   );
 }
+
+const renderRouteReport = () => {
+    if (isRouteLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="text-emerald-900/40 text-[10px] font-black uppercase tracking-widest mt-2">Analyzing Routes...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        {/* Route Performance Chart */}
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
+            <div className="mb-6 px-1">
+                <h3 className="text-lg font-black text-gray-900 tracking-tight">Route Leaderboard</h3>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Revenue Distribution by Assigned Route</p>
+            </div>
+            
+            <div className="h-[250px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={routeData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                        <XAxis type="number" hide />
+                        <YAxis 
+                            dataKey="routeName" 
+                            type="category" 
+                            axisLine={false} 
+                            tickLine={false}
+                            tick={{ fontSize: 10, fontWeight: 900, fill: '#374151' }}
+                            width={100}
+                        />
+                        <Tooltip 
+                            cursor={{ fill: '#f9fafb' }}
+                            contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Bar dataKey="totalSales" radius={[0, 10, 10, 0]} barSize={20}>
+                            {routeData?.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#f97316'} />
+                            ))}
+                        </Bar>
+                    </BarChart>
+                </ResponsiveContainer>
+            </div>
+        </div>
+
+        {/* Village Breakdown */}
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-6 px-1">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Village Performance</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Morning vs Evening Session Revenue</p>
+            </div>
+            <Activity className="text-gray-300" size={24} />
+          </div>
+
+          <div className="space-y-3">
+            {villageData?.map((v, idx) => (
+               <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
+                        <Globe size={18} />
+                    </div>
+                    <div>
+                        <p className="text-sm font-black text-gray-900">{v.villageName}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${v.coverageType === 'MORNING' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                {v.coverageType}
+                            </span>
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{v.orderCount} Orders</span>
+                        </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
+                  </div>
+               </div>
+            ))}
+            {(!villageData || villageData.length === 0) && (
+              <div className="py-12 text-center text-gray-300">
+                <Map size={48} className="mx-auto mb-4 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">No Geographical Data Logged</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+};
 
 function cn(...inputs) {
   return inputs.filter(Boolean).join(' ');

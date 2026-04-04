@@ -20,6 +20,7 @@ import AdminSales from './pages/admin/AdminSales';
 import AdminReports from './pages/admin/AdminReports';
 import AdminCashManagement from './pages/admin/AdminCashManagement';
 import AdminSettings from './pages/admin/AdminSettings';
+import AdminRoutes from './pages/admin/AdminRoutes';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -69,6 +70,7 @@ export default function App() {
           <Route path="reports" element={<AdminReports />} />
           <Route path="cash" element={<AdminCashManagement />} />
           <Route path="settings" element={<AdminSettings />} />
+          <Route path="routes" element={<AdminRoutes />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

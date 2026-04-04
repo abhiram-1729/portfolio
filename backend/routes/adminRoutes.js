@@ -7,6 +7,7 @@ import * as inventoryCtr from '../controllers/admin/inventoryController.js';
 import * as salesCtr from '../controllers/admin/salesController.js';
 import * as reportCtr from '../controllers/admin/reportController.js';
 import * as settingsCtr from '../controllers/admin/settingsController.js';
+import * as routeCtr from '../controllers/admin/routeController.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
@@ -81,6 +82,21 @@ router.get('/reports/vehicle/:id', reportCtr.getVehicleWiseReport);
 router.get('/reports/item', reportCtr.getItemWiseReport);
 router.get('/reports/date-range', reportCtr.getDateRangeReport);
 router.get('/reports/reconciliation', reportCtr.getReconciliationReport);
+router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
+router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
+
+// Routes & Assignments
+router.route('/routes')
+  .get(routeCtr.getAdminRoutes)
+  .post(routeCtr.createRoute);
+router.route('/routes/:id')
+  .put(routeCtr.updateRoute)
+  .delete(routeCtr.deleteRoute);
+router.route('/routes/assignments')
+  .get(routeCtr.getRouteAssignments)
+  .post(routeCtr.assignRouteToVehicle);
+router.route('/routes/assignments/:id')
+  .delete(routeCtr.deleteRouteAssignment);
 
 // Business Settings Update (Admin Only)
 router.put('/settings', admin, settingsCtr.updateSettings);

@@ -44,6 +44,8 @@ export const adminAPI = {
   getItemReport: () => api.get('/admin/reports/item'),
   getDateRangeReport: (params) => api.get('/admin/reports/date-range', { params }),
   getReconciliationReport: (params) => api.get('/admin/reports/reconciliation', { params }),
+  getRouteWiseReport: (params) => api.get('/admin/reports/route-wise', { params }),
+  getVillageWiseReport: (params) => api.get('/admin/reports/village-wise', { params }),
   
   // Settings
   getSettings: () => api.get('/admin/settings').catch(err => {

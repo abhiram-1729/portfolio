@@ -106,17 +106,58 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
             },
             update: {
                 openingCash: totalOpeningCash,
-                expectedCash: totalOpeningCash,
+                expectedCash: {
+                    increment: 0 // Placeholder to keep logic consistent
+                }
             },
             create: {
                 vehicleId,
                 date: dateString,
                 openingCash: totalOpeningCash,
                 expectedCash: totalOpeningCash,
+                cashSales: 0
             },
         });
 
+        // Re-fetch and accurately update expectedCash if it was an update
+        const finalSummary = await prisma.dailyCashSummary.findUnique({
+            where: { vehicleId_date: { vehicleId, date: dateString } }
+        });
+        
+        const newExpected = totalOpeningCash + (finalSummary.cashSales || 0);
+        const newDiff = (finalSummary.actualCash || 0) - newExpected;
+
+        await prisma.dailyCashSummary.update({
+            where: { vehicleId_date: { vehicleId, date: dateString } },
+            data: {
+                expectedCash: newExpected,
+                difference: newDiff,
+                status: finalSummary.actualCash > 0 ? (newDiff === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
+            }
+        });
+
         res.status(201).json(openingCash);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// ... existing code ...
+
+// @desc    Admin: Delete reconciliation and associated records
+// @route   DELETE /api/cash/admin/reconciliation/:vehicleId/:date
+// @access  Admin
+export const deleteReconciliation = async (req, res, next) => {
+    try {
+        const { vehicleId, date } = req.params;
+
+        await prisma.$transaction([
+            prisma.openingCash.deleteMany({ where: { vehicleId, date } }),
+            prisma.closingCash.deleteMany({ where: { vehicleId, date } }),
+            prisma.dailyCashSummary.deleteMany({ where: { vehicleId, date } }),
+        ]);
+
+        res.json({ message: 'Reconciliation data removed' });
     } catch (error) {
         next(error);
     }
@@ -316,29 +357,38 @@ export const getAdminCashSummary = async (req, res, next) => {
             },
         });
 
-        res.json(summaries);
+        // Attach opening denominations from OpeningCash records
+        const enriched = await Promise.all(
+            summaries.map(async (s) => {
+                const opening = await prisma.openingCash.findUnique({
+                    where: { vehicleId_date: { vehicleId: s.vehicleId, date: s.date } },
+                    select: { denominations: true },
+                });
+                return { ...s, openingDenominations: opening?.denominations || {} };
+            })
+        );
+
+        res.json(enriched);
     } catch (error) {
         next(error);
     }
 };
 
-// @desc    Admin: Update/Edit reconciliation for a vehicle
+// @desc    Admin: Update opening cash for a vehicle (recalculates expected, difference, status)
 // @route   PUT /api/cash/admin/reconciliation
 // @access  Admin
 export const adminUpdateReconciliation = async (req, res, next) => {
     try {
-        const { vehicleId, date, actualCash, denominations, remark } = req.body;
+        const { vehicleId, date, openingCash, denominations, remark } = req.body;
 
-        if (!vehicleId || !date || actualCash === undefined) {
+        if (!vehicleId || !date || openingCash === undefined) {
             res.status(400);
-            throw new Error('Vehicle ID, Date, and Actual Cash are required');
+            throw new Error('Vehicle ID, Date, and Opening Cash are required');
         }
 
-        // 1. Get current summary to calculate status/difference
+        // 1. Get current summary to access existing cashSales and actualCash
         const summary = await prisma.dailyCashSummary.findUnique({
-            where: {
-                vehicleId_date: { vehicleId, date }
-            }
+            where: { vehicleId_date: { vehicleId, date } }
         });
 
         if (!summary) {
@@ -346,18 +396,39 @@ export const adminUpdateReconciliation = async (req, res, next) => {
             throw new Error('Summary not found for this date/vehicle');
         }
 
-        const difference = actualCash - summary.expectedCash;
-        const status = difference === 0 ? 'MATCHED' : 'MISMATCHED';
-
-        // 2. Update DailyCashSummary
-        const updatedSummary = await prisma.dailyCashSummary.update({
-            where: {
-                vehicleId_date: { vehicleId, date }
+        // 2. Update the OpeningCash record
+        await prisma.openingCash.upsert({
+            where: { vehicleId_date: { vehicleId, date } },
+            update: {
+                totalOpeningCash: openingCash,
+                denominations: denominations || {},
             },
+            create: {
+                vehicleId,
+                date,
+                userId: req.user.id,
+                totalOpeningCash: openingCash,
+                denominations: denominations || {},
+            },
+        });
+
+        // 3. Recalculate expectedCash, difference, and status based on new opening cash
+        const cashSales = summary.cashSales || 0;
+        const newExpectedCash = openingCash + cashSales;
+        const actualCash = summary.actualCash || 0;
+        const newDifference = actualCash - newExpectedCash;
+        const newStatus = actualCash > 0
+            ? (newDifference === 0 ? 'MATCHED' : 'MISMATCHED')
+            : 'PENDING';
+
+        // 4. Update DailyCashSummary with recalculated values
+        const updatedSummary = await prisma.dailyCashSummary.update({
+            where: { vehicleId_date: { vehicleId, date } },
             data: {
-                actualCash,
-                difference,
-                status
+                openingCash,
+                expectedCash: newExpectedCash,
+                difference: newDifference,
+                status: newStatus,
             },
             include: {
                 vehicle: {
@@ -366,33 +437,6 @@ export const adminUpdateReconciliation = async (req, res, next) => {
                         vehicleName: true,
                     }
                 }
-            }
-        });
-
-        // 3. Update or create ClosingCash record for audit trial
-        await prisma.closingCash.upsert({
-            where: {
-                vehicleId_date: { vehicleId, date }
-            },
-            update: {
-                actualCash,
-                difference,
-                denominations: denominations || {},
-                remark: remark || 'Updated by admin',
-                status
-            },
-            create: {
-                vehicleId,
-                date,
-                userId: req.user.id,
-                openingCash: summary.openingCash,
-                cashSales: summary.cashSales,
-                expectedCash: summary.expectedCash,
-                actualCash,
-                difference,
-                denominations: denominations || {},
-                remark: remark || 'Manually created by admin',
-                status
             }
         });
 

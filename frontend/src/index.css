@@ -118,11 +118,22 @@ body {
   animation: shimmer 2s infinite linear;
 }
 
-/* Hide scrollbar for cleaner look on web views while allowing scroll */
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+/* Custom Subtle Scrollbar for emerald theme */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 4px;
 }
-.no-scrollbar {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #10b981;
+  border-radius: 10px;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #059669;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: #10b981 #f1f5f9;
 }

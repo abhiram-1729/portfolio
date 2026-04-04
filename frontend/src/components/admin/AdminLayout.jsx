@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   ShoppingCart,
-  Coins
+  Coins,
+  MapPin
 } from 'lucide-react';
 import { useUserStore } from '../../store/userStore';
 import { clsx } from 'clsx';
@@ -36,10 +37,11 @@ export default function AdminLayout() {
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/admin/users', icon: Users, label: 'Users' },
     { to: '/admin/vehicles', icon: Truck, label: 'Vehicles' },
+    { to: '/admin/routes', icon: MapPin, label: 'Routes' },
     { to: '/admin/inventory', icon: Package, label: 'Inventory' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
-    { to: '/admin/cash', icon: Coins, label: 'Cash Management' },
+    { to: '/admin/cash', icon: Coins, label: 'Cash Flow' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
 

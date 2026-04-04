@@ -1,0 +1,181 @@
+import prisma from '../../utils/prisma.js';
+
+// @desc    Create a new route with cycles
+// @route   POST /api/admin/routes/create
+// @access  Admin
+export const createRoute = async (req, res, next) => {
+    try {
+        const { routeName, villages, cycles } = req.body;
+
+        if (!routeName || !villages || !cycles) {
+            res.status(400);
+            throw new Error('All fields are required');
+        }
+
+        const route = await prisma.route.create({
+            data: {
+                routeName,
+                villages,
+                cycles: {
+                    create: cycles.map(cycle => ({
+                        dayOfWeek: cycle.dayOfWeek,
+                        villageName: cycle.villageName
+                    }))
+                }
+            },
+            include: {
+                cycles: true
+            }
+        });
+
+        res.status(201).json(route);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Assign a route to a vehicle and executive
+// @route   POST /api/admin/routes/assignments
+// @access  Admin
+export const assignRouteToVehicle = async (req, res, next) => {
+    try {
+        const { vehicleId, userId, routeId } = req.body;
+
+        if (!vehicleId || !userId || !routeId) {
+            res.status(400);
+            throw new Error('Vehicle, User, and Route are required');
+        }
+
+        // Deactivate previous active assignment for this vehicle
+        await prisma.routeAssignment.updateMany({
+            where: {
+                vehicleId,
+                status: true
+            },
+            data: {
+                status: false
+            }
+        });
+
+        const assignment = await prisma.routeAssignment.create({
+            data: {
+                vehicleId,
+                userId,
+                routeId,
+                status: true
+            },
+            include: {
+                route: true,
+                vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+                user: { select: { name: true } }
+            }
+        });
+
+        res.status(201).json(assignment);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get all routes
+// @route   GET /api/admin/routes
+// @access  Admin
+export const getAdminRoutes = async (req, res, next) => {
+    try {
+        const routes = await prisma.route.findMany({
+            include: {
+                cycles: true
+            }
+        });
+        res.json(routes);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get all active assignments
+// @route   GET /api/admin/routes/assignments
+// @access  Admin
+export const getRouteAssignments = async (req, res, next) => {
+    try {
+        const assignments = await prisma.routeAssignment.findMany({
+            where: { status: true },
+            include: {
+                route: true,
+                vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+                user: { select: { name: true } }
+            }
+        });
+        res.json(assignments);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Update a route
+// @route   PUT /api/admin/routes/:id
+// @access  Admin
+export const updateRoute = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { routeName, villages, cycles } = req.body;
+
+        // Update route and its cycles (re-create cycles for simplicity in v1.2)
+        const updated = await prisma.$transaction(async (tx) => {
+            if (cycles) {
+                await tx.routeCycle.deleteMany({ where: { routeId: id } });
+            }
+
+            return await tx.route.update({
+                where: { id },
+                data: {
+                    routeName,
+                    villages,
+                    cycles: cycles ? {
+                        create: cycles.map(c => ({
+                            dayOfWeek: c.dayOfWeek,
+                            villageName: c.villageName
+                        }))
+                    } : undefined
+                },
+                include: { cycles: true }
+            });
+        });
+
+        res.json(updated);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Delete a route
+// @route   DELETE /api/admin/routes/:id
+// @access  Admin
+export const deleteRoute = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        
+        await prisma.$transaction([
+            prisma.routeCycle.deleteMany({ where: { routeId: id } }),
+            prisma.routeAssignment.deleteMany({ where: { routeId: id } }),
+            prisma.route.delete({ where: { id } })
+        ]);
+
+        res.json({ message: 'Route deleted' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Delete/Deactivate assignment
+// @route   DELETE /api/admin/routes/assignments/:id
+// @access  Admin
+export const deleteRouteAssignment = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        await prisma.routeAssignment.delete({ where: { id } });
+        res.json({ message: 'Assignment removed' });
+    } catch (error) {
+        next(error);
+    }
+};

@@ -38,6 +38,21 @@ enum OrderStatus {
   CANCELLED
 }
 
+enum CoverageType {
+  MORNING
+  EVENING
+}
+
+enum DayOfWeek {
+  MONDAY
+  TUESDAY
+  WEDNESDAY
+  THURSDAY
+  FRIDAY
+  SATURDAY
+  SUNDAY
+}
+
 model User {
   id                String   @id @default(cuid())
   name              String?
@@ -50,13 +65,14 @@ model User {
   assignedVehicleId String?
   dailyTarget       Float    @default(10000)
 
-  assignedVehicle Vehicle?      @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
-  orders          Order[]
-  carts           Cart[]
-  openingCash     OpeningCash[]
-  closingCash     ClosingCash[]
+  assignedVehicle  Vehicle?          @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
+  orders           Order[]
+  carts            Cart[]
+  openingCash      OpeningCash[]
+  closingCash      ClosingCash[]
+  routeAssignments RouteAssignment[]
 
-  status            UserStatus @default(ACTIVE)
+  status UserStatus @default(ACTIVE)
 
   @@index([assignedVehicleId])
   @@index([role])
@@ -161,21 +177,25 @@ model CartItem {
 }
 
 model Order {
-  id           String       @id @default(cuid())
+  id           String        @id @default(cuid())
   userId       String?
   agentId      String?
   totalAmount  Float
-  status       OrderStatus  @default(PENDING)
+  status       OrderStatus   @default(PENDING)
   paymentMode  PaymentMode?
   mobile       String?
-  createdAt    DateTime     @default(now())
-  updatedAt    DateTime     @updatedAt
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   vehicleId    String?
-  orderNumber  Int          @unique @default(autoincrement())
+  orderNumber  Int           @unique @default(autoincrement())
   customerName String?
+  routeId      String?
+  villageName  String?
+  coverageType CoverageType?
 
   user    User?       @relation(fields: [userId], references: [id])
   vehicle Vehicle?    @relation(fields: [vehicleId], references: [id])
+  route   Route?      @relation(fields: [routeId], references: [id])
   items   OrderItem[]
   payment Payment?
 
@@ -184,6 +204,7 @@ model Order {
   @@index([vehicleId])
   @@index([status])
   @@index([createdAt])
+  @@index([routeId])
 }
 
 model OrderItem {
@@ -223,13 +244,14 @@ model Vehicle {
   rcDocument        String?
   vehicleName       String?
 
-  assignedUsers  User[]             @relation("UserVehicle")
-  stocks         VehicleStock[]
-  transactions   StockTransaction[]
-  orders         Order[]
-  openingCash    OpeningCash[]
-  closingCash    ClosingCash[]
-  dailySummaries DailyCashSummary[]
+  assignedUsers    User[]             @relation("UserVehicle")
+  stocks           VehicleStock[]
+  transactions     StockTransaction[]
+  orders           Order[]
+  openingCash      OpeningCash[]
+  closingCash      ClosingCash[]
+  dailySummaries   DailyCashSummary[]
+  routeAssignments RouteAssignment[]
 }
 
 model VehicleStock {
@@ -258,6 +280,46 @@ model StockTransaction {
   @@index([type])
   @@index([vehicleId])
   @@index([productId])
+}
+
+model Route {
+  id          String            @id @default(cuid())
+  routeName   String
+  villages    String[] // Array of village names
+  status      Boolean           @default(true)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  cycles      RouteCycle[]
+  assignments RouteAssignment[]
+  orders      Order[]
+
+  @@index([status])
+}
+
+model RouteCycle {
+  id          String    @id @default(cuid())
+  routeId     String
+  dayOfWeek   DayOfWeek
+  villageName String
+  route       Route     @relation(fields: [routeId], references: [id])
+
+  @@unique([routeId, dayOfWeek])
+}
+
+model RouteAssignment {
+  id        String   @id @default(cuid())
+  vehicleId String
+  userId    String
+  routeId   String
+  startDate DateTime @default(now())
+  status    Boolean  @default(true) // Only one active per vehicle
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+  route   Route   @relation(fields: [routeId], references: [id])
+
+  @@index([vehicleId, status])
+  @@index([userId, status])
 }
 
 model OpeningCash {

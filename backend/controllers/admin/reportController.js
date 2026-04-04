@@ -274,3 +274,83 @@ export const getReconciliationReport = async (req, res) => {
     res.status(500).json({ message: 'Error fetching reconciliation report', error: error.message });
   }
 };
+
+export const getRouteWiseReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const dateFilter = startDate && endDate ? {
+      createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
+    } : {};
+
+    const routeData = await prisma.order.groupBy({
+      by: ['routeId'],
+      where: {
+        ...dateFilter,
+        status: 'COMPLETED',
+        routeId: { not: null }
+      },
+      _sum: {
+        totalAmount: true
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    const routeIds = routeData.map(r => r.routeId);
+    const routes = await prisma.route.findMany({
+      where: { id: { in: routeIds } },
+      select: { id: true, routeName: true }
+    });
+
+    const routeMap = routes.reduce((acc, r) => {
+      acc[r.id] = r.routeName;
+      return acc;
+    }, {});
+
+    const result = routeData.map(r => ({
+      routeName: routeMap[r.routeId] || 'Unmapped Route',
+      totalSales: Math.round(r._sum.totalAmount || 0),
+      orderCount: r._count.id
+    }));
+
+    res.json(result);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching route report', error: error.message });
+  }
+};
+
+export const getVillageWiseReport = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    const dateFilter = startDate && endDate ? {
+      createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
+    } : {};
+
+    const villageData = await prisma.order.groupBy({
+      by: ['villageName', 'coverageType'],
+      where: {
+        ...dateFilter,
+        status: 'COMPLETED',
+        villageName: { not: null }
+      },
+      _sum: {
+        totalAmount: true
+      },
+      _count: {
+        id: true
+      }
+    });
+
+    const formattedData = villageData.map(v => ({
+      villageName: v.villageName,
+      coverageType: v.coverageType,
+      totalSales: Math.round(v._sum.totalAmount || 0),
+      orderCount: v._count.id
+    }));
+
+    res.json(formattedData);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching village report', error: error.message });
+  }
+};

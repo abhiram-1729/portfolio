@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Smartphone, Truck } from 'lucide-react';
+import { Search, ShoppingCart, Smartphone, Truck, MapPin } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { productsAPI } from '../services/api';
 import { useCartStore } from '../store/cartStore';
@@ -7,6 +7,7 @@ import Header from '../components/Header';
 import ProductGrid from '../components/ProductGrid';
 import CartDrawer from '../components/CartDrawer';
 import { getCashStatus } from '../services/cashService';
+import { getTodayPlan } from '../services/routeService';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -19,6 +20,7 @@ export default function SalesEntry() {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  const [plan, setPlan] = useState(null);
   const { user } = useUserStore();
   const { items, customerMobile, setCustomerMobile, customerName, setCustomerName, totalAmount } = useCartStore();
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -28,9 +30,19 @@ export default function SalesEntry() {
   useEffect(() => {
     if (user) {
       checkCashStatus();
+      loadPlan();
     }
     loadProducts();
   }, [user]);
+
+  const loadPlan = async () => {
+    try {
+        const data = await getTodayPlan();
+        setPlan(data);
+    } catch (err) {
+        console.error('Failed to load plan');
+    }
+  };
 
   const checkCashStatus = async () => {
     if (user?.role !== 'SALES_AGENT') return;
@@ -42,10 +54,7 @@ export default function SalesEntry() {
         toast.error('No vehicle assigned to your profile');
         return;
       }
-      if (!status.openingSubmitted) {
-        console.log('Redirecting to opening-cash');
-        navigate('/opening-cash', { replace: true });
-      }
+      // Redirection to opening-cash removed as admin now manages the float
     } catch (err) {
       console.error('Error checking cash status:', err);
       toast.error('Failed to verify cash status');
@@ -85,6 +94,27 @@ export default function SalesEntry() {
       {/* Sticky Combined Input Section */}
       <div className="sticky top-[56px] z-20 bg-slate-50/90 backdrop-blur-xl border-b border-emerald-100/30 pb-4 pt-4 shadow-sm">
         <div className="max-w-lg mx-auto px-5 space-y-4">
+          
+          {/* Today's Route Plan Banner */}
+          {plan && plan.villageName && (
+            <div className="bg-emerald-600 shadow-lg shadow-emerald-600/20 rounded-[1.25rem] p-4 flex items-center justify-between border border-emerald-500/10">
+                <div className="flex items-center gap-3">
+                    <div className="bg-white/20 backdrop-blur-md p-2.5 rounded-xl text-white shadow-inner">
+                        <MapPin size={22} strokeWidth={2.5} />
+                    </div>
+                    <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1 opacity-80">Today's Village</span>
+                        <h4 className="text-lg font-black text-white leading-tight tracking-tight uppercase">{plan.villageName}</h4>
+                        <div className="flex items-center gap-1.5 mt-1">
+                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-black text-white uppercase tracking-tighter">
+                                {new Date().getHours() < 14 ? 'Morning' : 'Evening'} Session
+                            </span>
+                            <span className="text-[10px] font-bold text-white/70 uppercase truncate max-w-[150px]">— {plan.routeName}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3">
             {/* Customer Name */}
             <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
