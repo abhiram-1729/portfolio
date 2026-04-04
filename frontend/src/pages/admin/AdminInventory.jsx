@@ -29,6 +29,8 @@ export default function AdminInventory() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [stockQuantities, setStockQuantities] = useState({}); // { productId: quantity }
   const [vehicleInventory, setVehicleInventory] = useState([]);
+  const [allVehiclesStock, setAllVehiclesStock] = useState({}); // { [vehicleId]: inventoryList }
+  const [viewingVehicleId, setViewingVehicleId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [taxRates, setTaxRates] = useState(['0', '5', '12', '18']);
@@ -78,6 +80,28 @@ export default function AdminInventory() {
       fetchVehicleInventory(selectedVehicleId);
     }
   }, [selectedVehicleId, activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'tracking') {
+      loadAllVehiclesStock();
+    }
+  }, [activeTab, vehicles]);
+
+  const loadAllVehiclesStock = async () => {
+    if (vehicles.length === 0) return;
+    try {
+      const stockRes = await Promise.all(
+        vehicles.map(v => adminAPI.getVehicleInventory(v.id).then(res => ({ id: v.id, data: res.data })))
+      );
+      const stockMap = {};
+      stockRes.forEach(r => {
+        stockMap[r.id] = r.data;
+      });
+      setAllVehiclesStock(stockMap);
+    } catch (err) {
+      toast.error('Failed to load tracking data for all vehicles');
+    }
+  };
 
   const fetchVehicleInventory = async (vId) => {
     try {
@@ -854,6 +878,122 @@ export default function AdminInventory() {
     </div>
   );
 
+  const renderTracking = () => {
+    if (viewingVehicleId) {
+      const v = vehicles.find(vh => vh.id === viewingVehicleId);
+      if (!v) return null;
+      
+      const inventory = allVehiclesStock[v.id] || [];
+      const activeStock = inventory.filter(i => i.quantity > 0);
+      const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
+      const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
+
+      return (
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+          <button 
+            onClick={() => setViewingVehicleId(null)}
+            className="flex items-center gap-2 text-gray-500 hover:text-emerald-600 transition-colors font-bold text-sm bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm w-fit"
+          >
+            ← Back to Vehicles
+          </button>
+          
+          <div className="bg-white p-4 sm:p-5 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4 sm:gap-6">
+              <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-100 pb-4 gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                    <Truck size={24} />
+                  </div>
+                  <div className="flex flex-col">
+                    <h3 className="text-lg font-black text-gray-900 leading-tight">{agentStr}</h3>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end bg-blue-50/50 p-2.5 rounded-xl border border-blue-100">
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Total Stock Value</span>
+                  <span className="text-base font-black text-blue-900">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
+              </div>
+              
+              <div className="space-y-3">
+                <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm"><Package size={16} className="text-emerald-500"/> Loaded Inventory</h4>
+                {activeStock.length === 0 ? (
+                  <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                    <Package size={28} className="mx-auto text-gray-300 mb-2" />
+                    <p className="text-xs text-gray-400 font-bold">No active stock loaded</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {activeStock.map(item => (
+                      <div key={`track-item-${item.id}`} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-xl border border-gray-100 group">
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                             {item.product?.isFree ? <Gift size={16} className="text-emerald-500"/> : <Package size={16} className="text-gray-400 group-hover:text-emerald-500"/>}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-gray-800 line-clamp-1">{item.product?.name || 'Unknown'}</span>
+                            <span className="text-[9px] font-bold text-emerald-600 uppercase">Rate: ₹{item.product?.price || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end shrink-0 pl-2">
+                          <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400">Qty</span></span>
+                          <span className="text-[10px] font-black text-gray-500">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {vehicles.map(v => {
+            const inventory = allVehiclesStock[v.id] || [];
+            const activeStock = inventory.filter(i => i.quantity > 0);
+            const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
+            const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
+
+            return (
+              <div 
+                key={`track-card-${v.id}`} 
+                onClick={() => setViewingVehicleId(v.id)}
+                className="bg-white p-4 rounded-[1.25rem] border border-gray-100 shadow-sm hover:border-emerald-300 hover:shadow-emerald-500/10 transition-all cursor-pointer group flex flex-col gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gray-50 group-hover:bg-emerald-50 transition-colors rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-500 shrink-0">
+                    <Truck size={20} />
+                  </div>
+                  <div className="flex flex-col overflow-hidden">
+                    <span className="text-sm font-black text-gray-900 truncate">{agentStr}</span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
+                  </div>
+                </div>
+                <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-2.5 rounded-xl flex justify-between items-center border border-transparent group-hover:border-emerald-100">
+                   <div className="flex flex-col">
+                     <span className="text-[8px] font-black uppercase text-gray-400">Unique Items</span>
+                     <span className="text-xs font-bold text-gray-700 leading-none mt-0.5">{activeStock.length}</span>
+                   </div>
+                   <div className="flex flex-col items-end">
+                     <span className="text-[8px] font-black uppercase text-emerald-600/70">Total Value</span>
+                     <span className="text-xs font-black text-emerald-700 leading-none mt-0.5">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                   </div>
+                </div>
+                <div className="flex items-center justify-between text-[9px] uppercase font-bold text-gray-400 group-hover:text-emerald-500 mt-1">
+                   <span>View Details</span>
+                   <span>→</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -899,17 +1039,19 @@ export default function AdminInventory() {
         )}
       </div>
 
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl flex-wrap">
         {[
           { key: 'master', label: 'Item Master' },
           { key: 'loading', label: 'Loading' },
           { key: 'return', label: 'Return' },
+          { key: 'tracking', label: 'Vehicle Tracking' }
         ].map((tab) => (
           <button
             key={tab.key}
             onClick={() => {
               setActiveTab(tab.key);
               setStockQuantities({});
+              setViewingVehicleId(null);
             }}
             className={cn(
               "flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200",
@@ -924,6 +1066,7 @@ export default function AdminInventory() {
       {activeTab === 'master' && renderMaster()}
       {activeTab === 'loading' && renderLoading()}
       {activeTab === 'return' && renderReturn()}
+      {activeTab === 'tracking' && renderTracking()}
 
       {/* Bulk Upload Modal */}
       {showBulkUploadModal && (
