@@ -25,6 +25,8 @@ export const adminAPI = {
   createItem: (data) => api.post('/admin/inventory/items', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  bulkCreateItems: (data) => api.post('/admin/inventory/items/bulk', data),
+  bulkDeleteItems: (ids) => api.post('/admin/inventory/items/bulk-delete', { ids }),
   updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

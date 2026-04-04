@@ -278,6 +278,108 @@ export const returnStock = async (req, res) => {
   }
 };
 
+export const bulkCreateItems = async (req, res) => {
+  try {
+    const products = req.body;
+    if (!Array.isArray(products)) {
+       return res.status(400).json({ message: 'Products data must be an array' });
+    }
+
+    const createdItems = [];
+    
+    // Ensure default relations exist
+    const defaultCategory = await prisma.category.upsert({
+      where: { name: 'Uncategorized' },
+      update: {},
+      create: { name: 'Uncategorized' }
+    });
+
+    const defaultBrand = await prisma.brand.upsert({
+      where: { name: 'Unbranded' },
+      update: {},
+      create: { name: 'Unbranded' }
+    });
+
+    let defaultSub = await prisma.subCategory.findFirst({
+      where: { name: 'Uncategorized', categoryId: defaultCategory.id }
+    });
+    if (!defaultSub) {
+      defaultSub = await prisma.subCategory.create({
+        data: { name: 'Uncategorized', categoryId: defaultCategory.id }
+      });
+    }
+
+    const parseNumber = (val) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    };
+
+    console.log(`[BulkCreate] Attempting to create ${products.length} products`);
+
+    for (const prod of products) {
+      if (!prod.name) {
+        console.warn(`[BulkCreate] Skipping product with missing name:`, prod);
+        continue;
+      }
+
+      const itemData = {
+        name: prod.name,
+        description: prod.description || '',
+        mrp: parseNumber(prod.mrp),
+        price: parseNumber(prod.price) || 0,
+        landingPrice: parseNumber(prod.landingPrice),
+        discount: parseNumber(prod.discount),
+        status: prod.status || 'ACTIVE',
+        image: null,
+        categoryId: prod.categoryId || defaultCategory.id,
+        subCategoryId: prod.subCategoryId || defaultSub.id,
+        brandId: prod.brandId || defaultBrand.id,
+        gst: parseNumber(prod.gst) || 0,
+        isFree: prod.isFree === true || prod.isFree === 'true',
+        minShopAmount: parseNumber(prod.minShopAmount) || 0,
+      };
+
+      try {
+        const item = await prisma.product.create({
+          data: itemData
+        });
+        createdItems.push(item);
+      } catch (err) {
+        console.error(`[BulkCreate] Failed to create product: ${prod.name}`, err.message);
+        // Continue with other products
+      }
+    }
+
+    res.status(201).json({ message: `Successfully created ${createdItems.length} items`, count: createdItems.length });
+  } catch (error) {
+    console.error('❌ Bulk Create Item Error:', error);
+    res.status(500).json({ message: 'Error bulk creating items', error: error.message });
+  }
+};
+
+export const bulkDeleteItems = async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ message: 'Product IDs must be provided as a non-empty array' });
+    }
+
+    // Cascade delete all child records for these items in dependency order
+    await prisma.orderItem.deleteMany({ where: { productId: { in: ids } } });
+    await prisma.stockTransaction.deleteMany({ where: { productId: { in: ids } } });
+    await prisma.vehicleStock.deleteMany({ where: { productId: { in: ids } } });
+    await prisma.warehouseInventory.deleteMany({ where: { productId: { in: ids } } });
+    await prisma.productVariant.deleteMany({ where: { productId: { in: ids } } });
+    const deleteResult = await prisma.product.deleteMany({ where: { id: { in: ids } } });
+
+    res.json({ message: `Successfully deleted ${deleteResult.count} items`, count: deleteResult.count });
+  } catch (error) {
+    console.error('❌ Bulk Delete Item Error:', error);
+    res.status(500).json({ message: 'Error bulk deleting items', error: error.message });
+  }
+};
+
 export const getVehicleInventory = async (req, res) => {
   try {
     const { id } = req.params; // vehicleId

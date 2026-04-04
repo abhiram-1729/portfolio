@@ -63,6 +63,8 @@ router.route('/inventory/items')
     uploadMiddleware.single('image'),
     inventoryCtr.createItem
   );
+router.post('/inventory/items/bulk', inventoryCtr.bulkCreateItems);
+router.post('/inventory/items/bulk-delete', inventoryCtr.bulkDeleteItems);
 router.route('/inventory/items/:id')
   .put(uploadMiddleware.single('image'), inventoryCtr.updateItem)
   .delete(inventoryCtr.deleteItem);

@@ -10,7 +10,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import cashRoutes from './routes/cashRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
-
+// lslsks
 dotenv.config();
 
 const app = express();
@@ -47,3 +47,4 @@ app.get('/', (req, res) => {
 app.use(errorHandler);
 
 export default app;
+// lslsl
