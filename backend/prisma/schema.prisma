@@ -252,6 +252,7 @@ model Vehicle {
   closingCash      ClosingCash[]
   dailySummaries   DailyCashSummary[]
   routeAssignments RouteAssignment[]
+  dailyCoverages   DailyCoverage[]
 }
 
 model VehicleStock {
@@ -386,4 +387,34 @@ model DailyCashSummary {
 enum UserStatus {
   ACTIVE
   SUSPENDED
+}
+
+model DailyCoverage {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+  routeId     String?
+  date        String   // YYYY-MM-DD
+  villageName String
+  morningDone Boolean  @default(false)
+  eveningDone Boolean  @default(false)
+  status      String   @default("PENDING") // PENDING | MORNING_DONE | EVENING_DONE | BOTH_DONE
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([vehicleId, date])
+  @@index([date])
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String
+  message   String   @db.Text
+  type      String   @default("ROUTE_PLAN") // ROUTE_PLAN | SYSTEM | ALERT
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId, isRead])
+  @@index([createdAt])
 }

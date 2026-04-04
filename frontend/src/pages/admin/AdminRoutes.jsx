@@ -15,7 +15,8 @@ import {
   ChevronRight,
   Clock,
   LayoutGrid,
-  Settings2
+  Settings2,
+  Eye
 } from 'lucide-react';
 import * as routeService from '../../services/routeService';
 import adminAPI from '../../services/adminService';
@@ -35,6 +36,7 @@ export default function AdminRoutes() {
 
   // Modals
   const [showAddRouteModal, setShowAddRouteModal] = useState(false);
+  const [showEditRouteModal, setShowEditRouteModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -42,6 +44,14 @@ export default function AdminRoutes() {
   const [newRoute, setNewRoute] = useState({
     routeName: '',
     villages: '', // comma separated string for easy entry
+    cycles: DAYS_OF_WEEK.map(day => ({ dayOfWeek: day, villageName: '' }))
+  });
+
+  // Form State - Edit Route
+  const [editRoute, setEditRoute] = useState({
+    id: '',
+    routeName: '',
+    villages: '',
     cycles: DAYS_OF_WEEK.map(day => ({ dayOfWeek: day, villageName: '' }))
   });
 
@@ -105,6 +115,51 @@ export default function AdminRoutes() {
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create route');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // ─── Edit Route Handler ───────────────────────
+  const openEditModal = (route) => {
+    const cycleMap = {};
+    (route.cycles || []).forEach(c => { cycleMap[c.dayOfWeek] = c.villageName; });
+
+    setEditRoute({
+      id: route.id,
+      routeName: route.routeName,
+      villages: (route.villages || []).join(', '),
+      cycles: DAYS_OF_WEEK.map(day => ({
+        dayOfWeek: day,
+        villageName: cycleMap[day] || ''
+      }))
+    });
+    setShowEditRouteModal(true);
+  };
+
+  const handleEditRoute = async (e) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    if (!editRoute.routeName) return toast.error('Route name is required');
+    if (editRoute.cycles.some(c => !c.villageName)) {
+      return toast.error('Please assign a village for every day (Mon-Sat)');
+    }
+
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        routeName: editRoute.routeName,
+        villages: Array.from(new Set(editRoute.cycles.map(c => c.villageName).filter(Boolean))),
+        cycles: editRoute.cycles
+      };
+
+      await routeService.updateRoute(editRoute.id, payload);
+      toast.success('Route updated successfully');
+      setShowEditRouteModal(false);
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update route');
     } finally {
       setIsSubmitting(false);
     }
@@ -204,7 +259,11 @@ export default function AdminRoutes() {
                       </div>
                     </div>
                     <div className="flex gap-1 shrink-0">
-                      <button className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-lg transition-colors">
+                      <button
+                        onClick={() => openEditModal(route)}
+                        className="p-1.5 text-gray-400 hover:text-emerald-600 rounded-lg transition-colors"
+                        title="Edit Route"
+                      >
                         <Pencil size={14} />
                       </button>
                       <button
@@ -246,8 +305,11 @@ export default function AdminRoutes() {
                         {route.villages.length} Villages
                       </span>
                     </div>
-                    <button className="text-emerald-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 hover:underline">
-                      Details <ChevronRight size={12} />
+                    <button
+                      onClick={() => openEditModal(route)}
+                      className="text-emerald-600 text-[10px] font-black uppercase tracking-widest flex items-center gap-1 hover:underline"
+                    >
+                      Edit <Pencil size={10} />
                     </button>
                   </div>
                 </div>
@@ -273,7 +335,7 @@ export default function AdminRoutes() {
             {assignments.length === 0 ? (
               <div className="md:col-span-2 text-center py-10 bg-white rounded-3xl border border-dashed border-gray-200">
                 <Calendar size={40} className="mx-auto text-gray-300 mb-2 opacity-50" />
-                <p className="text-gray-500 font-medium italic text-sm text-sm">No assignments found</p>
+                <p className="text-gray-500 font-medium italic text-sm">No assignments found</p>
               </div>
             ) : (
               assignments.map((assignment) => (
@@ -409,6 +471,89 @@ export default function AdminRoutes() {
         </div>
       )}
 
+      {/* ── Edit Route Modal ───────────────────────────────── */}
+      {showEditRouteModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between mb-6 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center">
+                  <Pencil size={20} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Edit Route</h3>
+                  <p className="text-xs text-gray-400 font-medium">Modify village cycle for this route</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowEditRouteModal(false)}
+                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditRoute} className="space-y-6">
+              <div className="space-y-1.5">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Route Identity</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Tadikonda Highway Cluster"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-medium focus:ring-2 focus:ring-amber-500/20 outline-none transition-all"
+                  value={editRoute.routeName}
+                  onChange={(e) => setEditRoute({ ...editRoute, routeName: e.target.value })}
+                />
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Daily Village Mapping</label>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {editRoute.cycles.map((day, idx) => (
+                    <div key={day.dayOfWeek} className="bg-gray-50 rounded-2xl p-4 border border-gray-50 focus-within:bg-white focus-within:border-amber-100 transition-all">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-[10px] font-black text-amber-600 uppercase tracking-tighter bg-amber-50 px-2 py-0.5 rounded-lg">
+                          {day.dayOfWeek}
+                        </span>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder={`Village for ${day.dayOfWeek.toLowerCase()}`}
+                        className="w-full bg-transparent text-sm font-bold text-gray-800 outline-none placeholder:text-gray-300 placeholder:font-normal"
+                        value={day.villageName}
+                        onChange={(e) => {
+                          const updated = [...editRoute.cycles];
+                          updated[idx].villageName = e.target.value;
+                          setEditRoute({ ...editRoute, cycles: updated });
+                        }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="bg-amber-50 rounded-2xl p-4 flex gap-3 border border-amber-100/50">
+                <Settings2 size={18} className="text-amber-600 shrink-0" />
+                <p className="text-[11px] text-amber-800 font-medium leading-relaxed">
+                  Updating will replace all current cycle mappings. Existing assignments will continue to use the new schedule.
+                </p>
+              </div>
+
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className={`w-full py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl transition-all flex items-center justify-center gap-3 ${isSubmitting
+                  ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  : 'bg-amber-600 text-white shadow-amber-600/20 hover:bg-amber-700 active:scale-[0.98]'
+                  }`}
+              >
+                {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Updating...</> : 'Update Route'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ── Assign Route Modal ───────────────────────────────── */}
       {showAssignModal && (
         <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -423,7 +568,7 @@ export default function AdminRoutes() {
                   <p className="text-xs text-gray-400 font-medium">Link Personnel to Route Performance</p>
                 </div>
               </div>
-              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 translation-colors"><X size={20} /></button>
+              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"><X size={20} /></button>
             </div>
 
             <form onSubmit={handleAssignRoute} className="space-y-5">

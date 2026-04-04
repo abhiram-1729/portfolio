@@ -11,6 +11,7 @@ import Profile from './pages/Profile';
 import OpeningCashEntry from './pages/OpeningCashEntry';
 import ClosingCashEntry from './pages/ClosingCashEntry';
 import AgentInventory from './pages/AgentInventory';
+import TodayPlan from './pages/TodayPlan';
 import AdminLayout from './components/admin/AdminLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
@@ -59,6 +60,7 @@ export default function App() {
         <Route path="/opening-cash" element={<PrivateRoute><OpeningCashEntry /></PrivateRoute>} />
         <Route path="/closing-cash" element={<PrivateRoute><ClosingCashEntry /></PrivateRoute>} />
         <Route path="/agent-inventory/:vehicleId" element={<PrivateRoute><AgentInventory /></PrivateRoute>} />
+        <Route path="/today-plan" element={<PrivateRoute><TodayPlan /></PrivateRoute>} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
