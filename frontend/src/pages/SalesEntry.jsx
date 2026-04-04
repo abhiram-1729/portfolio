@@ -37,16 +37,16 @@ export default function SalesEntry() {
 
   const loadPlan = async () => {
     try {
-        const data = await getTodayPlan();
-        setPlan(data);
+      const data = await getTodayPlan();
+      setPlan(data);
     } catch (err) {
-        console.error('Failed to load plan');
+      console.error('Failed to load plan');
     }
   };
 
   const checkCashStatus = async () => {
     if (user?.role !== 'SALES_AGENT') return;
-    
+
     try {
       const status = await getCashStatus();
       console.log('Cash Status Response:', status);
@@ -94,56 +94,35 @@ export default function SalesEntry() {
       {/* Sticky Combined Input Section */}
       <div className="sticky top-[56px] z-20 bg-slate-50/90 backdrop-blur-xl border-b border-emerald-100/30 pb-4 pt-4 shadow-sm">
         <div className="max-w-lg mx-auto px-5 space-y-4">
-          
-          {/* Today's Route Plan Banner */}
-          {plan && plan.villageName && (
-            <div className="bg-emerald-600 shadow-lg shadow-emerald-600/20 rounded-[1.25rem] p-4 flex items-center justify-between border border-emerald-500/10">
-                <div className="flex items-center gap-3">
-                    <div className="bg-white/20 backdrop-blur-md p-2.5 rounded-xl text-white shadow-inner">
-                        <MapPin size={22} strokeWidth={2.5} />
-                    </div>
-                    <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-emerald-100 uppercase tracking-widest leading-none mb-1 opacity-80">Today's Village</span>
-                        <h4 className="text-lg font-black text-white leading-tight tracking-tight uppercase">{plan.villageName}</h4>
-                        <div className="flex items-center gap-1.5 mt-1">
-                            <span className="bg-white/20 px-1.5 py-0.5 rounded text-[9px] font-black text-white uppercase tracking-tighter">
-                                {new Date().getHours() < 14 ? 'Morning' : 'Evening'} Session
-                            </span>
-                            <span className="text-[10px] font-bold text-white/70 uppercase truncate max-w-[150px]">— {plan.routeName}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-          )}
           <div className="grid grid-cols-2 gap-3">
             {/* Customer Name */}
             <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
-                <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
-                    <Smartphone size={16} strokeWidth={2.5} />
-                </div>
-                <input
-                    id="customer-name"
-                    type="text"
-                    placeholder="Name (Optional)"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
-                />
+              <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
+                <Smartphone size={16} strokeWidth={2.5} />
+              </div>
+              <input
+                id="customer-name"
+                type="text"
+                placeholder="Name (Optional)"
+                value={customerName}
+                onChange={(e) => setCustomerName(e.target.value)}
+                className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
+              />
             </div>
 
             {/* Customer Mobile */}
             <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
-                <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
-                    <Smartphone size={16} strokeWidth={2.5} />
-                </div>
-                <input
-                    id="customer-mobile"
-                    type="tel"
-                    placeholder="Mobile (Opt)"
-                    value={customerMobile}
-                    onChange={(e) => setCustomerMobile(e.target.value)}
-                    className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
-                />
+              <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
+                <Smartphone size={16} strokeWidth={2.5} />
+              </div>
+              <input
+                id="customer-mobile"
+                type="tel"
+                placeholder="Mobile (Opt)"
+                value={customerMobile}
+                onChange={(e) => setCustomerMobile(e.target.value)}
+                className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
+              />
             </div>
           </div>
 

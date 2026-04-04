@@ -30,29 +30,24 @@ export const fetchPlanForVehicle = async (vehicleId, targetDate = new Date()) =>
 
     if (!assignment) return null;
 
-    // 2. Get current day of week
+    // 2. Exclude Sundays as no-plan days
     const dayName = days[targetDate.getDay()];
+    if (dayName === 'SUNDAY') {
+        return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
+    }
 
-    // 3. Fetch village from route_cycles
-    const cycle = await prisma.routeCycle.findUnique({
-        where: {
-            routeId_dayOfWeek: {
-                routeId: assignment.routeId,
-                dayOfWeek: dayName
-            }
-        }
-    });
+    const { morningSession, afternoonSession } = assignment;
+    const villageName = morningSession === afternoonSession ? morningSession : `${morningSession} / ${afternoonSession}`;
 
-    if (!cycle) return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
+    if (!morningSession && !afternoonSession) return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
 
-    // 4. Return formatted plan
-    // Morning: Part A, Evening: Part B
+    // 3. Return formatted plan
     return {
         routeId: assignment.routeId,
-        villageName: cycle.villageName,
+        villageName: villageName,
         routeName: assignment.route.routeName,
-        morning: "Part A",
-        evening: "Part B"
+        morning: morningSession || "No Task",
+        evening: afternoonSession || "No Task"
     };
 };
 

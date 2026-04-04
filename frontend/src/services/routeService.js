@@ -67,7 +67,33 @@ export const getRouteAssignments = async () => {
     return response.data;
 };
 
+export const updateRouteAssignment = async (id, data) => {
+    const response = await api.put(`/admin/routes/assignments/${id}`, data);
+    return response.data;
+};
+
 export const deleteRouteAssignment = async (id) => {
     const response = await api.delete(`/admin/routes/assignments/${id}`);
+    return response.data;
+};
+
+// --- Village APIs ---
+export const getVillages = async () => {
+    const response = await api.get('/admin/villages');
+    return response.data;
+};
+
+export const createVillage = async (data) => {
+    const response = await api.post('/admin/villages', data);
+    return response.data;
+};
+
+export const updateVillage = async (id, data) => {
+    const response = await api.put(`/admin/villages/${id}`, data);
+    return response.data;
+};
+
+export const deleteVillage = async (id) => {
+    const response = await api.delete(`/admin/villages/${id}`);
     return response.data;
 };

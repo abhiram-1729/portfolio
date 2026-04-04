@@ -39,7 +39,7 @@ export const createRoute = async (req, res, next) => {
 // @access  Admin
 export const assignRouteToVehicle = async (req, res, next) => {
     try {
-        const { vehicleId, userId, routeId } = req.body;
+        const { vehicleId, userId, routeId, morningSession, afternoonSession } = req.body;
 
         if (!vehicleId || !userId || !routeId) {
             res.status(400);
@@ -62,7 +62,9 @@ export const assignRouteToVehicle = async (req, res, next) => {
                 vehicleId,
                 userId,
                 routeId,
-                status: true
+                status: true,
+                morningSession,
+                afternoonSession
             },
             include: {
                 route: true,
@@ -72,6 +74,43 @@ export const assignRouteToVehicle = async (req, res, next) => {
         });
 
         res.status(201).json(assignment);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Update a route assignment
+// @route   PUT /api/admin/routes/assignments/:id
+// @access  Admin
+export const updateRouteAssignment = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { userId, routeId, morningSession, afternoonSession } = req.body;
+
+        // If userId is updated, we must fetch the new assignedVehicleId for the user
+        let vehicleId = req.body.vehicleId;
+        if (!vehicleId && userId) {
+            const user = await prisma.user.findUnique({ where: { id: userId } });
+            vehicleId = user?.assignedVehicleId || undefined;
+        }
+
+        const assignment = await prisma.routeAssignment.update({
+            where: { id },
+            data: {
+                userId,
+                vehicleId,
+                routeId,
+                morningSession,
+                afternoonSession
+            },
+            include: {
+                route: true,
+                vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+                user: { select: { name: true } }
+            }
+        });
+
+        res.json(assignment);
     } catch (error) {
         next(error);
     }

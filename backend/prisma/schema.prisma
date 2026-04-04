@@ -319,8 +319,19 @@ model RouteAssignment {
   user    User    @relation(fields: [userId], references: [id])
   route   Route   @relation(fields: [routeId], references: [id])
 
+  morningSession   String?
+  afternoonSession String?
+
   @@index([vehicleId, status])
   @@index([userId, status])
+}
+
+model Village {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  status      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }
 
 model OpeningCash {

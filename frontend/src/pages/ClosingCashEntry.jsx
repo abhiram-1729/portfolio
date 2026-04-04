@@ -79,8 +79,8 @@ export default function ClosingCashEntry() {
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col p-5 pb-10 relative">
-      <button 
-        onClick={() => navigate('/')} 
+      <button
+        onClick={() => navigate('/')}
         className="absolute top-5 left-5 p-2 bg-white rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors z-10 shadow-sm"
       >
         <ArrowLeft size={20} />
@@ -117,7 +117,7 @@ export default function ClosingCashEntry() {
                 Opening float hasn't been assigned by the admin yet. Please request your supervisor to complete the assignment before submitting.
               </p>
             </div>
-            <button 
+            <button
               onClick={() => navigate('/')}
               className="px-8 py-4 bg-slate-900 text-white rounded-2xl font-black text-sm uppercase tracking-widest shadow-xl shadow-slate-200 transition-all active:scale-95 hover:bg-black"
             >
@@ -130,7 +130,7 @@ export default function ClosingCashEntry() {
             <div className="glass rounded-[2rem] p-6 border border-slate-200 bg-white shadow-xl shadow-slate-200/50 space-y-6 text-center animate-in fade-in slide-in-from-bottom duration-500">
               <div className="grid grid-cols-2 gap-4">
                 <div className="bg-slate-50 p-4 rounded-2xl">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Opening Float</span>
+                  <span className="text-[10px] font-black uppercase tracking-widest text-slate-400 block mb-1">Opening Cash</span>
                   <span className="text-xl font-black text-slate-900">₹{status?.openingCash?.toLocaleString()}</span>
                 </div>
                 <div className="bg-emerald-50 p-4 rounded-2xl">
@@ -147,106 +147,104 @@ export default function ClosingCashEntry() {
           </>
         )}
 
-          {status?.openingSubmitted && (
-            <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom duration-700">
-              <div className="glass rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/50 overflow-hidden">
-                <div className="bg-slate-100 p-4 text-slate-900 flex justify-between items-center px-6">
-                  <span className="font-black text-xs uppercase tracking-widest">Physical Cash Count</span>
-                  <span className="font-black text-xs opacity-50 uppercase tracking-widest">Actual</span>
-                </div>
-                
-                <div className="divide-y divide-slate-100">
-                  {DENOMINATIONS.map((denom) => (
-                    <div key={denom} className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-950 font-black text-sm">
-                          ₹{denom}
-                        </div>
-                        <span className="font-black text-slate-400">×</span>
-                      </div>
-                      
-                      <div className="flex items-center gap-4">
-                        <input
-                          type="number"
-                          inputMode="numeric"
-                          placeholder="0"
-                          value={counts[denom]}
-                          disabled={status?.closingSubmitted}
-                          onChange={(e) => handleCountChange(denom, e.target.value)}
-                          className={`w-24 bg-slate-50 border-2 border-transparent outline-none rounded-xl py-3 px-4 text-right font-black transition-all text-lg ${
-                            status?.closingSubmitted
-                              ? 'opacity-50 cursor-not-allowed text-slate-500'
-                              : 'focus:border-emerald-500 focus:bg-white text-slate-950'
-                          }`}
-                        />
-                        <div className="w-24 text-right">
-                          <span className="text-xs font-black text-slate-400 block leading-none mb-1">Row Sum</span>
-                          <span className="font-black text-slate-900">₹{(denom * (counts[denom] || 0)).toLocaleString()}</span>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+        {status?.openingSubmitted && (
+          <form onSubmit={handleSubmit} className="space-y-6 animate-in fade-in slide-in-from-bottom duration-700">
+            <div className="glass rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/50 overflow-hidden">
+              <div className="bg-slate-100 p-4 text-slate-900 flex justify-between items-center px-6">
+                <span className="font-black text-xs uppercase tracking-widest">Physical Cash Count</span>
+                <span className="font-black text-xs opacity-50 uppercase tracking-widest">Actual</span>
+              </div>
 
-                {/* Reconciliation section */}
-                <div className="p-6 space-y-4 border-t border-slate-100">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <span className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Actual Cash Total</span>
-                      <span className="text-3xl font-black text-slate-900 tracking-tighter">₹{actualCash.toLocaleString()}</span>
+              <div className="divide-y divide-slate-100">
+                {DENOMINATIONS.map((denom) => (
+                  <div key={denom} className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-950 font-black text-sm">
+                        ₹{denom}
+                      </div>
+                      <span className="font-black text-slate-400">×</span>
                     </div>
-                    {difference === 0 ? (
-                      <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
-                        <CheckCircle2 size={18} />
-                        <span className="text-xs font-black uppercase">Matched</span>
-                      </div>
-                    ) : (
-                      <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${difference > 0 ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>
-                        <AlertCircle size={18} />
-                        <span className="text-xs font-black uppercase">
-                          {difference > 0 ? `Extra: ₹${difference}` : `Short: ₹${Math.abs(difference)}`}
-                        </span>
-                      </div>
-                    )}
-                  </div>
 
-                  {difference !== 0 && (
-                    <div className="space-y-2 pt-2">
-                      <label className="text-[10px] font-black uppercase tracking-widest text-rose-600 block pl-1">
-                        Explain the difference (Required)
-                      </label>
-                      <textarea
-                        placeholder="Enter reason for difference..."
-                        value={remark}
+                    <div className="flex items-center gap-4">
+                      <input
+                        type="number"
+                        inputMode="numeric"
+                        placeholder="0"
+                        value={counts[denom]}
                         disabled={status?.closingSubmitted}
-                        onChange={(e) => setRemark(e.target.value)}
-                        className={`w-full border-2 outline-none rounded-2xl p-4 font-bold transition-all h-24 ${
-                          status?.closingSubmitted
-                            ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed opacity-70'
-                            : 'bg-rose-50/50 border-rose-100 focus:border-rose-300 focus:bg-white text-slate-900 placeholder:text-rose-300'
-                        }`}
+                        onChange={(e) => handleCountChange(denom, e.target.value)}
+                        className={`w-24 bg-slate-50 border-2 border-transparent outline-none rounded-xl py-3 px-4 text-right font-black transition-all text-lg ${status?.closingSubmitted
+                          ? 'opacity-50 cursor-not-allowed text-slate-500'
+                          : 'focus:border-emerald-500 focus:bg-white text-slate-950'
+                          }`}
                       />
+                      <div className="w-24 text-right">
+                        <span className="text-xs font-black text-slate-400 block leading-none mb-1">Row Sum</span>
+                        <span className="font-black text-slate-900">₹{(denom * (counts[denom] || 0)).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Reconciliation section */}
+              <div className="p-6 space-y-4 border-t border-slate-100">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="text-xs font-black text-slate-400 uppercase tracking-widest block mb-1">Actual Cash Total</span>
+                    <span className="text-3xl font-black text-slate-900 tracking-tighter">₹{actualCash.toLocaleString()}</span>
+                  </div>
+                  {difference === 0 ? (
+                    <div className="flex items-center gap-2 text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl border border-emerald-100">
+                      <CheckCircle2 size={18} />
+                      <span className="text-xs font-black uppercase">Matched</span>
+                    </div>
+                  ) : (
+                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl border ${difference > 0 ? 'text-blue-600 bg-blue-50 border-blue-100' : 'text-rose-600 bg-rose-50 border-rose-100'}`}>
+                      <AlertCircle size={18} />
+                      <span className="text-xs font-black uppercase">
+                        {difference > 0 ? `Extra: ₹${difference}` : `Short: ₹${Math.abs(difference)}`}
+                      </span>
                     </div>
                   )}
                 </div>
-              </div>
 
-              <button
-                type={status?.closingSubmitted ? "button" : "submit"}
-                disabled={loading || status?.closingSubmitted}
-                className="w-full bg-slate-900 hover:bg-black disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-slate-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
-              >
-                {status?.closingSubmitted ? 'Already Submitted for Today' : (
-                  loading ? 'Submitting...' : (
-                    <>
-                      Submit Closing Report
-                      <ArrowRight className="group-hover:translate-x-1 transition-transform" />
-                    </>
-                  )
+                {difference !== 0 && (
+                  <div className="space-y-2 pt-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-rose-600 block pl-1">
+                      Explain the difference (Required)
+                    </label>
+                    <textarea
+                      placeholder="Enter reason for difference..."
+                      value={remark}
+                      disabled={status?.closingSubmitted}
+                      onChange={(e) => setRemark(e.target.value)}
+                      className={`w-full border-2 outline-none rounded-2xl p-4 font-bold transition-all h-24 ${status?.closingSubmitted
+                        ? 'bg-slate-50 border-slate-200 text-slate-500 cursor-not-allowed opacity-70'
+                        : 'bg-rose-50/50 border-rose-100 focus:border-rose-300 focus:bg-white text-slate-900 placeholder:text-rose-300'
+                        }`}
+                    />
+                  </div>
                 )}
-              </button>
-            </form>
-          )}
+              </div>
+            </div>
+
+            <button
+              type={status?.closingSubmitted ? "button" : "submit"}
+              disabled={loading || status?.closingSubmitted}
+              className="w-full bg-slate-900 hover:bg-black disabled:bg-slate-300 disabled:cursor-not-allowed text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-slate-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+            >
+              {status?.closingSubmitted ? 'Already Submitted for Today' : (
+                loading ? 'Submitting...' : (
+                  <>
+                    Submit Closing Report
+                    <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                  </>
+                )
+              )}
+            </button>
+          </form>
+        )}
       </div>
     </div>
   );

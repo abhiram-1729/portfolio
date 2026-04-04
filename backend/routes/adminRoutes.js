@@ -8,6 +8,7 @@ import * as salesCtr from '../controllers/admin/salesController.js';
 import * as reportCtr from '../controllers/admin/reportController.js';
 import * as settingsCtr from '../controllers/admin/settingsController.js';
 import * as routeCtr from '../controllers/admin/routeController.js';
+import * as villageCtr from '../controllers/admin/villageController.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
@@ -87,6 +88,14 @@ router.get('/reports/reconciliation', reportCtr.getReconciliationReport);
 router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
 router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
 
+// Villages
+router.route('/villages')
+  .get(villageCtr.getVillages)
+  .post(villageCtr.createVillage);
+router.route('/villages/:id')
+  .put(villageCtr.updateVillage)
+  .delete(villageCtr.deleteVillage);
+
 // Routes & Assignments
 router.route('/routes')
   .get(routeCtr.getAdminRoutes)
@@ -98,6 +107,7 @@ router.route('/routes/assignments')
   .get(routeCtr.getRouteAssignments)
   .post(routeCtr.assignRouteToVehicle);
 router.route('/routes/assignments/:id')
+  .put(routeCtr.updateRouteAssignment)
   .delete(routeCtr.deleteRouteAssignment);
 
 // Business Settings Update (Admin Only)

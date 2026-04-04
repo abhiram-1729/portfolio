@@ -16,6 +16,7 @@ export default function AdminInventory() {
   const [loading, setLoading] = useState(true);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedEditFile, setSelectedEditFile] = useState(null);
@@ -101,6 +102,22 @@ export default function AdminInventory() {
     return base.toFixed(2);
   };
 
+  const handleDownloadSample = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        "Product Name": "",
+        "Landing Price": "",
+        "MRP": "",
+        "Discount (%/rs)": "",
+        "GST Slab": "",
+        "Description": ""
+      }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "villagkart");
+    XLSX.writeFile(wb, "villagkart.xlsx");
+  };
+
   const handleExcelUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -177,6 +194,7 @@ export default function AdminInventory() {
 
         await adminAPI.bulkCreateItems(products);
         toast.success(`Successfully uploaded ${products.length} products`);
+        setShowBulkUploadModal(false);
         fetchData();
       } catch (error) {
         console.error('Excel upload error:', error);
@@ -863,7 +881,7 @@ export default function AdminInventory() {
               disabled={isUploading}
             />
             <button
-              onClick={() => document.getElementById('excel-upload').click()}
+              onClick={() => setShowBulkUploadModal(true)}
               disabled={isUploading}
               className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
               title="Bulk Upload Excel"
@@ -906,6 +924,54 @@ export default function AdminInventory() {
       {activeTab === 'master' && renderMaster()}
       {activeTab === 'loading' && renderLoading()}
       {activeTab === 'return' && renderReturn()}
+
+      {/* Bulk Upload Modal */}
+      {showBulkUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                 <FileText className="text-emerald-500" />
+                 Bulk Upload
+              </h3>
+              <button
+                onClick={() => setShowBulkUploadModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div 
+                onClick={() => document.getElementById('excel-upload').click()}
+                className="w-full border-2 border-dashed border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
+                style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
+              >
+                <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform">
+                  {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ArrowUpCircle size={28} />}
+                </div>
+                <span className="font-bold text-emerald-800 text-sm">Upload Excel File</span>
+                <span className="text-xs text-emerald-600/70 mt-1 font-medium select-none">Click to browse your files</span>
+              </div>
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-gray-100"></div>
+                <span className="flex-shrink-0 mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or</span>
+                <div className="flex-grow border-t border-gray-100"></div>
+              </div>
+
+              <button
+                 onClick={handleDownloadSample}
+                 className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
+              >
+                 <ArrowDownCircle size={18} className="text-gray-500" />
+                 Download Sample Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add Item Modal */}
       {showAddItemModal && (
