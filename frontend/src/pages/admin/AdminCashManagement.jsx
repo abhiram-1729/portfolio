@@ -366,7 +366,7 @@ export default function AdminCashManagement() {
                       if (!agent) return null;
                       return (
                         <option key={v.id} value={v.id}>
-                          {v.vehicleNumber} ({agent.name})
+                          {agent.name} ({v.vehicleNumber})
                         </option>
                       );
                     })
