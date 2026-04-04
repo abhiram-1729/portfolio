@@ -13,6 +13,7 @@ export default function AdminUsers() {
     password: '',
     mobile: '',
     role: 'SALES_AGENT',
+    dailyTarget: 10000,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -320,6 +321,18 @@ export default function AdminUsers() {
                 />
               </div>
 
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Daily Sales Target (₹)</label>
+                <input 
+                  type="number"
+                  required
+                  placeholder="Daily Sales Target"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
+                  value={newUser.dailyTarget}
+                  onChange={(e) => setNewUser({...newUser, dailyTarget: e.target.value})}
+                />
+              </div>
+
               <button 
                 type="submit"
                 disabled={isSubmitting}
@@ -410,6 +423,18 @@ export default function AdminUsers() {
                   <option value="HELPER">Helper</option>
                   <option value="ADMIN">Admin</option>
                 </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Daily Sales Target (₹)</label>
+                <input 
+                  type="number"
+                  required
+                  placeholder="Daily Sales Target"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
+                  value={editingUser.dailyTarget}
+                  onChange={(e) => setEditingUser({...editingUser, dailyTarget: e.target.value})}
+                />
               </div>
 
               <div className="pt-2">

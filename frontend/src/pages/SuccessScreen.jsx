@@ -186,6 +186,10 @@ export default function SuccessScreen() {
       pdf.text(`Ph: ${settings.contactNo}`, margin, sellerDetailsY);
       sellerDetailsY += 4;
     }
+    if (settings.email) {
+      pdf.text(`Email: ${settings.email}`, margin, sellerDetailsY);
+      sellerDetailsY += 4;
+    }
     if (settings.address) {
       const splitAddr = pdf.splitTextToSize(settings.address, contentWidth * 0.45);
       pdf.text(splitAddr, margin, sellerDetailsY);

@@ -14,7 +14,11 @@ import {
   Target,
   ArrowUpRight,
   ShoppingCart,
-  DollarSign
+  DollarSign,
+  Users,
+  Activity,
+  Globe,
+  Map
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -39,26 +43,15 @@ export default function AdminReports() {
   const [dailyReport, setDailyReport] = useState(null);
   const [trendsData, setTrendsData] = useState(null);
   const [topProducts, setTopProducts] = useState(null);
-  const [reconReport, setReconReport] = useState(null);
   const [routeData, setRouteData] = useState(null);
   const [villageData, setVillageData] = useState(null);
-  const [vehicles, setVehicles] = useState(null);
-  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [agentPerformance, setAgentPerformance] = useState(null);
 
   // Loading States
   const [isOverviewLoading, setIsOverviewLoading] = useState(false);
   const [isDailyLoading, setIsDailyLoading] = useState(false);
-  const [isReconLoading, setIsReconLoading] = useState(false);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
-
-  const fetchVehicles = async () => {
-    try {
-      const { data } = await adminAPI.getVehicles();
-      setVehicles(data);
-    } catch (error) {
-      console.error('Failed to fetch vehicles:', error);
-    }
-  };
+  const [isAgentLoading, setIsAgentLoading] = useState(false);
 
   const loadDailyData = async () => {
     if (dailyReport) return; // Cache hit
@@ -110,21 +103,16 @@ export default function AdminReports() {
     }
   };
 
-  const loadReconData = async () => {
-    if (!vehicles) {
-       await fetchVehicles();
-    }
-  };
-
-  const fetchReconciliation = async (vId) => {
+  const loadAgentData = async () => {
+    if (agentPerformance) return;
+    setIsAgentLoading(true);
     try {
-      setIsReconLoading(true);
-      const { data } = await adminAPI.getReconciliationReport({ vehicleId: vId });
-      setReconReport(data);
+        const { data } = await adminAPI.getAgentPerformance();
+        setAgentPerformance(data);
     } catch (error) {
-      toast.error('Failed to fetch reconciliation report');
+        toast.error('Failed to fetch agent performance');
     } finally {
-      setIsReconLoading(false);
+        setIsAgentLoading(false);
     }
   };
 
@@ -137,8 +125,8 @@ export default function AdminReports() {
     // Only load if it's the active tab and data isn't already loaded
     if (activeTab === 'daily') loadDailyData();
     if (activeTab === 'overview') loadOverviewData();
-    if (activeTab === 'recon') loadReconData();
     if (activeTab === 'route') loadRouteData();
+    if (activeTab === 'targets') loadAgentData();
   }, [activeTab]);
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, bgColor }) => (
@@ -367,132 +355,7 @@ export default function AdminReports() {
     );
   };
 
-  const renderReconciliation = () => {
-    return (
-      <div className="space-y-6 animate-in fade-in duration-300">
-          <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle for Recon</label>
-              <div className="relative">
-                <select 
-                  value={selectedVehicleId}
-                  onChange={(e) => {
-                    setSelectedVehicleId(e.target.value);
-                    if (e.target.value) fetchReconciliation(e.target.value);
-                  }}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none"
-                >
-                  <option value="">Select Vehicle...</option>
-                  {vehicles?.map(v => (
-                    <option key={v.id} value={v.id}>{v.vehicleNumber}</option>
-                  ))}
-                </select>
-                <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-              </div>
-            </div>
-          </div>
-
-          {selectedVehicleId && isReconLoading && (
-             <div className="flex flex-col items-center justify-center py-10 gap-3">
-               <Loader2 className="animate-spin text-emerald-600" size={30} />
-               <span className="text-xs font-bold text-gray-400 uppercase">Fetching Math Data...</span>
-             </div>
-          )}
-
-          {selectedVehicleId && !isReconLoading && (
-            <div className="space-y-4">
-              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-100 flex items-start gap-4">
-                <AlertTriangle size={24} className="text-amber-500 shrink-0" />
-                <div className="flex flex-col gap-1">
-                  <h4 className="text-sm font-bold text-amber-900">Reconciliation Note</h4>
-                  <p className="text-xs text-amber-700 leading-relaxed">Calculated based on: Sold = Loaded - Returned. Differences indicate discrepancies.</p>
-                </div>
-              </div>
-
-              {reconReport?.report?.length === 0 ? (
-                <p className="text-center text-gray-500 py-8 font-medium text-sm">No transactions found for this vehicle today</p>
-              ) : (
-                reconReport?.report?.map((item, idx) => (
-                  <div key={idx} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-                    <div className="flex justify-between items-center">
-                      <h4 className="text-sm font-bold text-gray-900">{item.product}</h4>
-                      {item.difference === 0 ? (
-                          <span className="text-[10px] font-bold text-emerald-600 uppercase flex items-center gap-1">
-                            <CheckCircle2 size={12} /> Matched
-                          </span>
-                      ) : (
-                          <span className="text-[10px] font-bold text-red-600 uppercase flex items-center gap-1">
-                            <AlertTriangle size={12} /> {item.difference > 0 ? `Loss (${item.difference})` : `Excess (${Math.abs(item.difference)})`}
-                          </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-2">
-                        <div className="bg-gray-50 p-2 rounded-lg text-center">
-                          <span className="text-[8px] uppercase font-bold text-gray-400">Loaded</span>
-                          <p className="text-sm font-bold text-gray-800">{item.loadedQty}</p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-lg text-center">
-                          <span className="text-[8px] uppercase font-bold text-gray-400">Sold</span>
-                          <p className="text-sm font-bold text-gray-800">{item.soldQty}</p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded-lg text-center">
-                          <span className="text-[8px] uppercase font-bold text-gray-400">Returned</span>
-                          <p className="text-sm font-bold text-gray-800">{item.returnedQty}</p>
-                        </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-          )}
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Reports Portal</h2>
-          <p className="text-sm text-gray-500">Track performance and reconcile data</p>
-        </div>
-        <button className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors">
-          <Download size={24} />
-        </button>
-      </div>
-
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
-        {[
-          { key: 'overview', label: 'Overview' },
-          { key: 'daily', label: 'Summary' },
-          { key: 'route', label: 'Geographical' },
-          { key: 'recon', label: 'Recon' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              "flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200",
-              activeTab === tab.key ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="transition-all duration-300">
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'daily' && renderDaily()}
-        {activeTab === 'route' && renderRouteReport()}
-        {activeTab === 'recon' && renderReconciliation()}
-      </div>
-    </div>
-  );
-}
-
-const renderRouteReport = () => {
+  const renderRouteReport = () => {
     if (isRouteLoading) {
       return (
         <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
@@ -579,9 +442,122 @@ const renderRouteReport = () => {
         </div>
       </div>
     );
-};
+  };
+
+  const renderAgentPerformance = () => {
+    if (isAgentLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="text-emerald-900/40 text-[10px] font-black uppercase tracking-widest mt-2">Fetching Agent Stats...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-8 px-1">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Agent Sales Targets</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Real-time Daily Performance Tracking</p>
+            </div>
+            <Target size={24} className="text-emerald-500" />
+          </div>
+
+          <div className="space-y-8">
+            {agentPerformance?.map((agent, idx) => (
+              <div key={idx} className="space-y-3">
+                <div className="flex justify-between items-end px-1">
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900">{agent.name}</h4>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                      Today: ₹{agent.totalSales.toLocaleString()} <span className="opacity-40">/ Goal: ₹{agent.dailyTarget.toLocaleString()}</span>
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <span className={`text-sm font-black tracking-tighter ${agent.percentage >= 100 ? 'text-emerald-600' : 'text-orange-500'}`}>
+                      {agent.percentage}%
+                    </span>
+                  </div>
+                </div>
+                
+                <div className="h-2.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-0.5 shadow-inner">
+                  <motion.div 
+                    initial={{ width: 0 }}
+                    animate={{ width: `${Math.min(agent.percentage, 100)}%` }}
+                    transition={{ duration: 1.5, ease: "easeOut" }}
+                    className={`h-full rounded-full ${
+                      agent.percentage >= 100 
+                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
+                      : 'bg-gradient-to-r from-orange-400 to-orange-500'
+                    }`}
+                  />
+                </div>
+
+                {agent.percentage >= 100 && (
+                  <div className="flex items-center gap-1.5 px-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Target Achieved</span>
+                  </div>
+                )}
+              </div>
+            ))}
+
+            {(!agentPerformance || agentPerformance.length === 0) && (
+              <div className="py-12 text-center text-gray-300">
+                <Users size={48} className="mx-auto mb-4 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">No Active Sales Agents</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6 pb-20">
+      <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-bold text-gray-900">Reports Portal</h2>
+          <p className="text-sm text-gray-500">Track performance and reconcile data</p>
+        </div>
+        <button className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors">
+          <Download size={24} />
+        </button>
+      </div>
+
+      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
+        {[
+          { key: 'overview', label: 'Overview' },
+          { key: 'daily', label: 'Summary' },
+          { key: 'route', label: 'Geographical' },
+          { key: 'targets', label: 'Targets' },
+        ].map((tab) => (
+          <button
+            key={tab.key}
+            onClick={() => setActiveTab(tab.key)}
+            className={cn(
+              "flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200",
+              activeTab === tab.key ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400"
+            )}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </div>
+
+      <div className="transition-all duration-300">
+        {activeTab === 'overview' && renderOverview()}
+        {activeTab === 'daily' && renderDaily()}
+        {activeTab === 'route' && renderRouteReport()}
+        {activeTab === 'targets' && renderAgentPerformance()}
+      </div>
+    </div>
+  );
+}
 
 function cn(...inputs) {
   return inputs.filter(Boolean).join(' ');
 }
-

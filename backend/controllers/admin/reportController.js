@@ -354,3 +354,41 @@ export const getVillageWiseReport = async (req, res) => {
     res.status(500).json({ message: 'Error fetching village report', error: error.message });
   }
 };
+
+export const getAgentPerformance = async (req, res) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const agents = await prisma.user.findMany({
+      where: { role: 'SALES_AGENT' },
+      select: { id: true, name: true, dailyTarget: true, status: true }
+    });
+
+    const performance = await Promise.all(agents.map(async (agent) => {
+      const orders = await prisma.order.findMany({
+        where: {
+          agentId: agent.id,
+          createdAt: { gte: today },
+          status: { not: 'CANCELLED' }
+        },
+        select: { totalAmount: true }
+      });
+
+      const totalSales = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+      
+      return {
+        id: agent.id,
+        name: agent.name || 'Unknown Agent',
+        dailyTarget: agent.dailyTarget,
+        totalSales: totalSales,
+        percentage: agent.dailyTarget > 0 ? Math.round((totalSales / agent.dailyTarget) * 100) : 0,
+        status: agent.status
+      };
+    }));
+
+    res.json(performance);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching agent performance', error: error.message });
+  }
+};

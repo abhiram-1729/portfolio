@@ -51,6 +51,7 @@ export const adminAPI = {
   getReconciliationReport: (params) => api.get('/admin/reports/reconciliation', { params }),
   getRouteWiseReport: (params) => api.get('/admin/reports/route-wise', { params }),
   getVillageWiseReport: (params) => api.get('/admin/reports/village-wise', { params }),
+  getAgentPerformance: () => api.get('/admin/reports/agent-performance'),
   
   // Settings
   getSettings: () => api.get('/admin/settings').catch(err => {

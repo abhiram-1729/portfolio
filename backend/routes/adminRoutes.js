@@ -90,6 +90,7 @@ router.get('/reports/date-range', reportCtr.getDateRangeReport);
 router.get('/reports/reconciliation', reportCtr.getReconciliationReport);
 router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
 router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
+router.get('/reports/agent-performance', reportCtr.getAgentPerformance);
 
 // Villages
 router.route('/villages')
