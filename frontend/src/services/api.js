@@ -1,10 +1,18 @@
 import axios from 'axios';
 
-let API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001/api';
+let API_URL = import.meta.env.VITE_API_URL || '';
 
-// Auto-correct missing /api suffix from Vercel/Render env variables
-if (API_URL && !API_URL.endsWith('/api')) {
-  API_URL = API_URL.replace(/\/$/, '') + '/api';
+// Case 1: If on Vercel/Production HTTPS, default to relative '/api' if URL isn't set or is HTTP
+if (typeof window !== 'undefined' && window.location.protocol === 'https:' && (!API_URL || API_URL.startsWith('http://'))) {
+  API_URL = '/api';
+}
+
+// Case 2: Localhost fallback
+API_URL = API_URL || 'http://localhost:5001/api';
+
+// Case 3: Ensure /api suffix
+if (API_URL && !API_URL.endsWith('/api') && !API_URL.endsWith('/api/')) {
+    API_URL = API_URL.replace(/\/$/, '') + '/api';
 }
 
 const api = axios.create({
