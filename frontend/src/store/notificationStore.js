@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 
-const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
+const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost'));
 
 // For REST calls (fetch), always use the secure relative /api in production
 const API_BASE_URL = isProd ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5001/api');
