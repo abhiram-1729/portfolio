@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 
 export default function CartDrawer({ isOpen, onClose, products = [] }) {
-  const { items, updateQuantity, clearCart, totalAmount } = useCartStore();
+  const { items, addItem, updateQuantity, clearCart, totalAmount } = useCartStore();
   const navigate = useNavigate();
 
   const handleUpdate = (item, newQty) => {
@@ -152,15 +152,13 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
                   
                   const minAmount = Number(p.minShopAmount || 0);
                   
-                  // Simplified Logic: Only show gifts within a +/- 500 range of current subtotal
-                  // This focuses strictly on the most relevant nearest gifts
-                  const range = 500;
-                  const isNear = minAmount >= (subtotal - range) && minAmount <= (subtotal + range);
-                  
-                  // If subtotal is very low, show gifts from the starting tier up to 500
-                  if (subtotal < range) return minAmount <= range;
-                  
-                  return isNear;
+                  // Revised Logic:
+                  // 1. If it's already unlocked (minAmount <= subtotal), ALWAYS show it so they can claim it.
+                  // 2. If it's upcoming (minAmount > subtotal), only show it if it's within +500 of current subtotal.
+                  const isUnlocked = minAmount <= subtotal;
+                  const isUpcomingNear = minAmount > subtotal && minAmount <= (subtotal + 500);
+
+                  return isUnlocked || isUpcomingNear;
                 })
                 .sort((a, b) => Number(a.minShopAmount) - Number(b.minShopAmount))
                 .map((p) => {
