@@ -13,7 +13,8 @@ import {
   ShoppingCart,
   Coins,
   MapPin,
-  Bell
+  Bell,
+  Target
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -48,6 +49,7 @@ export default function AdminLayout() {
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow' },
+    { to: '/admin/targets', icon: Target, label: 'Targets' },
     { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];

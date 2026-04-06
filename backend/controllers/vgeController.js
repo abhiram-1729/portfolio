@@ -1,0 +1,339 @@
+/**
+ * VGE Targets & Incentives Controller
+ * 
+ * Endpoints for both agents and admins.
+ */
+
+import prisma from '../utils/prisma.js';
+import { 
+  updateDailyPerformance, 
+  getLeaderboard, 
+  endOfDayProcess,
+  generateMonthlySummary,
+  toISTDateString,
+  toISTMonthString 
+} from '../services/vgeAggregationService.js';
+import { 
+  calculateIncentive, 
+  getNextLevelInfo, 
+  getNextSlabInfo 
+} from '../services/incentiveEngine.js';
+
+
+// ─── AGENT ENDPOINTS ─────────────────────────────────────
+
+/**
+ * GET /api/vge/my-performance
+ * Get current day's performance for logged-in agent
+ */
+export const getMyPerformance = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const date = req.query.date || toISTDateString();
+
+    // Try to get existing record, or compute fresh
+    let perf = await prisma.vgeDailyPerformance.findUnique({
+      where: { userId_date: { userId, date } }
+    });
+
+    if (!perf) {
+      // Calculate on-the-fly if no record yet
+      perf = await updateDailyPerformance(userId, date);
+    }
+
+    // Load config for progress info
+    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { id: 'singleton' } });
+    if (!config) config = undefined; // engine uses defaults
+
+    const nextLevel = getNextLevelInfo(perf.totalSales, config);
+    const nextSlab = getNextSlabInfo(perf.totalSales, config);
+
+    // Get user's daily target
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { dailyTarget: true }
+    });
+
+    res.json({
+      ...perf,
+      nextLevel,
+      nextSlab,
+      dailyTarget: user?.dailyTarget || 10000,
+      targetProgress: user?.dailyTarget ? Math.min(100, (perf.totalSales / user.dailyTarget) * 100) : 0,
+    });
+  } catch (error) {
+    console.error('[VGE] getMyPerformance error:', error);
+    res.status(500).json({ message: 'Failed to load performance', error: error.message });
+  }
+};
+
+/**
+ * GET /api/vge/my-history
+ * Get performance history for the logged-in agent
+ */
+export const getMyHistory = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { days = 7 } = req.query;
+
+    const records = await prisma.vgeDailyPerformance.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: parseInt(days),
+    });
+
+    res.json(records);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load history', error: error.message });
+  }
+};
+
+/**
+ * GET /api/vge/my-monthly
+ * Get monthly summary for the logged-in agent
+ */
+export const getMyMonthlySummary = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const month = req.query.month || toISTMonthString();
+
+    const summary = await prisma.vgeMonthlySummary.findUnique({
+      where: { userId_month: { userId, month } }
+    });
+
+    if (!summary) {
+      return res.json({
+        userId,
+        month,
+        totalSales: 0,
+        totalRegistrations: 0,
+        totalIncentive: 0,
+        totalOrders: 0,
+        workingDays: 0,
+        avgLevel: 'NONE',
+        bestLevel: 'NONE',
+      });
+    }
+
+    res.json(summary);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load monthly summary', error: error.message });
+  }
+};
+
+/**
+ * GET /api/vge/leaderboard
+ * Get daily leaderboard
+ */
+export const getLeaderboardHandler = async (req, res) => {
+  try {
+    const date = req.query.date || toISTDateString();
+    const sortBy = req.query.sortBy || 'totalSales';
+
+    const leaderboard = await getLeaderboard(date, sortBy);
+    res.json(leaderboard);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load leaderboard', error: error.message });
+  }
+};
+
+
+// ─── ADMIN ENDPOINTS ─────────────────────────────────────
+
+/**
+ * GET /api/vge/admin/all-performance
+ * Get all agents' daily performance
+ */
+export const getAllPerformance = async (req, res) => {
+  try {
+    const date = req.query.date || toISTDateString();
+
+    const performances = await prisma.vgeDailyPerformance.findMany({
+      where: { date },
+      orderBy: { totalSales: 'desc' },
+      include: {
+        user: {
+          select: { 
+            id: true, name: true, 
+            assignedVehicle: { select: { vehicleNumber: true } }
+          }
+        }
+      }
+    });
+
+    res.json(performances);
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to load performance data', error: error.message });
+  }
+};
+
+/**
+ * GET /api/vge/admin/agent/:userId
+ * Get specific agent's detailed performance history
+ */
+export const getAgentPerformance = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { days = 30 } = req.query;
+
+    const records = await prisma.vgeDailyPerformance.findMany({
+      where: { userId },
+      orderBy: { date: 'desc' },
+      take: parseInt(days),
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, name: true, dailyTarget: true, assignedVehicle: { select: { vehicleNumber: true } } }
+    });
+
+    res.json({ user, records });
+  } catch (error) {
+    res.status(500).json({ message: 'Error', error: error.message });
+  }
+};
+
+/**
+ * GET /api/vge/admin/monthly-report
+ * Get all monthly summaries
+ */
+export const getMonthlyReport = async (req, res) => {
+  try {
+    const month = req.query.month || toISTMonthString();
+
+    const summaries = await prisma.vgeMonthlySummary.findMany({
+      where: { month },
+      orderBy: { totalSales: 'desc' },
+      include: {
+        user: {
+          select: { id: true, name: true, assignedVehicle: { select: { vehicleNumber: true } } }
+        }
+      }
+    });
+
+    res.json(summaries);
+  } catch (error) {
+    res.status(500).json({ message: 'Error', error: error.message });
+  }
+};
+
+/**
+ * GET /api/vge/admin/config
+ * Get incentive configuration
+ */
+export const getConfig = async (req, res) => {
+  try {
+    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { id: 'singleton' } });
+    if (!config) {
+      config = await prisma.vgeIncentiveConfig.create({ data: { id: 'singleton' } });
+    }
+    res.json(config);
+  } catch (error) {
+    res.status(500).json({ message: 'Error loading config', error: error.message });
+  }
+};
+
+/**
+ * PUT /api/vge/admin/config
+ * Update incentive configuration
+ */
+export const updateConfig = async (req, res) => {
+  try {
+    const data = req.body;
+    // Remove id and updatedAt from body to prevent overwrite
+    delete data.id;
+    delete data.updatedAt;
+
+    const config = await prisma.vgeIncentiveConfig.upsert({
+      where: { id: 'singleton' },
+      update: data,
+      create: { id: 'singleton', ...data }
+    });
+
+    res.json({ message: 'Configuration updated', config });
+  } catch (error) {
+    res.status(500).json({ message: 'Failed to update config', error: error.message });
+  }
+};
+
+/**
+ * POST /api/vge/admin/recalculate
+ * Force recalculation for a specific user + date (or all agents for a date)
+ */
+export const forceRecalculate = async (req, res) => {
+  try {
+    const { userId, date } = req.body;
+    const targetDate = date || toISTDateString();
+
+    if (userId) {
+      // Recalculate for specific user
+      // Unlock first if locked
+      await prisma.vgeDailyPerformance.updateMany({
+        where: { userId, date: targetDate },
+        data: { isLocked: false }
+      });
+
+      const result = await updateDailyPerformance(userId, targetDate);
+      return res.json({ message: 'Recalculated', result });
+    }
+
+    // Recalculate for all agents who have orders on this date
+    const agents = await prisma.order.findMany({
+      where: {
+        status: 'COMPLETED',
+        createdAt: {
+          gte: new Date(`${targetDate}T00:00:00+05:30`),
+          lte: new Date(`${targetDate}T23:59:59.999+05:30`)
+        }
+      },
+      distinct: ['agentId'],
+      select: { agentId: true }
+    });
+
+    const validAgents = agents.filter(a => a.agentId);
+
+    // Unlock all
+    await prisma.vgeDailyPerformance.updateMany({
+      where: { date: targetDate },
+      data: { isLocked: false }
+    });
+
+    const results = [];
+    for (const agent of validAgents) {
+      const result = await updateDailyPerformance(agent.agentId, targetDate);
+      results.push(result);
+    }
+
+    res.json({ message: `Recalculated ${results.length} agents`, count: results.length });
+  } catch (error) {
+    res.status(500).json({ message: 'Recalculation failed', error: error.message });
+  }
+};
+
+/**
+ * POST /api/vge/admin/end-of-day
+ * Manually trigger end-of-day process
+ */
+export const triggerEndOfDay = async (req, res) => {
+  try {
+    const date = req.body.date || toISTDateString();
+    const count = await endOfDayProcess(date);
+    res.json({ message: `End-of-day completed. Locked ${count} records.`, count });
+  } catch (error) {
+    res.status(500).json({ message: 'End-of-day failed', error: error.message });
+  }
+};
+
+/**
+ * POST /api/vge/admin/generate-monthly
+ * Manually trigger monthly summary generation
+ */
+export const triggerMonthlySummary = async (req, res) => {
+  try {
+    const month = req.body.month || toISTMonthString();
+    const count = await generateMonthlySummary(month);
+    res.json({ message: `Monthly summary generated for ${count} agents.`, count });
+  } catch (error) {
+    res.status(500).json({ message: 'Monthly summary failed', error: error.message });
+  }
+};

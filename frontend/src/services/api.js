@@ -79,4 +79,11 @@ export const reportsAPI = {
   byDate: (params) => api.get('/reports/date', { params }),
 };
 
+export const vgeAPI = {
+  getMyPerformance: (params) => api.get('/vge/my-performance', { params }),
+  getMyHistory: (params) => api.get('/vge/my-history', { params }),
+  getMyMonthlySummary: (params) => api.get('/vge/my-monthly', { params }),
+  getLeaderboard: (params) => api.get('/vge/leaderboard', { params }),
+};
+
 export default api;

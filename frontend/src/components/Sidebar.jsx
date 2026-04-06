@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch, Target } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 
@@ -18,6 +18,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Vehicle & Stock', path: `/agent-inventory/${user?.assignedVehicleId}`, icon: Truck, color: 'text-slate-600', bg: 'bg-slate-50' },
     { name: 'Cash Reconciliation', path: '/closing-cash', icon: Wallet, color: 'text-orange-600', bg: 'bg-orange-50' },
     { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { name: 'My Targets', path: '/targets', icon: Target, color: 'text-amber-600', bg: 'bg-amber-50' },
     { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 

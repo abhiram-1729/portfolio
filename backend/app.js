@@ -10,6 +10,7 @@ import adminRoutes from './routes/adminRoutes.js';
 import cashRoutes from './routes/cashRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import vgeRoutes from './routes/vgeRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -40,6 +41,7 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/cash', cashRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/vge', vgeRoutes);
 
 
 app.get('/', (req, res) => {

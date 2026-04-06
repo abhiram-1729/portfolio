@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma.js';
 import { fetchPlanForVehicle, getCoverageType } from './routeController.js';
 import { sendNotification } from '../services/notificationService.js';
+import { updateDailyPerformance } from '../services/vgeAggregationService.js';
 
 
 // @desc    Create order from cart
@@ -289,6 +290,13 @@ export const completePayment = async (req, res, next) => {
               orderNumber: updatedOrder.orderNumber 
             }
         });
+
+        // 5. Trigger VGE performance recalculation (fire-and-forget)
+        if (updatedOrder.agentId) {
+          updateDailyPerformance(updatedOrder.agentId).catch(err => {
+            console.warn('[VGE] Background recalculation failed:', err.message);
+          });
+        }
     } catch (error) {
 
         next(error);

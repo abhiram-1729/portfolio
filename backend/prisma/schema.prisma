@@ -17,7 +17,8 @@ model User {
   createdAt         DateTime          @default(now())
   updatedAt         DateTime          @updatedAt
   assignedVehicleId String?
-  dailyTarget       Float             @default(10000)
+  dailyTarget       Float?            @default(10000)
+  baseSalary        Float?            @default(12000)
   status            UserStatus        @default(ACTIVE)
   fcmToken          String?
   assignedVehicle   Vehicle?          @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
@@ -28,6 +29,8 @@ model User {
   routeAssignments  RouteAssignment[]
   refillRequests    RefillRequest[]
   notifications     Notification[]
+  dailyPerformance  VgeDailyPerformance[] @relation("UserDailyPerformance")
+  monthlySummaries  VgeMonthlySummary[]   @relation("UserMonthlySummary")
 
   @@index([assignedVehicleId])
   @@index([role])
@@ -246,6 +249,7 @@ model Route {
   cycles      RouteCycle[]
   assignments RouteAssignment[]
   orders      Order[]
+  monthlySummaries VgeMonthlySummary[]
 
   @@index([status])
 }
@@ -467,4 +471,107 @@ enum DayOfWeek {
 enum UserStatus {
   ACTIVE
   SUSPENDED
+}
+
+// ─── VGE Targets & Incentives ─────────────────────────────
+
+enum VgeLevel {
+  NONE
+  STARTER
+  PERFORMER
+  ACHIEVER
+  CHAMPION
+  STAR
+  SUPER_STAR
+}
+
+model VgeDailyPerformance {
+  id                  String   @id @default(cuid())
+  userId              String
+  date                String   // YYYY-MM-DD format
+  routeId             String?
+
+  // Raw aggregated data
+  totalSales          Float    @default(0)
+  totalRegistrations  Int      @default(0)
+  completedOrders     Int      @default(0)
+
+  // Derived from incentive engine
+  eligibleSales       Float    @default(0)
+  slabsCount          Int      @default(0)
+
+  // Calculated output
+  level               VgeLevel @default(NONE)
+  salesIncentive      Float    @default(0)
+  regIncentive        Float    @default(0)
+  totalIncentive      Float    @default(0)
+
+  // Lock for end-of-day finalization
+  isLocked            Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation("UserDailyPerformance", fields: [userId], references: [id])
+
+  @@unique([userId, date])
+  @@index([date])
+  @@index([userId])
+  @@index([level])
+}
+
+model VgeMonthlySummary {
+  id                  String   @id @default(cuid())
+  userId              String
+  month               String   // YYYY-MM format
+  routeId             String?
+  route               Route?   @relation(fields: [routeId], references: [id])
+
+  totalSales          Float    @default(0)
+  totalRegistrations  Int      @default(0)
+  totalIncentive      Float    @default(0)
+  totalOrders         Int      @default(0)
+  workingDays         Int      @default(0)
+  avgLevel            String?  // Stored as string representation
+  bestLevel           VgeLevel @default(NONE)
+  metadata            Json?
+
+  isLocked            Boolean  @default(false)
+
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  user                User     @relation("UserMonthlySummary", fields: [userId], references: [id])
+
+  @@unique([userId, month])
+  @@index([month])
+}
+
+model VgeIncentiveConfig {
+  id                      String   @id @default("singleton")
+
+  // Minimum thresholds
+  minSalesThreshold       Float    @default(10000)
+  minRegThreshold         Int      @default(5)
+
+  // Sales slab config
+  salesSlabSize           Float    @default(5000)
+  firstSlabCount          Int      @default(2)
+  firstSlabIncentive      Float    @default(50)
+  remainingSlabIncentive  Float    @default(100)
+
+  // Registration incentive config
+  firstRegCount           Int      @default(10)
+  firstRegIncentive       Float    @default(10)
+  remainingRegIncentive   Float    @default(15)
+
+  // Level thresholds (in ascending sales order)
+  starterThreshold        Float    @default(10000)
+  performerThreshold      Float    @default(15000)
+  achieverThreshold       Float    @default(20000)
+  championThreshold       Float    @default(25000)
+  starThreshold           Float    @default(30000)
+  superStarThreshold      Float    @default(35000)
+
+  updatedAt               DateTime @updatedAt
 }

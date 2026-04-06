@@ -1,14 +1,18 @@
 import React, { useEffect, useState } from 'react';
-import { 
-  Users, 
-  Truck, 
-  ShoppingCart, 
-  DollarSign, 
+import {
+  Users,
+  Truck,
+  ShoppingCart,
+  DollarSign,
   CreditCard,
   TrendingUp,
   Loader2,
-  Coins
+  Coins,
+  Target,
+  Trophy,
+  ChevronRight
 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import adminAPI from '../../services/adminService';
 import { getAdminReconciliation } from '../../services/cashService';
 import { format } from 'date-fns';
@@ -17,17 +21,20 @@ import toast from 'react-hot-toast';
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [cashStats, setCashStats] = useState([]);
+  const [vgeStats, setVgeStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, cashRes] = await Promise.all([
+        const [statsRes, cashRes, vgeRes] = await Promise.all([
           adminAPI.getDashboardStats(),
-          getAdminReconciliation(format(new Date(), 'yyyy-MM-dd'))
+          getAdminReconciliation(format(new Date(), 'yyyy-MM-dd')),
+          adminAPI.vgeAllPerformance({ date: format(new Date(), 'yyyy-MM-dd') })
         ]);
         setStats(statsRes.data);
         setCashStats(cashRes);
+        setVgeStats(vgeRes.data.slice(0, 3)); // Top 3
       } catch (error) {
         toast.error('Failed to load dashboard data');
         console.error(error);
@@ -63,7 +70,7 @@ export default function AdminDashboard() {
   const totalSales = stats?.totalSales || 1; // Avoid division by zero
 
   return (
-    <div className="space-y-6">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
       <div className="flex flex-col gap-2">
         <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
         <p className="text-sm text-gray-500">Quick overview of your operations today</p>
@@ -83,7 +90,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Payment Split Chart */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
           <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center gap-2">
@@ -98,8 +105,8 @@ export default function AdminDashboard() {
                   <span className="font-bold text-gray-900">₹{item.amount.toLocaleString()}</span>
                 </div>
                 <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                  <div 
-                    className="h-full bg-emerald-500 rounded-full transition-all duration-500" 
+                  <div
+                    className="h-full bg-emerald-500 rounded-full transition-all duration-500"
                     style={{ width: `${(item.amount / totalSales) * 100}%` }}
                   />
                 </div>
@@ -138,6 +145,59 @@ export default function AdminDashboard() {
             <p className="text-[10px] text-center text-gray-400 mt-4 font-bold uppercase tracking-widest">
               + {cashStats.length - 5} more vehicles
             </p>
+          )}
+        </div>
+
+        {/* VGE Leaderboard Summary */}
+        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm flex flex-col h-full">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+              <Trophy size={20} className="text-amber-500" />
+              Top Performers (VGE)
+            </h3>
+            <Link to="/admin/targets" className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest flex items-center gap-1 bg-emerald-50 px-3 py-1.5 rounded-xl transition-all">
+              View <ChevronRight size={12} />
+            </Link>
+          </div>
+
+          <div className="space-y-4 flex-1">
+            {vgeStats.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 opacity-40">
+                <Target size={32} className="text-gray-300 mb-2" />
+                <p className="text-xs font-bold text-gray-400 italic">No sales data yet today</p>
+              </div>
+            ) : (
+              vgeStats.map((p, idx) => (
+                <div key={p.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-amber-100 text-amber-600' :
+                    idx === 1 ? 'bg-slate-100 text-slate-500' :
+                      'bg-orange-100 text-orange-600'
+                    }`}>
+                    {idx + 1}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-black text-gray-900 truncate">{p.user?.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] font-bold text-gray-400 uppercase">{p.level}</span>
+                      <span className="w-1 h-1 rounded-full bg-gray-300" />
+                      <span className="text-[10px] font-bold text-gray-400">{p.completedOrders} Orders</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm font-black text-slate-900">₹{p.totalSales.toLocaleString()}</p>
+                    <p className="text-[9px] font-black text-emerald-600 tracking-tight">+₹{p.totalIncentive} Earned</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {vgeStats.length > 0 && (
+            <div className="mt-6 p-4 rounded-2xl bg-gradient-to-tr from-emerald-50 to-emerald-100/30 border border-emerald-100/50">
+              <p className="text-[10px] font-black text-emerald-800/80 uppercase tracking-widest text-center">
+                Live Performance Tracking Enabled
+              </p>
+            </div>
           )}
         </div>
       </div>

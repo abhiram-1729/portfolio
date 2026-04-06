@@ -26,7 +26,9 @@ import AdminCashManagement from './pages/admin/AdminCashManagement';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminRoutes from './pages/admin/AdminRoutes';
 import AdminNotifications from './pages/admin/AdminNotifications';
+import AdminTargets from './pages/admin/AdminTargets';
 import Notifications from './pages/Notifications';
+import VgeTargets from './pages/VgeTargets';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -79,6 +81,7 @@ export default function App() {
           <Route path="closing-cash" element={<ClosingCashEntry />} />
           <Route path="agent-inventory/:vehicleId" element={<AgentInventory />} />
           <Route path="today-plan" element={<TodayPlan />} />
+          <Route path="targets" element={<VgeTargets />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -97,6 +100,7 @@ export default function App() {
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="routes" element={<AdminRoutes />} />
+          <Route path="targets" element={<AdminTargets />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

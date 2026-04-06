@@ -3,6 +3,7 @@ import prisma from './prisma.js';
 import { fetchPlanForVehicle } from '../controllers/routeController.js';
 import { addDays, format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
+import { endOfDayProcess, generateMonthlySummary } from '../services/vgeAggregationService.js';
 
 
 // 8 PM Daily: Tomorrow Route Notification
@@ -72,5 +73,46 @@ export const initCronJobs = () => {
         timezone: 'Asia/Kolkata'
     });
 
-    console.log('✅ Cron Jobs Initialized (8 PM IST daily route notifications)');
+    // 11:59 PM Daily: VGE End-of-Day Lock + Summary Notifications
+    cron.schedule('59 23 * * *', async () => {
+        console.log('🎯 Running VGE End-of-Day Process [11:59 PM IST]');
+        try {
+            const count = await endOfDayProcess();
+            console.log(`✅ [VGE CRON] End-of-day complete. Locked ${count} performance records.`);
+        } catch (error) {
+            console.error('❌ Error in VGE End-of-Day Cron:', error);
+        }
+    }, {
+        timezone: 'Asia/Kolkata'
+    });
+
+    // 1st of every month at 1:00 AM: Generate Monthly Summaries
+    cron.schedule('0 1 1 * *', async () => {
+        console.log('📊 Running VGE Monthly Summary Generation [1st of Month, 1:00 AM IST]');
+        try {
+            // Generate for the previous month
+            const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Kolkata' }));
+            const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            const monthStr = `${prevMonth.getFullYear()}-${String(prevMonth.getMonth() + 1).padStart(2, '0')}`;
+            
+            const count = await generateMonthlySummary(monthStr);
+            console.log(`✅ [VGE CRON] Monthly summary generated for ${monthStr}: ${count} agents.`);
+
+            // Notify admins
+            sendNotification({
+                roles: ['ADMIN'],
+                title: '📊 Monthly VGE Report Ready',
+                message: `Monthly incentive summary for ${monthStr} has been generated for ${count} agents.`,
+                type: 'incentive',
+                priority: 'medium',
+                metadata: { month: monthStr, count }
+            });
+        } catch (error) {
+            console.error('❌ Error in VGE Monthly Summary Cron:', error);
+        }
+    }, {
+        timezone: 'Asia/Kolkata'
+    });
+
+    console.log('✅ Cron Jobs Initialized (Route notifications + VGE end-of-day + Monthly summary)');
 };

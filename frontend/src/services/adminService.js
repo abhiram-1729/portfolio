@@ -62,6 +62,16 @@ export const adminAPI = {
     throw err;
   }),
   updateSettings: (data) => api.put('/admin/settings', data),
+
+  // VGE Targets & Incentives
+  vgeAllPerformance: (params) => api.get('/vge/admin/all-performance', { params }),
+  vgeAgentPerformance: (userId, params) => api.get(`/vge/admin/agent/${userId}`, { params }),
+  vgeMonthlyReport: (params) => api.get('/vge/admin/monthly-report', { params }),
+  vgeGetConfig: () => api.get('/vge/admin/config'),
+  vgeUpdateConfig: (data) => api.put('/vge/admin/config', data),
+  vgeRecalculate: (data) => api.post('/vge/admin/recalculate', data),
+  vgeEndOfDay: (data) => api.post('/vge/admin/end-of-day', data || {}),
+  vgeGenerateMonthly: (data) => api.post('/vge/admin/generate-monthly', data || {}),
 };
 
 export default adminAPI;
