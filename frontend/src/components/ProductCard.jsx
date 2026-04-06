@@ -1,10 +1,23 @@
 import { Plus, Minus, Package, Gift, Lock, Unlock, Zap } from 'lucide-react';
 import { useCartStore, checkIsFree } from '../store/cartStore';
+import toast from 'react-hot-toast';
 
 export default function ProductCard({ product }) {
   const { items, addItem, updateQuantity } = useCartStore();
   const cartItem = items.find((i) => i.productId === product.id);
   const qty = cartItem?.quantity || 0;
+
+  const handleAdd = () => {
+    if (qty + 1 > (product.stock || 0)) {
+       toast.error(`Only ${product.stock || 0} units available in vehicle`, {
+          icon: '🚛',
+          style: { borderRadius: '15px', fontWeight: 'bold' }
+       });
+       return;
+    }
+    if (qty === 0) addItem(product);
+    else updateQuantity(product.id, qty + 1);
+  };
 
   // Calculate if it's currently free in the store
   const subtotal = items.reduce((sum, i) => {
@@ -43,7 +56,7 @@ export default function ProductCard({ product }) {
 
         {/* Stock Info - More subtle */}
         {!isFreeProduct && product.stock !== undefined && product.stock !== null && (
-          <div className="absolute top-2 right-2 z-10 bg-white/80 backdrop-blur-md text-emerald-900 text-[0.6rem] font-black px-2 py-1 rounded-lg border border-emerald-100 shadow-sm opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-2 right-2 z-10 bg-emerald-600/90 backdrop-blur-sm text-white text-[0.55rem] font-black px-1.5 py-0.5 rounded-md border border-white/20 shadow-sm select-none">
             {product.stock} IN STOCK
           </div>
         )}
@@ -121,7 +134,7 @@ export default function ProductCard({ product }) {
       <div className="mt-1">
         {qty === 0 ? (
           <button
-            onClick={() => addItem(product)}
+            onClick={handleAdd}
             className={`w-full font-black py-3 rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-[0.7rem] uppercase tracking-widest shadow-lg ${isCurrentlyFree
               ? 'bg-emerald-600 text-white shadow-emerald-500/20 hover:bg-emerald-700'
               : 'bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700'
@@ -140,7 +153,7 @@ export default function ProductCard({ product }) {
             </button>
             <span className="font-black text-emerald-950 text-sm">{qty}</span>
             <button
-              onClick={() => updateQuantity(product.id, qty + 1)}
+              onClick={handleAdd}
               className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center active:scale-90 transition-all shadow-lg shadow-emerald-600/20 hover:bg-emerald-700"
             >
               <Plus size={16} strokeWidth={3} />

@@ -14,19 +14,24 @@ export const protect = async (req, res, next) => {
                 select: { id: true, name: true, email: true, role: true, assignedVehicleId: true }
             });
 
+            if (!req.user) {
+              return res.status(401).json({ message: 'User not found' });
+            }
+
             next();
         } catch (error) {
-            console.error(error);
+            console.error('[AuthMiddleware Error]', error.message);
             res.status(401);
-            throw new Error('Not authorized, token failed');
+            return next(new Error('Not authorized, token failed'));
         }
     }
 
     if (!token) {
         res.status(401);
-        throw new Error('Not authorized, no token');
+        return next(new Error('Not authorized, no token'));
     }
 };
+
 
 export const admin = (req, res, next) => {
     if (req.user && req.user.role === 'ADMIN') {

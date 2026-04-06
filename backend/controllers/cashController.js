@@ -1,5 +1,7 @@
 import prisma from '../utils/prisma.js';
 import { format } from 'date-fns';
+import { sendNotification } from '../services/notificationService.js';
+
 
 // @desc    Submit opening cash for a vehicle
 // @route   POST /api/cash/opening
@@ -57,7 +59,17 @@ export const submitOpeningCash = async (req, res, next) => {
         });
 
         res.status(201).json(openingCash);
+
+        sendNotification({
+            roles: ['ADMIN'],
+            title: 'Opening Cash Submitted',
+            message: `Opening cash of ₹${totalOpeningCash} submitted for ${vehicleId}.`,
+            type: 'cash',
+            priority: 'low',
+            metadata: { vehicleId, amount: totalOpeningCash }
+        });
     } catch (error) {
+
         next(error);
     }
 };
@@ -137,6 +149,16 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
         });
 
         res.status(201).json(openingCash);
+
+        sendNotification({
+            userIds: [userId],
+            roles: ['ADMIN'],
+            title: 'Opening Cash Entry Submitted',
+            message: `Opening cash of ₹${totalOpeningCash} has been registered by admin for your vehicle.`,
+            type: 'cash',
+            priority: 'medium',
+            metadata: { vehicleId, amount: totalOpeningCash }
+        });
     } catch (error) {
         next(error);
     }
@@ -158,6 +180,16 @@ export const deleteReconciliation = async (req, res, next) => {
         ]);
 
         res.json({ message: 'Reconciliation data removed' });
+
+        sendNotification({
+            vehicleIds: [vehicleId],
+            roles: ['ADMIN'],
+            title: 'Reconciliation Deleted',
+            message: `Cash reconciliation records for ${date} have been removed for vehicle ${vehicleId}.`,
+            type: 'cash',
+            priority: 'high',
+            metadata: { vehicleId, date, action: 'DELETE' }
+        });
     } catch (error) {
         next(error);
     }
@@ -266,6 +298,18 @@ export const submitClosingCash = async (req, res, next) => {
         });
 
         res.status(201).json(closingCash);
+
+        if (difference !== 0) {
+            sendNotification({
+                userIds: [userId], // Notify the Agent too!
+                roles: ['ADMIN', 'SUPERVISOR'],
+                title: Math.abs(difference) >= 1000 ? 'CRITICAL: Large Cash Mismatch' : 'Cash Mismatch Detected',
+                message: `Closing cash mismatch of ₹${difference} detected. Please review your entries.`,
+                type: 'cash',
+                priority: Math.abs(difference) >= 1000 ? 'high' : 'medium',
+                metadata: { vehicleId, difference, actualCash, expectedCash }
+            });
+        }
     } catch (error) {
         next(error);
     }
@@ -441,6 +485,16 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         });
 
         res.json(updatedSummary);
+
+        sendNotification({
+            userIds: [summary.userId],
+            roles: ['ADMIN'],
+            title: 'Cash Summary Updated',
+            message: `Admin has updated the cash summary for ${date}. Status: ${newStatus}. Difference: ₹${newDifference}.`,
+            type: 'cash',
+            priority: 'medium',
+            metadata: { vehicleId, date, difference: newDifference, status: newStatus }
+        });
     } catch (error) {
         next(error);
     }

@@ -12,9 +12,13 @@ import {
   X,
   ShoppingCart,
   Coins,
-  MapPin
+  MapPin,
+  Bell
 } from 'lucide-react';
+
 import { useUserStore } from '../../store/userStore';
+import { useNotificationStore } from '../../store/notificationStore';
+import NotificationPopover from './NotificationPopover';
 import { clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 import logo from '../../assets/VillagKart_Logo.png';
@@ -25,7 +29,9 @@ function cn(...inputs) {
 
 export default function AdminLayout() {
   const { clearUser, user } = useUserStore();
+  const unreadCount = useNotificationStore(s => s.unreadCount);
   const navigate = useNavigate();
+  const [isNotifOpen, setIsNotifOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
 
   const handleLogout = () => {
@@ -42,8 +48,10 @@ export default function AdminLayout() {
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow' },
+    { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];
+
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0 md:pl-64">
@@ -53,7 +61,24 @@ export default function AdminLayout() {
           <img src={logo} alt="VillagKart" className="h-14 w-auto" />
           <h1 className="text-xl font-bold text-emerald-600">Admin Portal</h1>
         </div>
-        <div className="flex items-center gap-4">
+        <div className="flex items-center gap-4 relative">
+          <button
+            onClick={() => setIsNotifOpen(!isNotifOpen)}
+            className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
+          >
+            <Bell size={22} strokeWidth={2.5} />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[9px] font-bold text-white ring-2 ring-white">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+          
+          <NotificationPopover 
+            isOpen={isNotifOpen} 
+            onClose={() => setIsNotifOpen(false)} 
+          />
+
           <span className="hidden md:block text-sm text-gray-600 font-medium">
             {user?.name} ({user?.role})
           </span>
@@ -65,6 +90,7 @@ export default function AdminLayout() {
           </button>
         </div>
       </header>
+
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex-col py-6">

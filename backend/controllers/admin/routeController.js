@@ -1,4 +1,5 @@
 import prisma from '../../utils/prisma.js';
+import { sendNotification } from '../../services/notificationService.js';
 
 // @desc    Create a new route with cycles
 // @route   POST /api/admin/routes/create
@@ -39,7 +40,7 @@ export const createRoute = async (req, res, next) => {
 // @access  Admin
 export const assignRouteToVehicle = async (req, res, next) => {
     try {
-        const { vehicleId, userId, routeId, morningSession, afternoonSession } = req.body;
+        const { vehicleId, userId, routeId, morningSession, afternoonSession, schedule } = req.body;
 
         if (!vehicleId || !userId || !routeId) {
             res.status(400);
@@ -64,13 +65,24 @@ export const assignRouteToVehicle = async (req, res, next) => {
                 routeId,
                 status: true,
                 morningSession,
-                afternoonSession
+                afternoonSession,
+                schedule
             },
             include: {
                 route: true,
-                vehicle: { select: { vehicleNumber: true, vehicleName: true } },
-                user: { select: { name: true } }
+                vehicle: { select: { vehicleNumber: true, vehicleName: true, id: true } },
+                user: { select: { name: true, id: true } }
             }
+        });
+
+        // Send notification to the assigned Agent
+        sendNotification({
+            userIds: [userId],
+            title: 'New Route Assigned!',
+            message: `You have been assigned to Route: ${assignment.route.routeName} with a specific weekly schedule.`,
+            type: 'route',
+            priority: 'high',
+            metadata: { assignmentId: assignment.id, routeId, vehicleId }
         });
 
         res.status(201).json(assignment);
@@ -85,7 +97,7 @@ export const assignRouteToVehicle = async (req, res, next) => {
 export const updateRouteAssignment = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { userId, routeId, morningSession, afternoonSession } = req.body;
+        const { userId, routeId, morningSession, afternoonSession, schedule } = req.body;
 
         // If userId is updated, we must fetch the new assignedVehicleId for the user
         let vehicleId = req.body.vehicleId;
@@ -101,13 +113,24 @@ export const updateRouteAssignment = async (req, res, next) => {
                 vehicleId,
                 routeId,
                 morningSession,
-                afternoonSession
+                afternoonSession,
+                schedule: schedule || undefined
             },
             include: {
                 route: true,
-                vehicle: { select: { vehicleNumber: true, vehicleName: true } },
-                user: { select: { name: true } }
+                vehicle: { select: { vehicleNumber: true, vehicleName: true, id: true } },
+                user: { select: { name: true, id: true } }
             }
+        });
+
+        // Send notification to the updated / existing Agent
+        sendNotification({
+            userIds: [assignment.userId],
+            title: 'Route Assignment Updated',
+            message: `Your assignment for Route ${assignment.route.routeName} has been updated with a weekly schedule.`,
+            type: 'route',
+            priority: 'medium',
+            metadata: { assignmentId: assignment.id, routeId: assignment.routeId, vehicleId: assignment.vehicleId }
         });
 
         res.json(assignment);

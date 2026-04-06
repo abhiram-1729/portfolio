@@ -5,7 +5,22 @@ import prisma from '../utils/prisma.js';
 // @access  Private
 export const getProducts = async (req, res, next) => {
     try {
-        const { search, categoryId, warehouseId, vehicleId } = req.query;
+        let { search, categoryId, warehouseId, vehicleId } = req.query;
+
+        // Sanitize inputs
+        search = typeof search === 'string' ? search.trim() : null;
+        categoryId = typeof categoryId === 'string' ? categoryId.trim() : null;
+        warehouseId = typeof warehouseId === 'string' ? warehouseId.trim() : null;
+        vehicleId = typeof vehicleId === 'string' ? vehicleId.trim() : null;
+
+        const showAll = req.query.showAll === 'true';
+
+        // AUTO-FILTER: If user is an Agent, restrict to their vehicle by default (unless requesting full catalog)
+        if (req.user?.role === 'SALES_AGENT' && !showAll) {
+            vehicleId = vehicleId || req.user.assignedVehicleId;
+        }
+
+        console.log(`[getProducts] Request from ${req.user?.name} (Role: ${req.user?.role}):`, JSON.stringify({ search, categoryId, warehouseId, vehicleId }));
 
         const query = {
             where: {
@@ -27,7 +42,7 @@ export const getProducts = async (req, res, next) => {
             };
         }
 
-        if (categoryId) {
+        if (categoryId && categoryId !== 'all') {
             query.where.categoryId = categoryId;
         }
 
@@ -44,24 +59,14 @@ export const getProducts = async (req, res, next) => {
 
         // Filter by Vehicle Stock
         if (vehicleId) {
-            // Use AND to combine previous filters (like search) with this OR stock/gift check
-            const stockFilter = {
-                OR: [
-                    { vehicleStocks: { some: { vehicleId, quantity: { gt: 0 } } } },
-                    { isFree: true }
-                ]
-            };
-            
-            if (query.where.OR) {
-                // If there's already an OR (from warehouse), we MUST combine carefully
-                query.where.AND = [
-                    { OR: query.where.OR },
-                    stockFilter
-                ];
-                delete query.where.OR;
-            } else {
-                query.where.OR = stockFilter.OR;
-            }
+            query.where.OR = [
+                {
+                    vehicleStocks: {
+                        some: { vehicleId }
+                    }
+                },
+                { isFree: true }
+            ];
 
             query.include.vehicleStocks = {
                 where: { vehicleId }
@@ -69,6 +74,7 @@ export const getProducts = async (req, res, next) => {
         }
 
         const products = await prisma.product.findMany(query);
+        console.log(`[getProducts] Found ${products.length} products for vehicle ${vehicleId || 'NONE'}`);
         
         // Flatten stock info for easier frontend consumption
         const result = products.map(p => ({

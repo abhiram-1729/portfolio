@@ -8,41 +8,58 @@ import generateToken from '../utils/generateToken.js';
 export const loginUser = async (req, res, next) => {
     try {
         const { mobile, password } = req.body;
+        console.log(`[DEBUG] Login attempt: ${mobile}`);
 
         const user = await prisma.user.findUnique({
             where: { mobile },
             include: { assignedVehicle: true },
         });
+        console.log(`[DEBUG] User found: ${!!user}, Status: ${user?.status}, Role: ${user?.role}`);
 
         if (!user) {
+            console.log('[DEBUG] Login failed: User not found');
             res.status(401);
             throw new Error('Invalid mobile or password');
         }
 
         if (user.status === 'SUSPENDED') {
-            res.status(403);
-            throw new Error('Account is suspended. Please contact your administrator.');
+            console.log('[DEBUG] Login failed: User suspended');
+            return res.status(403).json({ 
+                success: false, 
+                message: 'Account is suspended. Please contact your administrator.' 
+            });
         }
 
         if (user.role === 'SALES_AGENT' && user.assignedVehicle && user.assignedVehicle.status === false) {
-            res.status(403);
-            throw new Error('Your assigned vehicle is currently marked as Inactive. Please contact your administrator.');
+            console.log('[DEBUG] Login failed: Vehicle inactive');
+            return res.status(403).json({ 
+                success: false, 
+                message: `Your assigned vehicle (${user.assignedVehicle.vehicleNumber}) is currently INACTIVE. Access denied.` 
+            });
         }
 
+        console.log('[DEBUG] Comparing password...');
         if (await bcrypt.compare(password, user.password)) {
+            console.log('[DEBUG] Password matched. Generating token...');
+            const token = generateToken(user.id, user.role, user.assignedVehicleId);
+            console.log('[DEBUG] Token generated successfully');
+            
             res.json({
                 id: user.id,
                 name: user.name,
                 email: user.email,
                 mobile: user.mobile,
                 role: user.role,
+                assignedVehicleId: user.assignedVehicleId,
                 assignedVehicle: user.assignedVehicle,
-                token: generateToken(user.id),
+                token: token,
             });
         } else {
+            console.log('[DEBUG] Login failed: Password mismatch');
             res.status(401);
             throw new Error('Invalid mobile or password');
         }
+
     } catch (error) {
         next(error);
     }
@@ -68,6 +85,7 @@ export const getUserProfile = async (req, res, next) => {
                 email: true,
                 mobile: true,
                 role: true,
+                assignedVehicleId: true,
                 assignedVehicle: true,
             }
         });

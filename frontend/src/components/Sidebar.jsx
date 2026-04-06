@@ -1,0 +1,115 @@
+import React from 'react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch } from 'lucide-react';
+import { Link, useLocation } from 'react-router-dom';
+import { useUserStore } from '../store/userStore';
+
+export default function Sidebar({ isOpen, onClose }) {
+  const { user, clearUser } = useUserStore();
+  const location = useLocation();
+
+  const handleLogout = () => {
+    clearUser();
+    onClose();
+  };
+
+  const menuItems = [
+    { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+    { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+    { name: 'Vehicle & Stock', path: `/agent-inventory/${user?.assignedVehicleId}`, icon: Truck, color: 'text-slate-600', bg: 'bg-slate-50' },
+    { name: 'Cash Reconciliation', path: '/closing-cash', icon: Wallet, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
+  ];
+
+  return (
+    <>
+      {/* Backdrop */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] transition-opacity duration-300"
+          onClick={onClose}
+        />
+      )}
+
+      {/* Sidebar Drawer */}
+      <div className={`fixed top-0 left-0 bottom-0 w-[80%] max-w-[320px] bg-white z-[70] transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl flex flex-col pt-[calc(var(--safe-top)+1rem)]`}>
+        
+        {/* Header */}
+        <div className="px-6 mb-4 flex items-center justify-between">
+          <div>
+            <div className="flex items-center gap-2 mb-0.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Merchant Portal</span>
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            </div>
+            <h2 className="text-xl font-black text-slate-900 tracking-tight">Menu</h2>
+          </div>
+          <button 
+            onClick={onClose}
+            className="p-2 rounded-xl bg-slate-50 text-slate-400 active:scale-95 transition-all"
+          >
+            <X size={18} strokeWidth={3} />
+          </button>
+        </div>
+
+        {/* User Profile Summary */}
+        <div className="mx-6 p-3 rounded-2xl bg-slate-50 border border-slate-100 mb-4 flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+            <User size={20} strokeWidth={2.5} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-xs font-black text-slate-900 truncate tracking-tight">{user?.name}</p>
+            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{user?.role?.replace('_', ' ')}</p>
+          </div>
+        </div>
+
+        {/* Navigation Content */}
+        <div className="flex-1 px-4 pb-4">
+          <div className="space-y-1">
+            <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Operations</p>
+            {menuItems.map((item) => {
+              const isActive = location.pathname === item.path;
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  onClick={onClose}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.98] ${isActive 
+                    ? `${item.bg} ${item.color} shadow-sm border border-${item.color.split('-')[1]}-100` 
+                    : 'text-slate-600 hover:bg-slate-50'}`}
+                >
+                  <div className={`p-1.5 rounded-lg ${isActive ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
+                    <item.icon size={18} strokeWidth={isActive ? 3 : 2.5} />
+                  </div>
+                  <span className="flex-1 font-black text-[0.85rem] tracking-tight">{item.name}</span>
+                  {isActive && <ChevronRight size={14} strokeWidth={3} />}
+                </Link>
+              );
+            })}
+          </div>
+
+          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
+            <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Settings</p>
+            <button
+               onClick={handleLogout}
+               className="flex items-center gap-3 px-4 py-3 rounded-xl text-orange-600 hover:bg-orange-50 active:scale-[0.98] transition-all"
+            >
+              <div className="p-1.5">
+                <LogOut size={18} strokeWidth={2.5} />
+              </div>
+              <span className="font-black text-[0.85rem] tracking-tight">Logout</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-8 border-t border-slate-50">
+           <div className="flex items-center justify-between opacity-30 font-black text-[8px] uppercase tracking-[0.3em] text-slate-500">
+             <span>VillagKart</span>
+             <span>v1.0.4</span>
+           </div>
+        </div>
+
+      </div>
+    </>
+  );
+}

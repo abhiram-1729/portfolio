@@ -1,5 +1,7 @@
 import prisma from '../utils/prisma.js';
 import { fetchPlanForVehicle, getCoverageType } from './routeController.js';
+import { sendNotification } from '../services/notificationService.js';
+
 
 // @desc    Create order from cart
 // @route   POST /api/orders/create-from-cart
@@ -111,6 +113,31 @@ export const createOrderFromCart = async (req, res, next) => {
             coverageType: coverage
         };
 
+        // 2.7 Verify Vehicle Stock Availability (Prevent + Notify on shortage)
+        if (vehicleId) {
+            for (const item of orderItemsData) {
+                const stock = await prisma.vehicleStock.findUnique({
+                    where: { vehicleId_productId: { vehicleId, productId: item.productId } }
+                });
+                
+                if (!stock || stock.quantity < item.quantity) {
+                    const product = await prisma.product.findUnique({ where: { id: item.productId } });
+                    
+                    sendNotification({
+                        roles: ['ADMIN'],
+                        title: 'Inventory Alert: Stock Mismatch',
+                        message: `Agent ${req.user.name} attempted sale exceeding vehicle stock for ${product.name}.`,
+                        type: 'inventory',
+                        priority: 'high',
+                        metadata: { productId: item.productId, vehicleId, requested: item.quantity, available: stock?.quantity || 0 }
+                    });
+                    
+                    res.status(400);
+                    throw new Error(`Insufficient stock for ${product.name} (Available: ${stock?.quantity || 0})`);
+                }
+            }
+        }
+
         // 3. Create Order + OrderItems in a transaction
         const order = await prisma.$transaction(async (tx) => {
             const newOrder = await tx.order.create({
@@ -174,6 +201,7 @@ export const completePayment = async (req, res, next) => {
         }
 
         // Transaction: update order, create payment, reduce inventory
+        const lowStockItems = [];
         const updatedOrder = await prisma.$transaction(async (tx) => {
             // Update order status and payment mode
             const updated = await tx.order.update({
@@ -195,24 +223,74 @@ export const completePayment = async (req, res, next) => {
                 },
             });
 
-            // Reduce warehouse inventory for each item
-            for (const item of order.items) {
-                await tx.warehouseInventory.updateMany({
-                    where: {
-                        productId: item.productId,
-                        quantity: { gte: item.quantity },
-                    },
-                    data: {
-                        quantity: { decrement: item.quantity },
-                    },
-                });
+            // Reduce vehicle inventory for all items in parallel
+            if (order.vehicleId) {
+                await Promise.all(order.items.map(async (item) => {
+                    const updatedStock = await tx.vehicleStock.update({
+                        where: {
+                            vehicleId_productId: {
+                                vehicleId: order.vehicleId,
+                                productId: item.productId,
+                            }
+                        },
+                        data: {
+                            quantity: { decrement: item.quantity },
+                        },
+                        include: { product: { select: { name: true } } }
+                    });
+
+                    // Collect low stock alerts (threshold < 5) to notify AFTER transaction
+                    if (updatedStock.quantity < 5) {
+                        lowStockItems.push({
+                            name: updatedStock.product.name,
+                            productId: item.productId,
+                            quantity: updatedStock.quantity
+                        });
+                    }
+                }));
             }
 
             return updated;
-        }, { maxWait: 5000, timeout: 20000 });
+        }, { maxWait: 15000, timeout: 45000 });
 
+        // Notifications (Background tasks after successful transaction)
         res.json(updatedOrder);
+
+        // Notify for low stock (Consolidated)
+        if (lowStockItems.length > 0) {
+            const lowStockCount = lowStockItems.length;
+            const msg = lowStockCount === 1 
+                ? `Vehicle is low on ${lowStockItems[0].name} (Only ${lowStockItems[0].quantity} left).`
+                : `Vehicle is low on ${lowStockCount} items including ${lowStockItems[0].name}. Please check inventory.`;
+
+            sendNotification({
+                userIds: [updatedOrder.agentId],
+                roles: ['ADMIN'],
+                title: `Low Stock Alert (${lowStockCount} items)`,
+                message: msg,
+                type: 'inventory',
+                priority: 'medium',
+                metadata: { vehicleId: updatedOrder.vehicleId, items: lowStockItems.map(i => i.productId) }
+            });
+        }
+
+        // 4. Send background notification (don't await for response to keep response fast)
+        sendNotification({
+            userIds: [updatedOrder.agentId, updatedOrder.userId].filter(id => id),
+            roles: ['ADMIN', 'SUPERVISOR'],
+            title: updatedOrder.totalAmount >= 2000 ? 'High-Value Order Alert!' : 'New Order Completed',
+            message: `Order #${updatedOrder.orderNumber} for ₹${updatedOrder.totalAmount} has been completed by ${req.user.name}.`,
+            type: 'sales',
+            priority: updatedOrder.totalAmount >= 2000 ? 'high' : 'medium',
+            metadata: { 
+              orderId: updatedOrder.id, 
+              amount: updatedOrder.totalAmount, 
+              vehicleId: updatedOrder.vehicleId,
+              orderNumber: updatedOrder.orderNumber 
+            }
+        });
     } catch (error) {
+
         next(error);
     }
 };

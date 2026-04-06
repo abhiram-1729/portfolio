@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -25,6 +25,8 @@ export default function AdminInventory() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]); // [id, id, ...]
   const [refillRequests, setRefillRequests] = useState([]);
+  const [expandedAgentId, setExpandedAgentId] = useState(null);
+  const [viewingAgentRefills, setViewingAgentRefills] = useState(null);
   const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
 
   // States for stock actions
@@ -76,6 +78,77 @@ export default function AdminInventory() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  const handleQuantityChange = React.useCallback((id, val) => {
+    setStockQuantities(prev => ({ ...prev, [id]: val }));
+  }, []);
+
+  // Optimized lookup map for vehicle inventory
+  const vehicleInventoryMap = React.useMemo(() => {
+    const map = {};
+    (vehicleInventory || []).forEach(vi => {
+      map[vi.productId] = vi.quantity;
+    });
+    return map;
+  }, [vehicleInventory]);
+
+  // Optimized totals and filtering
+  const totalLoadingValue = React.useMemo(() => {
+    return items.reduce((acc, item) => {
+      const qty = parseFloat(stockQuantities[item.id]) || 0;
+      return acc + (qty * (parseFloat(item.price) || 0));
+    }, 0);
+  }, [items, stockQuantities]);
+
+  const totalReturnInventoryValue = React.useMemo(() => {
+    return items.reduce((acc, item) => {
+      const currentStock = vehicleInventoryMap[item.id] || 0;
+      return acc + (currentStock * (parseFloat(item.price) || 0));
+    }, 0);
+  }, [items, vehicleInventoryMap]);
+
+  const loadingFilteredItems = React.useMemo(() => {
+    const q = searchQuery.toLowerCase();
+    return items.filter(i => i.name.toLowerCase().includes(q));
+  }, [items, searchQuery]);
+
+  const groupedLoadingItems = React.useMemo(() => {
+    const regular = [];
+    const free = [];
+    loadingFilteredItems.forEach(i => {
+      if (i.isFree) free.push(i);
+      else regular.push(i);
+    });
+    return { regular, free };
+  }, [loadingFilteredItems]);
+
+  const groupedRefills = React.useMemo(() => {
+    const groups = {};
+    (refillRequests || []).forEach(req => {
+      // Use both name and ID for more reliable grouping if ID is missing from old records
+      const userId = req.user?.id || req.user?.name || 'unknown';
+      if (!groups[userId]) {
+        groups[userId] = {
+          user: req.user,
+          vehicle: req.vehicle,
+          requests: [],
+          latestDate: new Date(req.createdAt)
+        };
+      }
+      groups[userId].requests.push(req);
+      const reqDate = new Date(req.createdAt);
+      if (reqDate > groups[userId].latestDate) {
+        groups[userId].latestDate = reqDate;
+      }
+    });
+    
+    // Sort requests within each group by date (newest first)
+    Object.values(groups).forEach(group => {
+      group.requests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    });
+    
+    return Object.values(groups).sort((a, b) => b.latestDate - a.latestDate);
+  }, [refillRequests]);
 
   useEffect(() => {
     if (selectedVehicleId && activeTab === 'return' && subTab === 'return') {
@@ -685,75 +758,63 @@ export default function AdminInventory() {
         </div>
 
         <div className="pt-4 space-y-4">
-          <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <ArrowUpCircle size={18} className="text-emerald-500" />
-            Stock Loading (Morning)
-          </h4>
+          <div className="flex items-center justify-between gap-4">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
+              <ArrowUpCircle size={18} className="text-emerald-500" />
+              Stock Loading
+            </h4>
+            <div className="flex-1 max-w-xs relative">
+              <input
+                type="text"
+                placeholder="Search to load..."
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            </div>
+          </div>
 
           <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-100">
             <div className="flex flex-col">
               <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Loading Value</span>
-              <span className="text-xl font-black text-emerald-900">₹{
-                items.reduce((acc, item) => {
-                  const qty = parseFloat(stockQuantities[item.id]) || 0;
-                  return acc + (qty * (parseFloat(item.price) || 0));
-                }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-              }</span>
+              <span className="text-xl font-black text-emerald-900">₹{totalLoadingValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
             </div>
             <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/10">
               <Truck className="text-emerald-600" size={24} />
             </div>
           </div>
 
-          <div className="space-y-6">
-            {items.filter(i => !i.isFree).length > 0 && (
+          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
+            {groupedLoadingItems.regular.length > 0 && (
               <div className="space-y-3">
                 <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
-                {items.filter(i => !i.isFree).map((item) => {
-                  const qty = parseFloat(stockQuantities[item.id]) || 0;
-                  const itemAmount = qty * (parseFloat(item.price) || 0);
-                  return (
-                    <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-emerald-200 transition-colors">
-                      <div className="flex flex-col flex-1">
-                        <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                        {qty > 0 && (
-                          <span className="text-[10px] font-bold text-emerald-600 animate-in fade-in slide-in-from-left-1 duration-200">Amount: ₹{itemAmount.toFixed(2)}</span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <div className="flex flex-col items-end mr-2">
-                          <span className="text-[8px] font-black text-gray-400 uppercase">Rate</span>
-                          <span className="text-[10px] font-bold text-gray-500">₹{item.price}</span>
-                        </div>
-                        <input
-                          type="number"
-                          placeholder="0"
-                          className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 outline-none transition-all"
-                          value={stockQuantities[item.id] || ''}
-                          onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {items.filter(i => i.isFree).length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                {items.filter(i => i.isFree).map((item) => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                    <span className="text-sm font-bold text-emerald-900">{item.name}</span>
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1 text-sm text-center font-bold text-emerald-700"
-                      value={stockQuantities[item.id] || ''}
-                      onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                    />
-                  </div>
+                {groupedLoadingItems.regular.map((item) => (
+                  <StockItemRow 
+                    key={`load-${item.id}`} 
+                    item={item} 
+                    quantity={stockQuantities[item.id]} 
+                    onChange={handleQuantityChange} 
+                  />
                 ))}
               </div>
+            )}
+            {groupedLoadingItems.free.length > 0 && (
+              <div className="space-y-3">
+                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                {groupedLoadingItems.free.map((item) => (
+                  <StockItemRow 
+                    key={`load-free-${item.id}`} 
+                    item={item} 
+                    quantity={stockQuantities[item.id]} 
+                    onChange={handleQuantityChange} 
+                    isFree 
+                  />
+                ))}
+              </div>
+            )}
+            {loadingFilteredItems.length === 0 && (
+              <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
             )}
           </div>
           <button
@@ -795,91 +856,75 @@ export default function AdminInventory() {
         </div>
 
         <div className="pt-4 space-y-4">
-          <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2">
-            <ArrowDownCircle size={18} className="text-orange-500" />
-            Stock Return (Evening)
-          </h4>
+          <div className="flex items-center justify-between gap-4">
+            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
+              <ArrowDownCircle size={18} className="text-orange-500" />
+              Stock Return
+            </h4>
+            <div className="flex-1 max-w-xs relative">
+              <input
+                type="text"
+                placeholder="Search inventory..."
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500/20 outline-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+            </div>
+          </div>
+
           <div className="space-y-6">
             {selectedVehicleId ? (
               <>
                 <div className="flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
                   <div className="flex flex-col">
                     <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">In-Vehicle Inventory Value</span>
-                    <span className="text-xl font-black text-blue-900">₹{
-                      items.reduce((acc, item) => {
-                        const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
-                        return acc + (currentStock * (parseFloat(item.price) || 0));
-                      }, 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })
-                    }</span>
+                    <span className="text-xl font-black text-blue-900">₹{totalReturnInventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                   <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/10">
                     <Package className="text-blue-600" size={24} />
                   </div>
                 </div>
 
-                {items.filter(i => !i.isFree).length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
-                    {items.filter(i => !i.isFree).map((item) => {
-                      const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
-                      const returnQty = parseFloat(stockQuantities[item.id]) || 0;
-                      const currentStockAmount = currentStock * (parseFloat(item.price) || 0);
-
-                      return (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100 group hover:border-orange-200 transition-colors">
-                          <div className="flex flex-col flex-1">
-                            <span className="text-sm font-medium text-gray-700">{item.name}</span>
-                            <div className="flex gap-4">
-                              <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600">Stock: {currentStock}</span>
-                              <span className="text-[10px] text-blue-400 font-bold uppercase">₹{currentStockAmount.toFixed(2)}</span>
-                            </div>
-                          </div>
-                          <div className="flex items-center gap-3">
-                            {returnQty > 0 && (
-                              <div className="flex flex-col items-end mr-1 animate-in fade-in slide-in-from-right-1 duration-200">
-                                <span className="text-[8px] font-black text-orange-400 uppercase">Return Value</span>
-                                <span className="text-[10px] font-bold text-orange-600">₹{(returnQty * (parseFloat(item.price) || 0)).toFixed(2)}</span>
-                              </div>
-                            )}
-                            <input
-                              type="number"
-                              placeholder="0"
-                              className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 focus:ring-orange-500/20 focus:border-orange-300 outline-none transition-all"
-                              value={stockQuantities[item.id] || ''}
-                              onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                            />
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-                {items.filter(i => i.isFree).length > 0 && (
-                  <div className="space-y-3">
-                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                    {items.filter(i => i.isFree).map((item) => {
-                      const currentStock = vehicleInventory.find(vi => vi.productId === item.id)?.quantity || 0;
-                      return (
-                        <div key={item.id} className="flex items-center justify-between p-3 bg-emerald-50/50 rounded-xl border border-emerald-100">
-                          <div className="flex flex-col">
-                            <span className="text-sm font-bold text-emerald-900">{item.name}</span>
-                            <span className="text-[10px] text-emerald-600 font-bold uppercase">In Vehicle: {currentStock}</span>
-                          </div>
-                          <input
-                            type="number"
-                            placeholder="Qty"
-                            className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1 text-sm text-center font-bold text-emerald-700"
-                            value={stockQuantities[item.id] || ''}
-                            onChange={(e) => setStockQuantities({ ...stockQuantities, [item.id]: e.target.value })}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
+                  {groupedLoadingItems.regular.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
+                      {groupedLoadingItems.regular.map((item) => (
+                        <StockItemRow 
+                          key={`return-${item.id}`} 
+                          item={item} 
+                          quantity={stockQuantities[item.id]} 
+                          onChange={handleQuantityChange} 
+                          currentStock={vehicleInventoryMap[item.id] || 0}
+                          mode="return"
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {groupedLoadingItems.free.length > 0 && (
+                    <div className="space-y-3 mt-4">
+                      <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                      {groupedLoadingItems.free.map((item) => (
+                        <StockItemRow 
+                          key={`return-free-${item.id}`} 
+                          item={item} 
+                          quantity={stockQuantities[item.id]} 
+                          onChange={handleQuantityChange} 
+                          currentStock={vehicleInventoryMap[item.id] || 0}
+                          mode="return"
+                          isFree
+                        />
+                      ))}
+                    </div>
+                  )}
+                  {loadingFilteredItems.length === 0 && (
+                    <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
+                  )}
+                </div>
               </>
             ) : (
-              <p className="text-center text-gray-400 text-sm py-4">Select a vehicle to see current stock</p>
+              <p className="text-center text-gray-400 text-sm py-8 border border-dashed border-gray-100 rounded-3xl">Select a vehicle to see current stock</p>
             )}
           </div>
           <button
@@ -1036,66 +1081,197 @@ export default function AdminInventory() {
     }
   };
 
-  const renderRefills = () => (
-    <div className="space-y-6 animate-in fade-in duration-300">
-      {refillRequests.length === 0 ? (
-        <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200 shadow-sm">
-          <Truck size={48} className="mx-auto text-gray-300 mb-4" />
-          <h3 className="text-lg font-black text-gray-900">No Refill Requests</h3>
-          <p className="text-sm text-gray-500 mt-2">Agents haven't requested any stock refills yet.</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {refillRequests.map(req => (
-            <div key={req.id} className="bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm flex flex-col gap-4">
-              <div className="flex justify-between items-center border-b border-gray-100 pb-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 shrink-0">
-                    <Truck size={20} />
+  const renderRefills = () => {
+    if (viewingAgentRefills) {
+      const group = viewingAgentRefills;
+      const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+      
+      return (
+        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
+          {/* Detailed View Header */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+             <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => setViewingAgentRefills(null)}
+                  className="p-3 rounded-2xl bg-gray-50 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100"
+                >
+                  <ArrowLeft size={20} strokeWidth={3} />
+                </button>
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-emerald-600/20">
+                    {group.user?.name?.[0] || '?'}
                   </div>
-                  <div className="flex flex-col">
-                    <span className="font-black text-gray-900 line-clamp-1">{req.user?.name || 'Unknown Agent'}</span>
-                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{req.vehicle?.vehicleNumber}</span>
-                  </div>
-                </div>
-                <div className="flex flex-col items-end shrink-0">
-                  <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-md ${
-                    req.status === 'PENDING' ? 'bg-amber-50 text-amber-600' :
-                    req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' :
-                    'bg-red-50 text-red-600'
-                  }`}>
-                    {req.status}
-                  </span>
-                  <span className="text-[10px] font-bold text-gray-400 mt-1">{new Date(req.createdAt).toLocaleDateString()}</span>
-                </div>
-              </div>
-              <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                {req.items.map(item => (
-                  <div key={item.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100/50">
+                  <div>
+                    <h3 className="text-xl font-black text-gray-900 tracking-tight">{group.user?.name || 'Unknown Agent'}</h3>
                     <div className="flex items-center gap-2">
-                       <Package size={14} className="text-emerald-500"/>
-                       <span className="text-xs font-bold text-gray-800">{item.product?.name}</span>
+                       <Truck size={14} className="text-emerald-400" />
+                       <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
                     </div>
-                    <span className="text-sm font-black text-gray-900">{item.quantity} <span className="text-[10px] text-gray-400">Qty</span></span>
                   </div>
-                ))}
-              </div>
-              {req.status === 'PENDING' && (
-                <div className="flex gap-2 pt-3 border-t border-gray-100 mt-auto">
-                  <button onClick={() => handleRejectRefill(req.id)} disabled={isSubmitting} className="flex-1 py-2.5 bg-red-50 text-red-600 font-bold text-sm rounded-xl hover:bg-red-100 transition-colors disabled:opacity-50">
-                    Reject
-                  </button>
-                  <button onClick={() => handleApproveRefill(req.id)} disabled={isSubmitting} className="flex-1 py-2.5 bg-emerald-600 text-white font-bold text-sm rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex justify-center items-center gap-2">
-                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Approve'}
-                  </button>
                 </div>
-              )}
-            </div>
-          ))}
+             </div>
+             <div className="flex items-center gap-3 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
+                <div className="flex flex-col">
+                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Sessions</span>
+                   <span className="text-lg font-black text-emerald-950">{group.requests.length}</span>
+                </div>
+                {pendingCount > 0 && (
+                  <div className="ml-4 flex flex-col items-end">
+                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Action Required</span>
+                    <span className="text-lg font-black text-amber-500">{pendingCount} Pending</span>
+                  </div>
+                )}
+             </div>
+          </div>
+
+          {/* Refill Timeline */}
+          <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
+             <div className="flex items-center gap-3 mb-8 px-2">
+                <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+                <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Refill Timeline</h4>
+             </div>
+
+             <div className="space-y-8 relative before:absolute before:left-[31px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-emerald-100 before:via-gray-100 before:to-gray-50">
+               {group.requests.map((req) => (
+                  <div key={req.id} className="relative pl-16 group/session">
+                    {/* Time Indicator Circle */}
+                    <div className={`absolute left-[24px] top-1.5 w-4 h-4 rounded-full border-4 border-white ring-2 ring-offset-2 transition-all group-hover/session:scale-125 ${
+                      req.status === 'PENDING' ? 'ring-amber-400 bg-amber-400' : 
+                      req.status === 'APPROVED' ? 'ring-emerald-400 bg-emerald-400' : 'ring-red-400 bg-red-400'
+                    }`} />
+                    
+                    <div className="flex flex-col gap-4">
+                      {/* Session Metadata */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                        <div className="flex items-center gap-4">
+                          <div className="flex flex-col">
+                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100 w-fit">
+                              {new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            </span>
+                            <span className="text-xl font-black text-emerald-950 font-mono tracking-tighter mt-1">
+                              {new Date(req.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                            </span>
+                          </div>
+                          <div className={`px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest ${
+                            req.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm shadow-amber-500/10' :
+                            req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                            'bg-red-50 text-red-600 border-red-100'
+                          }`}>
+                            {req.status}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Items List */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                        {req.items.map(item => (
+                          <div key={item.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100/50 flex items-center justify-between group-hover/session:border-emerald-200 transition-colors">
+                            <div className="flex items-center gap-3 min-w-0">
+                               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 border border-gray-100 shrink-0">
+                                  <Package size={18} />
+                               </div>
+                               <span className="text-sm font-bold text-gray-700 truncate">{item.product?.name}</span>
+                            </div>
+                            <div className="flex flex-col items-end shrink-0">
+                               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
+                               <span className="text-lg font-black text-emerald-600 tracking-tight">{item.quantity}</span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Action Controls */}
+                      {req.status === 'PENDING' && (
+                        <div className="flex flex-wrap gap-3 pt-2">
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }} 
+                            disabled={isSubmitting} 
+                            className="px-6 py-2.5 rounded-2xl bg-white border border-red-100 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+                          >
+                            <X size={16} strokeWidth={3} />
+                            Reject Session
+                          </button>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id); }} 
+                            disabled={isSubmitting} 
+                            className="px-8 py-2.5 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-2"
+                          >
+                            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
+                            Approve Refill
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+               ))}
+             </div>
+          </div>
         </div>
-      )}
-    </div>
-  );
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-300">
+        {groupedRefills.length === 0 ? (
+          <div className="text-center py-12 bg-white rounded-[2rem] border border-dashed border-gray-100 shadow-sm">
+            <Truck size={48} className="mx-auto text-gray-200 mb-4" />
+            <h3 className="text-lg font-black text-gray-900 tracking-tight">No Refill Requests</h3>
+            <p className="text-sm text-gray-400 mt-2 font-bold uppercase text-[10px] tracking-widest">Reports say it's all quiet for now.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {groupedRefills.map(group => {
+              const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+
+              return (
+                <div 
+                  key={group.user?.id || 'unknown'} 
+                  onClick={() => setViewingAgentRefills(group)}
+                  className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
+                >
+                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                    <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500">
+                      <ArrowLeft className="rotate-180" size={16} strokeWidth={3} />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 bg-emerald-50 group-hover/card:bg-emerald-600 rounded-3xl flex items-center justify-center text-emerald-600 group-hover/card:text-white font-black text-2xl transition-all shadow-inner">
+                      {group.user?.name?.[0] || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-black text-gray-900 tracking-tight text-lg truncate mb-1">{group.user?.name || 'Unknown Agent'}</h3>
+                      <div className="flex items-center gap-2">
+                        <Truck size={12} className="text-gray-300" />
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3 mt-1">
+                    <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
+                       <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
+                       <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
+                    </div>
+                    <div className={`${pendingCount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-3 border`}>
+                       <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
+                       <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                         {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
+                       </span>
+                    </div>
+                  </div>
+
+                  <div className="text-[10px] font-black text-center text-emerald-600 uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-opacity">
+                    Click to View Details →
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -1734,4 +1910,54 @@ export default function AdminInventory() {
 function cn(...inputs) {
   return inputs.filter(Boolean).join(' ');
 }
+
+// Memoized row component for massive lists to prevent full-page re-renders
+const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStock, mode = 'load' }) => {
+  const qty = parseFloat(quantity) || 0;
+  const price = parseFloat(item.price) || 0;
+  const isReturn = mode === 'return';
+  
+  const displayAmount = qty * price;
+  const stockAmount = (parseFloat(currentStock) || 0) * price;
+
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 animate-in fade-in ${isFree ? 'bg-emerald-50/50 border-emerald-100' : 'bg-gray-50 border-gray-100 group hover:border-emerald-200'}`}>
+      <div className="flex flex-col flex-1">
+        <span className={`text-sm font-medium ${isFree ? 'text-emerald-900 font-bold' : 'text-gray-700'}`}>{item.name}</span>
+        {isReturn ? (
+           <div className="flex gap-4">
+             <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600">In Vehicle: {currentStock || 0}</span>
+             <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">₹{stockAmount.toFixed(2)}</span>
+           </div>
+        ) : (
+          qty > 0 && (
+            <span className="text-[10px] font-bold text-emerald-600 animate-in slide-in-from-left-1 duration-200">Loading Value: ₹{displayAmount.toFixed(2)}</span>
+          )
+        )}
+      </div>
+      
+      <div className="flex items-center gap-3">
+        {isReturn && qty > 0 && (
+           <div className="flex flex-col items-end mr-1 animate-in fade-in slide-in-from-right-1 duration-200">
+             <span className="text-[8px] font-black text-orange-400 uppercase tracking-tighter">Return Value</span>
+             <span className="text-[10px] font-bold text-orange-600">₹{displayAmount.toFixed(2)}</span>
+           </div>
+        )}
+        {!isReturn && (
+          <div className="flex flex-col items-end mr-1">
+            <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Rate</span>
+            <span className="text-[10px] font-bold text-gray-500">₹{price}</span>
+          </div>
+        )}
+        <input
+          type="number"
+          placeholder="0"
+          className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300'}`}
+          value={quantity || ''}
+          onChange={(e) => onChange(item.id, e.target.value)}
+        />
+      </div>
+    </div>
+  );
+});
 

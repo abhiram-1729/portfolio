@@ -1,16 +1,28 @@
-import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus, Sparkles, Gift } from 'lucide-react';
+import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus, Sparkles, Gift, Package } from 'lucide-react';
 import { useCartStore, checkIsFree } from '../store/cartStore';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 
 export default function CartDrawer({ isOpen, onClose, products = [] }) {
-  const { items, addItem, updateQuantity, removeItem, clearCart, totalAmount } = useCartStore();
+  const { items, updateQuantity, clearCart, totalAmount } = useCartStore();
+  const navigate = useNavigate();
+
+  const handleUpdate = (item, newQty) => {
+    if (newQty > item.quantity && newQty > (item.stock || 0)) {
+        toast.error(`Only ${item.stock || 0} units available in vehicle`, {
+            icon: '🚛',
+            style: { borderRadius: '15px', fontWeight: 'bold' }
+        });
+        return;
+    }
+    updateQuantity(item.productId, newQty);
+  };
   
   // Calculate subtotal for free item threshold comparison
   const subtotal = items.reduce((sum, i) => {
     return !checkIsFree(i.isFree) ? sum + Number(i.price || 0) * i.quantity : sum;
   }, 0);
 
-  const navigate = useNavigate();
 
   const handleProceed = () => {
     onClose();
@@ -100,14 +112,14 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
 
                 <div className="flex items-center gap-1.5 bg-emerald-50 border border-emerald-100 rounded-[1.25rem] p-1.5 shadow-inner">
                   <button
-                    onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                    onClick={() => handleUpdate(item, item.quantity - 1)}
                     className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 active:scale-90 shadow-sm hover:bg-emerald-100 transition-all border border-emerald-100"
                   >
                     {item.quantity <= 1 ? <Trash2 size={14} strokeWidth={4} /> : <Minus size={14} strokeWidth={4} />}
                   </button>
                   <span className="w-6 text-center text-[0.95rem] font-black text-emerald-900">{item.quantity}</span>
                   <button
-                    onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                    onClick={() => handleUpdate(item, item.quantity + 1)}
                     className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white active:scale-90 shadow-md shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
                   >
                     <Plus size={14} strokeWidth={4} />

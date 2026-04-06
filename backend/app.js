@@ -9,7 +9,9 @@ import reportRoutes from './routes/reportRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import cashRoutes from './routes/cashRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
+
 dotenv.config();
 
 const app = express();
@@ -37,6 +39,8 @@ app.use('/api/reports', reportRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/cash', cashRoutes);
 app.use('/api/routes', routeRoutes);
+app.use('/api/notifications', notificationRoutes);
+
 
 app.get('/', (req, res) => {
   res.send('Vehicle Sales Tracking API is running...');

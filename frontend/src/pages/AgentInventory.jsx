@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Package, Loader2, Search, Plus, Minus, X } from 'lucide-react';
+import { ArrowLeft, Package, Loader2, Search, Plus, Minus, X, Gift } from 'lucide-react';
 import { productsAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -8,12 +8,13 @@ export default function AgentInventory() {
   const [inventory, setInventory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [showRefillModal, setShowRefillModal] = useState(false);
   const [allProducts, setAllProducts] = useState([]);
   const [refillItems, setRefillItems] = useState({}); // { [productId]: quantity }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refillSearchQuery, setRefillSearchQuery] = useState('');
-  
+
   const navigate = useNavigate();
   const { vehicleId } = useParams();
 
@@ -37,7 +38,7 @@ export default function AgentInventory() {
   const fetchAllProductsForRefill = async () => {
     try {
       setLoading(true);
-      const { data } = await productsAPI.getAll();
+      const { data } = await productsAPI.getAll({ showAll: true });
       setAllProducts(data);
       setShowRefillModal(true);
     } catch (error) {
@@ -69,9 +70,11 @@ export default function AgentInventory() {
     }
   };
 
-  const filteredInventory = inventory.filter(item => 
-    item.product?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredInventory = inventory.filter(item => {
+    const matchesSearch = item.product?.name?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesFree = !filterFreeOnly || item.product?.isFree;
+    return matchesSearch && matchesFree;
+  });
 
   return (
     <div className="min-h-screen bg-slate-50 animate-fade-in pb-[calc(var(--safe-bottom)+2rem)]">
@@ -84,23 +87,26 @@ export default function AgentInventory() {
             </button>
             <h1 className="text-xl font-black text-emerald-950 tracking-tight">Vehicle Inventory</h1>
           </div>
-          <button 
-            onClick={fetchAllProductsForRefill} 
+          <button
+            onClick={fetchAllProductsForRefill}
             className="px-3 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
           >
-            <Package size={16}/> Claim Refill
+            <Package size={16} /> Claim Refill
           </button>
         </div>
 
-        <div className="flex items-center gap-3 bg-gray-50 border border-gray-100 p-3 rounded-2xl shadow-sm">
-          <Search size={20} className="text-gray-400" />
+        <div className="flex items-center gap-3 bg-white border border-emerald-100 p-2 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+          <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500">
+            <Search size={18} strokeWidth={2.5} />
+          </div>
           <input
             type="text"
             placeholder="Search items..."
-            className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium"
+            className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold text-emerald-950 placeholder-emerald-950/30"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
+
         </div>
       </div>
 
@@ -185,55 +191,68 @@ export default function AgentInventory() {
                   <h2 className="text-xl font-black text-emerald-950">Claim Refill</h2>
                   <p className="text-xs font-bold text-gray-500">Request stock from the warehouse.</p>
                 </div>
-                <button 
-                  onClick={() => { setShowRefillModal(false); setRefillItems({}); setRefillSearchQuery(''); }} 
+                <button
+                  onClick={() => { setShowRefillModal(false); setRefillItems({}); setRefillSearchQuery(''); }}
                   className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-colors"
                 >
                   <X size={20} />
                 </button>
               </div>
-              <div className="flex items-center gap-2 bg-gray-50 border border-gray-100 p-3 rounded-xl shadow-sm">
-                <Search size={18} className="text-gray-400" />
+              <div className="flex items-center gap-2 bg-white border border-emerald-100 p-2 rounded-xl shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+                <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500">
+                  <Search size={18} strokeWidth={2.5} />
+                </div>
                 <input
                   type="text"
                   placeholder="Search products..."
-                  className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium"
+                  className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold text-emerald-950 placeholder-emerald-950/30"
                   value={refillSearchQuery}
                   onChange={(e) => setRefillSearchQuery(e.target.value)}
                 />
+                <button
+                  onClick={() => setFilterFreeOnly(!filterFreeOnly)}
+                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all border shrink-0 flex items-center gap-1.5 ${filterFreeOnly ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}
+                >
+                  <Gift size={12} strokeWidth={3} />
+                  Gifts
+                </button>
               </div>
             </div>
-            
+
             <div className="overflow-y-auto p-5 space-y-3 custom-scrollbar flex-1">
-              {allProducts.filter(p => p.name?.toLowerCase().includes(refillSearchQuery.toLowerCase())).map(p => {
+              {allProducts.filter(p => {
+                const matchesSearch = p.name?.toLowerCase().includes(refillSearchQuery.toLowerCase());
+                const matchesFree = !filterFreeOnly || p.isFree;
+                return matchesSearch && matchesFree;
+              }).map(p => {
                 const currentStock = inventory.find(i => i.productId === p.id)?.quantity || 0;
                 const reqQty = refillItems[p.id] || 0;
                 return (
                   <div key={`refill-${p.id}`} className="p-3 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100">
                     <div className="flex items-center gap-3">
                       <div className="w-12 h-12 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center overflow-hidden shrink-0">
-                        {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover"/> : <Package size={20} className="text-gray-300"/>}
+                        {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package size={20} className="text-gray-300" />}
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-gray-800 line-clamp-1">{p.name}</span>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100">
-                            Current: {currentStock} 
+                            Current: {currentStock}
                           </span>
                         </div>
                       </div>
                     </div>
                     {/* Add/remove controls */}
                     <div className="flex items-center gap-3 shrink-0">
-                      <button 
-                        onClick={() => setRefillItems(prev => ({...prev, [p.id]: Math.max(0, reqQty - 1)}))}
+                      <button
+                        onClick={() => setRefillItems(prev => ({ ...prev, [p.id]: Math.max(0, reqQty - 1) }))}
                         className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 shadow-sm"
                       >
                         <Minus size={16} />
                       </button>
                       <span className="w-6 text-center font-black text-emerald-950 text-lg">{reqQty}</span>
-                      <button 
-                        onClick={() => setRefillItems(prev => ({...prev, [p.id]: reqQty + 1}))}
+                      <button
+                        onClick={() => setRefillItems(prev => ({ ...prev, [p.id]: reqQty + 1 }))}
                         className="w-8 h-8 rounded-lg bg-emerald-600 text-white flex items-center justify-center hover:bg-emerald-700 shadow-sm active:scale-95"
                       >
                         <Plus size={16} />
@@ -244,12 +263,12 @@ export default function AgentInventory() {
               })}
             </div>
             <div className="p-5 border-t border-gray-100 bg-white rounded-b-[2rem]">
-              <button 
-                 onClick={handleRefillSubmit}
-                 disabled={isSubmitting}
-                 className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.98] flex justify-center items-center gap-2 transition-all disabled:opacity-50"
+              <button
+                onClick={handleRefillSubmit}
+                disabled={isSubmitting}
+                className="w-full bg-emerald-600 text-white font-black py-4 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.98] flex justify-center items-center gap-2 transition-all disabled:opacity-50"
               >
-                {isSubmitting ? <><Loader2 className="animate-spin" size={20}/> Submitting...</> : 'Submit Request'}
+                {isSubmitting ? <><Loader2 className="animate-spin" size={20} /> Submitting...</> : 'Submit Request'}
               </button>
             </div>
           </div>

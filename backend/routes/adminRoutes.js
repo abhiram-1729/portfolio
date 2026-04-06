@@ -45,6 +45,7 @@ router.route('/vehicles')
     vehicleCtr.createVehicle
   );
 router.route('/vehicles/:id')
+  .get(vehicleCtr.getVehicleById)
   .put(
     uploadMiddleware.fields([
       { name: 'rcDocument', maxCount: 1 },

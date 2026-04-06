@@ -14,6 +14,23 @@ export const getVehicles = async (req, res) => {
   }
 };
 
+export const getVehicleById = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id },
+      include: {
+        assignedUsers: { select: { id: true, name: true, role: true } },
+      }
+    });
+
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+    res.json(vehicle);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vehicle details', error: error.message });
+  }
+};
+
 export const createVehicle = async (req, res) => {
   try {
     const { vehicleNumber, vehicleName, status, assignedUserId } = req.body;
@@ -179,7 +196,20 @@ export const deleteVehicle = async (req, res) => {
     await prisma.openingCash.deleteMany({ where: { vehicleId: id } }).catch(() => {});
     await prisma.dailyCashSummary.deleteMany({ where: { vehicleId: id } }).catch(() => {});
 
-    // 6. Finally delete the vehicle
+    // 6. Delete Route Assignments and Coverage records
+    await prisma.routeAssignment.deleteMany({ where: { vehicleId: id } }).catch(() => {});
+    await prisma.dailyCoverage.deleteMany({ where: { vehicleId: id } }).catch(() => {});
+
+    // 7. Delete Refill Requests (RefillItems will cascade delete)
+    await prisma.refillRequest.deleteMany({ where: { vehicleId: id } }).catch(() => {});
+
+    // 8. Nullify vehicleId on notifications
+    await prisma.notification.updateMany({
+      where: { vehicleId: id },
+      data: { vehicleId: null }
+    }).catch(() => {});
+
+    // 9. Finally delete the vehicle
     await prisma.vehicle.delete({ where: { id } });
 
     res.json({ message: 'Vehicle deleted successfully' });

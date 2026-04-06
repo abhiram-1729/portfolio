@@ -54,14 +54,13 @@ export const useCartStore = create(
         let newItems;
 
         if (existing) {
-          // IMPORTANT: Even for existing items, we refresh their info 
-          // (Legacy data might have missing isFree or minShopAmount)
           newItems = items.map((i) =>
             i.productId === product.id
               ? { 
                   ...i, 
                   quantity: i.quantity + quantity, 
                   isFree: isFree,
+                  stock: product.stock, // Sync current stock
                   minShopAmount: Number(product.minShopAmount || 0)
                 }
               : i
@@ -78,6 +77,7 @@ export const useCartStore = create(
               landingPrice: Number(product.landingPrice || 0),
               image: product.image,
               isFree: isFree,
+              stock: product.stock, // Persist stock limit
               minShopAmount: Number(product.minShopAmount || 0),
               quantity,
             },

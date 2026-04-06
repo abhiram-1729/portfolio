@@ -1,5 +1,7 @@
 import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
+import { sendNotification } from '../../services/notificationService.js';
+
 
 // Item Master
 export const getItems = async (req, res) => {
@@ -237,6 +239,16 @@ export const loadStock = async (req, res) => {
     }
 
     res.json({ message: 'Stock loaded successfully' });
+
+    sendNotification({
+      vehicleIds: [vehicleId],
+      roles: ['ADMIN'],
+      title: 'Stock Loaded',
+      message: `New stock has been loaded to vehicle.`,
+      type: 'inventory',
+      priority: 'low',
+      metadata: { vehicleId }
+    });
   } catch (error) {
     console.error(error);
     res.status(500).json({ message: 'Error loading stock', error: error.message });
@@ -273,6 +285,16 @@ export const returnStock = async (req, res) => {
     }
 
     res.json({ message: 'Stock returned successfully' });
+
+    sendNotification({
+      vehicleIds: [vehicleId],
+      roles: ['ADMIN'],
+      title: 'Stock Returned',
+      message: `Evening stock return processed for vehicle.`,
+      type: 'inventory',
+      priority: 'low',
+      metadata: { vehicleId }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error returning stock', error: error.message });
   }
@@ -402,7 +424,7 @@ export const getRefillRequests = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         vehicle: { select: { vehicleNumber: true, vehicleName: true } },
-        user: { select: { name: true } },
+        user: { select: { id: true, name: true } },
         items: {
           include: {
             product: { select: { name: true, price: true, mrp: true } }
@@ -455,6 +477,16 @@ export const approveRefillRequest = async (req, res) => {
     });
 
     res.json({ message: 'Refill request approved and stock loaded successfully' });
+
+    sendNotification({
+      userIds: [request.userId],
+      roles: ['ADMIN'],
+      title: 'Refill Request Approved',
+      message: `Your refill request has been approved.`,
+      type: 'inventory',
+      priority: 'medium',
+      metadata: { requestId: request.id, vehicleId: request.vehicleId }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error approving refill request', error: error.message });
   }
@@ -474,6 +506,15 @@ export const rejectRefillRequest = async (req, res) => {
     });
 
     res.json({ message: 'Refill request rejected' });
+
+    sendNotification({
+      userIds: [request.userId],
+      title: 'Refill Request Rejected',
+      message: `Your refill request for vehicle has been rejected. Contact Admin for details.`,
+      type: 'inventory',
+      priority: 'high',
+      metadata: { requestId: request.id, vehicleId: request.vehicleId }
+    });
   } catch (error) {
     res.status(500).json({ message: 'Error rejecting refill request', error: error.message });
   }

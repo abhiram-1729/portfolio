@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useUserStore } from './store/userStore';
+import { useNotificationStore } from './store/notificationStore';
 import Login from './pages/Login';
 import SalesEntry from './pages/SalesEntry';
 import InvoicePreview from './pages/InvoicePreview';
@@ -13,6 +15,7 @@ import ClosingCashEntry from './pages/ClosingCashEntry';
 import AgentInventory from './pages/AgentInventory';
 import TodayPlan from './pages/TodayPlan';
 import AdminLayout from './components/admin/AdminLayout';
+import AgentLayout from './components/AgentLayout';
 import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminVehicles from './pages/admin/AdminVehicles';
@@ -22,6 +25,8 @@ import AdminReports from './pages/admin/AdminReports';
 import AdminCashManagement from './pages/admin/AdminCashManagement';
 import AdminSettings from './pages/admin/AdminSettings';
 import AdminRoutes from './pages/admin/AdminRoutes';
+import AdminNotifications from './pages/admin/AdminNotifications';
+import Notifications from './pages/Notifications';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -36,6 +41,18 @@ function AdminRoute({ children }) {
 }
 
 export default function App() {
+  const { token } = useUserStore();
+  const { initSocket, disconnectSocket, fetchNotifications } = useNotificationStore();
+
+  useEffect(() => {
+    if (token) {
+      initSocket(token);
+      fetchNotifications();
+    } else {
+      disconnectSocket();
+    }
+  }, [token, initSocket, disconnectSocket, fetchNotifications]);
+
   return (
     <BrowserRouter>
       <Toaster
@@ -51,16 +68,22 @@ export default function App() {
       />
       <Routes>
         <Route path="/login" element={<Login />} />
-        <Route path="/" element={<PrivateRoute><SalesEntry /></PrivateRoute>} />
+        
+        {/* Agent Routes wrapped in Layout */}
+        <Route path="/" element={<PrivateRoute><AgentLayout /></PrivateRoute>}>
+          <Route index element={<SalesEntry />} />
+          <Route path="reports" element={<Reports />} />
+          <Route path="profile" element={<Profile />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="opening-cash" element={<OpeningCashEntry />} />
+          <Route path="closing-cash" element={<ClosingCashEntry />} />
+          <Route path="agent-inventory/:vehicleId" element={<AgentInventory />} />
+          <Route path="today-plan" element={<TodayPlan />} />
+        </Route>
+
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
         <Route path="/payment" element={<PrivateRoute><PaymentScreen /></PrivateRoute>} />
         <Route path="/success/:id" element={<PrivateRoute><SuccessScreen /></PrivateRoute>} />
-        <Route path="/reports" element={<PrivateRoute><Reports /></PrivateRoute>} />
-        <Route path="/profile" element={<PrivateRoute><Profile /></PrivateRoute>} />
-        <Route path="/opening-cash" element={<PrivateRoute><OpeningCashEntry /></PrivateRoute>} />
-        <Route path="/closing-cash" element={<PrivateRoute><ClosingCashEntry /></PrivateRoute>} />
-        <Route path="/agent-inventory/:vehicleId" element={<PrivateRoute><AgentInventory /></PrivateRoute>} />
-        <Route path="/today-plan" element={<PrivateRoute><TodayPlan /></PrivateRoute>} />
         
         {/* Admin Routes */}
         <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
@@ -72,6 +95,7 @@ export default function App() {
           <Route path="reports" element={<AdminReports />} />
           <Route path="cash" element={<AdminCashManagement />} />
           <Route path="settings" element={<AdminSettings />} />
+          <Route path="notifications" element={<AdminNotifications />} />
           <Route path="routes" element={<AdminRoutes />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

@@ -142,9 +142,9 @@ export default function AdminRoutes() {
   // --- Assignment Handlers ---
   const handleSaveAssignment = async (e) => {
     e.preventDefault();
-    // Reverted checking for vehicleId because we infer it or it might be missing if agent is missing vehicle
-    if (!assignmentForm.userId || !assignmentForm.routeId || !assignmentForm.morningSession || !assignmentForm.afternoonSession) {
-      return toast.error('Required fields: Agent, Route, Sessions');
+    const hasSessions = assignmentForm.schedule && Object.values(assignmentForm.schedule).some(d => d.morning || d.evening);
+    if (!assignmentForm.userId || !assignmentForm.routeId || !hasSessions) {
+      return toast.error('Required fields: Agent, Route, Sessions (Select at least one day)');
     }
 
     setIsSubmitting(true);
@@ -305,7 +305,8 @@ export default function AdminRoutes() {
                           userId: a.userId,
                           routeId: a.routeId,
                           morningSession: a.morningSession || '',
-                          afternoonSession: a.afternoonSession || ''
+                          afternoonSession: a.afternoonSession || '',
+                          schedule: a.schedule || null
                         });
                         setShowAssignModal(true);
                      }} className="text-gray-400 hover:text-indigo-600"><Pencil size={16}/></button>
@@ -317,8 +318,23 @@ export default function AdminRoutes() {
                    <div className="flex flex-col"><span className="text-xs text-gray-400 uppercase font-bold">Agent</span><span className="font-medium text-gray-800">{a.user?.name}</span></div>
                  </div>
                  <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100/50 flex flex-col gap-1.5 text-sm">
-                   <div className="flex items-center justify-between"><span className="font-bold text-indigo-800">Morning Session</span><span className="text-indigo-600 font-medium">{a.morningSession || 'N/A'}</span></div>
-                   <div className="flex items-center justify-between"><span className="font-bold text-indigo-800">Afternoon Session</span><span className="text-indigo-600 font-medium">{a.afternoonSession || 'N/A'}</span></div>
+                   {(() => {
+                     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                     const today = days[new Date().getDay()];
+                     const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
+                     return (
+                       <>
+                         <div className="flex items-center justify-between">
+                           <span className="font-bold text-indigo-800">Today Morning ({today})</span>
+                           <span className="text-indigo-600 font-medium">{todaySchedule.morning || 'OFF'}</span>
+                         </div>
+                         <div className="flex items-center justify-between">
+                           <span className="font-bold text-indigo-800">Today Evening ({today})</span>
+                           <span className="text-indigo-600 font-medium">{todaySchedule.evening || 'OFF'}</span>
+                         </div>
+                       </>
+                     );
+                   })()}
                  </div>
               </div>
             ))}
@@ -351,15 +367,24 @@ export default function AdminRoutes() {
               <div>
                 <label className="text-xs font-bold text-gray-400 uppercase mb-2 block">Select Villages</label>
                 <div className="grid grid-cols-2 gap-2">
-                  {villages.map(v => (
-                    <label key={v.id} className={`p-3 rounded-xl border cursor-pointer flex items-center gap-2 transition-all ${routeForm.selectedVillages.includes(v.name) ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50'}`}>
-                      <input type="checkbox" className="hidden" checked={routeForm.selectedVillages.includes(v.name)} onChange={() => handleToggleRouteVillage(v.name)} />
-                      <div className={`w-4 h-4 rounded border flex items-center justify-center ${routeForm.selectedVillages.includes(v.name) ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300'}`}>
-                        {routeForm.selectedVillages.includes(v.name) && <CheckCircle2 size={12} className="text-white"/>}
-                      </div>
-                      <span className="text-sm font-bold truncate">{v.name}</span>
-                    </label>
-                  ))}
+                  {(() => {
+                    const assignedVillages = routes.reduce((acc, r) => {
+                      if (r.id !== routeForm.id) {
+                        return [...acc, ...(r.villages || [])];
+                      }
+                      return acc;
+                    }, []);
+
+                    return villages.filter(v => !assignedVillages.includes(v.name)).map(v => (
+                      <label key={v.id} className={`p-3 rounded-xl border cursor-pointer flex items-center gap-2 transition-all ${routeForm.selectedVillages.includes(v.name) ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-white border-gray-100 text-gray-600 hover:bg-gray-50'}`}>
+                        <input type="checkbox" className="hidden" checked={routeForm.selectedVillages.includes(v.name)} onChange={() => handleToggleRouteVillage(v.name)} />
+                        <div className={`w-4 h-4 rounded border flex items-center justify-center ${routeForm.selectedVillages.includes(v.name) ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-300'}`}>
+                          {routeForm.selectedVillages.includes(v.name) && <CheckCircle2 size={12} className="text-white"/>}
+                        </div>
+                        <span className="text-sm font-bold truncate">{v.name}</span>
+                      </label>
+                    ));
+                  })()}
                 </div>
               </div>
               <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white p-3 pt-4 pb-4 mt-4 rounded-xl font-bold">Save Route</button>
@@ -375,25 +400,31 @@ export default function AdminRoutes() {
           <div className="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-indigo-500"/> Assign Route</h3>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
-              <select className="w-full border p-3 rounded-xl outline-none" value={assignmentForm.routeId} onChange={e => {
-                const r = routes.find(x => x.id === e.target.value);
-                setAssignmentForm({...assignmentForm, routeId: e.target.value, morningSession: '', afternoonSession: ''});
-              }}>
-                <option value="">Select Route</option>
-                {routes.map(r => <option key={r.id} value={r.id}>{r.routeName}</option>)}
-              </select>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Route <span className="text-rose-500">*</span></label>
+                <select className="w-full bg-gray-50 border p-3 rounded-xl outline-none font-medium" value={assignmentForm.routeId} onChange={e => {
+                  const r = routes.find(x => x.id === e.target.value);
+                  setAssignmentForm({...assignmentForm, routeId: e.target.value, morningSession: '', afternoonSession: ''});
+                }}>
+                  <option value="">Select Route</option>
+                  {routes.map(r => <option key={r.id} value={r.id}>{r.routeName}</option>)}
+                </select>
+              </div>
 
-              <select className="w-full border p-3 rounded-xl outline-none" value={assignmentForm.userId} onChange={e => {
-                const u = users.find(x => x.id === e.target.value);
-                setAssignmentForm({
-                  ...assignmentForm, 
-                  userId: e.target.value, 
-                  vehicleId: u?.assignedVehicleId || ''
-                });
-              }}>
-                <option value="">Select Agent</option>
-                {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
+              <div className="space-y-1">
+                <label className="text-xs font-bold text-gray-400 uppercase ml-1">Agent <span className="text-rose-500">*</span></label>
+                <select className="w-full bg-gray-50 border p-3 rounded-xl outline-none font-medium" value={assignmentForm.userId} onChange={e => {
+                  const u = users.find(x => x.id === e.target.value);
+                  setAssignmentForm({
+                    ...assignmentForm, 
+                    userId: e.target.value, 
+                    vehicleId: u?.assignedVehicleId || ''
+                  });
+                }}>
+                  <option value="">Select Agent</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                </select>
+              </div>
 
               {assignmentForm.userId && !users.find(u => u.id === assignmentForm.userId)?.assignedVehicleId && (
                 <p className="text-rose-500 text-xs font-bold px-2">This agent is not assigned to any vehicle.</p>
@@ -402,17 +433,57 @@ export default function AdminRoutes() {
               {assignmentForm.routeId && (() => {
                 const selectedRoute = routes.find(r => r.id === assignmentForm.routeId);
                 const routeVillages = selectedRoute?.villages || [];
+                const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+                if (!assignmentForm.schedule) {
+                   assignmentForm.schedule = daysOfWeek.reduce((acc, d) => ({
+                      ...acc, 
+                      [d]: { morning: '', evening: '' }
+                   }), {});
+                }
+
                 return (
-                  <div className="space-y-3 bg-indigo-50 p-4 rounded-2xl border border-indigo-100">
-                    <label className="text-xs font-bold text-indigo-400 uppercase block">Daily Sessions Coverage</label>
-                    <select className="w-full border-none p-3 rounded-xl outline-none shadow-sm" value={assignmentForm.morningSession} onChange={e => setAssignmentForm({...assignmentForm, morningSession: e.target.value})}>
-                      <option value="">Select Morning Village</option>
-                      {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
-                    <select className="w-full border-none p-3 rounded-xl outline-none shadow-sm" value={assignmentForm.afternoonSession} onChange={e => setAssignmentForm({...assignmentForm, afternoonSession: e.target.value})}>
-                      <option value="">Select Afternoon Village</option>
-                      {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
-                    </select>
+                  <div className="space-y-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Weekly Field Schedule <span className="text-rose-500">*</span></label>
+                       <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
+                    </div>
+
+                    <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
+                       {daysOfWeek.map(day => (
+                         <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-indigo-100 transition-all">
+                            <div className="flex items-center justify-between">
+                               <span className="text-xs font-black text-gray-900 uppercase tracking-tight">{day}</span>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                               <select 
+                                 className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500" 
+                                 value={assignmentForm.schedule[day]?.morning || ''} 
+                                 onChange={e => setAssignmentForm({
+                                   ...assignmentForm, 
+                                   schedule: { ...assignmentForm.schedule, [day]: { ...assignmentForm.schedule[day], morning: e.target.value } }
+                                 })}
+                               >
+                                 <option value="">Mrng (Off)</option>
+                                 {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
+                               </select>
+
+                               <select 
+                                 className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500" 
+                                 value={assignmentForm.schedule[day]?.evening || ''} 
+                                 onChange={e => setAssignmentForm({
+                                   ...assignmentForm, 
+                                   schedule: { ...assignmentForm.schedule, [day]: { ...assignmentForm.schedule[day], evening: e.target.value } }
+                                 })}
+                               >
+                                 <option value="">Evng (Off)</option>
+                                 {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
+                               </select>
+                            </div>
+                         </div>
+                       ))}
+                    </div>
                   </div>
                 );
               })()}

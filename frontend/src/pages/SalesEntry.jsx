@@ -1,9 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Smartphone, Truck, MapPin } from 'lucide-react';
+import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2 } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { productsAPI } from '../services/api';
 import { useCartStore } from '../store/cartStore';
-import Header from '../components/Header';
 import ProductGrid from '../components/ProductGrid';
 import CartDrawer from '../components/CartDrawer';
 import { getCashStatus } from '../services/cashService';
@@ -18,6 +17,7 @@ export default function SalesEntry() {
   const [products, setProducts] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
+  const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
   const [plan, setPlan] = useState(null);
@@ -31,8 +31,8 @@ export default function SalesEntry() {
     if (user) {
       checkCashStatus();
       loadPlan();
+      loadProducts();
     }
-    loadProducts();
   }, [user]);
 
   const loadPlan = async () => {
@@ -64,41 +64,52 @@ export default function SalesEntry() {
   const loadProducts = async () => {
     try {
       const params = {};
-      if (user?.assignedVehicleId) {
-        params.vehicleId = user.assignedVehicleId;
+      if (user?.role === 'SALES_AGENT') {
+        const vehicleId = user.assignedVehicleId || user.assignedVehicle?.id;
+        if (!vehicleId) {
+          console.warn('[SalesEntry] No vehicle ID found for agent');
+          setLoading(false);
+          return;
+        }
+        params.vehicleId = vehicleId;
       }
 
       const { data } = await productsAPI.getAll(params);
       setProducts(data);
       setFiltered(data);
+      if (data.length === 0) {
+        toast.error('Vehicle inventory is empty. Please load stock.');
+      }
     } catch (err) {
-      toast.error('Failed to load products');
+      toast.error('Failed to load vehicle stock');
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!search.trim()) {
-      setFiltered(products);
-      return;
+    let result = products;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      result = result.filter((p) => p.name.toLowerCase().includes(q));
     }
-    const q = search.toLowerCase();
-    setFiltered(products.filter((p) => p.name.toLowerCase().includes(q)));
-  }, [search, products]);
+    if (filterFreeOnly) {
+      result = result.filter((p) => p.isFree);
+    }
+    setFiltered(result);
+  }, [search, products, filterFreeOnly]);
 
   return (
-    <div className="min-h-screen pb-28">
-      <Header />
+    <div className="min-h-screen pb-28 pt-2">
 
       {/* Sticky Combined Input Section */}
-      <div className="sticky top-[56px] z-20 bg-slate-50/90 backdrop-blur-xl border-b border-emerald-100/30 pb-4 pt-4 shadow-sm">
-        <div className="max-w-lg mx-auto px-5 space-y-4">
+      <div className="sticky top-[56px] z-20 bg-slate-50/90 backdrop-blur-xl border-b border-emerald-100/30 pb-2 pt-2 shadow-sm">
+        <div className="max-w-lg mx-auto px-5 space-y-2">
           <div className="grid grid-cols-2 gap-3">
             {/* Customer Name */}
             <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
-              <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
-                <Smartphone size={16} strokeWidth={2.5} />
+              <div className="bg-emerald-50 p-1 rounded-xl text-emerald-500 ml-1">
+                <Smartphone size={14} strokeWidth={2.5} />
               </div>
               <input
                 id="customer-name"
@@ -106,14 +117,14 @@ export default function SalesEntry() {
                 placeholder="Name (Optional)"
                 value={customerName}
                 onChange={(e) => setCustomerName(e.target.value)}
-                className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
+                className="flex-1 bg-transparent py-2 outline-none text-emerald-950 text-[0.8rem] placeholder-slate-950/40 font-bold min-w-0"
               />
             </div>
 
             {/* Customer Mobile */}
             <div className="glass rounded-[1.25rem] p-1 flex items-center gap-2 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all overflow-hidden">
-              <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
-                <Smartphone size={16} strokeWidth={2.5} />
+              <div className="bg-emerald-50 p-1 rounded-xl text-emerald-500 ml-1">
+                <Smartphone size={14} strokeWidth={2.5} />
               </div>
               <input
                 id="customer-mobile"
@@ -121,27 +132,34 @@ export default function SalesEntry() {
                 placeholder="Mobile (Opt)"
                 value={customerMobile}
                 onChange={(e) => setCustomerMobile(e.target.value)}
-                className="flex-1 bg-transparent py-2.5 outline-none text-emerald-950 text-[0.9rem] placeholder-slate-950/40 font-bold min-w-0"
+                className="flex-1 bg-transparent py-2 outline-none text-emerald-950 text-[0.8rem] placeholder-slate-950/40 font-bold min-w-0"
               />
             </div>
           </div>
 
           {/* Search */}
           <div className="glass rounded-[1.25rem] p-1 flex items-center gap-3 border border-emerald-100 bg-white/70 shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 focus-within:bg-white focus:border-emerald-500 transition-all">
-            <div className="bg-emerald-50 p-2 rounded-xl text-emerald-500 ml-1">
-              <Search size={20} strokeWidth={2.5} />
+            <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500 ml-1">
+              <Search size={18} strokeWidth={2.5} />
             </div>
             <input
               id="product-search"
               ref={searchRef}
               type="text"
-              placeholder="Search all products..."
+              placeholder="Search items..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="flex-1 bg-transparent py-2.5 pr-4 outline-none text-emerald-950 text-[1.05rem] placeholder-slate-950/40 font-bold"
+              className="flex-1 bg-transparent py-2 pr-2 outline-none text-emerald-950 text-[0.95rem] placeholder-slate-950/40 font-bold"
             />
+            <button
+              onClick={() => setFilterFreeOnly(!filterFreeOnly)}
+              className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all border shrink-0 flex items-center gap-1.5 ${filterFreeOnly ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}
+            >
+              <Gift size={14} strokeWidth={3} />
+              Gifts
+            </button>
             {search && (
-              <button onClick={() => setSearch('')} className="p-2 mr-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-xl transition-colors font-black text-[10px] uppercase tracking-tighter">
+              <button onClick={() => setSearch('')} className="p-1.5 mr-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-black text-[9px] uppercase tracking-tighter">
                 Clear
               </button>
             )}
