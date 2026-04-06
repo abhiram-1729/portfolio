@@ -130,7 +130,7 @@ export async function updateDailyPerformance(userId, date = null) {
         salesIncentive: result.salesIncentive,
         regIncentive: result.regIncentive,
         totalIncentive: result.totalIncentive,
-        routeId, // Update route in case it changed
+        routeId
       },
       create: {
         userId,
@@ -144,7 +144,7 @@ export async function updateDailyPerformance(userId, date = null) {
         level: result.level,
         salesIncentive: result.salesIncentive,
         regIncentive: result.regIncentive,
-        totalIncentive: result.totalIncentive,
+        totalIncentive: result.totalIncentive
       }
     });
 
@@ -373,12 +373,4 @@ export async function getLeaderboard(dateStr = null, sortBy = 'totalSales') {
   }));
 }
 
-export default {
-  updateDailyPerformance,
-  lockDay,
-  endOfDayProcess,
-  generateMonthlySummary,
-  getLeaderboard,
-  toISTDateString,
-  toISTMonthString,
-};
+// Removed default export

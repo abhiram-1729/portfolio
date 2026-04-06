@@ -6,10 +6,8 @@ const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.
 let SOCKET_URL = import.meta.env.VITE_API_URL || '';
 
 if (isProd) {
-    if (!SOCKET_URL || SOCKET_URL.startsWith('http://localhost')) {
-        // Fallback: If no explicit URL, assume the relative protocol/host (Vercel)
-        SOCKET_URL = typeof window !== 'undefined' ? window.location.origin : '';
-    }
+    // Vercel proxy doesn't handle WebSockets well. Use the explicit AWS IP:port for sockets.
+    SOCKET_URL = 'http://52.66.255.38:5001';
 } else {
     SOCKET_URL = SOCKET_URL || 'http://localhost:5001';
 }
