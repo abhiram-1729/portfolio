@@ -3,14 +3,12 @@ import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 
 const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
-let SOCKET_URL = import.meta.env.VITE_API_URL || '';
 
-if (isProd) {
-    // Vercel proxy doesn't handle WebSockets well. Use the explicit AWS IP:port for sockets.
-    SOCKET_URL = 'http://52.66.255.38:5001';
-} else {
-    SOCKET_URL = SOCKET_URL || 'http://localhost:5001';
-}
+// For REST calls (fetch), always use the secure relative /api in production
+const API_BASE_URL = isProd ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5001/api');
+
+// For WebSockets, we try the direct IP (Note: this will still be blocked by browsers on HTTPS unless you have SSL on AWS)
+let SOCKET_URL = isProd ? 'http://52.66.255.38:5001' : 'http://localhost:5001';
 
 // Ensure socket doesn't include /api suffix
 SOCKET_URL = SOCKET_URL.replace(/\/api\/?$/, '');
@@ -27,7 +25,7 @@ export const useNotificationStore = create((set, get) => ({
             const token = localStorage.getItem('token');
             if (!token) return;
 
-            const res = await fetch(`${SOCKET_URL}/api/notifications`, {
+            const res = await fetch(`${API_BASE_URL}/notifications`, {
                 headers: { 'Authorization': `Bearer ${token}` }
             });
             if (res.ok) {
@@ -49,7 +47,7 @@ export const useNotificationStore = create((set, get) => ({
     markAsRead: async (id) => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${SOCKET_URL}/api/notifications/${id}/read`, {
+            const res = await fetch(`${API_BASE_URL}/notifications/${id}/read`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
@@ -69,7 +67,7 @@ export const useNotificationStore = create((set, get) => ({
     markAllAsRead: async () => {
         try {
             const token = localStorage.getItem('token');
-            const res = await fetch(`${SOCKET_URL}/api/notifications/read-all`, {
+            const res = await fetch(`${API_BASE_URL}/notifications/read-all`, {
                 method: 'PUT',
                 headers: { 'Authorization': `Bearer ${token}` }
             });
