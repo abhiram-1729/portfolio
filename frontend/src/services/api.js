@@ -1,19 +1,27 @@
 import axios from 'axios';
 
-let API_URL = import.meta.env.VITE_API_URL || '';
+const envURL = import.meta.env.VITE_API_URL;
+const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
 
-// Case 1: If on Vercel/Production HTTPS, default to relative '/api' if URL isn't set or is HTTP
-if (typeof window !== 'undefined' && window.location.protocol === 'https:' && (!API_URL || API_URL.startsWith('http://'))) {
-  API_URL = '/api';
+let API_URL = envURL || '';
+
+// Case 1: Production logic
+if (isProd) {
+    // If we have an explicit URL, use it. Otherwise, assume a relative /api rewrite (common for Vercel/Nginx)
+    if (!API_URL || API_URL.startsWith('http://localhost')) {
+        API_URL = '/api';
+    }
+} else {
+    // Case 2: Development Localhost fallback
+    API_URL = API_URL || 'http://localhost:5001/api';
 }
-
-// Case 2: Localhost fallback
-API_URL = API_URL || 'http://localhost:5001/api';
 
 // Case 3: Ensure /api suffix
-if (API_URL && !API_URL.endsWith('/api') && !API_URL.endsWith('/api/')) {
+if (API_URL !== '/api' && API_URL && !API_URL.endsWith('/api') && !API_URL.endsWith('/api/')) {
     API_URL = API_URL.replace(/\/$/, '') + '/api';
 }
+
+console.log(`[API Config] Mode: ${isProd ? 'Production' : 'Development'}, Target: ${API_URL}`);
 
 const api = axios.create({
   baseURL: API_URL,

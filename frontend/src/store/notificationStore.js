@@ -2,7 +2,20 @@ import { create } from 'zustand';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5001';
+const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.location.hostname !== 'localhost');
+let SOCKET_URL = import.meta.env.VITE_API_URL || '';
+
+if (isProd) {
+    if (!SOCKET_URL || SOCKET_URL.startsWith('http://localhost')) {
+        // Fallback: If no explicit URL, assume the relative protocol/host (Vercel)
+        SOCKET_URL = typeof window !== 'undefined' ? window.location.origin : '';
+    }
+} else {
+    SOCKET_URL = SOCKET_URL || 'http://localhost:5001';
+}
+
+// Ensure socket doesn't include /api suffix
+SOCKET_URL = SOCKET_URL.replace(/\/api\/?$/, '');
 
 export const useNotificationStore = create((set, get) => ({
     notifications: [],
