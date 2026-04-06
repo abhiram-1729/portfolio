@@ -7,8 +7,9 @@ const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && window.
 // For REST calls (fetch), always use the secure relative /api in production
 const API_BASE_URL = isProd ? '/api' : (import.meta.env.VITE_API_URL || 'http://localhost:5001/api');
 
-// For WebSockets, we try the direct IP (Note: this will still be blocked by browsers on HTTPS unless you have SSL on AWS)
-let SOCKET_URL = isProd ? 'http://52.66.255.38:5001' : 'http://localhost:5001';
+// For WebSockets, only enable in development to avoid Mixed Content blocks on Vercel
+const SHOULD_USE_SOCKET = !isProd;
+let SOCKET_URL = isProd ? '' : 'http://localhost:5001';
 
 // Ensure socket doesn't include /api suffix
 SOCKET_URL = SOCKET_URL.replace(/\/api\/?$/, '');
@@ -82,7 +83,7 @@ export const useNotificationStore = create((set, get) => ({
     },
 
     initSocket: (token) => {
-        if (get().socket) return;
+        if (!SHOULD_USE_SOCKET || get().socket) return;
         
         console.log('🔗 Initializing Socket with token:', !!token);
         const socket = io(SOCKET_URL, {

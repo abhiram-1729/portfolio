@@ -7,13 +7,11 @@ let API_URL = envURL || '';
 
 // Case 1: Production logic
 if (isProd) {
-    // If we have an explicit URL, use it. Otherwise, assume a relative /api rewrite (common for Vercel/Nginx)
-    if (!API_URL || API_URL.startsWith('http://localhost')) {
-        API_URL = '/api';
-    }
+    // ALWAYS use/assume a relative /api rewrite on Vercel to avoid Mixed Content errors.
+    API_URL = '/api';
 } else {
-    // Case 2: Development Localhost fallback
-    API_URL = API_URL || 'http://localhost:5001/api';
+    // Case 2: Development Localhost / Environment fallback
+    API_URL = envURL || API_URL || 'http://localhost:5001/api';
 }
 
 // Case 3: Ensure /api suffix
