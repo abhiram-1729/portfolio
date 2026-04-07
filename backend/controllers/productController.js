@@ -32,6 +32,7 @@ export const getProducts = async (req, res, next) => {
                 subCategory: true,
                 brand: true,
                 variants: true,
+                unit: true,
             },
         };
 
@@ -102,6 +103,7 @@ export const getProductById = async (req, res, next) => {
                 subCategory: true,
                 brand: true,
                 variants: true,
+                unit: true,
             },
         });
 

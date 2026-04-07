@@ -9,6 +9,7 @@ export const getItems = async (req, res) => {
     const items = await prisma.product.findMany({
       include: {
         category: { select: { name: true } },
+        unit: { select: { name: true, type: true } },
       }
     });
     res.json(items);
@@ -31,6 +32,8 @@ export const createItem = async (req, res) => {
       categoryId,
       subCategoryId,
       brandId,
+      unitId,
+      unitValue,
       gst,
       isFree,
       minShopAmount
@@ -105,6 +108,8 @@ export const createItem = async (req, res) => {
       categoryId: finalCategoryId,
       subCategoryId: finalSubCategoryId,
       brandId: finalBrandId,
+      unitId: unitId || undefined,
+      unitValue: parseNumber(unitValue),
       gst: parseNumber(gst) || 0,
       isFree: isFree === 'true' || isFree === true,
       minShopAmount: parseNumber(minShopAmount) || 0,
@@ -134,7 +139,12 @@ export const updateItem = async (req, res) => {
       image,
       gst,
       isFree,
-      minShopAmount
+      minShopAmount,
+      unitId,
+      unitValue,
+      categoryId,
+      subCategoryId,
+      brandId
     } = req.body;
 
     // Handle image upload to Supabase if file is present
@@ -169,6 +179,11 @@ export const updateItem = async (req, res) => {
       gst: parseNumber(gst),
       isFree: isFree === undefined ? undefined : (isFree === 'true' || isFree === true),
       minShopAmount: parseNumber(minShopAmount),
+      unitId: unitId || undefined,
+      unitValue: parseNumber(unitValue),
+      categoryId: categoryId || undefined,
+      subCategoryId: subCategoryId || undefined,
+      brandId: brandId || undefined
     };
 
     const item = await prisma.product.update({
@@ -410,13 +425,65 @@ export const getVehicleInventory = async (req, res) => {
     const inventory = await prisma.vehicleStock.findMany({
       where: { vehicleId: id },
       include: {
-        product: { select: { name: true, image: true, price: true, mrp: true, discount: true } }
+        product: { 
+          include: { 
+            unit: true,
+            category: true,
+            brand: true,
+            subCategory: true
+          }
+        }
       }
     });
 
     res.json(inventory);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching vehicle inventory', error: error.message });
+  }
+};
+
+export const auditVehicleStock = async (req, res) => {
+  try {
+    const { id } = req.params; // vehicleId
+    const { items } = req.body; // items = [{ productId, quantity }]
+
+    if (!items || !Array.isArray(items)) {
+      return res.status(400).json({ message: 'Invalid items data' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const q = parseInt(item.quantity);
+        
+        // Log the audit as a special transaction
+        await tx.stockTransaction.create({
+          data: {
+            type: 'AUDIT',
+            vehicleId: id,
+            productId: item.productId,
+            quantity: q,
+            date: new Date()
+          }
+        });
+
+        // Hard update the stock to the new audited value
+        await tx.vehicleStock.upsert({
+          where: {
+            vehicleId_productId: { vehicleId: id, productId: item.productId }
+          },
+          update: { quantity: q },
+          create: { vehicleId: id, productId: item.productId, quantity: q }
+        });
+      }
+    }, {
+      maxWait: 20000, // Wait up to 20s to acquire connection
+      timeout: 60000  // Allow up to 60s for the entire audit to process
+    });
+
+    res.json({ message: 'Inventory audited successfully' });
+  } catch (error) {
+    console.error('❌ Audit Error:', error);
+    res.status(500).json({ message: 'Error auditing stock', error: error.message });
   }
 };
 
@@ -429,7 +496,12 @@ export const getRefillRequests = async (req, res) => {
         user: { select: { id: true, name: true } },
         items: {
           include: {
-            product: { select: { name: true, price: true, mrp: true } }
+            product: { 
+              include: { 
+                unit: true,
+                category: true
+              } 
+            }
           }
         }
       }

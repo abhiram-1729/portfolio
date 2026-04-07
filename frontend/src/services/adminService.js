@@ -34,6 +34,7 @@ export const adminAPI = {
   loadStock: (data) => api.post('/admin/inventory/load', data),
   returnStock: (data) => api.post('/admin/inventory/return', data),
   getVehicleInventory: (id) => api.get(`/admin/inventory/vehicle/${id}`),
+  auditVehicleStock: (id, data) => api.put(`/admin/inventory/vehicle/${id}/audit`, data),
   getRefillRequests: () => api.get('/admin/inventory/refills'),
   approveRefillRequest: (id) => api.put(`/admin/inventory/refills/${id}/approve`),
   rejectRefillRequest: (id) => api.put(`/admin/inventory/refills/${id}/reject`),
@@ -62,6 +63,18 @@ export const adminAPI = {
     throw err;
   }),
   updateSettings: (data) => api.put('/admin/settings', data),
+
+  // Units
+  getUnits: () => api.get('/admin/units'),
+  createUnit: (data) => api.post('/admin/units', data),
+  updateUnit: (id, data) => api.put(`/admin/units/${id}`, data),
+  deleteUnit: (id) => api.delete(`/admin/units/${id}`),
+
+  // Categories
+  getCategories: () => api.get('/admin/categories'),
+  createCategory: (data) => api.post('/admin/categories', data),
+  updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
+  deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
 
   // VGE Targets & Incentives
   vgeAllPerformance: (params) => api.get('/vge/admin/all-performance', { params }),

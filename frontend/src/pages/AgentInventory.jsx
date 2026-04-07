@@ -91,7 +91,7 @@ export default function AgentInventory() {
             onClick={fetchAllProductsForRefill}
             className="px-3 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
           >
-            <Package size={16} /> Claim Refill
+            <Package size={16} /> Request Refill
           </button>
         </div>
 
@@ -160,6 +160,11 @@ export default function AgentInventory() {
                         <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100/30">
                           {item.product?.category?.name || 'Item'}
                         </span>
+                        {item.product?.unit && (
+                          <span className="text-[10px] font-black text-emerald-600 bg-white px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-50">
+                            {item.product.unitValue || ''} {item.product.unit.type}
+                          </span>
+                        )}
                         <span className="text-[9px] font-black text-blue-500/60 uppercase tracking-tighter">₹{item.product?.price} / Unit</span>
                       </div>
                     </div>
@@ -188,7 +193,7 @@ export default function AgentInventory() {
             <div className="p-5 border-b border-gray-100 flex flex-col gap-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h2 className="text-xl font-black text-emerald-950">Claim Refill</h2>
+                  <h2 className="text-xl font-black text-emerald-950">Request Refill</h2>
                   <p className="text-xs font-bold text-gray-500">Request stock from the warehouse.</p>
                 </div>
                 <button
@@ -239,6 +244,11 @@ export default function AgentInventory() {
                           <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100">
                             Current: {currentStock}
                           </span>
+                          {p.unit && (
+                            <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded cursor-default border border-blue-100">
+                              {p.unitValue || ''} {p.unit.type}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

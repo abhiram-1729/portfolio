@@ -145,13 +145,16 @@ export const updateVehicle = async (req, res) => {
       }
     });
 
-    // Re-assign driver: first unassign anyone currently on this vehicle, then assign new
+    // Re-assign driver: first unassign everyone currently on this vehicle, then assign new
     if (assignedUserId !== undefined) {
+      // 1. Get the current assigned user(s) to notify or just unassign
       await prisma.user.updateMany({
         where: { assignedVehicleId: id },
         data: { assignedVehicleId: null }
       });
-      if (assignedUserId) {
+
+      // 2. Assign the new user if provided
+      if (assignedUserId && assignedUserId !== 'null' && assignedUserId !== '') {
         await prisma.user.update({
           where: { id: assignedUserId },
           data: { assignedVehicleId: id }
@@ -227,12 +230,22 @@ export const assignDriver = async (req, res) => {
     const vehicle = await prisma.vehicle.findUnique({ where: { id } });
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
 
-    await prisma.user.update({
-      where: { id: userId },
-      data: { assignedVehicleId: id }
+    // 1. Unassign current user(s) from this specific vehicle
+    await prisma.user.updateMany({
+      where: { assignedVehicleId: id },
+      data: { assignedVehicleId: null }
     });
 
-    res.json({ message: 'Driver assigned to vehicle' });
+    // 2. If a new userId is provided, assign them to this vehicle
+    // Also ensure this user isn't assigned to another vehicle (optional, but good practice)
+    if (userId && userId !== 'null' && userId !== '') {
+      await prisma.user.update({
+        where: { id: userId },
+        data: { assignedVehicleId: id }
+      });
+    }
+
+    res.json({ message: 'Driver assignment updated' });
   } catch (error) {
     res.status(500).json({ message: 'Error assigning driver', error: error.message });
   }

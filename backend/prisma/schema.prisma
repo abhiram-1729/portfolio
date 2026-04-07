@@ -67,6 +67,8 @@ model Product {
   categoryId         String
   subCategoryId      String
   brandId            String
+  unitId             String?
+  unitValue          Float?
   createdAt          DateTime             @default(now())
   updatedAt          DateTime             @updatedAt
   mrp                Float?
@@ -79,6 +81,7 @@ model Product {
   category           Category             @relation(fields: [categoryId], references: [id])
   subCategory        SubCategory          @relation(fields: [subCategoryId], references: [id])
   brand              Brand                @relation(fields: [brandId], references: [id])
+  unit               Unit?                @relation(fields: [unitId], references: [id])
   variants           ProductVariant[]
   WarehouseInventory WarehouseInventory[]
   vehicleStocks      VehicleStock[]
@@ -90,6 +93,7 @@ model Product {
   @@index([categoryId])
   @@index([subCategoryId])
   @@index([brandId])
+  @@index([unitId])
 }
 
 model ProductVariant {
@@ -438,6 +442,7 @@ enum RefillStatus {
 enum TransactionType {
   LOAD
   RETURN
+  AUDIT
 }
 
 enum PaymentMode {
@@ -574,4 +579,13 @@ model VgeIncentiveConfig {
   superStarThreshold      Float    @default(35000)
 
   updatedAt               DateTime @updatedAt
+}
+
+model Unit {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  type      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  products  Product[]
 }

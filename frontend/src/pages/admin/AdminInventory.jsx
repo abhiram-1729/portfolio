@@ -38,6 +38,10 @@ export default function AdminInventory() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [taxRates, setTaxRates] = useState(['0', '5', '12', '18']);
+  const [categories, setCategories] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [isAuditMode, setIsAuditMode] = useState(false);
+  const [auditQuantities, setAuditQuantities] = useState({}); // { productId: quantity }
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -50,6 +54,8 @@ export default function AdminInventory() {
     categoryId: 'default',
     subCategoryId: 'default',
     brandId: 'default',
+    unitId: '',
+    unitValue: '',
     gst: '0',
     isFree: false,
     minShopAmount: '0',
@@ -58,13 +64,17 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
-      const [iRes, vRes, sRes] = await Promise.all([
+      const [iRes, vRes, sRes, cRes, uRes] = await Promise.all([
         adminAPI.getItems(),
         adminAPI.getVehicles(),
-        adminAPI.getSettings()
+        adminAPI.getSettings(),
+        adminAPI.getCategories(),
+        adminAPI.getUnits()
       ]);
       setItems(iRes.data);
       setVehicles(vRes.data);
+      setCategories(cRes.data || []);
+      setUnits(uRes.data || []);
       if (sRes.data?.success && sRes.data?.data?.taxRates) {
         setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
       }
@@ -357,6 +367,8 @@ export default function AdminInventory() {
         categoryId: 'default',
         subCategoryId: 'default',
         brandId: 'default',
+        unitId: '',
+        unitValue: '',
         gst: '0',
         isFree: false,
         minShopAmount: '0',
@@ -382,6 +394,11 @@ export default function AdminInventory() {
       discountType: item.discountType || 'RUPEE',
       image: item.image || '',
       status: item.status || 'ACTIVE',
+      categoryId: item.categoryId || 'default',
+      subCategoryId: item.subCategoryId || 'default',
+      brandId: item.brandId || 'default',
+      unitId: item.unitId || '',
+      unitValue: item.unitValue?.toString() || '',
       gst: item.gst?.toString() || '0',
       isFree: item.isFree || false,
       minShopAmount: item.minShopAmount?.toString() || '0',
@@ -519,6 +536,35 @@ export default function AdminInventory() {
     }
   };
 
+  const handleAuditSave = async () => {
+    if (!viewingVehicleId) return;
+    
+    // items to update [{productId, quantity}]
+    const auditItems = Object.entries(auditQuantities).map(([productId, quantity]) => ({
+      productId,
+      quantity: parseInt(quantity) || 0
+    }));
+
+    if (auditItems.length === 0) {
+       setIsAuditMode(false);
+       return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await adminAPI.auditVehicleStock(viewingVehicleId, { items: auditItems });
+      toast.success('Inventory audited successfully');
+      setIsAuditMode(false);
+      setAuditQuantities({});
+      await loadAllVehiclesStock(); // Refresh tracking data
+    } catch (error) {
+       console.error('Audit Save Error:', error);
+       toast.error('Failed to audit inventory');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const uniqueCategories = [...new Set(items.map(i => i.category?.name).filter(Boolean))];
 
   const filteredItems = items.filter(item => {
@@ -553,15 +599,17 @@ export default function AdminInventory() {
             </div>
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
-                <h3 className={`text-sm font-bold ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
+                <h3 className={`text-[11px] font-black uppercase tracking-tight ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
+                {item.unit && (
+                  <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+                    {item.unitValue || ''} {item.unit.type}
+                  </span>
+                )}
                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600')}`}>
                   {item.status || 'ACTIVE'}
                 </span>
-                {item.isFree && (
-                  <span className="bg-gradient-to-r from-emerald-500 to-teal-500 text-white text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm">Gift</span>
-                )}
               </div>
-              <span className="text-[10px] text-gray-400 uppercase font-bold tracking-wider">{item.category?.name || 'Uncategorized'}</span>
+              <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">{item.category?.name || 'Uncategorized'}</span>
               <div className="flex items-center gap-3 mt-1 flex-wrap">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Selling</span>
@@ -980,8 +1028,45 @@ export default function AdminInventory() {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm"><Package size={16} className="text-emerald-500" /> Loaded Inventory</h4>
+            <div className="space-y-4">
+              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
+                <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm">
+                  <Package size={16} className="text-emerald-500" /> 
+                  Loaded Inventory
+                </h4>
+                <div className="flex items-center gap-2">
+                  {isAuditMode ? (
+                    <>
+                      <button 
+                        onClick={() => { setIsAuditMode(false); setAuditQuantities({}); }}
+                        className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-wider hover:bg-gray-50"
+                      >
+                        Cancel
+                      </button>
+                      <button 
+                        onClick={handleAuditSave}
+                        disabled={isSubmitting}
+                        className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-md hover:bg-emerald-700 disabled:opacity-50"
+                      >
+                        {isSubmitting ? 'Saving...' : 'Save Audit'}
+                      </button>
+                    </>
+                  ) : (
+                    <button 
+                      onClick={() => {
+                        setIsAuditMode(true);
+                        const initial = {};
+                        activeStock.forEach(s => initial[s.productId] = s.quantity);
+                        setAuditQuantities(initial);
+                      }}
+                      className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                    >
+                      <Pencil size={12} />
+                      Audit Inventory
+                    </button>
+                  )}
+                </div>
+              </div>
               {activeStock.length === 0 ? (
                 <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                   <Package size={28} className="mx-auto text-gray-300 mb-2" />
@@ -1001,8 +1086,23 @@ export default function AdminInventory() {
                         </div>
                       </div>
                       <div className="flex flex-col items-end shrink-0 pl-2">
-                        <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400">Qty</span></span>
-                        <span className="text-[10px] font-black text-gray-500">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
+                        {isAuditMode ? (
+                          <div className="flex flex-col items-end">
+                             <input 
+                               type="number"
+                               min="0"
+                               className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1 text-xs font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none text-right"
+                               value={auditQuantities[item.productId] ?? item.quantity}
+                               onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: e.target.value})}
+                             />
+                             <span className="text-[8px] font-bold text-emerald-600/50 uppercase mt-0.5">Auditing Qty</span>
+                          </div>
+                        ) : (
+                          <>
+                            <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400">Qty</span></span>
+                            <span className="text-[10px] font-black text-gray-500">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -1444,16 +1544,57 @@ export default function AdminInventory() {
             </div>
 
             <form onSubmit={handleCreateItem} className="space-y-2.5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="e.g. Standard Oil 5L"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                  value={newItem.name}
-                  onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Standard Oil 5L"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                    value={newItem.name}
+                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
+                  <select
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                    value={newItem.categoryId}
+                    onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value, subCategoryId: 'default' })}
+                  >
+                    <option value="default">Select Category</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Type</label>
+                  <select
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                    value={newItem.unitId}
+                    onChange={(e) => setNewItem({ ...newItem, unitId: e.target.value })}
+                  >
+                    <option value="">Select Unit</option>
+                    {units.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Count/Value</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 500"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                    value={newItem.unitValue}
+                    onChange={(e) => setNewItem({ ...newItem, unitValue: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -1685,15 +1826,56 @@ export default function AdminInventory() {
             </div>
 
             <form onSubmit={handleUpdateItem} className="space-y-2.5">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
-                <input
-                  type="text"
-                  required
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                  value={editItem.name}
-                  onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
+                    value={editItem.name}
+                    onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
+                  <select
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                    value={editItem.categoryId}
+                    onChange={(e) => setEditItem({ ...editItem, categoryId: e.target.value, subCategoryId: 'default' })}
+                  >
+                    <option value="default">Select Category</option>
+                    {categories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Type</label>
+                  <select
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                    value={editItem.unitId}
+                    onChange={(e) => setEditItem({ ...editItem, unitId: e.target.value })}
+                  >
+                    <option value="">Select Unit</option>
+                    {units.map(u => (
+                      <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Count/Value</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 500"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
+                    value={editItem.unitValue}
+                    onChange={(e) => setEditItem({ ...editItem, unitValue: e.target.value })}
+                  />
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -1928,17 +2110,24 @@ const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStoc
   return (
     <div className={`flex items-center justify-between p-3 rounded-xl border transition-all duration-200 animate-in fade-in ${isFree ? 'bg-emerald-50/50 border-emerald-100' : 'bg-gray-50 border-gray-100 group hover:border-emerald-200'}`}>
       <div className="flex flex-col flex-1">
-        <span className={`text-sm font-medium ${isFree ? 'text-emerald-900 font-bold' : 'text-gray-700'}`}>{item.name}</span>
-        {isReturn ? (
-           <div className="flex gap-4">
-             <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600">In Vehicle: {currentStock || 0}</span>
-             <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">₹{stockAmount.toFixed(2)}</span>
-           </div>
-        ) : (
-          qty > 0 && (
-            <span className="text-[10px] font-bold text-emerald-600 animate-in slide-in-from-left-1 duration-200">Loading Value: ₹{displayAmount.toFixed(2)}</span>
-          )
-        )}
+        <span className={`text-sm font-bold ${isFree ? 'text-emerald-900' : 'text-gray-700'}`}>{item.name}</span>
+        <div className="flex items-center gap-2 mt-0.5">
+          {item.unit && (
+            <span className="text-[10px] font-black text-gray-500 bg-white border border-gray-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
+              {item.unitValue || ''} {item.unit.type}
+            </span>
+          )}
+          {isReturn ? (
+             <div className="flex gap-4">
+               <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600 font-mono">In Vehicle: {currentStock || 0}</span>
+               <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">₹{stockAmount.toFixed(2)}</span>
+             </div>
+          ) : (
+            qty > 0 && (
+              <span className="text-[10px] font-bold text-emerald-600 animate-in slide-in-from-left-1 duration-200">Value: ₹{displayAmount.toFixed(2)}</span>
+            )
+          )}
+        </div>
       </div>
       
       <div className="flex items-center gap-3">

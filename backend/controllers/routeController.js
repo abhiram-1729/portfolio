@@ -13,7 +13,7 @@ export const getAllActiveAssignments = async () => {
     });
 };
 
-const days = ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'];
+const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
 
 // Helper to get plan for a specific date and vehicle
 export const fetchPlanForVehicle = async (vehicleId, targetDate = new Date()) => {
@@ -32,22 +32,34 @@ export const fetchPlanForVehicle = async (vehicleId, targetDate = new Date()) =>
 
     // 2. Exclude Sundays as no-plan days
     const dayName = days[targetDate.getDay()];
-    if (dayName === 'SUNDAY') {
+    if (dayName === 'Sunday') {
         return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
     }
 
-    const { morningSession, afternoonSession } = assignment;
-    const villageName = morningSession === afternoonSession ? morningSession : `${morningSession} / ${afternoonSession}`;
+    // 3. Extract sessions from schedule (JSON) or legacy session fields
+    let morning = assignment.morningSession || "";
+    let evening = assignment.afternoonSession || "";
 
-    if (!morningSession && !afternoonSession) return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
+    // If new schedule exists, override with today's specific data
+    if (assignment.schedule && typeof assignment.schedule === 'object') {
+        const todaySchedule = assignment.schedule[dayName];
+        if (todaySchedule) {
+            morning = todaySchedule.morning || "";
+            evening = todaySchedule.evening || "";
+        }
+    }
 
-    // 3. Return formatted plan
+    const villageName = morning === evening ? morning : (morning && evening ? `${morning} / ${evening}` : (morning || evening));
+
+    if (!morning && !evening) return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
+
+    // 4. Return formatted plan
     return {
         routeId: assignment.routeId,
         villageName: villageName,
         routeName: assignment.route.routeName,
-        morning: morningSession || "No Task",
-        evening: afternoonSession || "No Task"
+        morning: morning || "No Task",
+        evening: evening || "No Task"
     };
 };
 

@@ -87,36 +87,52 @@ export const deactivateUser = async (req, res) => {
   try {
     const { id } = req.params;
 
-    // 1. Get all carts to delete the cart items first (since there's no cascade in schema)
-    const userCarts = await prisma.cart.findMany({ where: { userId: id }, select: { id: true } });
-    if (userCarts.length > 0) {
-      await prisma.cartItem.deleteMany({
-        where: { cartId: { in: userCarts.map(c => c.id) } }
+    // --- NUCLEAR PERMANENT DELETION ---
+    // We must manually delete all linked records in correct order to safely bypass all constraints.
+    // Increased timeout for deep archival cleanup.
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Inventory Cleanup
+      const userCarts = await tx.cart.findMany({ where: { userId: id }, select: { id: true } });
+      if (userCarts.length > 0) {
+        await tx.cartItem.deleteMany({ where: { cartId: { in: userCarts.map(c => c.id) } } });
+      }
+      await tx.cart.deleteMany({ where: { userId: id } });
+
+      // Clean Refill-related
+      await tx.refillItem.deleteMany({ where: { refillRequest: { userId: id } } });
+      await tx.refillRequest.deleteMany({ where: { userId: id } });
+
+      // 2. Financial Purge (Large Data Block)
+      await tx.orderItem.deleteMany({ where: { order: { userId: id } } });
+      await tx.payment.deleteMany({ where: { order: { userId: id } } });
+      await tx.order.deleteMany({ where: { userId: id } });
+      
+      await tx.openingCash.deleteMany({ where: { userId: id } });
+      await tx.closingCash.deleteMany({ where: { userId: id } });
+
+      // 3. Activity & Performance
+      await tx.vgeDailyPerformance.deleteMany({ where: { userId: id } });
+      await tx.vgeMonthlySummary.deleteMany({ where: { userId: id } });
+      await tx.routeAssignment.deleteMany({ where: { userId: id } });
+
+      // 4. Notifications
+      await tx.notification.deleteMany({ where: { userId: id } });
+
+      // 5. Unlink and Purge User
+      await tx.user.update({
+        where: { id },
+        data: { assignedVehicleId: null }
       });
-    }
 
-    // 2. Clean up non-critical linked records first to allow deletion of test/new users
-    await prisma.notification.deleteMany({ where: { userId: id } });
-    await prisma.cart.deleteMany({ where: { userId: id } });
-    await prisma.vgeDailyPerformance.deleteMany({ where: { userId: id } });
-    await prisma.vgeMonthlySummary.deleteMany({ where: { userId: id } });
-    await prisma.routeAssignment.deleteMany({ where: { userId: id } });
+      await tx.user.delete({ where: { id } });
+    }, {
+      timeout: 20000 // Increase timeout to 20s for deep cleanup
+    });
     
-    // Clean up Refill requests (RefillItems cascade automatically)
-    await prisma.refillRequest.deleteMany({ where: { userId: id } });
-
-    // 3. Try deleting the user
-    await prisma.user.delete({ where: { id } });
-    
-    res.json({ message: 'User removed successfully' });
+    res.json({ message: 'User and all history permanently deleted.' });
   } catch (error) {
-    if (error.code === 'P2003') {
-      // Prisma Foreign Key Constraint failed
-      return res.status(400).json({ 
-        message: 'Cannot delete staff member: They have existing financial or inventory records (Orders/Cash). Please suspend them instead.' 
-      });
-    }
-    console.error('Error deleting user:', error);
-    res.status(500).json({ message: 'Error removing user', error: error.message });
+    console.error('DELETION FAILED:', error);
+    res.status(500).json({ message: 'Error removing user permanently', error: error.message });
   }
 };

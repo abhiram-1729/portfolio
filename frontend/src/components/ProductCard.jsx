@@ -61,6 +61,14 @@ export default function ProductCard({ product }) {
           </div>
         )}
 
+        {/* Weight / Unit Tag */}
+        {product.unit && (
+          <div className="absolute bottom-2 left-2 z-10 bg-white/90 backdrop-blur-md text-emerald-950 text-[0.65rem] font-black px-2 py-1 rounded-lg border border-emerald-100 shadow-sm select-none flex items-center gap-1">
+            <Zap size={10} className="text-orange-500 fill-orange-500" />
+            {product.unitValue || ''} {product.unit.type}
+          </div>
+        )}
+
 
 
         {product.image ? (
@@ -74,35 +82,28 @@ export default function ProductCard({ product }) {
       </div>
 
       {/* Product Content */}
-      <div className="px-1.5 py-1">
-        <div className="flex items-center gap-1 mb-1">
-          {isFreeProduct ? (
-            <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tight"></span>
-          ) : (
-            <span className="text-[10px] font-black text-slate-400 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100 uppercase tracking-tight"></span>
-          )}
-        </div>
-        <h3 className="text-[0.85rem] font-black text-emerald-950 leading-tight line-clamp-2 min-h-[2.4rem] mb-2 tracking-tight">
+      <div className="px-1.5 py-0.5 flex flex-col gap-1">
+        <h3 className="text-[0.75rem] font-extrabold text-emerald-950 leading-[1.1] line-clamp-2 min-h-[2rem] tracking-tight">
           {product.name}
         </h3>
 
         {/* Dynamic Price/Offer Area */}
-        <div className="flex items-center justify-between min-h-[2.5rem]">
+        <div className="flex items-center justify-between min-h-[2rem]">
           <div className="flex flex-col">
             {isFreeProduct ? (
               <>
-                <div className="flex items-center gap-1.5">
-                  <span className={`text-[1.1rem] font-black tracking-tighter ${isCurrentlyFree ? 'text-emerald-600' : 'text-slate-400'}`}>
+                <div className="flex items-center gap-1">
+                  <span className={`text-[1rem] font-black tracking-tighter ${isCurrentlyFree ? 'text-emerald-600' : 'text-slate-400'}`}>
                     {isCurrentlyFree ? '₹0.00' : `₹${Number(product.price).toFixed(0)}`}
                   </span>
                   {!isCurrentlyFree && (
-                    <span className="text-[0.7rem] font-bold text-slate-300 line-through">₹{Number(product.price).toFixed(0)}</span>
+                    <span className="text-[0.6rem] font-bold text-slate-300 line-through">₹{Number(product.price).toFixed(0)}</span>
                   )}
                 </div>
                 {!isCurrentlyFree && (
                   <div className="flex items-center gap-0.5 mt-[-2px]">
                     <Zap size={8} className="text-orange-500 fill-orange-500" />
-                    <span className="text-[0.65rem] font-black text-orange-600 uppercase tracking-tighter">
+                    <span className="text-[0.6rem] font-black text-orange-600 uppercase tracking-tighter">
                       ABOVE ₹{minAmount}
                     </span>
                   </div>
@@ -110,11 +111,11 @@ export default function ProductCard({ product }) {
               </>
             ) : (
               <>
-                <p className="text-[1.1rem] font-black text-emerald-700 tracking-tighter leading-none">
+                <p className="text-[1rem] font-black text-emerald-700 tracking-tighter leading-none">
                   ₹{Number(product.price).toFixed(2)}
                 </p>
                 {product.mrp > product.price && (
-                  <span className="text-[0.65rem] font-bold text-emerald-900/30 line-through">₹{Number(product.mrp).toFixed(2)}</span>
+                  <span className="text-[0.6rem] font-bold text-emerald-900/30 line-through">₹{Number(product.mrp).toFixed(2)}</span>
                 )}
               </>
             )}
@@ -122,9 +123,9 @@ export default function ProductCard({ product }) {
 
           {/* Savings Badge - Only if relevant */}
           {!isFreeProduct && product.discount > 0 && (
-            <div className="bg-orange-50 text-orange-600 px-2 py-1 rounded-lg border border-orange-100 flex flex-col items-center">
-              <span className="text-[0.55rem] font-black leading-none">OFF</span>
-              <span className="text-[0.75rem] font-black tracking-tighter leading-none">₹{product.discount.toFixed(0)}</span>
+            <div className="bg-orange-50 text-orange-600 px-1.5 py-0.5 rounded-lg border border-orange-100 flex flex-col items-center shrink-0 ml-1">
+              <span className="text-[0.5rem] font-black leading-none">OFF</span>
+              <span className="text-[0.7rem] font-black tracking-tighter leading-none">₹{product.discount.toFixed(0)}</span>
             </div>
           )}
         </div>

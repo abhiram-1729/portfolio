@@ -9,6 +9,8 @@ import * as reportCtr from '../controllers/admin/reportController.js';
 import * as settingsCtr from '../controllers/admin/settingsController.js';
 import * as routeCtr from '../controllers/admin/routeController.js';
 import * as villageCtr from '../controllers/admin/villageController.js';
+import * as unitCtr from '../controllers/admin/unitController.js';
+import * as categoryCtr from '../controllers/admin/categoryController.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
@@ -74,6 +76,7 @@ router.route('/inventory/items/:id')
 router.post('/inventory/load', inventoryCtr.loadStock);
 router.post('/inventory/return', inventoryCtr.returnStock);
 router.get('/inventory/vehicle/:id', inventoryCtr.getVehicleInventory);
+router.put('/inventory/vehicle/:id/audit', inventoryCtr.auditVehicleStock);
 router.get('/inventory/refills', inventoryCtr.getRefillRequests);
 router.put('/inventory/refills/:id/approve', inventoryCtr.approveRefillRequest);
 router.put('/inventory/refills/:id/reject', inventoryCtr.rejectRefillRequest);
@@ -117,5 +120,21 @@ router.route('/routes/assignments/:id')
 
 // Business Settings Update (Admin Only)
 router.put('/settings', admin, settingsCtr.updateSettings);
+
+// Units Management
+router.route('/units')
+  .get(unitCtr.getUnits)
+  .post(unitCtr.createUnit);
+router.route('/units/:id')
+  .put(unitCtr.updateUnit)
+  .delete(unitCtr.deleteUnit);
+
+// Categories Management
+router.route('/categories')
+  .get(categoryCtr.getCategories)
+  .post(categoryCtr.createCategory);
+router.route('/categories/:id')
+  .put(categoryCtr.updateCategory)
+  .delete(categoryCtr.deleteCategory);
 
 export default router;
