@@ -195,6 +195,7 @@ export const deleteItem = async (req, res) => {
     await prisma.vehicleStock.deleteMany({ where: { productId: id } });
     await prisma.warehouseInventory.deleteMany({ where: { productId: id } });
     await prisma.productVariant.deleteMany({ where: { productId: id } });
+    await prisma.refillItem.deleteMany({ where: { productId: id } });
     await prisma.product.delete({ where: { id } });
 
     res.json({ message: 'Item deleted successfully' });
@@ -393,6 +394,7 @@ export const bulkDeleteItems = async (req, res) => {
     await prisma.vehicleStock.deleteMany({ where: { productId: { in: ids } } });
     await prisma.warehouseInventory.deleteMany({ where: { productId: { in: ids } } });
     await prisma.productVariant.deleteMany({ where: { productId: { in: ids } } });
+    await prisma.refillItem.deleteMany({ where: { productId: { in: ids } } });
     const deleteResult = await prisma.product.deleteMany({ where: { id: { in: ids } } });
 
     res.json({ message: `Successfully deleted ${deleteResult.count} items`, count: deleteResult.count });
