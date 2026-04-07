@@ -392,10 +392,9 @@ export default function AdminUsers() {
                     type="email"
                     required
                     placeholder="Email"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none cursor-not-allowed opacity-70"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
                     value={editingUser.email}
-                    disabled
-                    title="Email cannot be changed"
+                    onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
                   />
                 </div>
                 <div className="space-y-1">

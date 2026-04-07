@@ -53,12 +53,13 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, mobile, role, assignedVehicleId, status, dailyTarget } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget } = req.body;
 
     const updatedUser = await prisma.user.update({
       where: { id },
       data: {
         name,
+        email,
         mobile,
         role,
         status,
