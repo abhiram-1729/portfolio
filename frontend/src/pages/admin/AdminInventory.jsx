@@ -26,7 +26,7 @@ export default function AdminInventory() {
   const [selectedItems, setSelectedItems] = useState([]); // [id, id, ...]
   const [refillRequests, setRefillRequests] = useState([]);
   const [expandedAgentId, setExpandedAgentId] = useState(null);
-  const [viewingAgentRefills, setViewingAgentRefills] = useState(null);
+  const [viewingAgentId, setViewingAgentId] = useState(null);
   const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
 
   // States for stock actions
@@ -149,6 +149,11 @@ export default function AdminInventory() {
     
     return Object.values(groups).sort((a, b) => b.latestDate - a.latestDate);
   }, [refillRequests]);
+
+  const activeRefillGroup = React.useMemo(() => {
+    if (!viewingAgentId) return null;
+    return groupedRefills.find(g => (g.user?.id || g.user?.name || 'unknown') === viewingAgentId);
+  }, [groupedRefills, viewingAgentId]);
 
   useEffect(() => {
     if (selectedVehicleId && activeTab === 'return' && subTab === 'return') {
@@ -1081,21 +1086,21 @@ export default function AdminInventory() {
     }
   };
 
+
   const renderRefills = () => {
-    if (viewingAgentRefills) {
-      const group = viewingAgentRefills;
+    if (activeRefillGroup) {
+      const group = activeRefillGroup;
       const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
       
       return (
-        <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
-          {/* Detailed View Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-             <div className="flex items-center gap-4">
+        <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+             <div className="flex items-center gap-6">
                 <button 
-                  onClick={() => setViewingAgentRefills(null)}
-                  className="p-3 rounded-2xl bg-gray-50 text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100"
+                  onClick={() => setViewingAgentId(null)}
+                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-500 hover:border-emerald-100 transition-all active:scale-90 shadow-sm"
                 >
-                  <ArrowLeft size={20} strokeWidth={3} />
+                   <X size={20} />
                 </button>
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-emerald-600/20">
@@ -1226,7 +1231,7 @@ export default function AdminInventory() {
               return (
                 <div 
                   key={group.user?.id || 'unknown'} 
-                  onClick={() => setViewingAgentRefills(group)}
+                  onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
                   className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
                 >
                   <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
