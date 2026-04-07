@@ -424,16 +424,28 @@ export default function AdminUsers() {
                 </select>
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Daily Sales Target (₹)</label>
-                <input 
-                  type="number"
-                  required
-                  placeholder="Daily Sales Target"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                  value={editingUser.dailyTarget}
-                  onChange={(e) => setEditingUser({...editingUser, dailyTarget: e.target.value})}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Daily Sales Target (₹)</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="Daily Sales Target"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
+                    value={editingUser.dailyTarget}
+                    onChange={(e) => setEditingUser({...editingUser, dailyTarget: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Update Password</label>
+                  <input 
+                    type="text"
+                    placeholder="Leave blank to keep current"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
+                    value={editingUser.password || ''}
+                    onChange={(e) => setEditingUser({...editingUser, password: e.target.value})}
+                  />
+                </div>
               </div>
 
               <div className="pt-2">

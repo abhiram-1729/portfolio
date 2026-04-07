@@ -53,19 +53,27 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget, password } = req.body;
+
+    const updateData = {
+      name,
+      email,
+      mobile,
+      role,
+      status,
+      assignedVehicleId: assignedVehicleId !== undefined ? assignedVehicleId : undefined,
+      dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined
+    };
+
+    // Safely update password if provided
+    if (password && password.trim() !== '') {
+      const salt = await bcrypt.genSalt(10);
+      updateData.password = await bcrypt.hash(password, salt);
+    }
 
     const updatedUser = await prisma.user.update({
       where: { id },
-      data: {
-        name,
-        email,
-        mobile,
-        role,
-        status,
-        assignedVehicleId: assignedVehicleId !== undefined ? assignedVehicleId : undefined,
-        dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined
-      }
+      data: updateData
     });
 
     res.json({ message: 'User updated', user: updatedUser });

@@ -60,18 +60,18 @@ export async function updateDailyPerformance(userId, date = null) {
   const dateStr = date || toISTDateString();
 
   try {
-    // Get user and their current active assignment to track route contribution
+    // Get user and their current active route assignment to track route contribution
     const user = await prisma.user.findUnique({
       where: { id: userId },
       include: { 
-        assignments: { 
-          where: { status: 'ACTIVE' },
+        routeAssignments: { 
+          where: { status: true },
           take: 1
         } 
       }
     });
 
-    const routeId = user?.assignments?.[0]?.routeId || null;
+    const routeId = user?.routeAssignments?.[0]?.routeId || null;
 
     // Check if day is locked (finalized)
     const existing = await prisma.vgeDailyPerformance.findUnique({

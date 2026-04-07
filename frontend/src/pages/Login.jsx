@@ -10,12 +10,17 @@ export default function Login() {
   const [mobile, setMobile] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
   const { setUser } = useUserStore();
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
-    if (!mobile || !password) return toast.error('Please fill all fields');
+    setLoginError(null);
+    if (!mobile || !password) {
+      setLoginError('Please fill in both mobile number and password.');
+      return;
+    }
     setLoading(true);
     try {
       const { data } = await authAPI.login({ mobile, password });
@@ -27,7 +32,7 @@ export default function Login() {
         navigate('/');
       }
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Login failed');
+      setLoginError(err.response?.data?.message || 'Login failed. Please check your credentials.');
     } finally {
       setLoading(false);
     }
@@ -73,6 +78,19 @@ export default function Login() {
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
+            {/* Error Popup Alert */}
+            {loginError && (
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-start gap-3 animate-in fade-in zoom-in duration-200 shadow-sm">
+                <div className="mt-0.5 bg-red-100 p-1 rounded-full text-red-500">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                </div>
+                <div className="flex-1">
+                  <p className="text-[13px] font-black tracking-tight leading-tight mb-0.5">Access Denied</p>
+                  <p className="text-[11px] font-semibold opacity-90 leading-tight">{loginError}</p>
+                </div>
+              </div>
+            )}
+
             <div className="relative group">
               <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-400 group-focus-within:bg-emerald-600 group-focus-within:text-white transition-all duration-300">
                 <Phone size={18} strokeWidth={2.5} />
@@ -82,8 +100,11 @@ export default function Login() {
                 type="tel"
                 placeholder="Mobile Number"
                 value={mobile}
-                onChange={(e) => setMobile(e.target.value)}
-                className="w-full pl-16 pr-4 py-4 rounded-[1.25rem] border border-emerald-100 bg-white/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium"
+                onChange={(e) => {
+                  setMobile(e.target.value);
+                  setLoginError(null);
+                }}
+                className={`w-full pl-16 pr-4 py-4 rounded-[1.25rem] border ${loginError ? 'border-red-300 bg-red-50/30' : 'border-emerald-100 bg-white/50'} hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium`}
               />
             </div>
 
@@ -96,8 +117,11 @@ export default function Login() {
                 type="password"
                 placeholder="Password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="w-full pl-16 pr-4 py-4 rounded-[1.25rem] border border-emerald-100 bg-white/50 hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium"
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setLoginError(null);
+                }}
+                className={`w-full pl-16 pr-4 py-4 rounded-[1.25rem] border ${loginError ? 'border-red-300 bg-red-50/30' : 'border-emerald-100 bg-white/50'} hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium`}
               />
             </div>
 

@@ -103,6 +103,9 @@ export const useCartStore = create(
       },
 
       clearCart: () => set({ items: [], customerName: '', customerMobile: '', totalAmount: 0, totalItems: 0 }),
+      
+      cartOwnerId: null,
+      setCartOwner: (id) => set({ cartOwnerId: id }),
     }),
     {
       name: 'cart-storage',

@@ -45,6 +45,12 @@ api.interceptors.response.use(
         console.warn('[API Interceptor] 401 Error on Success page. Skipping logout to preserve order view.');
         return Promise.reject(error);
       }
+      
+      // If we are ALREADY on the login page, don't hard refresh the browser
+      if (window.location.pathname.includes('/login')) {
+        console.warn('[API Interceptor] 401 Error during login attempt. Relaying error to component.');
+        return Promise.reject(error);
+      }
 
       localStorage.removeItem('token');
       window.location.href = '/login';
@@ -57,6 +63,7 @@ export const authAPI = {
   login: (data) => api.post('/auth/login', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  updatePassword: (data) => api.put('/auth/password', data),
 };
 
 export const productsAPI = {

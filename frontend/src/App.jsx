@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useUserStore } from './store/userStore';
+import { useCartStore } from './store/cartStore';
 import { useNotificationStore } from './store/notificationStore';
 import Login from './pages/Login';
 import SalesEntry from './pages/SalesEntry';
@@ -43,7 +44,8 @@ function AdminRoute({ children }) {
 }
 
 export default function App() {
-  const { token } = useUserStore();
+  const { token, user } = useUserStore();
+  const { cartOwnerId, clearCart, setCartOwner } = useCartStore();
   const { initSocket, disconnectSocket, fetchNotifications } = useNotificationStore();
 
   useEffect(() => {
@@ -54,6 +56,17 @@ export default function App() {
       disconnectSocket();
     }
   }, [token, initSocket, disconnectSocket, fetchNotifications]);
+
+  useEffect(() => {
+    // 🛡️ Anti-leak protection: If the logged-in user doesn't own this cart storage (e.g. they switched accounts in the same browser), wipe it immediately.
+    if (user && user.id !== cartOwnerId) {
+      clearCart();
+      setCartOwner(user.id);
+    } else if (!user && cartOwnerId) {
+      // If logged out entirely, clear the owner
+      setCartOwner(null);
+    }
+  }, [user, cartOwnerId, clearCart, setCartOwner]);
 
   return (
     <BrowserRouter>

@@ -1,10 +1,40 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
-import { ArrowLeft, User, Phone, Mail, Shield, Truck, LogOut, FileText, CheckCircle2, XCircle, Package } from 'lucide-react';
+import { authAPI } from '../services/api';
+import toast from 'react-hot-toast';
+import { ArrowLeft, User, Phone, Mail, Shield, Truck, LogOut, FileText, CheckCircle2, XCircle, Package, KeyRound, Loader2 } from 'lucide-react';
 
 export default function Profile() {
   const { user, clearUser } = useUserStore();
   const navigate = useNavigate();
+
+  const [passwords, setPasswords] = useState({ oldPassword: '', newPassword: '', confirmPassword: '' });
+  const [isUpdating, setIsUpdating] = useState(false);
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      return toast.error("New passwords don't match");
+    }
+    if (passwords.newPassword.length < 6) {
+      return toast.error("New password must be at least 6 characters");
+    }
+    
+    setIsUpdating(true);
+    try {
+      await authAPI.updatePassword({
+        oldPassword: passwords.oldPassword,
+        newPassword: passwords.newPassword
+      });
+      toast.success("Password updated securely!");
+      setPasswords({ oldPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.message || "Failed to update password");
+    } finally {
+      setIsUpdating(false);
+    }
+  };
 
   const handleLogout = () => {
     clearUser();
@@ -151,6 +181,74 @@ export default function Profile() {
                 <p className="text-[9px] font-bold text-emerald-600 mt-1 uppercase tracking-tighter italic">Contact Admin for Fleet Deployment</p>
               </div>
             )}
+          </div>
+        </div>
+
+        {/* Update Password */}
+        <div className="space-y-4">
+          <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.2em] px-2">Account Security</p>
+          <div className="glass rounded-[2rem] p-6 bg-white/70 border border-emerald-50 shadow-sm relative overflow-hidden">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shadow-inner">
+                <KeyRound size={20} strokeWidth={2.5} />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-emerald-950 tracking-tight leading-none mb-1">
+                  Change Password
+                </h3>
+                <p className="text-[10px] font-bold text-emerald-600/60 uppercase tracking-widest">
+                  Secure your account
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdatePassword} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">Current Password</label>
+                <input 
+                  type="password"
+                  required
+                  placeholder="Enter old password"
+                  className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
+                  value={passwords.oldPassword}
+                  onChange={(e) => setPasswords({...passwords, oldPassword: e.target.value})}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">New Password</label>
+                  <input 
+                    type="password"
+                    required
+                    placeholder="New password"
+                    className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
+                    value={passwords.newPassword}
+                    onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">Confirm</label>
+                  <input 
+                    type="password"
+                    required
+                    placeholder="Confirm password"
+                    className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
+                    value={passwords.confirmPassword}
+                    onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
+                  />
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                disabled={isUpdating}
+                className="w-full bg-orange-500 text-white p-3.5 rounded-2xl shadow-lg shadow-orange-500/20 hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest disabled:opacity-70 mt-2"
+              >
+                {isUpdating ? <Loader2 className="animate-spin" size={18} /> : <KeyRound size={18} />}
+                Update Security
+              </button>
+            </form>
           </div>
         </div>
 

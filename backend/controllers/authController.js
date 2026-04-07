@@ -100,3 +100,39 @@ export const getUserProfile = async (req, res, next) => {
         next(error);
     }
 };
+
+// @desc    Update user password
+// @route   PUT /api/auth/password
+// @access  Private
+export const updatePassword = async (req, res, next) => {
+    try {
+        const { oldPassword, newPassword } = req.body;
+
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Verify old password
+        if (!(await bcrypt.compare(oldPassword, user.password))) {
+            return res.status(401).json({ message: 'Incorrect old password' });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password
+        await prisma.user.update({
+            where: { id: req.user.id },
+            data: { password: hashedPassword }
+        });
+
+        res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
