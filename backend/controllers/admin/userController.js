@@ -77,9 +77,37 @@ export const updateUser = async (req, res) => {
 export const deactivateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    await prisma.user.delete({ where: { id } }); // Note: For a real enterprise app, we might just set an 'isActive' flag to false rather than hard delete. Based on 'Deactivate User' requirement, this could be adapted.
+
+    // 1. Get all carts to delete the cart items first (since there's no cascade in schema)
+    const userCarts = await prisma.cart.findMany({ where: { userId: id }, select: { id: true } });
+    if (userCarts.length > 0) {
+      await prisma.cartItem.deleteMany({
+        where: { cartId: { in: userCarts.map(c => c.id) } }
+      });
+    }
+
+    // 2. Clean up non-critical linked records first to allow deletion of test/new users
+    await prisma.notification.deleteMany({ where: { userId: id } });
+    await prisma.cart.deleteMany({ where: { userId: id } });
+    await prisma.vgeDailyPerformance.deleteMany({ where: { userId: id } });
+    await prisma.vgeMonthlySummary.deleteMany({ where: { userId: id } });
+    await prisma.routeAssignment.deleteMany({ where: { userId: id } });
+    
+    // Clean up Refill requests (RefillItems cascade automatically)
+    await prisma.refillRequest.deleteMany({ where: { userId: id } });
+
+    // 3. Try deleting the user
+    await prisma.user.delete({ where: { id } });
+    
     res.json({ message: 'User removed successfully' });
   } catch (error) {
+    if (error.code === 'P2003') {
+      // Prisma Foreign Key Constraint failed
+      return res.status(400).json({ 
+        message: 'Cannot delete staff member: They have existing financial or inventory records (Orders/Cash). Please suspend them instead.' 
+      });
+    }
+    console.error('Error deleting user:', error);
     res.status(500).json({ message: 'Error removing user', error: error.message });
   }
 };
