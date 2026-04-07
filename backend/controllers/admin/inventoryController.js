@@ -19,23 +19,23 @@ export const getItems = async (req, res) => {
 
 export const createItem = async (req, res) => {
   try {
-    const { 
-      name, 
-      description, 
-      mrp, 
-      price, 
-      landingPrice, 
-      discount, 
-      status, 
-      image, 
-      categoryId, 
-      subCategoryId, 
+    const {
+      name,
+      description,
+      mrp,
+      price,
+      landingPrice,
+      discount,
+      status,
+      image,
+      categoryId,
+      subCategoryId,
       brandId,
       gst,
       isFree,
       minShopAmount
     } = req.body;
-    
+
     // Handle image upload to Supabase if file is present
     let imageUrl = image || null;
     if (req.file) {
@@ -124,13 +124,13 @@ export const createItem = async (req, res) => {
 export const updateItem = async (req, res) => {
   try {
     const { id } = req.params;
-    const { 
-      name, 
-      mrp, 
-      price, 
-      landingPrice, 
-      discount, 
-      status, 
+    const {
+      name,
+      mrp,
+      price,
+      landingPrice,
+      discount,
+      status,
       image,
       gst,
       isFree,
@@ -280,7 +280,7 @@ export const returnStock = async (req, res) => {
           vehicleId_productId: { vehicleId, productId: item.productId }
         },
         data: {
-          quantity: { decrement: q } 
+          quantity: { decrement: q }
         }
       });
     }
@@ -305,11 +305,11 @@ export const bulkCreateItems = async (req, res) => {
   try {
     const products = req.body;
     if (!Array.isArray(products)) {
-       return res.status(400).json({ message: 'Products data must be an array' });
+      return res.status(400).json({ message: 'Products data must be an array' });
     }
 
     const createdItems = [];
-    
+
     // Ensure default relations exist
     const defaultCategory = await prisma.category.upsert({
       where: { name: 'Uncategorized' },
@@ -451,12 +451,41 @@ export const approveRefillRequest = async (req, res) => {
     if (!request) return res.status(404).json({ message: 'Refill request not found' });
     if (request.status !== 'PENDING') return res.status(400).json({ message: 'Request is already processed' });
 
-    // Ensure atomic transaction
+    // 1. Fetch all products first (outside transaction for speed)
+    const productIds = request.items.map(item => item.productId);
+    const validProducts = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true }
+    });
+    const validProductIds = new Set(validProducts.map(p => p.id));
+
+    // 2. Filter valid items and CONSOLIDATE duplicates (prevents row locking issues)
+    const consolidatedMap = {};
+    request.items.forEach(item => {
+      if (!validProductIds.has(item.productId)) {
+        console.warn(`[RefillApproval] Skipping invalid product ID: ${item.productId}`);
+        return;
+      }
+      
+      if (!consolidatedMap[item.productId]) {
+        consolidatedMap[item.productId] = 0;
+      }
+      consolidatedMap[item.productId] += item.quantity;
+    });
+
+    const itemsToProcess = Object.entries(consolidatedMap).map(([productId, quantity]) => ({
+      productId,
+      quantity
+    }));
+
+    // 3. Run stock updates in a highly-resilient atomic transaction
+    // Explicitly override Prisma's default 5000ms timeout with massive limits
     await prisma.$transaction(async (tx) => {
-      for (const item of request.items) {
+      for (const item of itemsToProcess) {
         // Log transaction
         await tx.stockTransaction.create({
           data: {
+            date: new Date(),
             type: 'LOAD',
             vehicleId: request.vehicleId,
             productId: item.productId,
@@ -476,7 +505,11 @@ export const approveRefillRequest = async (req, res) => {
         where: { id },
         data: { status: 'APPROVED' }
       });
+    }, {
+      maxWait: 50000,  // Wait up to 50 seconds to acquire a connection
+      timeout: 120000  // Allow up to 120 seconds to process the transaction
     });
+
 
     res.json({ message: 'Refill request approved and stock loaded successfully' });
 
@@ -490,6 +523,10 @@ export const approveRefillRequest = async (req, res) => {
       metadata: { requestId: request.id, vehicleId: request.vehicleId }
     });
   } catch (error) {
+    console.error('❌ Error approving refill request:', error);
+    import('fs').then(fs => {
+      fs.writeFileSync('approve_refill_error.log', new Date().toISOString() + '\\n' + String(error.stack || error) + '\\n\\n', { flag: 'a' });
+    });
     res.status(500).json({ message: 'Error approving refill request', error: error.message });
   }
 };
