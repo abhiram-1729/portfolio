@@ -23,7 +23,8 @@ export default function AdminVehicles() {
     try {
       const [vRes, uRes] = await Promise.all([adminAPI.getVehicles(), adminAPI.getUsers()]);
       setVehicles(vRes.data);
-      setUsers(uRes.data.filter(u => u.role !== 'CONSUMER'));
+      // Filter out Consumers AND Admins - only show agents/staff for vehicles
+      setUsers(uRes.data.filter(u => u.role !== 'CONSUMER' && u.role !== 'ADMIN'));
     } catch {
       toast.error('Failed to fetch vehicle data');
     } finally {
@@ -294,7 +295,9 @@ export default function AdminVehicles() {
                 <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
                   value={newVehicle.assignedUserId} onChange={(e) => setNewVehicle({ ...newVehicle, assignedUserId: e.target.value })}>
                   <option value="">-- Unassigned --</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  {users.filter(u => !u.assignedVehicleId).map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
                 </select>
               </div>
 
@@ -359,7 +362,9 @@ export default function AdminVehicles() {
                   value={editingVehicle.assignedUserId || ''}
                   onChange={(e) => setEditingVehicle({ ...editingVehicle, assignedUserId: e.target.value })}>
                   <option value="">-- Unassigned --</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                  {users.filter(u => !u.assignedVehicleId || u.assignedVehicleId === editingVehicle.id).map(u => (
+                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                  ))}
                 </select>
               </div>
 
@@ -400,7 +405,7 @@ export default function AdminVehicles() {
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {users.map(user => (
+              {users.filter(u => !u.assignedVehicleId).map(user => (
                 <button key={user.id} disabled={isSubmitting} onClick={() => handleAssignDriver(user.id)}
                   className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
                   <div className="flex items-center gap-3">

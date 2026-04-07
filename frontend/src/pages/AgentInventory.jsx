@@ -214,13 +214,7 @@ export default function AgentInventory() {
                   value={refillSearchQuery}
                   onChange={(e) => setRefillSearchQuery(e.target.value)}
                 />
-                <button
-                  onClick={() => setFilterFreeOnly(!filterFreeOnly)}
-                  className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-tighter transition-all border shrink-0 flex items-center gap-1.5 ${filterFreeOnly ? 'bg-emerald-600 text-white border-emerald-600 shadow-md' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}
-                >
-                  <Gift size={12} strokeWidth={3} />
-                  Gifts
-                </button>
+
               </div>
             </div>
 
