@@ -1,5 +1,6 @@
 import jwt from 'jsonwebtoken';
 import prisma from '../utils/prisma.js';
+import { tenantContext } from '../utils/tenantContext.js';
 
 export const protect = async (req, res, next) => {
     let token;
@@ -11,14 +12,18 @@ export const protect = async (req, res, next) => {
 
             req.user = await prisma.user.findUnique({
                 where: { id: decoded.id },
-                select: { id: true, name: true, email: true, role: true, assignedVehicleId: true }
+                select: { id: true, name: true, email: true, role: true, assignedVehicleId: true, tenantId: true }
             });
 
             if (!req.user) {
               return res.status(401).json({ message: 'User not found' });
             }
 
-            next();
+            // Set Tenant Context
+            tenantContext.run({ tenantId: req.user.tenantId }, () => {
+              next();
+            });
+            return; // Important: don't call next() again outside
         } catch (error) {
             console.error('[AuthMiddleware Error]', error.message);
             res.status(401);
@@ -34,10 +39,11 @@ export const protect = async (req, res, next) => {
 
 
 export const admin = (req, res, next) => {
-    if (req.user && req.user.role === 'ADMIN') {
+    const allowedRoles = ['ADMIN', 'TENANT_OWNER', 'SUPER_ADMIN'];
+    if (req.user && allowedRoles.includes(req.user.role)) {
         next();
     } else {
         res.status(403);
-        throw new Error('Not authorized as an admin');
+        return next(new Error('Not authorized as an administrator'));
     }
 };

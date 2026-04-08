@@ -35,6 +35,8 @@ import AgentAssets from './pages/AgentAssets';
 import CashWallet from './pages/CashWallet';
 import AdminExpenses from './pages/admin/AdminExpenses';
 import AdminFinanceReports from './pages/admin/AdminFinanceReports';
+import TenantLayout from './components/tenant/TenantLayout';
+import TenantDashboard from './pages/tenant/TenantDashboard';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -44,7 +46,16 @@ function PrivateRoute({ children }) {
 function AdminRoute({ children }) {
   const { token, user } = useUserStore();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.role !== 'ADMIN') return <Navigate to="/" replace />;
+  if (user?.role !== 'ADMIN' && user?.role !== 'TENANT_OWNER') {
+     return <Navigate to="/" replace />;
+  }
+  return children;
+}
+
+function TenantRoute({ children }) {
+  const { token, user } = useUserStore();
+  if (!token) return <Navigate to="/login" replace />;
+  if (user?.role !== 'TENANT_OWNER') return <Navigate to="/" replace />;
   return children;
 }
 
@@ -125,6 +136,18 @@ export default function App() {
           <Route path="expenses" element={<AdminExpenses />} />
           <Route path="finance-reports" element={<AdminFinanceReports />} />
         </Route>
+        {/* Tenant Routes */}
+        <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
+          <Route index element={<TenantDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="vehicles" element={<AdminVehicles />} />
+          <Route path="reports" element={<AdminReports />} />
+          <Route path="settings" element={<AdminSettings />} />
+          <Route path="notifications" element={<AdminNotifications />} />
+          {/* Tenant specifically wants to manage Admins */}
+          <Route path="admins" element={<AdminUsers />} /> 
+        </Route>
+
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>

@@ -12,7 +12,7 @@ export const loginUser = async (req, res, next) => {
 
         const user = await prisma.user.findUnique({
             where: { mobile },
-            include: { assignedVehicle: true },
+            include: { assignedVehicle: true, tenant: true },
         });
         console.log(`[DEBUG] User found: ${!!user}, Status: ${user?.status}, Role: ${user?.role}`);
 
@@ -41,11 +41,13 @@ export const loginUser = async (req, res, next) => {
         console.log('[DEBUG] Comparing password...');
         if (await bcrypt.compare(password, user.password)) {
             console.log('[DEBUG] Password matched. Generating token...');
-            const token = generateToken(user.id, user.role, user.assignedVehicleId);
+            const token = generateToken(user.id, user.role, user.assignedVehicleId, user.tenantId);
             console.log('[DEBUG] Token generated successfully');
             
             res.json({
                 id: user.id,
+                tenantId: user.tenantId,
+                tenantName: user.tenant?.name,
                 name: user.name,
                 email: user.email,
                 mobile: user.mobile,
@@ -79,14 +81,9 @@ export const getUserProfile = async (req, res, next) => {
     try {
         const user = await prisma.user.findUnique({
             where: { id: req.user.id },
-            select: {
-                id: true,
-                name: true,
-                email: true,
-                mobile: true,
-                role: true,
-                assignedVehicleId: true,
-                assignedVehicle: true,
+            include: {
+                tenant: { select: { name: true, logo: true } },
+                assignedVehicle: true
             }
         });
 

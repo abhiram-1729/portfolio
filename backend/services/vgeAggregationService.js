@@ -16,15 +16,24 @@ import { getIO } from './socketService.js';
 /**
  * Load incentive config from DB (with fallback to defaults)
  */
-async function getConfig() {
+async function getConfig(tenantId) {
   try {
-    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { id: 'singleton' } });
+    if (!tenantId) return null;
+    
+    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { tenantId } });
     if (!config) {
-      config = await prisma.vgeIncentiveConfig.create({ data: { id: 'singleton' } });
+      // Create default config for this tenant if requested
+      config = await prisma.vgeIncentiveConfig.create({ 
+        data: { 
+          tenantId,
+          minSalesThreshold: 10000,
+          minRegThreshold: 5
+        } 
+      });
     }
     return config;
   } catch (err) {
-    console.warn('[VGE] Failed to load config, using defaults:', err.message);
+    console.warn(`[VGE] Failed to load config for tenant ${tenantId}, using defaults:`, err.message);
     return null; // Engine will use DEFAULT_CONFIG
   }
 }
@@ -114,10 +123,12 @@ export async function updateDailyPerformance(userId, date = null) {
     const totalRegistrations = uniqueCustomers.length;
 
     // 3. Calculate incentives
-    const config = await getConfig();
+    const config = await getConfig(user.tenantId);
     const result = calculateIncentive(totalSales, totalRegistrations, config);
 
     // 4. Upsert into VgeDailyPerformance
+    // Note: tenantId will be automatically handled if we are in a context, 
+    // but here we are in a service that might be called from background.
     const performance = await prisma.vgeDailyPerformance.upsert({
       where: { userId_date: { userId, date: dateStr } },
       update: {
@@ -134,6 +145,7 @@ export async function updateDailyPerformance(userId, date = null) {
       },
       create: {
         userId,
+        tenantId: user.tenantId,
         date: dateStr,
         routeId,
         totalSales,

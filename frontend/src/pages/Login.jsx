@@ -26,7 +26,10 @@ export default function Login() {
       const { data } = await authAPI.login({ mobile, password });
       setUser(data, data.token);
       toast.success(`Welcome back, ${data.name || 'Agent'}!`);
-      if (data.role === 'ADMIN') {
+      
+      if (data.role === 'TENANT_OWNER') {
+        navigate('/tenant');
+      } else if (data.role === 'ADMIN') {
         navigate('/admin');
       } else {
         navigate('/');

@@ -3,15 +3,16 @@ import prisma from '../../utils/prisma.js';
 // Get current business settings
 export const getSettings = async (req, res) => {
   try {
+    // findFirst will be automatically scoped by extension
     let settings = await prisma.businessSettings.findFirst();
     
-    // If no settings exist yet, create the default singleton
+    // If no settings exist yet, create default for this tenant
     if (!settings) {
       settings = await prisma.businessSettings.create({
         data: {
-          id: 'singleton',
           businessName: 'VillagKart',
-          taxRates: '0,5,12,18'
+          taxRates: '0,5,12,18',
+          // tenantId injected by extension
         }
       });
     }
@@ -27,10 +28,11 @@ export const getSettings = async (req, res) => {
 export const updateSettings = async (req, res) => {
   try {
     const { businessName, gstNo, contactNo, email, address, taxRates } = req.body;
-    
-    // Find or create the singleton
+    const tenantId = req.user.tenantId;
+
+    // Use tenantId for uniqueness
     const settings = await prisma.businessSettings.upsert({
-      where: { id: 'singleton' },
+      where: { tenantId }, 
       update: {
         businessName,
         gstNo,
@@ -40,13 +42,13 @@ export const updateSettings = async (req, res) => {
         taxRates
       },
       create: {
-        id: 'singleton',
         businessName,
         gstNo,
         contactNo,
         email,
         address,
-        taxRates
+        taxRates,
+        tenantId
       }
     });
 

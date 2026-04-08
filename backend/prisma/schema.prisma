@@ -7,8 +7,45 @@ datasource db {
   relationMode = "prisma"
 }
 
+model Tenant {
+  id            String       @id @default(cuid())
+  name          String
+  code          String       @unique
+  contactEmail  String?
+  contactPhone  String?
+  address       String?
+  logo          String?
+  status        TenantStatus @default(ACTIVE)
+  planName      String       @default("FREE")
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  // Ownership Relations
+  users             User[]
+  categories        Category[]
+  brands            Brand[]
+  products          Product[]
+  warehouses        Warehouse[]
+  orders            Order[]
+  vehicles          Vehicle[]
+  routes            Route[]
+  villages          Village[]
+  expenseCategories ExpenseCategory[]
+  units             Unit[]
+  assets            Asset[]
+  businessSettings  BusinessSettings[]
+  incentiveConfig   VgeIncentiveConfig?
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
 model User {
   id                String            @id @default(cuid())
+  tenantId          String            @default("VK001") // Temp default for migration
   name              String?
   email             String            @unique
   password          String
@@ -21,6 +58,8 @@ model User {
   baseSalary        Float?            @default(12000)
   status            UserStatus        @default(ACTIVE)
   fcmToken          String?
+
+  tenant            Tenant            @relation(fields: [tenantId], references: [id])
   assignedVehicle   Vehicle?          @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
   orders            Order[]
   carts             Cart[]
@@ -38,6 +77,7 @@ model User {
   dailySummaries    DailyCashSummary[] @relation("UserDailyCashSummary")
   assetRequests     AssetRequest[]    @relation("UserAssetRequests")
 
+  @@index([tenantId])
   @@index([assignedVehicleId])
   @@index([role])
   @@index([status])
@@ -45,9 +85,14 @@ model User {
 
 model Category {
   id            String        @id @default(cuid())
-  name          String        @unique
+  tenantId      String        @default("VK001")
+  name          String
   subCategories SubCategory[]
   products      Product[]
+  tenant        Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model SubCategory {
@@ -60,12 +105,18 @@ model SubCategory {
 
 model Brand {
   id       String    @id @default(cuid())
-  name     String    @unique
+  tenantId String    @default("VK001")
+  name     String
   products Product[]
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Product {
   id                 String               @id @default(cuid())
+  tenantId           String               @default("VK001")
   name               String
   description        String?
   price              Float
@@ -84,6 +135,8 @@ model Product {
   gst                Float?               @default(0)
   isFree             Boolean              @default(false)
   minShopAmount      Float                @default(0)
+  
+  tenant             Tenant               @relation(fields: [tenantId], references: [id])
   category           Category             @relation(fields: [categoryId], references: [id])
   subCategory        SubCategory          @relation(fields: [subCategoryId], references: [id])
   brand              Brand                @relation(fields: [brandId], references: [id])
@@ -95,6 +148,7 @@ model Product {
   orderItems         OrderItem[]
   refillItems        RefillItem[]
 
+  @@index([tenantId])
   @@index([status])
   @@index([categoryId])
   @@index([subCategoryId])
@@ -104,21 +158,29 @@ model Product {
 
 model ProductVariant {
   id        String  @id @default(cuid())
+  tenantId  String  @default("VK001")
   name      String
   price     Float
   productId String
   product   Product @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
 }
 
 model Warehouse {
   id        String               @id @default(cuid())
+  tenantId  String               @default("VK001")
   name      String
   location  String?
   inventory WarehouseInventory[]
+  tenant    Tenant               @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 model WarehouseInventory {
   id          String    @id @default(cuid())
+  tenantId    String    @default("VK001")
   warehouseId String
   productId   String
   quantity    Int       @default(0)
@@ -126,6 +188,7 @@ model WarehouseInventory {
   product     Product   @relation(fields: [productId], references: [id])
 
   @@unique([warehouseId, productId])
+  @@index([tenantId])
 }
 
 model Cart {
@@ -139,14 +202,18 @@ model Cart {
 
 model CartItem {
   id        String @id @default(cuid())
+  tenantId  String @default("VK001")
   cartId    String
   productId String
   quantity  Int
   cart      Cart   @relation(fields: [cartId], references: [id])
+
+  @@index([tenantId])
 }
 
 model Order {
   id           String        @id @default(cuid())
+  tenantId     String        @default("VK001")
   userId       String?
   agentId      String?
   totalAmount  Float
@@ -161,12 +228,14 @@ model Order {
   coverageType CoverageType?
   routeId      String?
   villageName  String?
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
   user         User?         @relation(fields: [userId], references: [id])
   vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   route        Route?        @relation(fields: [routeId], references: [id])
   items        OrderItem[]
   payment      Payment?
 
+  @@index([tenantId])
   @@index([userId])
   @@index([agentId])
   @@index([vehicleId])
@@ -177,6 +246,7 @@ model Order {
 
 model OrderItem {
   id           String  @id @default(cuid())
+  tenantId     String  @default("VK001")
   orderId      String
   productId    String
   quantity     Int
@@ -188,28 +258,34 @@ model OrderItem {
   order        Order   @relation(fields: [orderId], references: [id])
   product      Product @relation(fields: [productId], references: [id])
 
+  @@index([tenantId])
   @@index([orderId])
   @@index([productId])
 }
 
 model Payment {
   id          String      @id @default(cuid())
+  tenantId    String      @default("VK001")
   orderId     String      @unique
   paymentMode PaymentMode
   amount      Float
   status      String
   createdAt   DateTime    @default(now())
   order       Order       @relation(fields: [orderId], references: [id])
+
+  @@index([tenantId])
 }
 
 model Vehicle {
   id                String             @id @default(cuid())
-  vehicleNumber     String             @unique
+  tenantId          String             @default("VK001")
+  vehicleNumber     String
   status            Boolean            @default(true)
   insuranceDocument String?
   permitDocument    String?
   rcDocument        String?
   vehicleName       String?
+  tenant            Tenant             @relation(fields: [tenantId], references: [id])
   assignedUsers     User[]             @relation("UserVehicle")
   stocks            VehicleStock[]
   transactions      StockTransaction[]
@@ -222,6 +298,9 @@ model Vehicle {
   refillRequests    RefillRequest[]
   expenses          Expense[]
   cashTransfers     CashTransfer[]
+
+  @@unique([tenantId, vehicleNumber])
+  @@index([tenantId])
 }
 
 model VehicleStock {
@@ -238,6 +317,7 @@ model VehicleStock {
 
 model StockTransaction {
   id        String          @id @default(cuid())
+  tenantId  String          @default("VK001")
   date      DateTime        @default(now())
   type      TransactionType
   vehicleId String
@@ -246,6 +326,7 @@ model StockTransaction {
   vehicle   Vehicle         @relation(fields: [vehicleId], references: [id])
   product   Product         @relation(fields: [productId], references: [id])
 
+  @@index([tenantId])
   @@index([date])
   @@index([type])
   @@index([vehicleId])
@@ -254,27 +335,32 @@ model StockTransaction {
 
 model Route {
   id          String            @id @default(cuid())
+  tenantId    String            @default("VK001")
   routeName   String
   villages    String[]
   status      Boolean           @default(true)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
   cycles      RouteCycle[]
   assignments RouteAssignment[]
   orders      Order[]
   monthlySummaries VgeMonthlySummary[]
 
+  @@index([tenantId])
   @@index([status])
 }
 
 model RouteCycle {
   id          String    @id @default(cuid())
+  tenantId    String    @default("VK001")
   routeId     String
   dayOfWeek   DayOfWeek
   villageName String
   route       Route     @relation(fields: [routeId], references: [id])
 
   @@unique([routeId, dayOfWeek])
+  @@index([tenantId])
 }
 
 model RouteAssignment {
@@ -297,14 +383,20 @@ model RouteAssignment {
 
 model Village {
   id        String   @id @default(cuid())
-  name      String   @unique
+  tenantId  String   @default("VK001")
+  name      String
   status    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model OpeningCash {
   id               String   @id @default(cuid())
+  tenantId         String   @default("VK001")
   vehicleId        String
   userId           String
   date             String
@@ -316,10 +408,12 @@ model OpeningCash {
   user             User     @relation(fields: [userId], references: [id])
 
   @@unique([vehicleId, date])
+  @@index([tenantId])
 }
 
 model ClosingCash {
   id            String   @id @default(cuid())
+  tenantId      String   @default("VK001")
   vehicleId     String
   userId        String
   date          String
@@ -336,10 +430,12 @@ model ClosingCash {
   user          User     @relation(fields: [userId], references: [id])
 
   @@unique([vehicleId, date])
+  @@index([tenantId])
 }
 
 model BusinessSettings {
-  id           String   @id @default("singleton")
+  id           String   @id @default(cuid())
+  tenantId     String   @unique @default("VK001")
   businessName String   @default("VillagKart")
   gstNo        String?
   contactNo    String?
@@ -347,10 +443,14 @@ model BusinessSettings {
   address      String?
   taxRates     String   @default("0,5,12,18")
   updatedAt    DateTime @updatedAt
+  tenant       Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 model DailyCashSummary {
   id           String   @id @default(cuid())
+  tenantId     String   @default("VK001")
   vehicleId    String
   userId       String?
   date         String
@@ -367,12 +467,14 @@ model DailyCashSummary {
   user         User?    @relation("UserDailyCashSummary", fields: [userId], references: [id])
 
   @@unique([vehicleId, date])
+  @@index([tenantId])
   @@index([date])
   @@index([userId])
 }
 
 model Expense {
   id           String             @id @default(cuid())
+  tenantId     String             @default("VK001")
   userId       String
   vehicleId    String?
   type         String             // e.g. FUEL, FOOD, etc (to match dynamic management)
@@ -387,6 +489,7 @@ model Expense {
   user         User               @relation(fields: [userId], references: [id])
   vehicle      Vehicle?           @relation(fields: [vehicleId], references: [id])
 
+  @@index([tenantId])
   @@index([userId])
   @@index([vehicleId])
   @@index([date])
@@ -395,6 +498,7 @@ model Expense {
 
 model CashTransfer {
   id              String             @id @default(cuid())
+  tenantId        String             @default("VK001")
   userId          String
   vehicleId       String
   date            String             // YYYY-MM-DD
@@ -407,16 +511,22 @@ model CashTransfer {
   vehicle         Vehicle            @relation(fields: [vehicleId], references: [id])
 
   @@unique([vehicleId, date])
+  @@index([tenantId])
   @@index([userId])
 }
 
 model ExpenseCategory {
   id        String   @id @default(cuid())
-  name      String   @unique
+  tenantId  String   @default("VK001")
+  name      String
   limit     Float?
   status    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 enum ExpensePaymentMode {
@@ -433,6 +543,7 @@ enum ExpenseStatus {
 
 model DailyCoverage {
   id          String   @id @default(cuid())
+  tenantId    String   @default("VK001")
   vehicleId   String
   routeId     String?
   date        String
@@ -445,11 +556,13 @@ model DailyCoverage {
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
 
   @@unique([vehicleId, date])
+  @@index([tenantId])
   @@index([date])
 }
 
 model Notification {
   id        String    @id @default(cuid())
+  tenantId  String    @default("VK001")
   userId    String?
   title     String
   message   String
@@ -462,6 +575,7 @@ model Notification {
   vehicleId String?
   user      User?     @relation(fields: [userId], references: [id])
 
+  @@index([tenantId])
   @@index([userId, isRead])
   @@index([createdAt])
   @@index([role])
@@ -469,6 +583,7 @@ model Notification {
 
 model RefillRequest {
   id        String       @id @default(cuid())
+  tenantId  String       @default("VK001")
   vehicleId String
   userId    String
   status    RefillStatus @default(PENDING)
@@ -478,6 +593,7 @@ model RefillRequest {
   user      User         @relation(fields: [userId], references: [id])
   items     RefillItem[]
 
+  @@index([tenantId])
   @@index([vehicleId])
   @@index([userId])
   @@index([status])
@@ -485,18 +601,22 @@ model RefillRequest {
 
 model RefillItem {
   id              String        @id @default(cuid())
+  tenantId        String        @default("VK001")
   refillRequestId String
   productId       String
   quantity        Int
   refillRequest   RefillRequest @relation(fields: [refillRequestId], references: [id], onDelete: Cascade)
   product         Product       @relation(fields: [productId], references: [id])
 
+  @@index([tenantId])
   @@index([refillRequestId])
   @@index([productId])
 }
 
 enum UserRole {
   CONSUMER
+  SUPER_ADMIN
+  TENANT_OWNER
   ADMIN
   SALES_AGENT
   SUPERVISOR
@@ -567,6 +687,7 @@ enum VgeLevel {
 
 model VgeDailyPerformance {
   id                  String   @id @default(cuid())
+  tenantId            String   @default("VK001")
   userId              String
   date                String   // YYYY-MM-DD format
   routeId             String?
@@ -595,6 +716,7 @@ model VgeDailyPerformance {
   user                User     @relation("UserDailyPerformance", fields: [userId], references: [id])
 
   @@unique([userId, date])
+  @@index([tenantId])
   @@index([date])
   @@index([userId])
   @@index([level])
@@ -602,6 +724,7 @@ model VgeDailyPerformance {
 
 model VgeMonthlySummary {
   id                  String   @id @default(cuid())
+  tenantId            String   @default("VK001")
   userId              String
   month               String   // YYYY-MM format
   routeId             String?
@@ -624,11 +747,13 @@ model VgeMonthlySummary {
   user                User     @relation("UserMonthlySummary", fields: [userId], references: [id])
 
   @@unique([userId, month])
+  @@index([tenantId])
   @@index([month])
 }
 
 model VgeIncentiveConfig {
-  id                      String   @id @default("singleton")
+  id                      String   @id @default(cuid())
+  tenantId                String   @unique @default("VK001")
 
   // Minimum thresholds
   minSalesThreshold       Float    @default(10000)
@@ -654,15 +779,23 @@ model VgeIncentiveConfig {
   superStarThreshold      Float    @default(35000)
 
   updatedAt               DateTime @updatedAt
+  tenant                  Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
 }
 
 model Unit {
   id        String   @id @default(cuid())
-  name      String   @unique
+  tenantId  String   @default("VK001")
+  name      String
   type      String
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
   products  Product[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 // ─── Asset Management ─────────────────────────────────────
@@ -702,6 +835,7 @@ enum AssetIssueStatus {
 
 model Asset {
   id              String      @id @default(cuid())
+  tenantId        String      @default("VK001")
   name            String
   assetType       AssetType
   model           String?
@@ -712,14 +846,17 @@ model Asset {
   totalQuantity   Int         @default(0)
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
   units           AssetUnit[]
   requests        AssetRequest[]
 
+  @@index([tenantId])
   @@index([assetType])
 }
 
 model AssetUnit {
   id            String            @id @default(cuid())
+  tenantId      String            @default("VK001")
   assetId       String
   serialNumber  String?
   status        AssetStatus       @default(AVAILABLE)
@@ -732,12 +869,14 @@ model AssetUnit {
   requests      AssetRequest[]
 
   @@unique([assetId, serialNumber])
+  @@index([tenantId])
   @@index([assetId])
   @@index([status])
 }
 
 model AssetAssignment {
   id              String          @id @default(cuid())
+  tenantId        String          @default("VK001")
   assetUnitId     String
   userId          String
   assignedDate    DateTime        @default(now())
@@ -752,6 +891,7 @@ model AssetAssignment {
   assetUnit       AssetUnit       @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
   user            User            @relation(fields: [userId], references: [id])
 
+  @@index([tenantId])
   @@index([assetUnitId])
   @@index([userId])
   @@index([isActive])
@@ -759,6 +899,7 @@ model AssetAssignment {
 
 model AssetIssue {
   id            String           @id @default(cuid())
+  tenantId      String           @default("VK001")
   assetUnitId   String
   userId        String
   issueType     AssetIssueType
@@ -770,6 +911,7 @@ model AssetIssue {
   assetUnit     AssetUnit        @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
   user          User             @relation(fields: [userId], references: [id])
 
+  @@index([tenantId])
   @@index([assetUnitId])
   @@index([userId])
   @@index([status])
@@ -777,6 +919,7 @@ model AssetIssue {
 
 model AssetRequest {
   id            String          @id @default(cuid())
+  tenantId      String          @default("VK001")
   userId        String
   type          AssetRequestType
   assetId       String?         // Reference to asset if requesting specific type
@@ -792,6 +935,7 @@ model AssetRequest {
   asset         Asset?          @relation(fields: [assetId], references: [id])
   assetUnit     AssetUnit?      @relation(fields: [assetUnitId], references: [id])
 
+  @@index([tenantId])
   @@index([userId])
   @@index([status])
 }

@@ -4,6 +4,7 @@ import { uploadToSupabase } from '../../utils/supabaseService.js';
 export const getVehicles = async (req, res) => {
   try {
     const vehicles = await prisma.vehicle.findMany({
+      where: { tenantId: req.user.tenantId },
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
       }
@@ -18,7 +19,7 @@ export const getVehicleById = async (req, res) => {
   try {
     const { id } = req.params;
     const vehicle = await prisma.vehicle.findUnique({
-      where: { id },
+      where: { id, tenantId: req.user.tenantId },
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
       }
@@ -78,7 +79,8 @@ export const createVehicle = async (req, res) => {
         status: isStatusActive,
         rcDocument,
         insuranceDocument,
-        permitDocument
+        permitDocument,
+        tenantId: req.user.tenantId
       }
     });
 
@@ -134,7 +136,7 @@ export const updateVehicle = async (req, res) => {
     }
 
     const updated = await prisma.vehicle.update({
-      where: { id },
+      where: { id, tenantId: req.user.tenantId },
       data: {
         ...(vehicleNumber !== undefined && { vehicleNumber }),
         ...(vehicleName !== undefined && { vehicleName }),
@@ -149,14 +151,14 @@ export const updateVehicle = async (req, res) => {
     if (assignedUserId !== undefined) {
       // 1. Get the current assigned user(s) to notify or just unassign
       await prisma.user.updateMany({
-        where: { assignedVehicleId: id },
+        where: { assignedVehicleId: id, tenantId: req.user.tenantId },
         data: { assignedVehicleId: null }
       });
 
       // 2. Assign the new user if provided
       if (assignedUserId && assignedUserId !== 'null' && assignedUserId !== '') {
         await prisma.user.update({
-          where: { id: assignedUserId },
+          where: { id: assignedUserId, tenantId: req.user.tenantId },
           data: { assignedVehicleId: id }
         });
       }
@@ -213,7 +215,7 @@ export const deleteVehicle = async (req, res) => {
     }).catch(() => {});
 
     // 9. Finally delete the vehicle
-    await prisma.vehicle.delete({ where: { id } });
+    await prisma.vehicle.delete({ where: { id, tenantId: req.user.tenantId } });
 
     res.json({ message: 'Vehicle deleted successfully' });
   } catch (error) {
@@ -240,7 +242,7 @@ export const assignDriver = async (req, res) => {
     // Also ensure this user isn't assigned to another vehicle (optional, but good practice)
     if (userId && userId !== 'null' && userId !== '') {
       await prisma.user.update({
-        where: { id: userId },
+        where: { id: userId, tenantId: req.user.tenantId },
         data: { assignedVehicleId: id }
       });
     }
@@ -255,7 +257,7 @@ export const getVehicleSales = async (req, res) => {
   try {
     const { id } = req.params;
     const orders = await prisma.order.findMany({
-      where: { vehicleId: id },
+      where: { vehicleId: id, tenantId: req.user.tenantId },
       include: { user: { select: { name: true } }, items: true }
     });
 

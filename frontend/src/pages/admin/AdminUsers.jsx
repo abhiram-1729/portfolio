@@ -98,7 +98,9 @@ export default function AdminUsers() {
 
   const getRoleBadge = (role) => {
     const roles = {
-      ADMIN: { label: 'Admin', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: ShieldCheck },
+      SUPER_ADMIN: { label: 'Sys Admin', color: 'bg-rose-50 text-rose-700 border-rose-100', icon: ShieldCheck },
+      TENANT_OWNER: { label: 'Owner', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: ShieldCheck },
+      ADMIN: { label: 'Admin', color: 'bg-blue-50 text-blue-700 border-blue-100', icon: ShieldCheck },
       SALES_AGENT: { label: 'Sales', color: 'bg-emerald-50 text-emerald-700 border-emerald-100', icon: Truck },
       SUPERVISOR: { label: 'Sup', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: UserCog },
       HELPER: { label: 'Helper', color: 'bg-slate-50 text-slate-700 border-slate-100', icon: Users },
@@ -374,6 +376,8 @@ export default function AdminUsers() {
                   <option value="SUPERVISOR">Supervisor</option>
                   <option value="HELPER">Helper</option>
                   <option value="ADMIN">Admin</option>
+                  <option value="TENANT_OWNER">Tenant Owner</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
                 <input 
                   type="password"
@@ -485,6 +489,8 @@ export default function AdminUsers() {
                   <option value="SUPERVISOR">Supervisor</option>
                   <option value="HELPER">Helper</option>
                   <option value="ADMIN">Admin</option>
+                  <option value="TENANT_OWNER">Tenant Owner</option>
+                  <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
               </div>
 

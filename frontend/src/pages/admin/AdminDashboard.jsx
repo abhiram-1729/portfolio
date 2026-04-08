@@ -16,9 +16,10 @@ import { Link } from 'react-router-dom';
 import adminAPI from '../../services/adminService';
 import { getAdminReconciliation } from '../../services/cashService';
 import { format } from 'date-fns';
-import toast from 'react-hot-toast';
+import { useUserStore } from '../../store/userStore';
 
 export default function AdminDashboard() {
+  const { user: currentUser } = useUserStore();
   const [stats, setStats] = useState(null);
   const [cashStats, setCashStats] = useState([]);
   const [vgeStats, setVgeStats] = useState([]);
@@ -73,7 +74,9 @@ export default function AdminDashboard() {
     <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
       <div className="flex flex-col gap-2">
         <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-        <p className="text-sm text-gray-500">Quick overview of your operations today</p>
+        <p className="text-sm text-gray-500">
+          Adminizing <span className="text-emerald-600 font-black">{currentUser?.tenantName || currentUser?.tenant?.name || 'Organization'}</span>
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
