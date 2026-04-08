@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText } from 'lucide-react';
+import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -15,6 +15,7 @@ export default function AdminVehicles() {
   const [editDocuments, setEditDocuments] = useState({ rcDocument: null, insuranceDocument: null, permitDocument: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const [newVehicle, setNewVehicle] = useState({ vehicleNumber: '', vehicleName: '', assignedUserId: '', status: true });
   const [documents, setDocuments] = useState({ rcDocument: null, insuranceDocument: null, permitDocument: null });
@@ -125,6 +126,16 @@ export default function AdminVehicles() {
     }
   };
 
+  const filteredVehicles = vehicles.filter((v) => {
+    const searchLower = searchTerm.toLowerCase();
+    const assignedUser = users.find(u => u.assignedVehicleId === v.id);
+    return (
+      v.vehicleNumber?.toLowerCase().includes(searchLower) ||
+      v.vehicleName?.toLowerCase().includes(searchLower) ||
+      assignedUser?.name?.toLowerCase().includes(searchLower)
+    );
+  });
+
   // ── Assign driver ─────────────────────────────────────────
   const handleAssignDriver = async (userId) => {
     setIsSubmitting(true);
@@ -179,15 +190,39 @@ export default function AdminVehicles() {
           <h2 className="text-2xl font-bold text-gray-900">Vehicle Management</h2>
           <p className="text-sm text-gray-500">Manage your fleet and driver assignments</p>
         </div>
-        <button onClick={() => setShowAddModal(true)}
-          className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors">
-          <Plus size={24} />
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative group hidden sm:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-emerald-500 transition-colors" size={16} />
+            <input 
+              type="text"
+              placeholder="Search by number or driver..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
+            />
+          </div>
+          <button onClick={() => setShowAddModal(true)}
+            className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
+            <Plus size={24} />
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Search - Only visible on small screens */}
+      <div className="sm:hidden relative group px-1">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        <input 
+          type="text"
+          placeholder="Search fleet..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
+        />
       </div>
 
       {/* Vehicle Data Representation */}
       <div className="space-y-4">
-        {vehicles.length === 0 ? (
+        {filteredVehicles.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
             <Truck size={48} className="mx-auto text-gray-300 mb-2" />
             <p className="text-gray-500">No vehicles found</p>
@@ -196,7 +231,7 @@ export default function AdminVehicles() {
           <>
             {/* Mobile Card View */}
             <div className="grid grid-cols-1 gap-4 md:hidden">
-              {vehicles.map((vehicle) => (
+              {filteredVehicles.map((vehicle) => (
                 <div key={vehicle.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                   <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
@@ -278,7 +313,7 @@ export default function AdminVehicles() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {vehicles.map((vehicle) => (
+                  {filteredVehicles.map((vehicle) => (
                     <tr key={vehicle.id} className="hover:bg-gray-50/30 transition-colors group">
                       <td className="px-6 py-4">
                         <div className="flex items-center gap-3">

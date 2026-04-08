@@ -11,6 +11,7 @@ export default function AdminCashManagement() {
   const [summaries, setSummaries] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -169,6 +170,15 @@ export default function AdminCashManagement() {
       setIsDeleting(false);
     }
   };
+  const filteredSummaries = summaries.filter(s => {
+    const searchLower = searchTerm.toLowerCase();
+    const agent = s.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
+    return (
+      s.vehicle?.vehicleNumber?.toLowerCase().includes(searchLower) ||
+      s.vehicle?.vehicleName?.toLowerCase().includes(searchLower) ||
+      agent?.name?.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <div className="space-y-6">
@@ -179,6 +189,16 @@ export default function AdminCashManagement() {
         </div>
 
         <div className="flex items-center gap-3">
+          <div className="relative group hidden sm:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+            <input 
+              type="text"
+              placeholder="Search by vehicle or agent..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
+            />
+          </div>
           <button
             onClick={() => setShowAssignModal(true)}
             className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
@@ -196,6 +216,18 @@ export default function AdminCashManagement() {
             />
           </div>
         </div>
+      </div>
+
+      {/* Mobile Search - Only visible on small screens */}
+      <div className="sm:hidden relative group px-1">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        <input 
+          type="text"
+          placeholder="Search by vehicle or agent..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
+        />
       </div>
 
       {/* Stats Overview */}
@@ -254,15 +286,15 @@ export default function AdminCashManagement() {
                     Loading cash summaries...
                   </td>
                 </tr>
-              ) : summaries.length === 0 ? (
+              ) : filteredSummaries.length === 0 ? (
                 <tr>
                   <td colSpan="8" className="px-6 py-12 text-center">
                     <Coins size={32} className="mx-auto text-gray-200 mb-2" />
-                    <p className="text-sm font-bold text-gray-400">No cash records found for this date</p>
+                    <p className="text-sm font-bold text-gray-400">No matching cash records found</p>
                   </td>
                 </tr>
               ) : (
-                summaries.map((summary) => (
+                filteredSummaries.map((summary) => (
                   <tr key={summary.id} className="hover:bg-gray-50/50 transition-colors">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">

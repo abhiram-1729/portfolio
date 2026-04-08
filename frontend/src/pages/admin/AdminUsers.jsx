@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -19,6 +19,7 @@ export default function AdminUsers({ type }) {
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const fetchUsers = async () => {
     try {
@@ -132,9 +133,22 @@ export default function AdminUsers({ type }) {
   };
 
   const filteredUsers = users.filter(u => {
-    if (type === 'admin') return ['ADMIN', 'TENANT_OWNER', 'SUPER_ADMIN'].includes(u.role);
-    if (type === 'staff') return ['SALES_AGENT', 'SUPERVISOR', 'HELPER'].includes(u.role);
-    return true;
+    // 1. Role Filter
+    const roleMatches = type === 'admin' 
+      ? ['ADMIN', 'TENANT_OWNER', 'SUPER_ADMIN'].includes(u.role)
+      : type === 'staff' 
+        ? ['SALES_AGENT', 'SUPERVISOR', 'HELPER'].includes(u.role)
+        : true;
+
+    if (!roleMatches) return false;
+
+    // 2. Search Filter
+    const searchLower = searchTerm.toLowerCase();
+    return (
+      u.name?.toLowerCase().includes(searchLower) ||
+      u.mobile?.includes(searchTerm) ||
+      u.role?.toLowerCase().includes(searchLower)
+    );
   });
 
   if (loading) {
@@ -156,13 +170,38 @@ export default function AdminUsers({ type }) {
           <h2 className="text-xl font-bold text-gray-900">{type === 'admin' ? 'Organization Admins' : 'Operational Staff'}</h2>
           <p className="text-xs text-gray-500">{listToRender.length} members found</p>
         </div>
-        <button 
-          onClick={() => setShowAddModal(true)}
-          className="bg-emerald-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-medium text-sm"
-        >
-          <Plus size={18} />
-          <span>Add New</span>
-        </button>
+        <div className="flex items-center gap-3">
+          <div className="relative group hidden sm:block">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-emerald-500" size={16} />
+            <input 
+              type="text"
+              placeholder="Search by name or phone..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
+            />
+          </div>
+          <button 
+            onClick={() => setShowAddModal(true)}
+            className="bg-emerald-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-medium text-sm active:scale-95"
+          >
+            <Plus size={18} />
+            <span className="hidden md:inline">Hire Staff</span>
+            <span className="md:hidden">Add</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Mobile Search - Only visible on small screens */}
+      <div className="sm:hidden relative group px-1">
+        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+        <input 
+          type="text"
+          placeholder="Search staff members..."
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
+        />
       </div>
 
       {/* Main List Container */}
