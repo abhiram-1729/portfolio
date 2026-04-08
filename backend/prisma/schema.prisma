@@ -97,10 +97,13 @@ model Category {
 
 model SubCategory {
   id         String    @id @default(cuid())
+  tenantId   String    @default("VK001")
   name       String
   categoryId String
   category   Category  @relation(fields: [categoryId], references: [id])
   products   Product[]
+
+  @@index([tenantId])
 }
 
 model Brand {
@@ -193,11 +196,14 @@ model WarehouseInventory {
 
 model Cart {
   id        String     @id @default(cuid())
+  tenantId  String     @default("VK001")
   userId    String
   createdAt DateTime   @default(now())
   updatedAt DateTime   @updatedAt
   user      User       @relation(fields: [userId], references: [id])
   items     CartItem[]
+
+  @@index([tenantId])
 }
 
 model CartItem {
@@ -305,6 +311,7 @@ model Vehicle {
 
 model VehicleStock {
   id              String  @id @default(cuid())
+  tenantId        String  @default("VK001")
   vehicleId       String
   productId       String
   quantity        Int     @default(0)
@@ -313,6 +320,7 @@ model VehicleStock {
   product         Product @relation(fields: [productId], references: [id])
 
   @@unique([vehicleId, productId])
+  @@index([tenantId])
 }
 
 model StockTransaction {
@@ -365,6 +373,7 @@ model RouteCycle {
 
 model RouteAssignment {
   id               String   @id @default(cuid())
+  tenantId         String   @default("VK001")
   vehicleId        String
   userId           String
   routeId          String
@@ -377,6 +386,7 @@ model RouteAssignment {
   user             User     @relation(fields: [userId], references: [id])
   route            Route    @relation(fields: [routeId], references: [id])
 
+  @@index([tenantId])
   @@index([vehicleId, status])
   @@index([userId, status])
 }

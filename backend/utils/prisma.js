@@ -25,43 +25,66 @@ const prisma = basePrisma.$extends({
   query: {
     $allModels: {
       async $allOperations({ model, operation, args, query }) {
-        const tenantId = getTenantId();
-        
-        // Skip isolation for Tenant model itself
-        if (model === 'Tenant') {
-          return query(args);
-        }
-
-        if (tenantId) {
-          // Injection for Read operations
-          if (['findMany', 'findFirst', 'count', 'groupBy', 'aggregate'].includes(operation)) {
-            args.where = { ...args.where, tenantId };
-          }
-
-          // Redirect findUnique to findFirst to include tenantId (since findUnique only takes unique fields)
-          if (operation === 'findUnique') {
-            const modelName = model.charAt(0).toLowerCase() + model.slice(1);
-            return basePrisma[modelName].findFirst({
-              ...args,
-              where: { ...args.where, tenantId }
-            });
-          }
+        try {
+          const tenantId = getTenantId();
           
-          // Injection for Write operations
-          if (['create', 'createMany'].includes(operation)) {
-            if (Array.isArray(args.data)) {
-              args.data = args.data.map(d => ({ ...d, tenantId }));
-            } else {
-              args.data = { ...args.data, tenantId };
+          // Skip isolation for Tenant model itself
+          if (model === 'Tenant') {
+            return query(args);
+          }
+
+          if (tenantId) {
+            // Injection for Read operations
+            if (['findMany', 'findFirst', 'count', 'groupBy', 'aggregate'].includes(operation)) {
+              args.where = { ...args.where, tenantId };
+            }
+
+            // Redirect findUnique to findFirst to include tenantId
+            if (operation === 'findUnique') {
+              const modelName = model.charAt(0).toLowerCase() + model.slice(1);
+              if (basePrisma[modelName]) {
+                const refinedWhere = { ...args.where, tenantId };
+                
+                // Flatten composite unique keys for findFirst compatibility
+                // (e.g., { vehicleId_date: { vehicleId, date } } -> { vehicleId, date })
+                for (const key in args.where) {
+                  if (key.includes('_') && typeof args.where[key] === 'object' && !Array.isArray(args.where[key])) {
+                    // Check if it's a composite key (values are not filters like 'in', 'gt', etc.)
+                    const values = args.where[key];
+                    const isFilter = Object.keys(values).some(k => ['in', 'not', 'gt', 'lt', 'gte', 'lte', 'contains'].includes(k));
+                    if (!isFilter) {
+                      Object.assign(refinedWhere, values);
+                      delete refinedWhere[key];
+                    }
+                  }
+                }
+
+                return basePrisma[modelName].findFirst({
+                  ...args,
+                  where: refinedWhere
+                });
+              }
+            }
+            
+            // Injection for Write operations
+            if (['create', 'createMany'].includes(operation)) {
+              if (Array.isArray(args.data)) {
+                args.data = args.data.map(d => ({ ...d, tenantId }));
+              } else {
+                args.data = { ...args.data, tenantId };
+              }
+            }
+            
+            if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
+              args.where = { ...args.where, tenantId };
             }
           }
-          
-          if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
-            args.where = { ...args.where, tenantId };
-          }
-        }
 
-        return query(args);
+          return query(args);
+        } catch (error) {
+          console.error(`[Prisma Extension Error] Model: ${model}, Op: ${operation}:`, error.message);
+          throw error;
+        }
       },
     },
   },
