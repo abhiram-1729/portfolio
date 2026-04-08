@@ -55,14 +55,21 @@ export default function Sidebar({ isOpen, onClose }) {
         </div>
 
         {/* User Profile Summary */}
-        <div className="mx-6 p-3 rounded-2xl bg-slate-50 border border-slate-100 mb-4 flex items-center gap-3">
+        <div className="mx-6 p-3 rounded-2xl bg-slate-50 border border-slate-100 mb-4 flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
             <User size={20} strokeWidth={2.5} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-xs font-black text-slate-900 truncate tracking-tight">{user?.name}</p>
+            <p className="text-xs font-black text-slate-900 truncate tracking-tight font-sans uppercase">{user?.name}</p>
             <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{user?.role?.replace('_', ' ')}</p>
           </div>
+          <button 
+            onClick={handleLogout}
+            className="p-2.5 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
+            title="Logout"
+          >
+            <LogOut size={16} strokeWidth={3} />
+          </button>
         </div>
 
         {/* Navigation Content */}
@@ -90,17 +97,11 @@ export default function Sidebar({ isOpen, onClose }) {
             })}
           </div>
 
-          <div className="mt-4 pt-4 border-t border-slate-100 flex flex-col gap-1">
-            <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Settings</p>
-            <button
-               onClick={handleLogout}
-               className="flex items-center gap-3 px-4 py-3 rounded-xl text-orange-600 hover:bg-orange-50 active:scale-[0.98] transition-all"
-            >
-              <div className="p-1.5">
-                <LogOut size={18} strokeWidth={2.5} />
-              </div>
-              <span className="font-black text-[0.85rem] tracking-tight">Logout</span>
-            </button>
+          <div className="mt-4 pt-4 border-t border-slate-100">
+            <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">System</p>
+            <div className="px-4 py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest italic">
+              Synchronized Access
+            </div>
           </div>
         </div>
 

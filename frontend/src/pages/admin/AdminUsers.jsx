@@ -156,99 +156,163 @@ export default function AdminUsers() {
       </div>
 
       {/* Main List Container */}
-      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div className="space-y-4">
         {users.length === 0 ? (
-          <div className="text-center py-12">
-            <User size={48} className="mx-auto text-gray-200 mb-2" />
-            <p className="text-gray-400 text-sm">No staff members found</p>
+          <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
+            <User size={48} className="mx-auto text-gray-200 mb-4" />
+            <h3 className="text-lg font-black text-gray-900 tracking-tight">Access Control Empty</h3>
+            <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">No staff members have been onboarded yet.</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {/* Table Header - Desktop Only */}
-            <div className="hidden md:grid grid-cols-12 gap-4 px-6 py-3 bg-gray-50/50 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-              <div className="col-span-5">Member Information</div>
-              <div className="col-span-3">Contact</div>
-              <div className="col-span-3">Role / Vehicle</div>
-              <div className="col-span-1 text-right">Action</div>
-            </div>
-
-            {/* List Items */}
-            {users.map((user) => (
-              <div 
-                key={user.id} 
-                className={`group relative flex flex-col md:grid md:grid-cols-12 md:items-center gap-2 md:gap-4 px-4 py-3 md:px-6 md:py-4 transition-colors hover:bg-gray-50/30 ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80' : ''}`}
-              >
-                {/* Information Column */}
-                <div className="col-span-10 flex items-start gap-3">
-                  {/* Avatar */}
-                  <div className={`flex-shrink-0 w-10 h-10 rounded-xl flex items-center justify-center font-bold text-xs border transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-100 text-gray-500 border-gray-200 group-hover:bg-emerald-50 group-hover:text-emerald-600 group-hover:border-emerald-100'}`}>
-                    {getInitials(user.name)}
-                  </div>
-                  
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className={`font-bold text-sm whitespace-nowrap ${user.status === 'SUSPENDED' ? 'text-gray-500 line-through' : 'text-gray-900'}`}>{user.name}</h3>
-                      {getRoleBadge(user.role)}
-                      {getStatusBadge(user.status)}
-                    </div>
-
-                    <div className={`flex items-center gap-2 mt-1 text-[11px] font-medium flex-wrap ${user.status === 'SUSPENDED' ? 'text-gray-400' : 'text-emerald-600'}`}>
-                      <span className="flex items-center gap-1">
-                        <Phone size={11} />
-                        {user.mobile || 'No mobile added'}
-                      </span>
-                      <div className="flex items-center gap-1 px-1.5 py-0 bg-gray-50 rounded-md text-[9px] font-bold text-gray-400 border border-gray-100 uppercase tracking-tighter">
-                        <Truck size={10} className="text-gray-300" />
-                        <span>{user.assignedVehicle?.vehicleNumber || 'None'}</span>
+          <>
+            {/* Mobile Card View */}
+            <div className="md:hidden space-y-4">
+              {users.map((user) => (
+                <div 
+                  key={user.id} 
+                  className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 grayscale opacity-80' : ''}`}
+                >
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border shadow-inner ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                        {getInitials(user.name)}
+                      </div>
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <h3 className={`font-black text-gray-900 tracking-tight leading-none ${user.status === 'SUSPENDED' ? 'line-through' : ''}`}>{user.name}</h3>
+                          {getStatusBadge(user.status)}
+                        </div>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {getRoleBadge(user.role)}
+                        </div>
                       </div>
                     </div>
-
-                    <p className="hidden md:block text-[10px] text-gray-400 truncate mt-0.5">{user.email}</p>
+                    
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => { setEditingUser(user); setShowEditModal(true); }}
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => handleToggleStatus(user)}
+                        className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
+                        {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                      </button>
+                      <button onClick={() => handleDeleteUser(user.id)}
+                        disabled={deletingId === user.id}
+                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
+                        {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                      </button>
+                    </div>
                   </div>
+
+                  <div className="grid grid-cols-2 gap-3 pb-1">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Mobile</span>
+                      <span className="text-xs font-black text-gray-700 flex items-center gap-1.5"><Phone size={10} className="text-emerald-500" /> {user.mobile || '---'}</span>
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Assigned Vehicle</span>
+                      <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'Unassigned'}</span>
+                    </div>
+                  </div>
+                  
+                  {user.dailyTarget && (
+                    <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 flex justify-between items-center">
+                       <span className="text-[9px] font-black uppercase text-emerald-600 tracking-widest">Daily Revenue Target</span>
+                       <span className="text-sm font-black text-emerald-950">₹{parseFloat(user.dailyTarget).toLocaleString()}</span>
+                    </div>
+                  )}
                 </div>
+              ))}
+            </div>
 
-                {/* Actions */}
-                <div className="absolute top-4 right-3 md:static md:col-span-2 flex items-center justify-end gap-1.5">
-                  {/* Edit Button */}
-                  <button 
-                    onClick={() => {
-                      setEditingUser(user);
-                      setShowEditModal(true);
-                    }}
-                    title="Edit Member"
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                  >
-                    <Pencil size={15} />
-                  </button>
-
-                  {/* Suspend/Unsuspend Button */}
-                  <button 
-                    onClick={() => handleToggleStatus(user)}
-                    title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
-                    className={`p-2 rounded-xl transition-all ${
-                      user.status === 'ACTIVE' 
-                        ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' 
-                        : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'
-                    }`}
-                  >
-                    {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
-                  </button>
-
-                  {/* Delete Button */}
-                  <button 
-                    onClick={() => handleDeleteUser(user.id)}
-                    title="Delete Account"
-                    disabled={deletingId === user.id}
-                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {deletingId === user.id
-                      ? <Loader2 size={15} className="animate-spin text-rose-400" />
-                      : <Trash2 size={15} />}
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Daily Target</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {users.map((user) => (
+                    <tr 
+                      key={user.id} 
+                      className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
+                    >
+                      <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs border shadow-inner transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-50 text-gray-400 border-gray-100 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-500 transition-all'}`}>
+                            {getInitials(user.name)}
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`text-sm font-black text-gray-900 tracking-tight leading-none mb-1 ${user.status === 'SUSPENDED' ? 'line-through text-gray-400' : ''}`}>
+                              {user.name}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-gray-400 font-bold tracking-tight">{user.email}</span>
+                              {getStatusBadge(user.status)}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                        <div className="flex flex-col items-center">
+                          <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                            <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                        <div className="flex flex-col items-center gap-1.5">
+                          {getRoleBadge(user.role)}
+                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                            <Truck size={10} />
+                            {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                         <span className={`text-sm font-black ${user.dailyTarget > 0 ? 'text-emerald-700' : 'text-gray-300 italic'}`}>
+                           {user.dailyTarget ? `₹${parseFloat(user.dailyTarget).toLocaleString()}` : 'Not Set'}
+                         </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button 
+                            onClick={() => { setEditingUser(user); setShowEditModal(true); }}
+                            title="Edit Profile"
+                            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                          >
+                            <Pencil size={15} />
+                          </button>
+                          <button 
+                            onClick={() => handleToggleStatus(user)}
+                            title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
+                            className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                          >
+                            {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteUser(user.id)}
+                            title="Permanent Removal"
+                            disabled={deletingId === user.id}
+                            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                          >
+                            {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

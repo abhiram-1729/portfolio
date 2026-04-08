@@ -676,6 +676,117 @@ export default function AdminInventory() {
 
     const allSelected = filteredItems.length > 0 && selectedItems.length === filteredItems.length;
 
+    const renderDesktopTable = (itemsToRender) => (
+      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 w-10">
+                <button
+                  onClick={() => handleSelectAll(itemsToRender)}
+                  className={`p-1 rounded-md transition-colors ${selectedItems.length === itemsToRender.length && itemsToRender.length > 0 ? 'text-emerald-600' : 'text-gray-300'}`}
+                >
+                  {selectedItems.length === itemsToRender.length && itemsToRender.length > 0 ? <CheckSquare size={18} /> : <Square size={18} />}
+                </button>
+              </th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Category</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Pricing</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Tax</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {itemsToRender.map((item) => {
+              const isSelected = selectedItems.includes(item.id);
+              return (
+                <tr key={item.id} className={`hover:bg-gray-50/30 transition-colors group ${isSelected ? 'bg-emerald-50/10' : ''}`}>
+                  <td className="px-6 py-4">
+                    <button
+                      onClick={() => toggleSelectItem(item.id)}
+                      className={`p-1 rounded-md transition-colors ${isSelected ? 'text-emerald-600' : 'text-gray-300'}`}
+                    >
+                      {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                    </button>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden border shadow-inner shrink-0 ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          item.isFree ? <Gift size={18} /> : <Package size={18} />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-900 leading-tight">{item.name}</span>
+                        {item.unit && (
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+                            {item.unitValue || ''} {item.unit.type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                      {item.category?.name || 'Uncategorized'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-center gap-4">
+                      <div className="flex flex-col items-center">
+                        <span className="text-[8px] font-black text-gray-300 uppercase tracking-tighter">Selling</span>
+                        <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
+                      </div>
+                      <div className="flex flex-col items-center border-l border-gray-100 pl-4 text-gray-400">
+                        <span className="text-[8px] font-black uppercase tracking-tighter">MRP</span>
+                        <span className="text-[10px] line-through">₹{item.mrp || 0}</span>
+                      </div>
+                      <div className="flex flex-col items-center border-l border-gray-100 pl-4">
+                        <span className="text-[8px] font-black text-orange-400 uppercase tracking-tighter">Disc</span>
+                        <span className="text-[10px] text-orange-600 font-bold">₹{item.discount || 0}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-widest border border-blue-100">
+                      {item.gst || 0}%
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-500 text-white')}`}>
+                      {item.status || 'ACTIVE'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center justify-end gap-1 transition-all">
+                      <button
+                        onClick={() => openEditModal(item)}
+                        className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                        title="Edit Item"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteItem(item)}
+                        disabled={deletingId === item.id}
+                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                        title="Delete Item"
+                      >
+                        {deletingId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+
     return (
       <div className="space-y-4">
         <div className="flex items-center gap-3">
@@ -770,18 +881,37 @@ export default function AdminInventory() {
             </div>
           ) : (
             <>
-              {filteredItems.filter(i => !i.isFree).length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Regular Products</h4>
-                  {filteredItems.filter(i => !i.isFree).map(renderProductCard)}
-                </div>
-              )}
-              {filteredItems.filter(i => i.isFree).length > 0 && (
-                <div className="space-y-3 mt-4">
-                  <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-2 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                  {filteredItems.filter(i => i.isFree).map(renderProductCard)}
-                </div>
-              )}
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-8">
+                {filteredItems.filter(i => !i.isFree).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Regular Products</h4>
+                    {filteredItems.filter(i => !i.isFree).map(renderProductCard)}
+                  </div>
+                )}
+                {filteredItems.filter(i => i.isFree).length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-2 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                    {filteredItems.filter(i => i.isFree).map(renderProductCard)}
+                  </div>
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block space-y-8">
+                {filteredItems.filter(i => !i.isFree).length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-4">Regular Products</h4>
+                    {renderDesktopTable(filteredItems.filter(i => !i.isFree))}
+                  </div>
+                )}
+                {filteredItems.filter(i => i.isFree).length > 0 && (
+                  <div className="space-y-3 mt-8">
+                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-4 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                    {renderDesktopTable(filteredItems.filter(i => i.isFree))}
+                  </div>
+                )}
+              </div>
             </>
           )}
         </div>
@@ -789,213 +919,400 @@ export default function AdminInventory() {
     );
   };
 
-  const renderLoading = () => (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle</label>
-          <div className="relative">
-            <select
-              value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+  const renderLoading = () => {
+    const regularItems = groupedLoadingItems.regular;
+    const freeItems = groupedLoadingItems.free;
+
+    const renderLoadingTable = (itemsToRender, isFreeGroup = false) => (
+      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Load Quantity</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {itemsToRender.map((item) => {
+              const qty = parseFloat(stockQuantities[item.id]) || 0;
+              const price = parseFloat(item.price) || 0;
+              const displayAmount = qty * price;
+              return (
+                <tr key={`load-table-${item.id}`} className={`hover:bg-gray-50/30 transition-colors group ${isFreeGroup ? 'bg-emerald-50/10' : ''}`}>
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden border shadow-inner shrink-0 ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          item.isFree ? <Gift size={14} /> : <Package size={14} />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-800 leading-tight">{item.name}</span>
+                        {item.unit && (
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+                            {item.unitValue || ''} {item.unit.type}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                    <span className="text-xs font-bold text-gray-500">₹{price}</span>
+                  </td>
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                    <div className="flex justify-center">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        className="w-20 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
+                        value={stockQuantities[item.id] || ''}
+                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className={`text-sm font-black ${qty > 0 ? 'text-emerald-700' : 'text-gray-300'}`}>
+                      ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle</label>
+            <div className="relative">
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="">Select Vehicle No.</option>
+                {vehicles.map(v => {
+                  const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
+                  const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
+                    </option>
+                  );
+                })}
+              </select>
+              <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+            </div>
+          </div>
+
+          <div className="pt-4 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h4 className="text-sm font-black text-gray-900 flex items-center gap-2 whitespace-nowrap uppercase tracking-widest">
+                <ArrowUpCircle size={18} className="text-emerald-500" />
+                Stock Loading
+              </h4>
+              <div className="w-full md:max-w-xs relative">
+                <input
+                  type="text"
+                  placeholder="Search to load..."
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Loading Value</span>
+                <span className="text-2xl font-black text-emerald-900">₹{totalLoadingValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              </div>
+              <div className="w-14 h-14 bg-emerald-500 shadow-lg shadow-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-400">
+                <Truck className="text-white" size={28} />
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              {/* Mobile Card View */}
+              <div className="md:hidden space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
+                {regularItems.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
+                    {regularItems.map((item) => (
+                      <StockItemRow 
+                        key={`load-mob-${item.id}`} 
+                        item={item} 
+                        quantity={stockQuantities[item.id]} 
+                        onChange={handleQuantityChange} 
+                      />
+                    ))}
+                  </div>
+                )}
+                {freeItems.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                    {freeItems.map((item) => (
+                      <StockItemRow 
+                        key={`load-free-mob-${item.id}`} 
+                        item={item} 
+                        quantity={stockQuantities[item.id]} 
+                        onChange={handleQuantityChange} 
+                        isFree 
+                      />
+                    ))}
+                  </div>
+                )}
+                {loadingFilteredItems.length === 0 && (
+                  <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
+                )}
+              </div>
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block">
+                {regularItems.length > 0 && (
+                  <div className="space-y-3">
+                    <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-4">Regular Products</h4>
+                    {renderLoadingTable(regularItems)}
+                  </div>
+                )}
+                {freeItems.length > 0 && (
+                  <div className="space-y-3 mt-4">
+                    <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-4 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                    {renderLoadingTable(freeItems, true)}
+                  </div>
+                )}
+                {loadingFilteredItems.length === 0 && (
+                  <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                    <p className="text-sm font-bold text-gray-400">No items found matching "{searchQuery}"</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <button
+              onClick={() => handleStockAction('LOAD')}
+              disabled={isSubmitting}
+              className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2"
             >
-              <option value="">Select Vehicle No.</option>
-              {vehicles.map(v => {
-                const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
-                const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
-                return (
-                  <option key={v.id} value={v.id}>
-                    {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
-                  </option>
-                );
-              })}
-            </select>
-            <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Confirm & Submit Loading'}
+            </button>
           </div>
-        </div>
-
-        <div className="pt-4 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
-              <ArrowUpCircle size={18} className="text-emerald-500" />
-              Stock Loading
-            </h4>
-            <div className="flex-1 max-w-xs relative">
-              <input
-                type="text"
-                placeholder="Search to load..."
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between bg-emerald-50 p-4 rounded-xl border border-emerald-100">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Loading Value</span>
-              <span className="text-xl font-black text-emerald-900">₹{totalLoadingValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="w-12 h-12 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/10">
-              <Truck className="text-emerald-600" size={24} />
-            </div>
-          </div>
-
-          <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
-            {groupedLoadingItems.regular.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
-                {groupedLoadingItems.regular.map((item) => (
-                  <StockItemRow 
-                    key={`load-${item.id}`} 
-                    item={item} 
-                    quantity={stockQuantities[item.id]} 
-                    onChange={handleQuantityChange} 
-                  />
-                ))}
-              </div>
-            )}
-            {groupedLoadingItems.free.length > 0 && (
-              <div className="space-y-3">
-                <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                {groupedLoadingItems.free.map((item) => (
-                  <StockItemRow 
-                    key={`load-free-${item.id}`} 
-                    item={item} 
-                    quantity={stockQuantities[item.id]} 
-                    onChange={handleQuantityChange} 
-                    isFree 
-                  />
-                ))}
-              </div>
-            )}
-            {loadingFilteredItems.length === 0 && (
-              <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
-            )}
-          </div>
-          <button
-            onClick={() => handleStockAction('LOAD')}
-            disabled={isSubmitting}
-            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : 'Submit Loading'}
-          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const renderReturn = () => (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle</label>
-          <div className="relative">
-            <select
-              value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="">Select Vehicle No.</option>
-              {vehicles.map(v => {
-                const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
-                const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
-                return (
-                  <option key={v.id} value={v.id}>
-                    {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
-                  </option>
-                );
-              })}
-            </select>
-            <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-        </div>
+  const renderReturn = () => {
+    const regularItems = groupedLoadingItems.regular;
+    const freeItems = groupedLoadingItems.free;
 
-        <div className="pt-4 space-y-4">
-          <div className="flex items-center justify-between gap-4">
-            <h4 className="text-sm font-bold text-gray-900 flex items-center gap-2 whitespace-nowrap">
-              <ArrowDownCircle size={18} className="text-orange-500" />
-              Stock Return
-            </h4>
-            <div className="flex-1 max-w-xs relative">
-              <input
-                type="text"
-                placeholder="Search inventory..."
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-1.5 text-xs focus:ring-2 focus:ring-orange-500/20 outline-none"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+    const renderReturnTable = (itemsToRender, isFreeGroup = false) => (
+      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">In Vehicle</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Return Qty</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Return Value</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {itemsToRender.map((item) => {
+              const qty = parseFloat(stockQuantities[item.id]) || 0;
+              const price = parseFloat(item.price) || 0;
+              const currentStock = vehicleInventoryMap[item.id] || 0;
+              const displayAmount = qty * price;
+              return (
+                <tr key={`return-table-${item.id}`} className={`hover:bg-gray-50/30 transition-colors group ${isFreeGroup ? 'bg-emerald-50/10' : ''}`}>
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden border shadow-inner shrink-0 ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                        {item.image ? (
+                          <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                        ) : (
+                          item.isFree ? <Gift size={14} /> : <Package size={14} />
+                        )}
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-800 leading-tight">{item.name}</span>
+                        <span className="text-[10px] font-bold text-blue-500">Rate: ₹{price}</span>
+                      </div>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                    <span className="text-sm font-black text-gray-700">{currentStock}</span>
+                  </td>
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                    <div className="flex justify-center">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        className="w-20 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-sm"
+                        value={stockQuantities[item.id] || ''}
+                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                      />
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    <span className={`text-sm font-black ${qty > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
+                      ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    );
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
+          <div className="space-y-2">
+            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle</label>
+            <div className="relative">
+              <select
+                value={selectedVehicleId}
+                onChange={(e) => setSelectedVehicleId(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+              >
+                <option value="">Select Vehicle No.</option>
+                {vehicles.map(v => {
+                  const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
+                  const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
+                  return (
+                    <option key={v.id} value={v.id}>
+                      {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
+                    </option>
+                  );
+                })}
+              </select>
+              <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
             </div>
           </div>
 
-          <div className="space-y-6">
-            {selectedVehicleId ? (
-              <>
-                <div className="flex items-center justify-between bg-blue-50 p-4 rounded-xl border border-blue-100 mb-2">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">In-Vehicle Inventory Value</span>
-                    <span className="text-xl font-black text-blue-900">₹{totalReturnInventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-                  </div>
-                  <div className="w-12 h-12 bg-blue-500/10 rounded-full flex items-center justify-center border border-blue-500/10">
-                    <Package className="text-blue-600" size={24} />
-                  </div>
-                </div>
+          <div className="pt-4 space-y-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <h4 className="text-sm font-black text-gray-900 flex items-center gap-2 whitespace-nowrap uppercase tracking-widest">
+                <ArrowDownCircle size={18} className="text-orange-500" />
+                Stock Return
+              </h4>
+              <div className="w-full md:max-w-xs relative">
+                <input
+                  type="text"
+                  placeholder="Search inventory..."
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+                <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              </div>
+            </div>
 
-                <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
-                  {groupedLoadingItems.regular.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
-                      {groupedLoadingItems.regular.map((item) => (
-                        <StockItemRow 
-                          key={`return-${item.id}`} 
-                          item={item} 
-                          quantity={stockQuantities[item.id]} 
-                          onChange={handleQuantityChange} 
-                          currentStock={vehicleInventoryMap[item.id] || 0}
-                          mode="return"
-                        />
-                      ))}
+            <div className="space-y-6">
+              {selectedVehicleId ? (
+                <>
+                  <div className="flex items-center justify-between bg-blue-50 p-6 rounded-3xl border border-blue-100 shadow-sm mb-6">
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">In-Vehicle Inventory Value</span>
+                      <span className="text-2xl font-black text-blue-900">₹{totalReturnInventoryValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                     </div>
-                  )}
-                  {groupedLoadingItems.free.length > 0 && (
-                    <div className="space-y-3 mt-4">
-                      <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                      {groupedLoadingItems.free.map((item) => (
-                        <StockItemRow 
-                          key={`return-free-${item.id}`} 
-                          item={item} 
-                          quantity={stockQuantities[item.id]} 
-                          onChange={handleQuantityChange} 
-                          currentStock={vehicleInventoryMap[item.id] || 0}
-                          mode="return"
-                          isFree
-                        />
-                      ))}
+                    <div className="w-14 h-14 bg-blue-500 shadow-lg shadow-blue-500/20 rounded-2xl flex items-center justify-center border border-blue-400">
+                      <Package className="text-white" size={28} />
                     </div>
-                  )}
-                  {loadingFilteredItems.length === 0 && (
-                    <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
-                  )}
+                  </div>
+
+                  {/* Mobile Card View */}
+                  <div className="md:hidden space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
+                    {regularItems.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
+                        {regularItems.map((item) => (
+                          <StockItemRow 
+                            key={`return-mob-${item.id}`} 
+                            item={item} 
+                            quantity={stockQuantities[item.id]} 
+                            onChange={handleQuantityChange} 
+                            currentStock={vehicleInventoryMap[item.id] || 0}
+                            mode="return"
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {freeItems.length > 0 && (
+                      <div className="space-y-3 mt-4">
+                        <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                        {freeItems.map((item) => (
+                          <StockItemRow 
+                            key={`return-free-mob-${item.id}`} 
+                            item={item} 
+                            quantity={stockQuantities[item.id]} 
+                            onChange={handleQuantityChange} 
+                            currentStock={vehicleInventoryMap[item.id] || 0}
+                            mode="return"
+                            isFree
+                          />
+                        ))}
+                      </div>
+                    )}
+                    {loadingFilteredItems.length === 0 && (
+                      <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
+                    )}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block">
+                    {regularItems.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-4">Regular Products</h4>
+                        {renderReturnTable(regularItems)}
+                      </div>
+                    )}
+                    {freeItems.length > 0 && (
+                      <div className="space-y-3 mt-4">
+                        <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-4 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                        {renderReturnTable(freeItems, true)}
+                      </div>
+                    )}
+                    {loadingFilteredItems.length === 0 && (
+                      <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
+                        <p className="text-sm font-bold text-gray-400">No items found matching "{searchQuery}"</p>
+                      </div>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <div className="text-center py-16 bg-gray-50 rounded-[2.5rem] border border-dashed border-gray-200">
+                  <Truck size={48} className="mx-auto text-gray-300 mb-4" />
+                  <h3 className="text-lg font-black text-gray-900 tracking-tight">Vehicle Not Selected</h3>
+                  <p className="text-xs text-gray-400 mt-2 font-bold uppercase tracking-widest">Please select a vehicle from the dropdown above</p>
                 </div>
-              </>
-            ) : (
-              <p className="text-center text-gray-400 text-sm py-8 border border-dashed border-gray-100 rounded-3xl">Select a vehicle to see current stock</p>
-            )}
+              )}
+            </div>
+            
+            <button
+              onClick={() => handleStockAction('RETURN')}
+              disabled={!selectedVehicleId || isSubmitting}
+              className="w-full bg-orange-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-600/20 hover:bg-orange-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2"
+            >
+              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Confirm & Submit Return'}
+            </button>
           </div>
-          <button
-            onClick={() => handleStockAction('RETURN')}
-            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-            disabled={!selectedVehicleId || isSubmitting}
-          >
-            {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : 'Submit Return'}
-          </button>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   const renderTracking = () => {
     if (viewingVehicleId) {
@@ -1016,27 +1333,27 @@ export default function AdminInventory() {
             ← Back to Vehicles
           </button>
 
-          <div className="bg-white p-4 sm:p-5 rounded-[1.5rem] sm:rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4 sm:gap-6">
-            <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-100 pb-4 gap-4">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
-                  <Truck size={24} />
+          <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col gap-6">
+            <div className="flex flex-col md:flex-row justify-between md:items-center border-b border-gray-100 pb-5 gap-4">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-emerald-600/20">
+                  <Truck size={28} />
                 </div>
                 <div className="flex flex-col">
-                  <h3 className="text-lg font-black text-gray-900 leading-tight">{agentStr}</h3>
-                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight leading-none mb-1">{agentStr}</h3>
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit">{v.vehicleNumber}</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end bg-blue-50/50 p-2.5 rounded-xl border border-blue-100">
-                <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Total Stock Value</span>
-                <span className="text-base font-black text-blue-900">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <div className="flex flex-col items-end bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-inner">
+                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Stock Value</span>
+                <span className="text-2xl font-black text-blue-900 tracking-tighter">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
               </div>
             </div>
 
             <div className="space-y-4">
-              <div className="flex items-center justify-between border-b border-gray-100 pb-2">
-                <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm">
-                  <Package size={16} className="text-emerald-500" /> 
+              <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+                <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm uppercase tracking-widest">
+                  <Package size={18} className="text-emerald-500" /> 
                   Loaded Inventory
                 </h4>
                 <div className="flex items-center gap-2">
@@ -1044,14 +1361,14 @@ export default function AdminInventory() {
                     <>
                       <button 
                         onClick={() => { setIsAuditMode(false); setAuditQuantities({}); }}
-                        className="px-3 py-1.5 rounded-xl border border-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-wider hover:bg-gray-50"
+                        className="px-4 py-2 rounded-xl border border-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-wider hover:bg-gray-50 transition-colors"
                       >
                         Cancel
                       </button>
                       <button 
                         onClick={handleAuditSave}
                         disabled={isSubmitting}
-                        className="px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-md hover:bg-emerald-700 disabled:opacity-50"
+                        className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-all"
                       >
                         {isSubmitting ? 'Saving...' : 'Save Audit'}
                       </button>
@@ -1064,7 +1381,7 @@ export default function AdminInventory() {
                         activeStock.forEach(s => initial[s.productId] = s.quantity);
                         setAuditQuantities(initial);
                       }}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-1.5"
+                      className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-2"
                     >
                       <Pencil size={12} />
                       Audit Inventory
@@ -1072,46 +1389,109 @@ export default function AdminInventory() {
                   )}
                 </div>
               </div>
+              
               {activeStock.length === 0 ? (
-                <div className="text-center py-8 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                  <Package size={28} className="mx-auto text-gray-300 mb-2" />
-                  <p className="text-xs text-gray-400 font-bold">No active stock loaded</p>
+                <div className="text-center py-12 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
+                  <Package size={32} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No active stock loaded</p>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {activeStock.map(item => (
-                    <div key={`track-item-${item.id}`} className="flex items-center justify-between p-3 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-xl border border-gray-100 group">
-                      <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-white border border-gray-100 shadow-sm flex items-center justify-center">
-                          {item.product?.isFree ? <Gift size={16} className="text-emerald-500" /> : <Package size={16} className="text-gray-400 group-hover:text-emerald-500" />}
-                        </div>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-bold text-gray-800 line-clamp-1">{item.product?.name || 'Unknown'}</span>
-                          <span className="text-[9px] font-bold text-emerald-600 uppercase">Rate: ₹{item.product?.price || 0}</span>
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end shrink-0 pl-2">
-                        {isAuditMode ? (
-                          <div className="flex flex-col items-end">
-                             <input 
-                               type="number"
-                               min="0"
-                               className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1 text-xs font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none text-right"
-                               value={auditQuantities[item.productId] ?? item.quantity}
-                               onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: e.target.value})}
-                             />
-                             <span className="text-[8px] font-bold text-emerald-600/50 uppercase mt-0.5">Auditing Qty</span>
+                <>
+                  {/* Mobile View */}
+                  <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {activeStock.map(item => (
+                      <div key={`track-item-${item.id}`} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-2xl border border-gray-100 group">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center">
+                            {item.product?.isFree ? <Gift size={18} className="text-emerald-500" /> : <Package size={18} className="text-gray-400 group-hover:text-emerald-500" />}
                           </div>
-                        ) : (
-                          <>
-                            <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400">Qty</span></span>
-                            <span className="text-[10px] font-black text-gray-500">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
-                          </>
-                        )}
+                          <div className="flex flex-col">
+                            <span className="text-xs font-bold text-gray-800 line-clamp-1 leading-tight">{item.product?.name || 'Unknown'}</span>
+                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-tighter mt-0.5">Rate: ₹{item.product?.price || 0}</span>
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end shrink-0 pl-2">
+                          {isAuditMode ? (
+                            <div className="flex flex-col items-end">
+                               <input 
+                                 type="number"
+                                 min="0"
+                                 className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none text-right"
+                                 value={auditQuantities[item.productId] ?? item.quantity}
+                                 onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: e.target.value})}
+                               />
+                               <span className="text-[8px] font-black text-emerald-600/50 uppercase mt-1">Auditing</span>
+                            </div>
+                          ) : (
+                            <>
+                              <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400 uppercase">Qty</span></span>
+                              <span className="text-[10px] font-black text-gray-500 mt-0.5">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
+                            </>
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+
+                  {/* Desktop Table View */}
+                  <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+                    <table className="w-full text-left border-collapse">
+                      <thead>
+                        <tr className="bg-gray-50/50">
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Current Qty</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {activeStock.map((item) => {
+                          const qty = isAuditMode ? (auditQuantities[item.productId] ?? item.quantity) : item.quantity;
+                          const price = parseFloat(item.product?.price || 0);
+                          const displayAmount = qty * price;
+                          return (
+                            <tr key={`track-table-${item.id}`} className="hover:bg-gray-50/30 transition-colors group">
+                              <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 shadow-inner flex items-center justify-center">
+                                    {item.product?.isFree ? <Gift size={18} className="text-emerald-500" /> : <Package size={18} className="text-gray-400 group-hover:text-emerald-500" />}
+                                  </div>
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-black text-gray-800 line-clamp-1">{item.product?.name || 'Unknown'}</span>
+                                    {item.product?.isFree && <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Promotion</span>}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                                <span className="text-xs font-black text-gray-500">₹{price}</span>
+                              </td>
+                              <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                                <div className="flex justify-center">
+                                  {isAuditMode ? (
+                                    <input 
+                                      type="number"
+                                      min="0"
+                                      className="w-20 bg-emerald-50 border border-emerald-200 rounded-xl px-2 py-2 text-sm text-center font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                                      value={auditQuantities[item.productId] ?? item.quantity}
+                                      onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: e.target.value})}
+                                    />
+                                  ) : (
+                                    <span className="text-sm font-black text-gray-900">{qty}</span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <span className="text-sm font-black text-emerald-700">
+                                  ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+                                </span>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               )}
             </div>
           </div>
@@ -1121,7 +1501,62 @@ export default function AdminInventory() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {/* Vehicles Desktop Table View */}
+        <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50">
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Unique Items</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Total Stock Value</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {vehicles.map(v => {
+                const inventory = allVehiclesStock[v.id] || [];
+                const activeStock = inventory.filter(i => i.quantity > 0);
+                const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
+                const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
+
+                return (
+                  <tr 
+                    key={`track-row-${v.id}`}
+                    onClick={() => setViewingVehicleId(v.id)}
+                    className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gray-50 rounded-2xl flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all shadow-inner">
+                          <Truck size={24} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{agentStr}</span>
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-sm font-black text-gray-700">{activeStock.length} Items</span>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className="text-sm font-black text-emerald-700">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-2 text-[10px] font-black text-gray-300 uppercase tracking-widest group-hover:text-emerald-600 transition-colors">
+                        View Detailed Inventory
+                        <ArrowLeft className="rotate-180" size={14} strokeWidth={3} />
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Vehicles Mobile Card View */}
+        <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
           {vehicles.map(v => {
             const inventory = allVehiclesStock[v.id] || [];
             const activeStock = inventory.filter(i => i.quantity > 0);
@@ -1132,30 +1567,30 @@ export default function AdminInventory() {
               <div
                 key={`track-card-${v.id}`}
                 onClick={() => setViewingVehicleId(v.id)}
-                className="bg-white p-4 rounded-[1.25rem] border border-gray-100 shadow-sm hover:border-emerald-300 hover:shadow-emerald-500/10 transition-all cursor-pointer group flex flex-col gap-3"
+                className="bg-white p-5 rounded-3xl border border-gray-100 shadow-sm hover:border-emerald-300 hover:shadow-xl hover:shadow-emerald-500/5 transition-all cursor-pointer group flex flex-col gap-4"
               >
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-gray-50 group-hover:bg-emerald-50 transition-colors rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-500 shrink-0">
-                    <Truck size={20} />
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-gray-50 group-hover:bg-emerald-600 rounded-2xl flex items-center justify-center text-gray-400 group-hover:text-white transition-all shrink-0 shadow-inner">
+                    <Truck size={24} />
                   </div>
                   <div className="flex flex-col overflow-hidden">
-                    <span className="text-sm font-black text-gray-900 truncate">{agentStr}</span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
+                    <span className="text-sm font-black text-gray-900 truncate leading-none mb-1">{agentStr}</span>
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
                   </div>
                 </div>
-                <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-2.5 rounded-xl flex justify-between items-center border border-transparent group-hover:border-emerald-100">
+                <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-3 rounded-2xl flex justify-between items-center border border-transparent group-hover:border-emerald-100">
                   <div className="flex flex-col">
-                    <span className="text-[8px] font-black uppercase text-gray-400">Unique Items</span>
-                    <span className="text-xs font-bold text-gray-700 leading-none mt-0.5">{activeStock.length}</span>
+                    <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Unique Items</span>
+                    <span className="text-sm font-black text-gray-700 leading-none mt-1">{activeStock.length}</span>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[8px] font-black uppercase text-emerald-600/70">Total Value</span>
-                    <span className="text-xs font-black text-emerald-700 leading-none mt-0.5">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[9px] font-black uppercase text-emerald-600/70 tracking-widest">Stock Value</span>
+                    <span className="text-sm font-black text-emerald-700 leading-none mt-1">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                   </div>
                 </div>
-                <div className="flex items-center justify-between text-[9px] uppercase font-bold text-gray-400 group-hover:text-emerald-500 mt-1">
+                <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest text-gray-400 group-hover:text-emerald-600 mt-1 transition-colors">
                   <span>View Details</span>
-                  <span>→</span>
+                  <ArrowLeft className="rotate-180" size={12} strokeWidth={3} />
                 </div>
               </div>
             );
@@ -1347,61 +1782,116 @@ export default function AdminInventory() {
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
         {groupedRefills.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-[2rem] border border-dashed border-gray-100 shadow-sm">
+          <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
             <Truck size={48} className="mx-auto text-gray-200 mb-4" />
-            <h3 className="text-lg font-black text-gray-900 tracking-tight">No Refill Requests</h3>
-            <p className="text-sm text-gray-400 mt-2 font-bold uppercase text-[10px] tracking-widest">Reports say it's all quiet for now.</p>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight">No Refill Requests</h3>
+            <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">Everything is up to date.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groupedRefills.map(group => {
-              const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+          <>
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Refill Sessions</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {groupedRefills.map(group => {
+                    const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+                    return (
+                      <tr 
+                        key={group.user?.id || 'unknown'} 
+                        onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                        className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center font-black text-xl transition-all shadow-inner">
+                              {group.user?.name?.[0] || '?'}
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{group.user?.name || 'Unknown Agent'}</span>
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-sm font-black text-gray-700">{group.requests.length} Sessions</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${pendingCount > 0 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                            {pendingCount > 0 ? `${pendingCount} Action Required` : 'Verified'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest transition-colors">
+                            Manage Refills
+                            <ArrowLeft className="rotate-180" size={14} strokeWidth={3} />
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-              return (
-                <div 
-                  key={group.user?.id || 'unknown'} 
-                  onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
-                  className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                    <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500">
-                      <ArrowLeft className="rotate-180" size={16} strokeWidth={3} />
-                    </div>
-                  </div>
+            {/* Mobile Card View */}
+            <div className="md:hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {groupedRefills.map(group => {
+                const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
 
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-emerald-50 group-hover/card:bg-emerald-600 rounded-3xl flex items-center justify-center text-emerald-600 group-hover/card:text-white font-black text-2xl transition-all shadow-inner">
-                      {group.user?.name?.[0] || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-black text-gray-900 tracking-tight text-lg truncate mb-1">{group.user?.name || 'Unknown Agent'}</h3>
-                      <div className="flex items-center gap-2">
-                        <Truck size={12} className="text-gray-300" />
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                return (
+                  <div 
+                    key={group.user?.id || 'unknown'} 
+                    onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                    className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
+                  >
+                    <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                      <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500">
+                        <ArrowLeft className="rotate-180" size={16} strokeWidth={3} />
                       </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
-                       <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
-                       <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
+                    <div className="flex items-center gap-4">
+                      <div className="w-14 h-14 bg-emerald-50 group-hover/card:bg-emerald-600 rounded-3xl flex items-center justify-center text-emerald-600 group-hover/card:text-white font-black text-2xl transition-all shadow-inner">
+                        {group.user?.name?.[0] || '?'}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-black text-gray-900 tracking-tight text-lg truncate mb-1">{group.user?.name || 'Unknown Agent'}</h3>
+                        <div className="flex items-center gap-2">
+                          <Truck size={12} className="text-gray-300" />
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className={`${pendingCount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-3 border`}>
-                       <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
-                       <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                         {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
-                       </span>
-                    </div>
-                  </div>
 
-                  <div className="text-[10px] font-black text-center text-emerald-600 uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-opacity">
-                    Click to View Details →
+                    <div className="grid grid-cols-2 gap-3 mt-1">
+                      <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
+                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
+                         <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
+                      </div>
+                      <div className={`${pendingCount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-3 border`}>
+                         <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
+                         <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                           {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
+                         </span>
+                      </div>
+                    </div>
+
+                    <div className="text-[10px] font-black text-center text-emerald-600 uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-opacity">
+                      Click to View Details →
+                    </div>
                   </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          </>
         )}
       </div>
     );

@@ -185,84 +185,179 @@ export default function AdminVehicles() {
         </button>
       </div>
 
-      {/* Vehicle Cards */}
-      <div className="grid grid-cols-1 gap-4">
+      {/* Vehicle Data Representation */}
+      <div className="space-y-4">
         {vehicles.length === 0 ? (
           <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
             <Truck size={48} className="mx-auto text-gray-300 mb-2" />
             <p className="text-gray-500">No vehicles found</p>
           </div>
         ) : (
-          vehicles.map((vehicle) => (
-            <div key={vehicle.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-              <div className="flex justify-between items-start">
-                <div className="flex items-center gap-4">
-                  <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center',
-                    vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
-                    <Truck size={24} />
-                  </div>
-                  <div className="flex flex-col">
-                    <h3 className="font-bold text-gray-900">{vehicle.vehicleNumber}</h3>
-                    {vehicle.vehicleName && <span className="text-xs text-gray-500">{vehicle.vehicleName}</span>}
-                    <div className="flex items-center gap-2 mt-1">
-                      {vehicle.status ? (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase">
-                          <CheckCircle2 size={12} /> Active
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase">
-                          <XCircle size={12} /> Inactive
-                        </span>
-                      )}
+          <>
+            {/* Mobile Card View */}
+            <div className="grid grid-cols-1 gap-4 md:hidden">
+              {vehicles.map((vehicle) => (
+                <div key={vehicle.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center gap-4">
+                      <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center',
+                        vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
+                        <Truck size={24} />
+                      </div>
+                      <div className="flex flex-col">
+                        <h3 className="font-bold text-gray-900">{vehicle.vehicleNumber}</h3>
+                        {vehicle.vehicleName && <span className="text-xs text-gray-500">{vehicle.vehicleName}</span>}
+                        <div className="flex items-center gap-2 mt-1">
+                          {vehicle.status ? (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase">
+                              <CheckCircle2 size={12} /> Active
+                            </span>
+                          ) : (
+                            <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase">
+                              <XCircle size={12} /> Inactive
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                        className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                        {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                      </button>
+                      <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                        <Pencil size={16} />
+                      </button>
+                      <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete Vehicle"
+                        disabled={deletingId === vehicle.id}
+                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                        {deletingId === vehicle.id
+                          ? <Loader2 size={16} className="animate-spin text-rose-400" />
+                          : <Trash2 size={16} />}
+                      </button>
                     </div>
                   </div>
-                </div>
 
-                {/* Action buttons */}
-                <div className="flex items-center gap-1">
-                  <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                    className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                    {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
-                  </button>
-                  <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
-                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                    <Pencil size={16} />
-                  </button>
-                  <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete Vehicle"
-                    disabled={deletingId === vehicle.id}
-                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                    {deletingId === vehicle.id
-                      ? <Loader2 size={16} className="animate-spin text-rose-400" />
-                      : <Trash2 size={16} />}
-                  </button>
-                </div>
-              </div>
+                  {(vehicle.rcDocument || vehicle.insuranceDocument || vehicle.permitDocument) && (
+                    <div className="flex gap-2">
+                      {vehicle.rcDocument && <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">RC</a>}
+                      {vehicle.insuranceDocument && <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Insurance</a>}
+                      {vehicle.permitDocument && <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Permit</a>}
+                    </div>
+                  )}
 
-              {/* Documents */}
-              {(vehicle.rcDocument || vehicle.insuranceDocument || vehicle.permitDocument) && (
-                <div className="flex gap-2">
-                  {vehicle.rcDocument && <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">RC</a>}
-                  {vehicle.insuranceDocument && <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Insurance</a>}
-                  {vehicle.permitDocument && <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Permit</a>}
-                </div>
-              )}
-
-              {/* Assigned Driver */}
-              <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between border border-gray-100">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">Assigned Driver</span>
-                  <div className="flex items-center gap-2">
-                    <User size={14} className="text-emerald-500" />
-                    <span className="text-sm font-bold text-gray-800">{vehicle.assignedUsers?.[0]?.name || 'Not Assigned'}</span>
+                  <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between border border-gray-100">
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">Assigned Driver</span>
+                      <div className="flex items-center gap-2">
+                        <User size={14} className="text-emerald-500" />
+                        <span className="text-sm font-bold text-gray-800">{vehicle.assignedUsers?.[0]?.name || 'Not Assigned'}</span>
+                      </div>
+                    </div>
+                    <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                      className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
+                      <ArrowRight size={20} />
+                    </button>
                   </div>
                 </div>
-                <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                  className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
-                  <ArrowRight size={20} />
-                </button>
-              </div>
+              ))}
             </div>
-          ))
+
+            {/* Desktop Table View */}
+            <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle Info</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Driver Assignment</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Compliance</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {vehicles.map((vehicle) => (
+                    <tr key={vehicle.id} className="hover:bg-gray-50/30 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+                            vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
+                            <Truck size={20} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="font-bold text-gray-900 tracking-tight">{vehicle.vehicleNumber}</span>
+                            {vehicle.vehicleName && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{vehicle.vehicleName}</span>}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex justify-center">
+                          {vehicle.status ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest">
+                              <CheckCircle2 size={10} /> Active
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-full uppercase tracking-widest">
+                              <XCircle size={10} /> Inactive
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-between gap-4 bg-gray-50/50 p-2 rounded-xl border border-transparent hover:border-gray-100 transition-all group/driver">
+                          <div className="flex items-center gap-2">
+                            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-emerald-500 shadow-sm border border-gray-50">
+                              <User size={14} />
+                            </div>
+                            <span className="text-sm font-bold text-gray-700">{vehicle.assignedUsers?.[0]?.name || 'Unassigned'}</span>
+                          </div>
+                        <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                            className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
+                            <ArrowRight size={16} />
+                          </button>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex gap-1.5">
+                          {vehicle.rcDocument ? (
+                            <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" title="RC Document"
+                              className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-emerald-600/10 text-emerald-700 rounded-lg hover:bg-emerald-600 hover:text-white transition-all">RC</a>
+                          ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
+                          {vehicle.insuranceDocument ? (
+                            <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" title="Insurance"
+                              className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-blue-600/10 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all">IN</a>
+                          ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
+                          {vehicle.permitDocument ? (
+                            <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" title="Permit"
+                              className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-orange-600/10 text-orange-700 rounded-lg hover:bg-orange-600 hover:text-white transition-all">PM</a>
+                          ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="flex items-center justify-end gap-1 transition-all">
+                          <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                            className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                            {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                          </button>
+                          <button onClick={() => openEditModal(vehicle)} title="Edit Details"
+                            className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                            <Pencil size={16} />
+                          </button>
+                          <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete"
+                            disabled={deletingId === vehicle.id}
+                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
+                            {deletingId === vehicle.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
       </div>
 

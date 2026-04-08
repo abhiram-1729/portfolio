@@ -200,43 +200,46 @@ export default function AdminRoutes() {
       {/* --- VILLAGES TAB --- */}
       {activeTab === 'villages' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end pr-2">
             <button
               onClick={() => { setVillageForm({ id: '', name: '' }); setShowVillageModal(true); }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
             >
-              <Plus size={16} /> New Village
+              <Plus size={16} strokeWidth={3} /> New Village
             </button>
           </div>
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full text-left">
                 <thead className="bg-gray-50/50 border-b border-gray-100">
                   <tr>
-                    <th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-xs">Village Name</th>
-                    <th className="px-6 py-4 font-black text-gray-400 uppercase tracking-widest text-xs text-right">Actions</th>
+                    <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px]">Village Designation</th>
+                    <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px] text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {villages.length === 0 ? (
                     <tr>
-                      <td colSpan="2" className="px-6 py-8 text-center text-gray-400 font-medium italic">No villages added yet</td>
+                      <td colSpan="2" className="px-8 py-16 text-center">
+                        <Home size={40} className="mx-auto text-gray-200 mb-3" />
+                        <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest italic">No villages have been registered</p>
+                      </td>
                     </tr>
                   ) : (
                     villages.map(v => (
-                      <tr key={v.id} className="hover:bg-gray-50/50 transition-colors group">
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50">
-                              <Home size={14} />
+                      <tr key={v.id} className="hover:bg-gray-50/30 transition-colors group">
+                        <td className="px-8 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                              <Home size={18} />
                             </div>
-                            <span className="font-bold text-gray-800">{v.name}</span>
+                            <span className="font-black text-gray-900 tracking-tight uppercase text-sm">{v.name}</span>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2">
-                            <button onClick={() => { setVillageForm(v); setShowVillageModal(true); }} className="p-2 bg-white rounded-xl border border-gray-200 text-gray-500 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"><Pencil size={14}/></button>
-                            <button onClick={() => handleDeleteVillage(v.id)} className="p-2 bg-white rounded-xl border border-gray-200 text-gray-500 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><Trash2 size={14}/></button>
+                        <td className="px-8 py-4 text-right">
+                          <div className="flex items-center justify-end gap-2 transition-all">
+                            <button onClick={() => { setVillageForm(v); setShowVillageModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"><Pencil size={15}/></button>
+                            <button onClick={() => handleDeleteVillage(v.id)} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><Trash2 size={15}/></button>
                           </div>
                         </td>
                       </tr>
@@ -252,31 +255,75 @@ export default function AdminRoutes() {
       {/* --- ROUTES TAB --- */}
       {activeTab === 'routes' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end pr-2">
             <button
               onClick={() => { setRouteForm({ id: '', routeName: '', selectedVillages: [] }); setShowRouteModal(true); }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
             >
-              <Plus size={16} /> New Route
+              <Plus size={16} strokeWidth={3} /> New Route
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          
+          <div className="grid grid-cols-1 md:hidden gap-4">
             {routes.map(route => (
-              <div key={route.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-3">
-                <div className="flex justify-between">
-                  <h3 className="font-bold text-gray-900 flex items-center gap-2"><MapPin size={18} className="text-emerald-500"/> {route.routeName}</h3>
-                  <div className="flex gap-2">
-                    <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="text-gray-400 hover:text-emerald-600"><Pencil size={16}/></button>
-                    <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="text-gray-400 hover:text-rose-600"><Trash2 size={16}/></button>
+              <div key={route.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="font-black text-gray-900 flex items-center gap-2 uppercase tracking-tight"><MapPin size={18} className="text-emerald-500 fill-emerald-500/10"/> {route.routeName}</h3>
+                  <div className="flex gap-1">
+                    <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg"><Pencil size={14}/></button>
+                    <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2 text-gray-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg"><Trash2 size={14}/></button>
                   </div>
                 </div>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50">
                   {(route.villages || []).map(v => (
-                    <span key={v} className="text-xs bg-gray-50 border border-gray-100 px-2 py-1 rounded-md font-medium text-gray-600">{v}</span>
+                    <span key={v} className="text-[10px] bg-emerald-50/50 border border-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md font-black uppercase tracking-tighter">{v}</span>
                   ))}
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50 border-b border-gray-100">
+                <tr>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px]">Route Identifier</th>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Village Coverage</th>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {routes.map(route => (
+                  <tr key={route.id} className="hover:bg-gray-50/30 transition-colors group">
+                    <td className="px-8 py-6 flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 transition-all">
+                        <MapPin size={18} className="fill-emerald-600/10" />
+                      </div>
+                      <span className="font-black text-gray-900 uppercase tracking-tight">{route.routeName}</span>
+                    </td>
+                    <td className="px-8 py-6">
+                      <div className="flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
+                        {(route.villages || []).map(v => (
+                          <span key={v} className="text-[10px] bg-white border border-gray-100 text-gray-500 px-2.5 py-1 rounded-lg font-black uppercase tracking-tighter shadow-sm">
+                            {v}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-8 py-6 text-right">
+                      <div className="flex items-center justify-end gap-2 transition-all">
+                        <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-emerald-600 transition-all">
+                          <Pencil size={15}/>
+                        </button>
+                        <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-rose-600 transition-all">
+                          <Trash2 size={15}/>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
@@ -284,21 +331,22 @@ export default function AdminRoutes() {
       {/* --- ASSIGNMENTS TAB --- */}
       {activeTab === 'assignments' && (
         <div className="space-y-4">
-          <div className="flex justify-end">
+          <div className="flex justify-end pr-2">
             <button
               onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all"
+              className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
             >
-              <Plus size={16} /> New Assignment
+              <Plus size={16} strokeWidth={3} /> New Assignment
             </button>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+
+          <div className="grid grid-cols-1 md:hidden gap-4">
             {assignments.map(a => (
-              <div key={a.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
-                 <div className="flex justify-between items-center mb-3">
-                   <h4 className="font-bold text-gray-900 border-b pb-1">{a.route.routeName}</h4>
-                   <div className="flex gap-2">
-                     <button onClick={() => {
+              <div key={a.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
+                <div className="flex justify-between items-center pb-3 border-b border-gray-50">
+                  <h4 className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</h4>
+                  <div className="flex gap-1">
+                    <button onClick={() => {
                         setAssignmentForm({
                           id: a.id,
                           vehicleId: a.vehicleId,
@@ -309,35 +357,135 @@ export default function AdminRoutes() {
                           schedule: a.schedule || null
                         });
                         setShowAssignModal(true);
-                     }} className="text-gray-400 hover:text-indigo-600"><Pencil size={16}/></button>
-                     <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="text-rose-400 hover:text-rose-600"><X size={16}/></button>
-                   </div>
-                 </div>
-                 <div className="grid grid-cols-2 gap-2 text-sm mb-3">
-                   <div className="flex flex-col"><span className="text-xs text-gray-400 uppercase font-bold">Vehicle</span><span className="font-medium text-gray-800">{a.vehicle?.vehicleNumber}</span></div>
-                   <div className="flex flex-col"><span className="text-xs text-gray-400 uppercase font-bold">Agent</span><span className="font-medium text-gray-800">{a.user?.name}</span></div>
-                 </div>
-                 <div className="bg-indigo-50 p-3 rounded-xl border border-indigo-100/50 flex flex-col gap-1.5 text-sm">
-                   {(() => {
-                     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                     const today = days[new Date().getDay()];
-                     const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
-                     return (
-                       <>
-                         <div className="flex items-center justify-between">
-                           <span className="font-bold text-indigo-800">Today Morning ({today})</span>
-                           <span className="text-indigo-600 font-medium">{todaySchedule.morning || 'OFF'}</span>
-                         </div>
-                         <div className="flex items-center justify-between">
-                           <span className="font-bold text-indigo-800">Today Evening ({today})</span>
-                           <span className="text-indigo-600 font-medium">{todaySchedule.evening || 'OFF'}</span>
-                         </div>
-                       </>
-                     );
-                   })()}
-                 </div>
+                    }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14}/></button>
+                    <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><X size={14}/></button>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><Truck size={10}/> Vehicle</span>
+                    <span className="text-sm font-black text-gray-800 leading-none">{a.vehicle?.vehicleNumber}</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><User size={10}/> Agent</span>
+                    <span className="text-sm font-black text-gray-800 leading-none">{a.user?.name}</span>
+                  </div>
+                </div>
+                <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 space-y-2">
+                  {(() => {
+                    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                    const today = days[new Date().getDay()];
+                    const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
+                    return (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Morning ({today})</span>
+                          <span className="text-xs font-black text-indigo-700">{todaySchedule.morning || 'OFF'}</span>
+                        </div>
+                        <div className="flex items-center justify-between pt-1 border-t border-indigo-100/30">
+                          <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Evening ({today})</span>
+                          <span className="text-xs font-black text-indigo-700">{todaySchedule.evening || 'OFF'}</span>
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
               </div>
             ))}
+          </div>
+
+          <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <table className="w-full text-left">
+              <thead className="bg-gray-50/50 border-b border-gray-100">
+                <tr>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px]">Assignment Details</th>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Weekly Snapshot</th>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Status</th>
+                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {assignments.length === 0 ? (
+                  <tr>
+                    <td colSpan="4" className="px-8 py-16 text-center">
+                      <ClipboardList size={40} className="mx-auto text-gray-200 mb-3" />
+                      <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest italic">No route assignments created</p>
+                    </td>
+                  </tr>
+                ) : (
+                  assignments.map(a => (
+                    <tr key={a.id} className="hover:bg-gray-50/30 transition-colors group">
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col gap-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                              <MapPin size={14} className="fill-indigo-600/10" />
+                            </div>
+                            <span className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</span>
+                          </div>
+                          <div className="flex items-center gap-4 pl-1">
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Vehicle</span>
+                              <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{a.vehicle?.vehicleNumber}</span>
+                            </div>
+                            <div className="w-px h-6 bg-gray-100 self-center" />
+                            <div className="flex flex-col">
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Driver</span>
+                              <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{a.user?.name}</span>
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6">
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100/30 w-full max-w-[200px]">
+                            {(() => {
+                              const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                              const today = days[new Date().getDay()];
+                              const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
+                              return (
+                                <div className="space-y-1.5 grayscale-[0.3]">
+                                  <div className="flex justify-between items-baseline">
+                                    <span className="text-[8px] font-black text-indigo-400 uppercase">{today} AM</span>
+                                    <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-baseline pt-1 border-t border-indigo-100/20">
+                                    <span className="text-[8px] font-black text-indigo-400 uppercase">{today} PM</span>
+                                    <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-8 py-6 text-center">
+                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-[0.1em] border border-emerald-100 shadow-sm shadow-emerald-500/5">
+                          In Service
+                        </span>
+                      </td>
+                      <td className="px-8 py-6 text-right">
+                        <div className="flex items-center justify-end gap-2 transition-all">
+                          <button onClick={() => {
+                            setAssignmentForm({
+                              id: a.id,
+                              vehicleId: a.vehicleId,
+                              userId: a.userId,
+                              routeId: a.routeId,
+                              morningSession: a.morningSession || '',
+                              afternoonSession: a.afternoonSession || '',
+                              schedule: a.schedule || null
+                            });
+                            setShowAssignModal(true);
+                          }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15}/></button>
+                          <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15}/></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       )}
