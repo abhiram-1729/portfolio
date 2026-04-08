@@ -178,6 +178,7 @@ export default function AdminInventory() {
        }
        if (subTab === 'refills') {
          loadRefillRequests();
+         loadAllVehiclesStock();
        }
     }
   }, [activeTab, subTab, vehicles]);
@@ -194,9 +195,13 @@ export default function AdminInventory() {
   const loadAllVehiclesStock = async () => {
     if (vehicles.length === 0) return;
     try {
-      const stockRes = await Promise.all(
-        vehicles.map(v => adminAPI.getVehicleInventory(v.id).then(res => ({ id: v.id, data: res.data })))
-      );
+      // Fetch sequentially to prevent connection pool exhaustion (500 errors)
+      const stockRes = [];
+      for (const v of vehicles) {
+        const res = await adminAPI.getVehicleInventory(v.id);
+        stockRes.push({ id: v.id, data: res.data });
+      }
+      
       const stockMap = {};
       stockRes.forEach(r => {
         stockMap[r.id] = r.data;
@@ -1269,20 +1274,44 @@ export default function AdminInventory() {
 
                       {/* Items List */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {req.items.map(item => (
-                          <div key={item.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100/50 flex items-center justify-between group-hover/session:border-emerald-200 transition-colors">
-                            <div className="flex items-center gap-3 min-w-0">
-                               <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 border border-gray-100 shrink-0">
-                                  <Package size={18} />
-                               </div>
-                               <span className="text-sm font-bold text-gray-700 truncate">{item.product?.name}</span>
+                        {req.items.map(item => {
+                          let excessBadge = null;
+                          if (req.status === 'PENDING') {
+                            const vehicleInventory = allVehiclesStock[req.vehicleId] || [];
+                            const stockItem = vehicleInventory.find(i => i.productId === item.productId);
+                            
+                            const targetCapacity = stockItem ? Math.max(stockItem.openingQuantity || 0, stockItem.quantity) : 0;
+                            const currentQty = stockItem ? stockItem.quantity : 0;
+                            const shortfall = targetCapacity - currentQty;
+                            const excess = item.quantity - shortfall;
+
+                            if (excess > 0) {
+                              excessBadge = (
+                                <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-tighter whitespace-nowrap border border-amber-100 flex items-center gap-1 w-fit mt-1 shadow-sm">
+                                  <ArrowUpCircle size={10} strokeWidth={3} /> +{excess} ABOVE LIMIT
+                                </span>
+                              );
+                            }
+                          }
+
+                          return (
+                            <div key={item.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100/50 flex items-center justify-between group-hover/session:border-emerald-200 transition-colors">
+                              <div className="flex items-center gap-3 min-w-0">
+                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 border border-gray-100 shrink-0">
+                                    <Package size={18} />
+                                 </div>
+                                 <div className="flex flex-col min-w-0">
+                                   <span className="text-sm font-bold text-gray-700 truncate">{item.product?.name}</span>
+                                   {excessBadge}
+                                 </div>
+                              </div>
+                              <div className="flex flex-col items-end shrink-0 pl-2">
+                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
+                                 <span className="text-lg font-black text-emerald-600 tracking-tight leading-none">{item.quantity}</span>
+                              </div>
                             </div>
-                            <div className="flex flex-col items-end shrink-0">
-                               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
-                               <span className="text-lg font-black text-emerald-600 tracking-tight">{item.quantity}</span>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
 
                       {/* Action Controls */}

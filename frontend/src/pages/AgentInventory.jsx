@@ -70,6 +70,41 @@ export default function AgentInventory() {
     }
   };
 
+  const refillToInitial = async () => {
+    try {
+      setLoading(true);
+      // Fetch all products if not already loaded for the modal
+      if (allProducts.length === 0) {
+        const { data } = await productsAPI.getAll({ showAll: true });
+        setAllProducts(data);
+      }
+      
+      const newRefillItems = {};
+      let hasItemsToRefill = false;
+      
+      inventory.forEach(item => {
+        const targetCapacity = Math.max(item.openingQuantity || 0, item.quantity);
+        const diff = targetCapacity - item.quantity;
+        if (diff > 0) {
+          newRefillItems[item.productId] = diff;
+          hasItemsToRefill = true;
+        }
+      });
+      
+      if (!hasItemsToRefill) {
+        toast.error('Inventory is already at full capacity');
+        return;
+      }
+      
+      setRefillItems(newRefillItems);
+      setShowRefillModal(true);
+    } catch (error) {
+      toast.error('Failed to prepare refill');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const filteredInventory = inventory.filter(item => {
     const matchesSearch = item.product?.name?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesFree = !filterFreeOnly || item.product?.isFree;
@@ -87,12 +122,20 @@ export default function AgentInventory() {
             </button>
             <h1 className="text-xl font-black text-emerald-950 tracking-tight">Vehicle Inventory</h1>
           </div>
-          <button
-            onClick={fetchAllProductsForRefill}
-            className="px-3 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
-          >
-            <Package size={16} /> Request Refill
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={refillToInitial}
+              className="px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+            >
+              <Package size={16} /> Refill Original
+            </button>
+            <button
+              onClick={fetchAllProductsForRefill}
+              className="px-3 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+            >
+              <Plus size={16} /> Custom Refill
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-3 bg-white border border-emerald-100 p-2 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
@@ -129,7 +172,7 @@ export default function AgentInventory() {
               <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-white/20 to-transparent blur-[40px] pointer-events-none group-hover:scale-110 transition-transform duration-700" />
               <div className="relative flex justify-between items-center text-white">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Total Inventory Value</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Remaining Inventory Value</p>
                   <p className="text-3xl font-black tracking-tighter">₹{
                     filteredInventory.reduce((acc, item) => acc + (item.quantity * (item.product?.price || 0)), 0)
                       .toLocaleString('en-IN', { minimumFractionDigits: 2 })
@@ -171,11 +214,11 @@ export default function AgentInventory() {
 
                     <div className="flex items-center gap-4 pl-4 border-l border-gray-100/50">
                       <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Amt</span>
-                        <span className="text-xs font-black text-emerald-700">₹{itemAmount.toFixed(0)}</span>
+                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Total</span>
+                        <span className="text-xs font-black text-emerald-900/60">{Math.max(item.openingQuantity || 0, item.quantity)}</span>
                       </div>
                       <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Qty</span>
+                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Rem</span>
                         <span className="text-lg font-black text-emerald-950 tracking-tighter leading-none">{item.quantity}</span>
                       </div>
                     </div>
@@ -223,6 +266,10 @@ export default function AgentInventory() {
                 const matchesSearch = p.name?.toLowerCase().includes(refillSearchQuery.toLowerCase());
                 const matchesFree = !filterFreeOnly || p.isFree;
                 return matchesSearch && matchesFree;
+              }).sort((a, b) => {
+                const reqA = refillItems[a.id] || 0;
+                const reqB = refillItems[b.id] || 0;
+                return reqB - reqA; // Higher requested quantities first
               }).map(p => {
                 const currentStock = inventory.find(i => i.productId === p.id)?.quantity || 0;
                 const reqQty = refillItems[p.id] || 0;

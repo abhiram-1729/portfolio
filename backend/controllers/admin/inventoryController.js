@@ -244,12 +244,14 @@ export const loadStock = async (req, res) => {
           vehicleId_productId: { vehicleId, productId: item.productId }
         },
         update: {
-          quantity: { increment: q }
+          quantity: { increment: q },
+          openingQuantity: { increment: q }
         },
         create: {
           vehicleId,
           productId: item.productId,
-          quantity: q
+          quantity: q,
+          openingQuantity: q
         }
       });
     }
@@ -295,7 +297,8 @@ export const returnStock = async (req, res) => {
           vehicleId_productId: { vehicleId, productId: item.productId }
         },
         data: {
-          quantity: { decrement: q }
+          quantity: { decrement: q },
+          openingQuantity: { decrement: q }
         }
       });
     }
@@ -471,8 +474,16 @@ export const auditVehicleStock = async (req, res) => {
           where: {
             vehicleId_productId: { vehicleId: id, productId: item.productId }
           },
-          update: { quantity: q },
-          create: { vehicleId: id, productId: item.productId, quantity: q }
+          update: { 
+            quantity: q,
+            openingQuantity: q 
+          },
+          create: { 
+            vehicleId: id, 
+            productId: item.productId, 
+            quantity: q,
+            openingQuantity: q
+          }
         });
       }
     }, {
@@ -568,8 +579,15 @@ export const approveRefillRequest = async (req, res) => {
         // Update vehicle stock
         await tx.vehicleStock.upsert({
           where: { vehicleId_productId: { vehicleId: request.vehicleId, productId: item.productId } },
-          update: { quantity: { increment: item.quantity } },
-          create: { vehicleId: request.vehicleId, productId: item.productId, quantity: item.quantity }
+          update: { 
+            quantity: { increment: item.quantity }
+          },
+          create: { 
+            vehicleId: request.vehicleId, 
+            productId: item.productId, 
+            quantity: item.quantity,
+            openingQuantity: item.quantity
+          }
         });
       }
 

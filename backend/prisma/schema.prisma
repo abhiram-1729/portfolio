@@ -217,12 +217,13 @@ model Vehicle {
 }
 
 model VehicleStock {
-  id        String  @id @default(cuid())
-  vehicleId String
-  productId String
-  quantity  Int     @default(0)
-  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
-  product   Product @relation(fields: [productId], references: [id])
+  id              String  @id @default(cuid())
+  vehicleId       String
+  productId       String
+  quantity        Int     @default(0)
+  openingQuantity Int     @default(0)
+  vehicle         Vehicle @relation(fields: [vehicleId], references: [id])
+  product         Product @relation(fields: [productId], references: [id])
 
   @@unique([vehicleId, productId])
 }
