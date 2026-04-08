@@ -15,7 +15,7 @@ const icons = {
   default: { icon: Bell, color: 'text-emerald-500', bg: 'bg-emerald-50' }
 };
 
-export default function NotificationPopover({ isOpen, onClose }) {
+export default function NotificationPopover({ isOpen, onClose, basePath = '/admin/notifications' }) {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotificationStore();
   const popoverRef = useRef(null);
 
@@ -118,7 +118,7 @@ export default function NotificationPopover({ isOpen, onClose }) {
 
           {/* Footer */}
           <Link
-            to="/admin/notifications"
+            to={basePath}
             onClick={onClose}
             className="block py-4 border-t border-gray-50 text-center text-xs font-black text-emerald-600 hover:bg-emerald-50 transition-colors bg-gray-50/30 flex items-center justify-center gap-2"
           >

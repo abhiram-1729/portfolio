@@ -85,6 +85,7 @@ export default function TenantLayout() {
           <NotificationPopover 
             isOpen={isNotifOpen} 
             onClose={() => setIsNotifOpen(false)} 
+            basePath="/tenant/notifications"
           />
 
           <button

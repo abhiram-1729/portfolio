@@ -28,6 +28,7 @@ export const getDailyReport = async (req, res) => {
 
     res.json({ title: 'Daily Report', date: today, totalOrders, totalSales, totalProfit, paymentSplits });
   } catch (error) {
+    console.error('[ReportController] Daily Report Error:', error);
     res.status(500).json({ message: 'Error fetching daily report', error: error.message });
   }
 };
@@ -84,6 +85,7 @@ export const getTrendsReport = async (req, res) => {
 
     res.json(finalResults);
   } catch (error) {
+    console.error('[ReportController] Trends Report Error:', error);
     res.status(500).json({ message: 'Error fetching trends', error: error.message });
   }
 };
@@ -127,6 +129,7 @@ export const getTopProducts = async (req, res) => {
 
     res.json(topProducts);
   } catch (error) {
+    console.error('[ReportController] Top Products Error:', error);
     res.status(500).json({ message: 'Error fetching top products', error: error.message });
   }
 };
@@ -153,6 +156,7 @@ export const getVehicleWiseReport = async (req, res) => {
 
     res.json({ title: 'Vehicle Wise Report', totalOrders, totalSales, topSellingItems: itemsMap });
   } catch (error) {
+    console.error('[ReportController] Vehicle Report Error:', error);
     res.status(500).json({ message: 'Error fetching vehicle report', error: error.message });
   }
 };
@@ -189,6 +193,7 @@ export const getItemWiseReport = async (req, res) => {
 
     res.json({ title: 'Item Wise Report', data: results });
   } catch (error) {
+    console.error('[ReportController] Item Report Error:', error);
     res.status(500).json({ message: 'Error fetching item report', error: error.message });
   }
 };
@@ -316,6 +321,7 @@ export const getRouteWiseReport = async (req, res) => {
 
     res.json(result);
   } catch (error) {
+    console.error('[ReportController] Route Report Error:', error);
     res.status(500).json({ message: 'Error fetching route report', error: error.message });
   }
 };
@@ -351,6 +357,7 @@ export const getVillageWiseReport = async (req, res) => {
 
     res.json(formattedData);
   } catch (error) {
+    console.error('[ReportController] Village Report Error:', error);
     res.status(500).json({ message: 'Error fetching village report', error: error.message });
   }
 };
@@ -389,6 +396,7 @@ export const getAgentPerformance = async (req, res) => {
 
     res.json(performance);
   } catch (error) {
+    console.error('[ReportController] Agent Performance Error:', error);
     res.status(500).json({ message: 'Error fetching agent performance', error: error.message });
   }
 };

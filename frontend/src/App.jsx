@@ -139,13 +139,13 @@ export default function App() {
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
           <Route index element={<TenantDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
+          <Route path="users" element={<AdminUsers type="staff" />} />
           <Route path="vehicles" element={<AdminVehicles />} />
           <Route path="reports" element={<AdminReports />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
           {/* Tenant specifically wants to manage Admins */}
-          <Route path="admins" element={<AdminUsers />} /> 
+          <Route path="admins" element={<AdminUsers type="admin" />} /> 
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

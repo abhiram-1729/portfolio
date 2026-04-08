@@ -3,7 +3,7 @@ import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, 
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
-export default function AdminUsers() {
+export default function AdminUsers({ type }) {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -131,22 +131,30 @@ export default function AdminUsers() {
     return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '??';
   };
 
+  const filteredUsers = users.filter(u => {
+    if (type === 'admin') return ['ADMIN', 'TENANT_OWNER', 'SUPER_ADMIN'].includes(u.role);
+    if (type === 'staff') return ['SALES_AGENT', 'SUPERVISOR', 'HELPER'].includes(u.role);
+    return true;
+  });
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="animate-spin text-emerald-600" size={40} />
-        <p className="text-gray-500 font-medium tracking-wide">Loading Staff...</p>
+        <p className="text-gray-500 font-medium tracking-wide">Loading {type === 'admin' ? 'Admins' : 'Staff'}...</p>
       </div>
     );
   }
+
+  const listToRender = filteredUsers;
 
   return (
     <div className="space-y-4">
       {/* Sub-Header */}
       <div className="flex items-center justify-between pb-2">
         <div>
-          <h2 className="text-xl font-bold text-gray-900">Staff</h2>
-          <p className="text-xs text-gray-500">{users.length} active members</p>
+          <h2 className="text-xl font-bold text-gray-900">{type === 'admin' ? 'Organization Admins' : 'Operational Staff'}</h2>
+          <p className="text-xs text-gray-500">{listToRender.length} members found</p>
         </div>
         <button 
           onClick={() => setShowAddModal(true)}
@@ -159,17 +167,17 @@ export default function AdminUsers() {
 
       {/* Main List Container */}
       <div className="space-y-4">
-        {users.length === 0 ? (
+        {listToRender.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
             <User size={48} className="mx-auto text-gray-200 mb-4" />
             <h3 className="text-lg font-black text-gray-900 tracking-tight">Access Control Empty</h3>
-            <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">No staff members have been onboarded yet.</p>
+            <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">No members match this category yet.</p>
           </div>
         ) : (
           <>
             {/* Mobile Card View */}
             <div className="md:hidden space-y-4">
-              {users.map((user) => (
+              {listToRender.map((user) => (
                 <div 
                   key={user.id} 
                   className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 grayscale opacity-80' : ''}`}
@@ -241,7 +249,7 @@ export default function AdminUsers() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {users.map((user) => (
+                  {listToRender.map((user) => (
                     <tr 
                       key={user.id} 
                       className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
