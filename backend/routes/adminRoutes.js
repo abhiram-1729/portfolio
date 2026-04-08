@@ -11,6 +11,8 @@ import * as routeCtr from '../controllers/admin/routeController.js';
 import * as villageCtr from '../controllers/admin/villageController.js';
 import * as unitCtr from '../controllers/admin/unitController.js';
 import * as categoryCtr from '../controllers/admin/categoryController.js';
+import * as assetCtr from '../controllers/admin/assetController.js';
+import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
@@ -96,6 +98,9 @@ router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
 router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
 router.get('/reports/agent-performance', reportCtr.getAgentPerformance);
 
+// Finance
+router.get('/finance/reports', getFinanceReports);
+
 // Villages
 router.route('/villages')
   .get(villageCtr.getVillages)
@@ -136,5 +141,20 @@ router.route('/categories')
 router.route('/categories/:id')
   .put(categoryCtr.updateCategory)
   .delete(categoryCtr.deleteCategory);
+
+// ─── Asset Management ─────────────────────────────────────
+router.route('/assets')
+  .get(assetCtr.getAssets)
+  .post(uploadMiddleware.single('image'), assetCtr.createAsset);
+router.route('/assets/:id')
+  .put(uploadMiddleware.single('image'), assetCtr.updateAsset)
+  .delete(assetCtr.deleteAsset);
+router.post('/assets/:id/units', assetCtr.addAssetUnits);
+router.post('/assets/assign', assetCtr.assignAsset);
+router.post('/assets/return', assetCtr.returnAsset);
+router.get('/assets/tracking', assetCtr.getAssetTracking);
+router.get('/assets/issues', assetCtr.getIssues);
+router.put('/assets/issues/:id', assetCtr.updateIssueStatus);
+router.get('/assets/reports', assetCtr.getAssetReports);
 
 export default router;

@@ -2,6 +2,8 @@ import prisma from '../utils/prisma.js';
 import { fetchPlanForVehicle, getCoverageType } from './routeController.js';
 import { sendNotification } from '../services/notificationService.js';
 import { updateDailyPerformance } from '../services/vgeAggregationService.js';
+import { recalculateDailySummary } from './cashController.js';
+import { format } from 'date-fns';
 
 
 // @desc    Create order from cart
@@ -296,6 +298,14 @@ export const completePayment = async (req, res, next) => {
           updateDailyPerformance(updatedOrder.agentId).catch(err => {
             console.warn('[VGE] Background recalculation failed:', err.message);
           });
+        }
+
+        // 6. Recalculate Daily Cash Summary if CASH payment
+        if (paymentMode === 'CASH') {
+            const dateString = format(new Date(), 'yyyy-MM-dd');
+            recalculateDailySummary(updatedOrder.vehicleId, dateString).catch(err => {
+                console.warn('[CASH] Summary sync failed:', err.message);
+            });
         }
     } catch (error) {
 

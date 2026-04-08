@@ -48,10 +48,12 @@ export const submitOpeningCash = async (req, res, next) => {
             },
             update: {
                 openingCash: totalOpeningCash,
-                expectedCash: totalOpeningCash, // Initial expected is just opening
+                expectedCash: totalOpeningCash,
+                userId,
             },
             create: {
                 vehicleId,
+                userId,
                 date: dateString,
                 openingCash: totalOpeningCash,
                 expectedCash: totalOpeningCash,
@@ -118,12 +120,11 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
             },
             update: {
                 openingCash: totalOpeningCash,
-                expectedCash: {
-                    increment: 0 // Placeholder to keep logic consistent
-                }
+                userId,
             },
             create: {
                 vehicleId,
+                userId,
                 date: dateString,
                 openingCash: totalOpeningCash,
                 expectedCash: totalOpeningCash,
@@ -241,7 +242,20 @@ export const submitClosingCash = async (req, res, next) => {
         });
 
         const cashSales = cashSalesResult._sum.totalAmount || 0;
-        const expectedCash = summary.openingCash + cashSales;
+        
+        // Get total cash expenses for today
+        const expensesResult = await prisma.expense.aggregate({
+            _sum: { amount: true },
+            where: {
+                vehicleId,
+                date: dateString,
+                paymentMode: 'CASH',
+                NOT: { status: 'REJECTED' }
+            }
+        });
+        const expenses = expensesResult._sum.amount || 0;
+
+        const expectedCash = summary.openingCash + cashSales - expenses;
         const difference = actualCash - expectedCash;
 
         if (difference !== 0 && !remark) {
@@ -290,6 +304,7 @@ export const submitClosingCash = async (req, res, next) => {
             },
             data: {
                 cashSales,
+                expenses,
                 expectedCash,
                 actualCash,
                 difference,
@@ -365,6 +380,19 @@ export const getCashStatus = async (req, res, next) => {
             },
         });
 
+        const cashSales = cashSalesResult._sum.totalAmount || 0;
+
+        // Get current expenses
+        const expensesResult = await prisma.expense.aggregate({
+            _sum: { amount: true },
+            where: {
+                vehicleId,
+                date: dateString,
+                paymentMode: 'CASH',
+                NOT: { status: 'REJECTED' }
+            }
+        });
+
         res.json({
             vehicleAssigned: true,
             openingSubmitted: !!opening,
@@ -372,7 +400,8 @@ export const getCashStatus = async (req, res, next) => {
             openingCash: opening?.totalOpeningCash || 0,
             openingDenominations: opening?.denominations || null,
             closingDenominations: closing?.denominations || null,
-            cashSales: cashSalesResult._sum.totalAmount || 0,
+            cashSales,
+            expenses: expensesResult._sum.amount || 0
         });
     } catch (error) {
         next(error);
@@ -499,3 +528,162 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         next(error);
     }
 };
+
+// Shared utility to recalculate daily summary
+export async function recalculateDailySummary(vehicleId, date) {
+    if (!vehicleId || !date) return;
+
+    // 1. Get Opening Cash
+    const opening = await prisma.openingCash.findUnique({
+        where: { vehicleId_date: { vehicleId, date } }
+    });
+
+    // 2. Calculate Cash Sales from Orders
+    const startOfDay = new Date(date);
+    startOfDay.setHours(0, 0, 0, 0);
+    const endOfDay = new Date(date);
+    endOfDay.setHours(23, 59, 59, 999);
+
+    const cashSalesRes = await prisma.order.aggregate({
+        _sum: { totalAmount: true },
+        where: {
+            vehicleId,
+            paymentMode: 'CASH',
+            status: 'COMPLETED',
+            createdAt: {
+                gte: startOfDay,
+                lte: endOfDay
+            }
+        }
+    });
+    const cashSales = cashSalesRes._sum.totalAmount || 0;
+
+    // 3. Calculate Approved/Pending Cash Expenses
+    const expensesRes = await prisma.expense.aggregate({
+        _sum: { amount: true },
+        where: {
+            vehicleId,
+            date,
+            paymentMode: 'CASH',
+            NOT: { status: 'REJECTED' }
+        }
+    });
+    const expenses = expensesRes._sum.amount || 0;
+
+    // 4. Get Actual Cash (from closing cash submission)
+    const closing = await prisma.closingCash.findUnique({
+        where: { vehicleId_date: { vehicleId, date } }
+    });
+    const actualCash = closing?.actualCash || 0;
+
+    // 5. Calculate Expected and Difference
+    const openingCash = opening?.totalOpeningCash || 0;
+    const expectedCash = openingCash + cashSales - expenses;
+    const difference = actualCash - expectedCash;
+
+    // 6. Upsert Daily Summary
+    return await prisma.dailyCashSummary.upsert({
+        where: { vehicleId_date: { vehicleId, date } },
+        update: {
+            openingCash,
+            cashSales,
+            expenses,
+            expectedCash,
+            actualCash,
+            difference,
+            status: actualCash > 0 ? (difference === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
+        },
+        create: {
+            vehicleId,
+            userId: opening?.userId || 'SYSTEM',
+            date,
+            openingCash,
+            cashSales,
+            expenses,
+            expectedCash,
+            actualCash,
+            difference,
+            status: actualCash > 0 ? (difference === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
+        }
+    });
+}
+
+// @desc    Admin: Get finance reports (aggregated cash, expenses, profitability)
+// @route   GET /api/cash/admin/finance/reports
+// @access  Admin
+export const getFinanceReports = async (req, res, next) => {
+    try {
+        const { date, startDate, endDate } = req.query;
+        const targetDate = date || format(new Date(), 'yyyy-MM-dd');
+
+        // 1. Daily Summary (Daily Cash Sheet)
+        const dailySummaries = await prisma.dailyCashSummary.findMany({
+            where: {
+                ...(date ? { date: targetDate } : {
+                    date: {
+                        gte: startDate,
+                        lte: endDate || targetDate
+                    }
+                })
+            },
+            include: {
+                vehicle: {
+                    select: { vehicleNumber: true }
+                }
+            }
+        });
+
+        // 2. Expense Category Breakdown
+        const expenses = await prisma.expense.groupBy({
+            by: ['type'],
+            _sum: { amount: true },
+            where: {
+                status: 'APPROVED',
+                ...(date ? { date: targetDate } : {
+                    date: {
+                        gte: startDate,
+                        lte: endDate || targetDate
+                    }
+                })
+            }
+        });
+
+        // 3. Profitability (Simplified: Sales - approved expenses)
+        const salesByVehicle = await prisma.dailyCashSummary.groupBy({
+            by: ['vehicleId'],
+            _sum: { cashSales: true, expenses: true },
+            where: {
+                ...(date ? { date: targetDate } : {
+                    date: {
+                        gte: startDate,
+                        lte: endDate || targetDate
+                    }
+                })
+            }
+        });
+
+        // Enforce vehicle names for profitability
+        const profitability = await Promise.all(salesByVehicle.map(async (v) => {
+            const vehicle = await prisma.vehicle.findUnique({
+                where: { id: v.vehicleId },
+                select: { vehicleNumber: true }
+            });
+            return {
+                vehicleId: v.vehicleId,
+                vehicleNumber: vehicle?.vehicleNumber || 'Unknown',
+                totalSales: v._sum.cashSales || 0,
+                totalExpenses: v._sum.expenses || 0,
+                profit: (v._sum.cashSales || 0) - (v._sum.expenses || 0)
+            };
+        }));
+
+        res.json({
+            dailySheet: dailySummaries,
+            expenseBreakdown: expenses,
+            profitability
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+

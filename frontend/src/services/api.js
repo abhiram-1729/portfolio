@@ -99,4 +99,11 @@ export const vgeAPI = {
   getLeaderboard: (params) => api.get('/vge/leaderboard', { params }),
 };
 
+export const assetAPI = {
+  getMyAssets: () => api.get('/assets/my-assets'),
+  reportIssue: (data) => api.post('/assets/report-issue', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
 export default api;

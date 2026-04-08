@@ -28,8 +28,13 @@ import AdminSettings from './pages/admin/AdminSettings';
 import AdminRoutes from './pages/admin/AdminRoutes';
 import AdminNotifications from './pages/admin/AdminNotifications';
 import AdminTargets from './pages/admin/AdminTargets';
+import AdminAssets from './pages/admin/AdminAssets';
 import Notifications from './pages/Notifications';
 import VgeTargets from './pages/VgeTargets';
+import AgentAssets from './pages/AgentAssets';
+import CashWallet from './pages/CashWallet';
+import AdminExpenses from './pages/admin/AdminExpenses';
+import AdminFinanceReports from './pages/admin/AdminFinanceReports';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -95,6 +100,8 @@ export default function App() {
           <Route path="agent-inventory/:vehicleId" element={<AgentInventory />} />
           <Route path="today-plan" element={<TodayPlan />} />
           <Route path="targets" element={<VgeTargets />} />
+          <Route path="my-assets" element={<AgentAssets />} />
+          <Route path="wallet" element={<CashWallet />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -114,6 +121,9 @@ export default function App() {
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="routes" element={<AdminRoutes />} />
           <Route path="targets" element={<AdminTargets />} />
+          <Route path="assets" element={<AdminAssets />} />
+          <Route path="expenses" element={<AdminExpenses />} />
+          <Route path="finance-reports" element={<AdminFinanceReports />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

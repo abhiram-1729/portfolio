@@ -31,6 +31,11 @@ model User {
   notifications     Notification[]
   dailyPerformance  VgeDailyPerformance[] @relation("UserDailyPerformance")
   monthlySummaries  VgeMonthlySummary[]   @relation("UserMonthlySummary")
+  assetAssignments  AssetAssignment[]
+  assetIssues       AssetIssue[]
+  expenses          Expense[]
+  cashTransfers     CashTransfer[]
+  dailySummaries    DailyCashSummary[] @relation("UserDailyCashSummary")
 
   @@index([assignedVehicleId])
   @@index([role])
@@ -214,6 +219,8 @@ model Vehicle {
   routeAssignments  RouteAssignment[]
   dailyCoverages    DailyCoverage[]
   refillRequests    RefillRequest[]
+  expenses          Expense[]
+  cashTransfers     CashTransfer[]
 }
 
 model VehicleStock {
@@ -344,17 +351,83 @@ model BusinessSettings {
 model DailyCashSummary {
   id           String   @id @default(cuid())
   vehicleId    String
+  userId       String?
   date         String
   openingCash  Float    @default(0)
   cashSales    Float    @default(0)
+  expenses     Float    @default(0)
   expectedCash Float    @default(0)
   actualCash   Float    @default(0)
   difference   Float    @default(0)
   status       String   @default("PENDING")
+  submittedCash Float   @default(0)
   updatedAt    DateTime @updatedAt
   vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
+  user         User?    @relation("UserDailyCashSummary", fields: [userId], references: [id])
 
   @@unique([vehicleId, date])
+  @@index([date])
+  @@index([userId])
+}
+
+model Expense {
+  id           String             @id @default(cuid())
+  userId       String
+  vehicleId    String?
+  type         String             // e.g. FUEL, FOOD, etc (to match dynamic management)
+  amount       Float
+  paymentMode  ExpensePaymentMode
+  description  String?
+  billImage    String?
+  status       ExpenseStatus      @default(PENDING)
+  date         String             // YYYY-MM-DD
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  user         User               @relation(fields: [userId], references: [id])
+  vehicle      Vehicle?           @relation(fields: [vehicleId], references: [id])
+
+  @@index([userId])
+  @@index([vehicleId])
+  @@index([date])
+  @@index([status])
+}
+
+model CashTransfer {
+  id              String             @id @default(cuid())
+  userId          String
+  vehicleId       String
+  date            String             // YYYY-MM-DD
+  amount          Float
+  denominations   Json?
+  status          String             @default("SUBMITTED") // SUBMITTED, RECEIVED
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+  user            User               @relation(fields: [userId], references: [id])
+  vehicle         Vehicle            @relation(fields: [vehicleId], references: [id])
+
+  @@unique([vehicleId, date])
+  @@index([userId])
+}
+
+model ExpenseCategory {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  limit     Float?
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+enum ExpensePaymentMode {
+  CASH
+  UPI
+}
+
+enum ExpenseStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
 }
 
 model DailyCoverage {
@@ -589,4 +662,112 @@ model Unit {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   products  Product[]
+}
+
+// ─── Asset Management ─────────────────────────────────────
+
+enum AssetType {
+  ELECTRONIC
+  NON_ELECTRONIC
+}
+
+enum AssetStatus {
+  AVAILABLE
+  ASSIGNED
+  DAMAGED
+  LOST
+  REPAIR_NEEDED
+  RETIRED
+}
+
+enum AssetCondition {
+  NEW
+  GOOD
+  USED
+  DAMAGED
+}
+
+enum AssetIssueType {
+  NOT_WORKING
+  DAMAGED
+  OTHER
+}
+
+enum AssetIssueStatus {
+  OPEN
+  RESOLVED
+  CLOSED
+}
+
+model Asset {
+  id              String      @id @default(cuid())
+  name            String
+  assetType       AssetType
+  model           String?
+  brand           String?
+  image           String?
+  description     String?
+  estimatedCost   Float       @default(0)
+  totalQuantity   Int         @default(0)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  units           AssetUnit[]
+
+  @@index([assetType])
+}
+
+model AssetUnit {
+  id            String            @id @default(cuid())
+  assetId       String
+  serialNumber  String?
+  status        AssetStatus       @default(AVAILABLE)
+  condition     AssetCondition    @default(NEW)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  asset         Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assignments   AssetAssignment[]
+  issues        AssetIssue[]
+
+  @@unique([assetId, serialNumber])
+  @@index([assetId])
+  @@index([status])
+}
+
+model AssetAssignment {
+  id              String          @id @default(cuid())
+  assetUnitId     String
+  userId          String
+  assignedDate    DateTime        @default(now())
+  returnDate      DateTime?
+  assignCondition AssetCondition  @default(NEW)
+  returnCondition AssetCondition?
+  returnRemarks   String?
+  quantity        Int             @default(1)
+  isActive        Boolean         @default(true)
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  assetUnit       AssetUnit       @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
+  user            User            @relation(fields: [userId], references: [id])
+
+  @@index([assetUnitId])
+  @@index([userId])
+  @@index([isActive])
+}
+
+model AssetIssue {
+  id            String           @id @default(cuid())
+  assetUnitId   String
+  userId        String
+  issueType     AssetIssueType
+  description   String?
+  photos        String[]
+  status        AssetIssueStatus @default(OPEN)
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  assetUnit     AssetUnit        @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
+  user          User             @relation(fields: [userId], references: [id])
+
+  @@index([assetUnitId])
+  @@index([userId])
+  @@index([status])
 }

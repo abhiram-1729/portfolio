@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch, Target } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch, Target, Box } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 
@@ -17,8 +17,10 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50' },
     { name: 'Vehicle & Stock', path: `/agent-inventory/${user?.assignedVehicleId}`, icon: Truck, color: 'text-slate-600', bg: 'bg-slate-50' },
     { name: 'Cash Reconciliation', path: '/closing-cash', icon: Wallet, color: 'text-orange-600', bg: 'bg-orange-50' },
+    { name: 'Cash Wallet', path: '/wallet', icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'My Targets', path: '/targets', icon: Target, color: 'text-amber-600', bg: 'bg-amber-50' },
+    { name: 'My Assets', path: '/my-assets', icon: Box, color: 'text-cyan-600', bg: 'bg-cyan-50' },
     { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
   ];
 

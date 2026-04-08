@@ -85,6 +85,29 @@ export const adminAPI = {
   vgeRecalculate: (data) => api.post('/vge/admin/recalculate', data),
   vgeEndOfDay: (data) => api.post('/vge/admin/end-of-day', data || {}),
   vgeGenerateMonthly: (data) => api.post('/vge/admin/generate-monthly', data || {}),
+
+  // Asset Management
+  getAssets: () => api.get('/admin/assets'),
+  createAsset: (data) => api.post('/admin/assets', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  updateAsset: (id, data) => api.put(`/admin/assets/${id}`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  deleteAsset: (id) => api.delete(`/admin/assets/${id}`),
+  addAssetUnits: (id, data) => api.post(`/admin/assets/${id}/units`, data),
+  assignAsset: (data) => api.post('/admin/assets/assign', data),
+  returnAsset: (data) => api.post('/admin/assets/return', data),
+  getAssetTracking: () => api.get('/admin/assets/tracking'),
+  getAssetIssues: () => api.get('/admin/assets/issues'),
+  updateAssetIssue: (id, data) => api.put(`/admin/assets/issues/${id}`, data),
+  getAssetReports: () => api.get('/admin/assets/reports'),
+
+  // Financial Reports
+  getFinancialReport: async (params) => {
+    const response = await api.get('/admin/finance/reports', { params });
+    return response.data;
+  },
 };
 
 export default adminAPI;

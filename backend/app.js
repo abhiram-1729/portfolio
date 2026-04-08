@@ -11,6 +11,8 @@ import cashRoutes from './routes/cashRoutes.js';
 import routeRoutes from './routes/routeRoutes.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import vgeRoutes from './routes/vgeRoutes.js';
+import assetRoutes from './routes/assetRoutes.js';
+import expenseRoutes from './routes/expenseRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -42,6 +44,8 @@ app.use('/api/cash', cashRoutes);
 app.use('/api/routes', routeRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/vge', vgeRoutes);
+app.use('/api/assets', assetRoutes);
+app.use('/api/expenses', expenseRoutes);
 
 
 app.get('/', (req, res) => {

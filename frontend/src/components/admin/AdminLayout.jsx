@@ -14,7 +14,10 @@ import {
   Coins,
   MapPin,
   Bell,
-  Target
+  Target,
+  Box,
+  Receipt,
+  PieChart
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -50,6 +53,9 @@ export default function AdminLayout() {
     { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow' },
     { to: '/admin/targets', icon: Target, label: 'Targets' },
+    { to: '/admin/assets', icon: Box, label: 'Assets' },
+    { to: '/admin/expenses', icon: Receipt, label: 'Expenses' },
+    { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports' },
     { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
   ];

@@ -83,6 +83,7 @@ export default function AdminCashManagement() {
   const stats = {
     totalExpected: summaries.reduce((sum, s) => sum + s.expectedCash, 0),
     totalActual: summaries.reduce((sum, s) => sum + s.actualCash, 0),
+    totalExpenses: summaries.reduce((sum, s) => sum + (s.expenses || 0), 0),
     totalDifference: summaries.reduce((sum, s) => sum + s.difference, 0),
     matchedCount: summaries.filter(s => s.status === 'MATCHED').length,
     mismatchCount: summaries.filter(s => s.status === 'MISMATCHED').length,
@@ -201,9 +202,9 @@ export default function AdminCashManagement() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
           { label: 'Expected Total', value: `₹${stats.totalExpected.toLocaleString()}`, color: 'text-gray-900', bg: 'bg-white' },
+          { label: 'Total Expenses', value: `₹${stats.totalExpenses.toLocaleString()}`, color: 'text-rose-600', bg: 'bg-rose-50' },
           { label: 'Actual Collected', value: `₹${stats.totalActual.toLocaleString()}`, color: 'text-emerald-600', bg: 'bg-emerald-50' },
           { label: 'Total Diff', value: `₹${stats.totalDifference.toLocaleString()}`, color: stats.totalDifference === 0 ? 'text-gray-400' : 'text-rose-600', bg: 'bg-white' },
-          { label: 'Status', value: `${stats.matchedCount} Match / ${stats.mismatchCount} Diff`, color: 'text-orange-600', bg: 'bg-orange-50' },
         ].map((stat, i) => (
           <div key={i} className={`${stat.bg} p-4 rounded-2xl border border-gray-100 shadow-sm`}>
             <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">{stat.label}</span>
@@ -237,8 +238,10 @@ export default function AdminCashManagement() {
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Opening</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Sales</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-rose-400">Expenses</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Expected</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Actual</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-400">Chest</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Difference</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Status</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
@@ -274,8 +277,10 @@ export default function AdminCashManagement() {
                     </td>
                     <td className="px-6 py-4 text-sm font-bold text-gray-600">₹{summary.openingCash.toLocaleString()}</td>
                     <td className="px-6 py-4 text-sm font-bold text-emerald-600">₹{summary.cashSales.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-rose-500">₹{(summary.expenses || 0).toLocaleString()}</td>
                     <td className="px-6 py-4 text-sm font-black text-gray-900 underline decoration-emerald-200 decoration-2 underline-offset-4">₹{summary.expectedCash.toLocaleString()}</td>
                     <td className="px-6 py-4 text-sm font-black text-slate-800">₹{summary.actualCash.toLocaleString()}</td>
+                    <td className="px-6 py-4 text-sm font-black text-emerald-700">₹{(summary.submittedCash || 0).toLocaleString()}</td>
                     <td className="px-6 py-4">
                       {summary.difference === 0 ? (
                         <span className="text-xs font-bold text-gray-400">-</span>

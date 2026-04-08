@@ -61,7 +61,7 @@ export default function ClosingCashEntry() {
     setLoading(true);
     try {
       await submitClosingCash({
-        vehicleId: user.assignedVehicle?.id,
+        vehicleId: user.assignedVehicle?.id || user.assignedVehicleId,
         actualCash,
         denominations: counts,
         remark,

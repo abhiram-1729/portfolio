@@ -6,7 +6,7 @@ import {
     getAdminCashSummary,
     adminSubmitOpeningCash,
     adminUpdateReconciliation,
-    deleteReconciliation,
+    deleteReconciliation
 } from '../controllers/cashController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 
