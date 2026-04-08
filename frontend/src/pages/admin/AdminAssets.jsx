@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Search, X, Loader2, Pencil, Trash2, Truck, Users, ArrowLeft, AlertTriangle,
-  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye } from 'lucide-react';
+  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -23,6 +23,7 @@ export default function AdminAssets() {
   // Tracking & Issues & Reports
   const [tracking, setTracking] = useState([]);
   const [issues, setIssues] = useState([]);
+  const [requests, setRequests] = useState([]);
   const [reports, setReports] = useState(null);
 
   // Form states
@@ -48,6 +49,7 @@ export default function AdminAssets() {
   useEffect(() => {
     if (activeTab === 'tracking') loadTracking();
     if (activeTab === 'issues') loadIssues();
+    if (activeTab === 'requests') loadRequests();
     if (activeTab === 'reports') loadReports();
   }, [activeTab]);
 
@@ -85,6 +87,21 @@ export default function AdminAssets() {
       const { data } = await adminAPI.getAssetReports();
       setReports(data);
     } catch { toast.error('Failed to load reports'); }
+  };
+
+  const loadRequests = async () => {
+    try {
+      const { data } = await adminAPI.getAssetRequests();
+      setRequests(data);
+    } catch { toast.error('Failed to load requests'); }
+  };
+
+  const handleRequestUpdate = async (id, status, remark = '') => {
+    try {
+      await adminAPI.updateAssetRequest(id, { status, adminRemark: remark });
+      toast.success(`Request ${status.toLowerCase()}`);
+      loadRequests();
+    } catch { toast.error('Failed to update request'); }
   };
 
   const handleCreate = async (e) => {
@@ -217,6 +234,7 @@ export default function AdminAssets() {
     { key: 'assign', label: 'Assign', icon: <Users size={14} /> },
     { key: 'tracking', label: 'Tracking', icon: <Eye size={14} /> },
     { key: 'issues', label: 'Issues', icon: <AlertTriangle size={14} /> },
+    { key: 'requests', label: 'Requests', icon: <MessageSquare size={14} /> },
     { key: 'reports', label: 'Reports', icon: <BarChart3 size={14} /> },
   ];
 
@@ -594,6 +612,102 @@ export default function AdminAssets() {
     );
   };
 
+  // ─── Requests Tab ───────────────────────────────────────
+  const renderRequests = () => (
+    <div className="space-y-4">
+      {requests.length === 0 ? (
+        <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
+          <MessageSquare size={32} className="mx-auto text-emerald-200 mb-2" />
+          <p className="text-sm font-bold text-gray-400">No requests found</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {requests.map(req => (
+            <div key={req.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 flex flex-col transition-all hover:shadow-md hover:border-emerald-200">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
+                    req.type === 'REPLACEMENT' ? 'bg-orange-50 text-orange-500' :
+                    req.type === 'NEW_ASSET' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'
+                  }`}>
+                    {req.type === 'REPLACEMENT' ? <RefreshCcw size={16} /> :
+                     req.type === 'NEW_ASSET' ? <Plus size={16} /> : <MessageSquare size={16} />}
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black text-gray-900 uppercase tracking-tight block leading-none">
+                      {req.type.replace('_', ' ')}
+                    </span>
+                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{req.user?.name}</span>
+                  </div>
+                </div>
+                <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm ${
+                  req.status === 'PENDING' ? 'bg-amber-100 text-amber-600' :
+                  req.status === 'APPROVED' ? 'bg-blue-100 text-blue-600' :
+                  req.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                }`}>{req.status}</span>
+              </div>
+
+              <div className="bg-gray-50 p-3 rounded-xl flex-1">
+                <div className="text-[9px] font-black text-gray-400 uppercase mb-1">Request Details</div>
+                <div className="text-xs font-bold text-gray-700">
+                  {req.asset?.name || 'Requirement'}
+                  {req.asset?.model && <span className="text-gray-400 ml-1 font-medium italic">({req.asset.model})</span>}
+                </div>
+                {req.assetUnit?.serialNumber && (
+                   <div className="text-[9px] font-mono text-emerald-600 mt-0.5">SN: {req.assetUnit.serialNumber}</div>
+                )}
+                {req.description && <p className="text-[10px] text-gray-500 mt-2 italic leading-relaxed">"{req.description}"</p>}
+              </div>
+
+              <div className="flex items-center justify-between text-[9px] font-bold border-t border-gray-50 pt-2">
+                <span className="text-gray-400">{new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                <span className={`uppercase tracking-tighter ${
+                  req.priority === 'HIGH' || req.priority === 'CRITICAL' ? 'text-red-500 font-extrabold' : 'text-gray-400'
+                }`}>Priority: {req.priority}</span>
+              </div>
+
+              {req.status === 'PENDING' && (
+                <div className="grid grid-cols-2 gap-2 pt-1 mt-auto">
+                   <button 
+                     onClick={() => handleRequestUpdate(req.id, 'APPROVED')}
+                     className="py-2 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-blue-100 hover:bg-blue-100 transition-all"
+                   >
+                     Approve
+                   </button>
+                   <button 
+                     onClick={() => {
+                        const remark = window.prompt("Reason for rejection?");
+                        if(remark !== null) handleRequestUpdate(req.id, 'REJECTED', remark);
+                     }}
+                     className="py-2 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-red-100 hover:bg-red-100 transition-all"
+                   >
+                     Reject
+                   </button>
+                </div>
+              )}
+              
+              {req.status === 'APPROVED' && (
+                 <button 
+                    onClick={() => handleRequestUpdate(req.id, 'COMPLETED')}
+                    className="w-full py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all"
+                  >
+                    Mark Handover Complete
+                  </button>
+              )}
+
+              {req.adminRemark && req.status === 'REJECTED' && (
+                <div className="p-2 bg-red-50 rounded-xl border border-red-100">
+                  <span className="text-[8px] font-black text-red-400 uppercase block mb-0.5">Admin Remark</span>
+                  <p className="text-[10px] text-red-600 italic">"{req.adminRemark}"</p>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -622,6 +736,7 @@ export default function AdminAssets() {
       {activeTab === 'assign' && renderAssign()}
       {activeTab === 'tracking' && renderTracking()}
       {activeTab === 'issues' && renderIssues()}
+      {activeTab === 'requests' && renderRequests()}
       {activeTab === 'reports' && renderReports()}
 
       {/* ══════ Create Asset Modal ══════ */}

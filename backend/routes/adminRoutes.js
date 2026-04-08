@@ -155,6 +155,8 @@ router.post('/assets/return', assetCtr.returnAsset);
 router.get('/assets/tracking', assetCtr.getAssetTracking);
 router.get('/assets/issues', assetCtr.getIssues);
 router.put('/assets/issues/:id', assetCtr.updateIssueStatus);
+router.get('/assets/requests', assetCtr.getAssetRequests);
+router.put('/assets/requests/:id', assetCtr.updateAssetRequestStatus);
 router.get('/assets/reports', assetCtr.getAssetReports);
 
 export default router;

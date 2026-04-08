@@ -104,6 +104,9 @@ export const assetAPI = {
   reportIssue: (data) => api.post('/assets/report-issue', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  createRequest: (data) => api.post('/assets/requests', data),
+  getMyRequests: () => api.get('/assets/requests'),
+  getCatalog: () => api.get('/assets/catalog'),
 };
 
 export default api;

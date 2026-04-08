@@ -3,6 +3,64 @@ import { uploadToSupabase } from '../../utils/supabaseService.js';
 
 // ─── Asset Master CRUD ────────────────────────────────────
 
+export const getAssetRequests = async (req, res) => {
+  try {
+    const requests = await prisma.assetRequest.findMany({
+      orderBy: { createdAt: 'desc' },
+      include: {
+        user: { select: { id: true, name: true, role: true } },
+        asset: { select: { id: true, name: true, model: true } },
+        assetUnit: { select: { id: true, serialNumber: true } }
+      }
+    });
+    res.json(requests);
+  } catch (error) {
+    console.error('❌ Get Asset Requests Error:', error);
+    res.status(500).json({ message: 'Error fetching requests', error: error.message });
+  }
+};
+
+export const updateAssetRequestStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, adminRemark } = req.body;
+
+    const request = await prisma.assetRequest.update({
+      where: { id },
+      data: { 
+        status, 
+        adminRemark: adminRemark || undefined 
+      }
+    });
+
+    res.json({ message: 'Request updated', request });
+  } catch (error) {
+    console.error('❌ Update Request Error:', error);
+    res.status(500).json({ message: 'Error updating request', error: error.message });
+  }
+};
+
+export const getAssetCatalog = async (req, res) => {
+  try {
+    const assets = await prisma.asset.findMany({
+      select: {
+        id: true,
+        name: true,
+        model: true,
+        brand: true,
+        assetType: true,
+        image: true,
+        description: true
+      },
+      orderBy: { name: 'asc' }
+    });
+    res.json(assets);
+  } catch (error) {
+    console.error('❌ Get Asset Catalog Error:', error);
+    res.status(500).json({ message: 'Error fetching catalog', error: error.message });
+  }
+};
+
 export const getAssets = async (req, res) => {
   try {
     const assets = await prisma.asset.findMany({
@@ -481,5 +539,46 @@ export const reportIssue = async (req, res) => {
   } catch (error) {
     console.error('❌ Report Issue Error:', error);
     res.status(500).json({ message: 'Error reporting issue', error: error.message });
+  }
+};
+
+export const createAssetRequest = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const { type, assetId, assetUnitId, description, priority } = req.body;
+
+    const request = await prisma.assetRequest.create({
+      data: {
+        userId,
+        type,
+        assetId: assetId || null,
+        assetUnitId: assetUnitId || null,
+        description: description || null,
+        priority: priority || 'MEDIUM'
+      }
+    });
+
+    res.status(201).json({ message: 'Request submitted successfully', request });
+  } catch (error) {
+    console.error('❌ Create Asset Request Error:', error);
+    res.status(500).json({ message: 'Error submitting request', error: error.message });
+  }
+};
+
+export const getMyAssetRequests = async (req, res) => {
+  try {
+    const userId = req.user.id;
+    const requests = await prisma.assetRequest.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'desc' },
+      include: {
+        asset: { select: { name: true, model: true } },
+        assetUnit: { select: { serialNumber: true } }
+      }
+    });
+    res.json(requests);
+  } catch (error) {
+    console.error('❌ Get My Asset Requests Error:', error);
+    res.status(500).json({ message: 'Error fetching requests', error: error.message });
   }
 };

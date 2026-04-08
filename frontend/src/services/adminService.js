@@ -101,6 +101,8 @@ export const adminAPI = {
   getAssetTracking: () => api.get('/admin/assets/tracking'),
   getAssetIssues: () => api.get('/admin/assets/issues'),
   updateAssetIssue: (id, data) => api.put(`/admin/assets/issues/${id}`, data),
+  getAssetRequests: () => api.get('/admin/assets/requests'),
+  updateAssetRequest: (id, data) => api.put(`/admin/assets/requests/${id}`, data),
   getAssetReports: () => api.get('/admin/assets/reports'),
 
   // Financial Reports

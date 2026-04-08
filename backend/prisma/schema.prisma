@@ -36,6 +36,7 @@ model User {
   expenses          Expense[]
   cashTransfers     CashTransfer[]
   dailySummaries    DailyCashSummary[] @relation("UserDailyCashSummary")
+  assetRequests     AssetRequest[]    @relation("UserAssetRequests")
 
   @@index([assignedVehicleId])
   @@index([role])
@@ -712,6 +713,7 @@ model Asset {
   createdAt       DateTime    @default(now())
   updatedAt       DateTime    @updatedAt
   units           AssetUnit[]
+  requests        AssetRequest[]
 
   @@index([assetType])
 }
@@ -727,6 +729,7 @@ model AssetUnit {
   asset         Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
   assignments   AssetAssignment[]
   issues        AssetIssue[]
+  requests      AssetRequest[]
 
   @@unique([assetId, serialNumber])
   @@index([assetId])
@@ -770,4 +773,38 @@ model AssetIssue {
   @@index([assetUnitId])
   @@index([userId])
   @@index([status])
+}
+
+model AssetRequest {
+  id            String          @id @default(cuid())
+  userId        String
+  type          AssetRequestType
+  assetId       String?         // Reference to asset if requesting specific type
+  assetUnitId   String?         // Reference to existing unit if replacement
+  description   String?         // Specific details or "New Requirement" text
+  priority      String          @default("MEDIUM")
+  status        RequestStatus   @default(PENDING)
+  adminRemark   String?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  user          User            @relation("UserAssetRequests", fields: [userId], references: [id])
+  asset         Asset?          @relation(fields: [assetId], references: [id])
+  assetUnit     AssetUnit?      @relation(fields: [assetUnitId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+}
+
+enum AssetRequestType {
+  REPLACEMENT
+  NEW_ASSET
+  NEW_REQUIREMENT
+}
+
+enum RequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  COMPLETED
 }
