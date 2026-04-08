@@ -67,7 +67,16 @@ const prisma = basePrisma.$extends({
             }
             
             // Injection for Write operations
-            if (['create', 'createMany'].includes(operation)) {
+            if (operation === 'create') {
+              // Models where Prisma insists on relation connectivity instead of scalar ID
+              const useRelationModels = ['Order', 'OrderItem', 'Product', 'User'];
+              
+              if (useRelationModels.includes(model)) {
+                args.data = { ...args.data, tenant: { connect: { id: tenantId } } };
+              } else {
+                args.data = { ...args.data, tenantId };
+              }
+            } else if (operation === 'createMany') {
               if (Array.isArray(args.data)) {
                 args.data = args.data.map(d => ({ ...d, tenantId }));
               } else {

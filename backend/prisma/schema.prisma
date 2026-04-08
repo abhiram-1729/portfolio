@@ -8,17 +8,17 @@ datasource db {
 }
 
 model Tenant {
-  id            String       @id @default(cuid())
-  name          String
-  code          String       @unique
-  contactEmail  String?
-  contactPhone  String?
-  address       String?
-  logo          String?
-  status        TenantStatus @default(ACTIVE)
-  planName      String       @default("FREE")
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id           String       @id @default(cuid())
+  name         String
+  code         String       @unique
+  contactEmail String?
+  contactPhone String?
+  address      String?
+  logo         String?
+  status       TenantStatus @default(ACTIVE)
+  planName     String       @default("FREE")
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
 
   // Ownership Relations
   users             User[]
@@ -35,6 +35,8 @@ model Tenant {
   assets            Asset[]
   businessSettings  BusinessSettings[]
   incentiveConfig   VgeIncentiveConfig?
+  orderItems        OrderItem[]
+  payments          Payment[]
 }
 
 enum TenantStatus {
@@ -44,38 +46,38 @@ enum TenantStatus {
 }
 
 model User {
-  id                String            @id @default(cuid())
-  tenantId          String            @default("VK001") // Temp default for migration
+  id                String     @id @default(cuid())
+  tenantId          String     @default("VK001") // Temp default for migration
   name              String?
-  email             String            @unique
+  email             String     @unique
   password          String
-  mobile            String?           @unique
-  role              UserRole          @default(CONSUMER)
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+  mobile            String?    @unique
+  role              UserRole   @default(CONSUMER)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
   assignedVehicleId String?
-  dailyTarget       Float?            @default(10000)
-  baseSalary        Float?            @default(12000)
-  status            UserStatus        @default(ACTIVE)
+  dailyTarget       Float?     @default(10000)
+  baseSalary        Float?     @default(12000)
+  status            UserStatus @default(ACTIVE)
   fcmToken          String?
 
-  tenant            Tenant            @relation(fields: [tenantId], references: [id])
-  assignedVehicle   Vehicle?          @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
-  orders            Order[]
-  carts             Cart[]
-  openingCash       OpeningCash[]
-  closingCash       ClosingCash[]
-  routeAssignments  RouteAssignment[]
-  refillRequests    RefillRequest[]
-  notifications     Notification[]
-  dailyPerformance  VgeDailyPerformance[] @relation("UserDailyPerformance")
-  monthlySummaries  VgeMonthlySummary[]   @relation("UserMonthlySummary")
-  assetAssignments  AssetAssignment[]
-  assetIssues       AssetIssue[]
-  expenses          Expense[]
-  cashTransfers     CashTransfer[]
-  dailySummaries    DailyCashSummary[] @relation("UserDailyCashSummary")
-  assetRequests     AssetRequest[]    @relation("UserAssetRequests")
+  tenant           Tenant                @relation(fields: [tenantId], references: [id])
+  assignedVehicle  Vehicle?              @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
+  orders           Order[]
+  carts            Cart[]
+  openingCash      OpeningCash[]
+  closingCash      ClosingCash[]
+  routeAssignments RouteAssignment[]
+  refillRequests   RefillRequest[]
+  notifications    Notification[]
+  dailyPerformance VgeDailyPerformance[] @relation("UserDailyPerformance")
+  monthlySummaries VgeMonthlySummary[]   @relation("UserMonthlySummary")
+  assetAssignments AssetAssignment[]
+  assetIssues      AssetIssue[]
+  expenses         Expense[]
+  cashTransfers    CashTransfer[]
+  dailySummaries   DailyCashSummary[]    @relation("UserDailyCashSummary")
+  assetRequests    AssetRequest[]        @relation("UserAssetRequests")
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -118,27 +120,27 @@ model Brand {
 }
 
 model Product {
-  id                 String               @id @default(cuid())
-  tenantId           String               @default("VK001")
-  name               String
-  description        String?
-  price              Float
-  image              String?
-  categoryId         String
-  subCategoryId      String
-  brandId            String
-  unitId             String?
-  unitValue          Float?
-  createdAt          DateTime             @default(now())
-  updatedAt          DateTime             @updatedAt
-  mrp                Float?
-  status             ItemStatus           @default(ACTIVE)
-  discount           Float?
-  landingPrice       Float?
-  gst                Float?               @default(0)
-  isFree             Boolean              @default(false)
-  minShopAmount      Float                @default(0)
-  
+  id            String     @id @default(cuid())
+  tenantId      String     @default("VK001")
+  name          String
+  description   String?
+  price         Float
+  image         String?
+  categoryId    String
+  subCategoryId String
+  brandId       String
+  unitId        String?
+  unitValue     Float?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  mrp           Float?
+  status        ItemStatus @default(ACTIVE)
+  discount      Float?
+  landingPrice  Float?
+  gst           Float?     @default(0)
+  isFree        Boolean    @default(false)
+  minShopAmount Float      @default(0)
+
   tenant             Tenant               @relation(fields: [tenantId], references: [id])
   category           Category             @relation(fields: [categoryId], references: [id])
   subCategory        SubCategory          @relation(fields: [subCategoryId], references: [id])
@@ -263,6 +265,7 @@ model OrderItem {
   gst          Float?  @default(0)
   order        Order   @relation(fields: [orderId], references: [id])
   product      Product @relation(fields: [productId], references: [id])
+  tenant       Tenant  @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([orderId])
@@ -278,6 +281,7 @@ model Payment {
   status      String
   createdAt   DateTime    @default(now())
   order       Order       @relation(fields: [orderId], references: [id])
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
 }
@@ -342,17 +346,17 @@ model StockTransaction {
 }
 
 model Route {
-  id          String            @id @default(cuid())
-  tenantId    String            @default("VK001")
-  routeName   String
-  villages    String[]
-  status      Boolean           @default(true)
-  createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
-  tenant      Tenant            @relation(fields: [tenantId], references: [id])
-  cycles      RouteCycle[]
-  assignments RouteAssignment[]
-  orders      Order[]
+  id               String              @id @default(cuid())
+  tenantId         String              @default("VK001")
+  routeName        String
+  villages         String[]
+  status           Boolean             @default(true)
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+  tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  cycles           RouteCycle[]
+  assignments      RouteAssignment[]
+  orders           Order[]
   monthlySummaries VgeMonthlySummary[]
 
   @@index([tenantId])
@@ -459,22 +463,22 @@ model BusinessSettings {
 }
 
 model DailyCashSummary {
-  id           String   @id @default(cuid())
-  tenantId     String   @default("VK001")
-  vehicleId    String
-  userId       String?
-  date         String
-  openingCash  Float    @default(0)
-  cashSales    Float    @default(0)
-  expenses     Float    @default(0)
-  expectedCash Float    @default(0)
-  actualCash   Float    @default(0)
-  difference   Float    @default(0)
-  status       String   @default("PENDING")
-  submittedCash Float   @default(0)
-  updatedAt    DateTime @updatedAt
-  vehicle      Vehicle  @relation(fields: [vehicleId], references: [id])
-  user         User?    @relation("UserDailyCashSummary", fields: [userId], references: [id])
+  id            String   @id @default(cuid())
+  tenantId      String   @default("VK001")
+  vehicleId     String
+  userId        String?
+  date          String
+  openingCash   Float    @default(0)
+  cashSales     Float    @default(0)
+  expenses      Float    @default(0)
+  expectedCash  Float    @default(0)
+  actualCash    Float    @default(0)
+  difference    Float    @default(0)
+  status        String   @default("PENDING")
+  submittedCash Float    @default(0)
+  updatedAt     DateTime @updatedAt
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  user          User?    @relation("UserDailyCashSummary", fields: [userId], references: [id])
 
   @@unique([vehicleId, date])
   @@index([tenantId])
@@ -483,21 +487,21 @@ model DailyCashSummary {
 }
 
 model Expense {
-  id           String             @id @default(cuid())
-  tenantId     String             @default("VK001")
-  userId       String
-  vehicleId    String?
-  type         String             // e.g. FUEL, FOOD, etc (to match dynamic management)
-  amount       Float
-  paymentMode  ExpensePaymentMode
-  description  String?
-  billImage    String?
-  status       ExpenseStatus      @default(PENDING)
-  date         String             // YYYY-MM-DD
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
-  user         User               @relation(fields: [userId], references: [id])
-  vehicle      Vehicle?           @relation(fields: [vehicleId], references: [id])
+  id          String             @id @default(cuid())
+  tenantId    String             @default("VK001")
+  userId      String
+  vehicleId   String?
+  type        String // e.g. FUEL, FOOD, etc (to match dynamic management)
+  amount      Float
+  paymentMode ExpensePaymentMode
+  description String?
+  billImage   String?
+  status      ExpenseStatus      @default(PENDING)
+  date        String // YYYY-MM-DD
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  user        User               @relation(fields: [userId], references: [id])
+  vehicle     Vehicle?           @relation(fields: [vehicleId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
@@ -507,18 +511,18 @@ model Expense {
 }
 
 model CashTransfer {
-  id              String             @id @default(cuid())
-  tenantId        String             @default("VK001")
-  userId          String
-  vehicleId       String
-  date            String             // YYYY-MM-DD
-  amount          Float
-  denominations   Json?
-  status          String             @default("SUBMITTED") // SUBMITTED, RECEIVED
-  createdAt       DateTime           @default(now())
-  updatedAt       DateTime           @updatedAt
-  user            User               @relation(fields: [userId], references: [id])
-  vehicle         Vehicle            @relation(fields: [vehicleId], references: [id])
+  id            String   @id @default(cuid())
+  tenantId      String   @default("VK001")
+  userId        String
+  vehicleId     String
+  date          String // YYYY-MM-DD
+  amount        Float
+  denominations Json?
+  status        String   @default("SUBMITTED") // SUBMITTED, RECEIVED
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  user          User     @relation(fields: [userId], references: [id])
+  vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
 
   @@unique([vehicleId, date])
   @@index([tenantId])
@@ -696,34 +700,34 @@ enum VgeLevel {
 }
 
 model VgeDailyPerformance {
-  id                  String   @id @default(cuid())
-  tenantId            String   @default("VK001")
-  userId              String
-  date                String   // YYYY-MM-DD format
-  routeId             String?
+  id       String  @id @default(cuid())
+  tenantId String  @default("VK001")
+  userId   String
+  date     String // YYYY-MM-DD format
+  routeId  String?
 
   // Raw aggregated data
-  totalSales          Float    @default(0)
-  totalRegistrations  Int      @default(0)
-  completedOrders     Int      @default(0)
+  totalSales         Float @default(0)
+  totalRegistrations Int   @default(0)
+  completedOrders    Int   @default(0)
 
   // Derived from incentive engine
-  eligibleSales       Float    @default(0)
-  slabsCount          Int      @default(0)
+  eligibleSales Float @default(0)
+  slabsCount    Int   @default(0)
 
   // Calculated output
-  level               VgeLevel @default(NONE)
-  salesIncentive      Float    @default(0)
-  regIncentive        Float    @default(0)
-  totalIncentive      Float    @default(0)
+  level          VgeLevel @default(NONE)
+  salesIncentive Float    @default(0)
+  regIncentive   Float    @default(0)
+  totalIncentive Float    @default(0)
 
   // Lock for end-of-day finalization
-  isLocked            Boolean  @default(false)
+  isLocked Boolean @default(false)
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user                User     @relation("UserDailyPerformance", fields: [userId], references: [id])
+  user User @relation("UserDailyPerformance", fields: [userId], references: [id])
 
   @@unique([userId, date])
   @@index([tenantId])
@@ -733,28 +737,28 @@ model VgeDailyPerformance {
 }
 
 model VgeMonthlySummary {
-  id                  String   @id @default(cuid())
-  tenantId            String   @default("VK001")
-  userId              String
-  month               String   // YYYY-MM format
-  routeId             String?
-  route               Route?   @relation(fields: [routeId], references: [id])
+  id       String  @id @default(cuid())
+  tenantId String  @default("VK001")
+  userId   String
+  month    String // YYYY-MM format
+  routeId  String?
+  route    Route?  @relation(fields: [routeId], references: [id])
 
-  totalSales          Float    @default(0)
-  totalRegistrations  Int      @default(0)
-  totalIncentive      Float    @default(0)
-  totalOrders         Int      @default(0)
-  workingDays         Int      @default(0)
-  avgLevel            String?  // Stored as string representation
-  bestLevel           VgeLevel @default(NONE)
-  metadata            Json?
+  totalSales         Float    @default(0)
+  totalRegistrations Int      @default(0)
+  totalIncentive     Float    @default(0)
+  totalOrders        Int      @default(0)
+  workingDays        Int      @default(0)
+  avgLevel           String? // Stored as string representation
+  bestLevel          VgeLevel @default(NONE)
+  metadata           Json?
 
-  isLocked            Boolean  @default(false)
+  isLocked Boolean @default(false)
 
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  user                User     @relation("UserMonthlySummary", fields: [userId], references: [id])
+  user User @relation("UserMonthlySummary", fields: [userId], references: [id])
 
   @@unique([userId, month])
   @@index([tenantId])
@@ -762,46 +766,46 @@ model VgeMonthlySummary {
 }
 
 model VgeIncentiveConfig {
-  id                      String   @id @default(cuid())
-  tenantId                String   @unique @default("VK001")
+  id       String @id @default(cuid())
+  tenantId String @unique @default("VK001")
 
   // Minimum thresholds
-  minSalesThreshold       Float    @default(10000)
-  minRegThreshold         Int      @default(5)
+  minSalesThreshold Float @default(10000)
+  minRegThreshold   Int   @default(5)
 
   // Sales slab config
-  salesSlabSize           Float    @default(5000)
-  firstSlabCount          Int      @default(2)
-  firstSlabIncentive      Float    @default(50)
-  remainingSlabIncentive  Float    @default(100)
+  salesSlabSize          Float @default(5000)
+  firstSlabCount         Int   @default(2)
+  firstSlabIncentive     Float @default(50)
+  remainingSlabIncentive Float @default(100)
 
   // Registration incentive config
-  firstRegCount           Int      @default(10)
-  firstRegIncentive       Float    @default(10)
-  remainingRegIncentive   Float    @default(15)
+  firstRegCount         Int   @default(10)
+  firstRegIncentive     Float @default(10)
+  remainingRegIncentive Float @default(15)
 
   // Level thresholds (in ascending sales order)
-  starterThreshold        Float    @default(10000)
-  performerThreshold      Float    @default(15000)
-  achieverThreshold       Float    @default(20000)
-  championThreshold       Float    @default(25000)
-  starThreshold           Float    @default(30000)
-  superStarThreshold      Float    @default(35000)
+  starterThreshold   Float @default(10000)
+  performerThreshold Float @default(15000)
+  achieverThreshold  Float @default(20000)
+  championThreshold  Float @default(25000)
+  starThreshold      Float @default(30000)
+  superStarThreshold Float @default(35000)
 
-  updatedAt               DateTime @updatedAt
-  tenant                  Tenant   @relation(fields: [tenantId], references: [id])
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
 }
 
 model Unit {
-  id        String   @id @default(cuid())
-  tenantId  String   @default("VK001")
+  id        String    @id @default(cuid())
+  tenantId  String    @default("VK001")
   name      String
   type      String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenant    Tenant    @relation(fields: [tenantId], references: [id])
   products  Product[]
 
   @@unique([tenantId, name])
@@ -844,39 +848,39 @@ enum AssetIssueStatus {
 }
 
 model Asset {
-  id              String      @id @default(cuid())
-  tenantId        String      @default("VK001")
-  name            String
-  assetType       AssetType
-  model           String?
-  brand           String?
-  image           String?
-  description     String?
-  estimatedCost   Float       @default(0)
-  totalQuantity   Int         @default(0)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  tenant          Tenant      @relation(fields: [tenantId], references: [id])
-  units           AssetUnit[]
-  requests        AssetRequest[]
+  id            String         @id @default(cuid())
+  tenantId      String         @default("VK001")
+  name          String
+  assetType     AssetType
+  model         String?
+  brand         String?
+  image         String?
+  description   String?
+  estimatedCost Float          @default(0)
+  totalQuantity Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  units         AssetUnit[]
+  requests      AssetRequest[]
 
   @@index([tenantId])
   @@index([assetType])
 }
 
 model AssetUnit {
-  id            String            @id @default(cuid())
-  tenantId      String            @default("VK001")
-  assetId       String
-  serialNumber  String?
-  status        AssetStatus       @default(AVAILABLE)
-  condition     AssetCondition    @default(NEW)
-  createdAt     DateTime          @default(now())
-  updatedAt     DateTime          @updatedAt
-  asset         Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
-  assignments   AssetAssignment[]
-  issues        AssetIssue[]
-  requests      AssetRequest[]
+  id           String            @id @default(cuid())
+  tenantId     String            @default("VK001")
+  assetId      String
+  serialNumber String?
+  status       AssetStatus       @default(AVAILABLE)
+  condition    AssetCondition    @default(NEW)
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+  asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  assignments  AssetAssignment[]
+  issues       AssetIssue[]
+  requests     AssetRequest[]
 
   @@unique([assetId, serialNumber])
   @@index([tenantId])
@@ -908,18 +912,18 @@ model AssetAssignment {
 }
 
 model AssetIssue {
-  id            String           @id @default(cuid())
-  tenantId      String           @default("VK001")
-  assetUnitId   String
-  userId        String
-  issueType     AssetIssueType
-  description   String?
-  photos        String[]
-  status        AssetIssueStatus @default(OPEN)
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  assetUnit     AssetUnit        @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
-  user          User             @relation(fields: [userId], references: [id])
+  id          String           @id @default(cuid())
+  tenantId    String           @default("VK001")
+  assetUnitId String
+  userId      String
+  issueType   AssetIssueType
+  description String?
+  photos      String[]
+  status      AssetIssueStatus @default(OPEN)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  assetUnit   AssetUnit        @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
+  user        User             @relation(fields: [userId], references: [id])
 
   @@index([tenantId])
   @@index([assetUnitId])
@@ -928,22 +932,22 @@ model AssetIssue {
 }
 
 model AssetRequest {
-  id            String          @id @default(cuid())
-  tenantId      String          @default("VK001")
-  userId        String
-  type          AssetRequestType
-  assetId       String?         // Reference to asset if requesting specific type
-  assetUnitId   String?         // Reference to existing unit if replacement
-  description   String?         // Specific details or "New Requirement" text
-  priority      String          @default("MEDIUM")
-  status        RequestStatus   @default(PENDING)
-  adminRemark   String?
-  createdAt     DateTime        @default(now())
-  updatedAt     DateTime        @updatedAt
+  id          String           @id @default(cuid())
+  tenantId    String           @default("VK001")
+  userId      String
+  type        AssetRequestType
+  assetId     String? // Reference to asset if requesting specific type
+  assetUnitId String? // Reference to existing unit if replacement
+  description String? // Specific details or "New Requirement" text
+  priority    String           @default("MEDIUM")
+  status      RequestStatus    @default(PENDING)
+  adminRemark String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
-  user          User            @relation("UserAssetRequests", fields: [userId], references: [id])
-  asset         Asset?          @relation(fields: [assetId], references: [id])
-  assetUnit     AssetUnit?      @relation(fields: [assetUnitId], references: [id])
+  user      User       @relation("UserAssetRequests", fields: [userId], references: [id])
+  asset     Asset?     @relation(fields: [assetId], references: [id])
+  assetUnit AssetUnit? @relation(fields: [assetUnitId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
