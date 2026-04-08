@@ -42,6 +42,8 @@ export default function AdminInventory() {
   const [units, setUnits] = useState([]);
   const [isAuditMode, setIsAuditMode] = useState(false);
   const [auditQuantities, setAuditQuantities] = useState({}); // { productId: quantity }
+  const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false);
+  const [pendingLoadItems, setPendingLoadItems] = useState([]);
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -511,6 +513,45 @@ export default function AdminInventory() {
         setSelectedFile(file);
         setPreviewUrl(URL.createObjectURL(file));
       }
+    }
+  };
+
+  const handleInitiateLoad = () => {
+    if (!selectedVehicleId) return toast.error('Please select a vehicle');
+
+    const actionItems = Object.entries(stockQuantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([productId, quantity]) => {
+         const itemDetails = items.find(i => i.id === productId);
+         return { 
+           productId, 
+           quantity: parseInt(quantity),
+           name: itemDetails?.name,
+           price: itemDetails?.price,
+           isFree: itemDetails?.isFree,
+           unitValue: itemDetails?.unitValue,
+           unitType: itemDetails?.unit?.type
+         };
+      });
+
+    if (actionItems.length === 0) return toast.error('Please enter quantities');
+
+    setPendingLoadItems(actionItems);
+    setShowLoadConfirmModal(true);
+  };
+
+  const handleConfirmLoad = async () => {
+    setIsSubmitting(true);
+    try {
+      const itemsToLoad = pendingLoadItems.map(i => ({ productId: i.productId, quantity: i.quantity }));
+      await adminAPI.loadStock({ vehicleId: selectedVehicleId, items: itemsToLoad });
+      toast.success('Stock loaded successfully');
+      setStockQuantities({});
+      setShowLoadConfirmModal(false);
+    } catch (error) {
+      toast.error('Failed to load stock');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1099,11 +1140,11 @@ export default function AdminInventory() {
             </div>
 
             <button
-              onClick={() => handleStockAction('LOAD')}
+              onClick={handleInitiateLoad}
               disabled={isSubmitting}
               className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2"
             >
-              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Confirm & Submit Loading'}
+              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Initiate Loading'}
             </button>
           </div>
         </div>
@@ -2326,6 +2367,83 @@ export default function AdminInventory() {
                 ) : 'Add to Master'}
               </button>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Load Confirmation Modal */}
+      {showLoadConfirmModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl animate-in fade-in duration-200 flex flex-col max-h-[85vh]">
+            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                  <ArrowUpCircle size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900 tracking-tight leading-none">Confirm Loading</h3>
+                  <span className="text-xs text-gray-500 font-medium">Please review before confirming</span>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowLoadConfirmModal(false)}
+                className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                disabled={isSubmitting}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            
+            <div className="p-5 overflow-y-auto space-y-3 bg-gray-50/50">
+              {pendingLoadItems.map((item, idx) => {
+                const totalValue = item.quantity * (item.price || 0);
+                return (
+                  <div key={idx} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${item.isFree ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-50 text-gray-400'}`}>
+                        <Package size={16} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-bold text-gray-800 leading-tight">{item.name}</span>
+                        {item.unitValue && item.unitType && (
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{item.unitValue} {item.unitType}</span>
+                        )}
+                        {!item.isFree && <span className="text-[10px] text-gray-500 mt-0.5">Rate: ₹{item.price}</span>}
+                        {item.isFree && <span className="text-[10px] font-bold text-emerald-500 mt-0.5">Free Item</span>}
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-lg font-black text-emerald-600">{item.quantity}</span>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
+                      {!item.isFree && <span className="text-xs font-bold text-gray-600 mt-1 block">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="p-5 border-t border-gray-100 bg-white rounded-b-3xl">
+              <div className="flex justify-between items-center mb-4 px-2">
+                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Items: <span className="text-gray-900">{pendingLoadItems.length}</span></span>
+                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Value: <span className="text-emerald-600">₹{pendingLoadItems.reduce((acc, item) => acc + (item.quantity * (item.price || 0)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></span>
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowLoadConfirmModal(false)}
+                  disabled={isSubmitting}
+                  className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmLoad}
+                  disabled={isSubmitting}
+                  className="flex-[2] py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Confirm Loading'}
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}

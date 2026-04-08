@@ -160,9 +160,9 @@ export default function PaymentScreen() {
             <button
             id="confirm-payment-btn"
             onClick={handlePayment}
-            disabled={!selected || loading || (selected === 'CASH' && (parseFloat(cashReceived) || 0) < totalAmount)}
+            disabled={!selected || loading}
             className={`w-full font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative overflow-hidden group ${
-                !selected || loading || (selected === 'CASH' && (parseFloat(cashReceived) || 0) < totalAmount)
+                !selected || loading
                 ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70 shadow-none'
                 : 'bg-emerald-600 text-white shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700'
             }`}
