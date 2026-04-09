@@ -36,6 +36,12 @@ export const markAllNotificationsRead = async () => {
     return response.data;
 };
 
+export const locationCheckIn = async (data) => {
+    const response = await api.post('/routes/location-check-in', data);
+    return response.data;
+};
+
+
 // ─── Admin-facing APIs ─────────────────────────────
 export const createRoute = async (data) => {
     const response = await api.post('/admin/routes', data);
@@ -97,3 +103,9 @@ export const deleteVillage = async (id) => {
     const response = await api.delete(`/admin/villages/${id}`);
     return response.data;
 };
+
+export const getAllLocationCheckIns = async () => {
+    const response = await api.get('/routes/all-location-check-ins');
+    return response.data;
+};
+

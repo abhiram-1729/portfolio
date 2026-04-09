@@ -3,6 +3,7 @@ import api from './api';
 export const adminAPI = {
   // Dashboard
   getDashboardStats: () => api.get('/admin/dashboard'),
+  getLocationCheckIns: () => api.get('/routes/all-location-check-ins'),
 
   // Users
   getUsers: () => api.get('/admin/users'),
@@ -110,6 +111,7 @@ export const adminAPI = {
     const response = await api.get('/admin/finance/reports', { params });
     return response.data;
   },
+  resolveVillageLink: (url) => api.post('/admin/villages/resolve-link', { url }),
 };
 
 export default adminAPI;

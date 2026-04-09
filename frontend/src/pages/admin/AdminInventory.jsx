@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -28,6 +28,8 @@ export default function AdminInventory() {
   const [expandedAgentId, setExpandedAgentId] = useState(null);
   const [viewingAgentId, setViewingAgentId] = useState(null);
   const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(25);
 
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -44,6 +46,7 @@ export default function AdminInventory() {
   const [auditQuantities, setAuditQuantities] = useState({}); // { productId: quantity }
   const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false);
   const [pendingLoadItems, setPendingLoadItems] = useState([]);
+  const [modalTab, setModalTab] = useState('info'); // info or price
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -90,6 +93,10 @@ export default function AdminInventory() {
   useEffect(() => {
     fetchData();
   }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterCategory, filterStatus, filterFreeOnly]);
 
   const handleQuantityChange = React.useCallback((id, val) => {
     setStockQuantities(prev => ({ ...prev, [id]: val }));
@@ -390,6 +397,7 @@ export default function AdminInventory() {
   };
 
   const openEditModal = (item) => {
+    setModalTab('info');
     setEditItem({
       id: item.id,
       name: item.name || '',
@@ -621,6 +629,13 @@ export default function AdminInventory() {
     return matchesSearch && matchesCategory && matchesStatus && matchesFree;
   });
 
+  const paginatedItems = React.useMemo(() => {
+    const start = (currentPage - 1) * itemsPerPage;
+    return filteredItems.slice(start, start + itemsPerPage);
+  }, [filteredItems, currentPage, itemsPerPage]);
+
+  const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
   const renderMaster = () => {
     const renderProductCard = (item) => {
       const isSelected = selectedItems.includes(item.id);
@@ -739,7 +754,7 @@ export default function AdminInventory() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {itemsToRender.map((item) => {
+                    {itemsToRender.map((item) => {
               const isSelected = selectedItems.includes(item.id);
               return (
                 <tr key={item.id} className={`hover:bg-gray-50/30 transition-colors group ${isSelected ? 'bg-emerald-50/10' : ''}`}>
@@ -924,35 +939,81 @@ export default function AdminInventory() {
             <>
               {/* Mobile Card View */}
               <div className="md:hidden space-y-8">
-                {filteredItems.filter(i => !i.isFree).length > 0 && (
+                {paginatedItems.filter(i => !i.isFree).length > 0 && (
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-2">Regular Products</h4>
-                    {filteredItems.filter(i => !i.isFree).map(renderProductCard)}
+                    {paginatedItems.filter(i => !i.isFree).map(renderProductCard)}
                   </div>
                 )}
-                {filteredItems.filter(i => i.isFree).length > 0 && (
+                {paginatedItems.filter(i => i.isFree).length > 0 && (
                   <div className="space-y-3 mt-4">
                     <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-2 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                    {filteredItems.filter(i => i.isFree).map(renderProductCard)}
+                    {paginatedItems.filter(i => i.isFree).map(renderProductCard)}
                   </div>
                 )}
               </div>
 
               {/* Desktop Table View */}
               <div className="hidden md:block space-y-8">
-                {filteredItems.filter(i => !i.isFree).length > 0 && (
+                {paginatedItems.filter(i => !i.isFree).length > 0 && (
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-4">Regular Products</h4>
-                    {renderDesktopTable(filteredItems.filter(i => !i.isFree))}
+                    {renderDesktopTable(paginatedItems.filter(i => !i.isFree))}
                   </div>
                 )}
-                {filteredItems.filter(i => i.isFree).length > 0 && (
+                {paginatedItems.filter(i => i.isFree).length > 0 && (
                   <div className="space-y-3 mt-8">
                     <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-4 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                    {renderDesktopTable(filteredItems.filter(i => i.isFree))}
+                    {renderDesktopTable(paginatedItems.filter(i => i.isFree))}
                   </div>
                 )}
               </div>
+
+              {/* Pagination */}
+              {totalPages > 1 && (
+                <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 px-2 border-t border-gray-100 pt-6">
+                  <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    Showing {Math.min(filteredItems.length, (currentPage - 1) * itemsPerPage + 1)} to {Math.min(filteredItems.length, currentPage * itemsPerPage)} of {filteredItems.length} Products
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                    >
+                      <ArrowLeft size={14} /> Previous
+                    </button>
+                    {(() => {
+                      let pages = [];
+                      let startPage = Math.max(1, currentPage - 2);
+                      let endPage = Math.min(totalPages, startPage + 4);
+                      if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+                      
+                      for(let i = startPage; i <= endPage; i++) {
+                        if (i > 0) {
+                          pages.push(
+                            <button
+                              key={i}
+                              onClick={() => { setCurrentPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                              className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${currentPage === i ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-emerald-200'}`}
+                            >
+                              {i}
+                            </button>
+                          );
+                        }
+                      }
+                      return pages;
+                    })()}
+                    <button
+                      disabled={currentPage === totalPages}
+                      onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                    >
+                      Next <ArrowLeft size={14} className="rotate-180" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
@@ -1974,7 +2035,7 @@ export default function AdminInventory() {
               <span className="hidden md:block">Bulk Upload</span>
             </button>
             <button
-              onClick={() => setShowAddItemModal(true)}
+              onClick={() => { setShowAddItemModal(true); setModalTab('info'); }}
               className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
             >
               <Plus size={24} />
@@ -2091,281 +2152,415 @@ export default function AdminInventory() {
 
       {/* Add Item Modal */}
       {showAddItemModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Add New Item</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-10 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/20">
+                  <Plus size={24} strokeWidth={3} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Create Registry Item</h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Master Inventory Management System
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => setShowAddItemModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+                className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-rose-500 transition-all border border-transparent hover:border-gray-100"
               >
-                <X size={18} />
+                <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={handleCreateItem} className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. Standard Oil 5L"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={newItem.name}
-                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                    value={newItem.categoryId}
-                    onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value, subCategoryId: 'default' })}
+            {/* Mobile Tab Switcher (Only visible on < lg screens) */}
+            <div className="lg:hidden px-6 pt-4">
+              <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
+                {[
+                  { id: 'info', label: 'Identity', icon: Package },
+                  { id: 'price', label: 'Pricing', icon: ArrowUpCircle },
+                  { id: 'final', label: 'Finalize', icon: Grid }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setModalTab(tab.id)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === tab.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
                   >
-                    <option value="default">Select Category</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
+                    <tab.icon size={14} className={tab.id === 'price' ? 'rotate-180' : ''} />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleCreateItem} className="flex flex-col">
+              <div className="p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
+                {/* Column 1: Product Identity */}
+                <div className={`space-y-6 lg:block ${modalTab === 'info' ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                      <Package size={16} />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Product Identity</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="group">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-emerald-600 transition-colors">Item Display Name</label>
+                      <input
+                        type="text"
+                        required
+                        placeholder="e.g. Premium Basmati Rice"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all shadow-sm"
+                        value={newItem.name}
+                        onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Category</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                          value={newItem.categoryId}
+                          onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value, subCategoryId: 'default' })}
+                        >
+                          <option value="default">Select</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                          value={newItem.status}
+                          onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Unit Type</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                          value={newItem.unitId}
+                          onChange={(e) => setNewItem({ ...newItem, unitId: e.target.value })}
+                        >
+                          <option value="">Measure</option>
+                          {units.map(u => (
+                            <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
+                        <input
+                          type="number"
+                          placeholder="500"
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                          value={newItem.unitValue}
+                          onChange={(e) => setNewItem({ ...newItem, unitValue: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Description</label>
+                      <textarea
+                        placeholder="Product specifications..."
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-medium focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm h-28 resize-none"
+                        value={newItem.description}
+                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Economics */}
+                <div className={`space-y-6 lg:block ${modalTab === 'price' ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                      <ArrowUpCircle size={16} className="rotate-180" />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Economics</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Landing Price</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            required
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                            value={newItem.landingPrice}
+                            onChange={(e) => setNewItem({ ...newItem, landingPrice: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">MRP Value</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            required
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                            value={newItem.mrp}
+                            onChange={(e) => {
+                              const m = e.target.value;
+                              setNewItem({
+                                ...newItem,
+                                mrp: m,
+                                price: calculateFinalPrice(m, newItem.discount, newItem.discountType)
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Type</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-xs font-black focus:bg-white outline-none appearance-none"
+                          value={newItem.discountType}
+                          onChange={(e) => {
+                            const type = e.target.value;
+                            setNewItem({
+                              ...newItem,
+                              discountType: type,
+                              price: calculateFinalPrice(newItem.mrp, newItem.discount, type)
+                            });
+                          }}
+                        >
+                          <option value="RUPEE">Flat ₹</option>
+                          <option value="PERCENT">% Off</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Disc.</label>
+                        <input
+                          type="number"
+                          required
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
+                          value={newItem.discount}
+                          onChange={(e) => {
+                            const d = Math.max(0, parseFloat(e.target.value) || 0);
+                            setNewItem({
+                              ...newItem,
+                              discount: d.toString(),
+                              price: calculateFinalPrice(newItem.mrp, d, newItem.discountType)
+                            });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1 block">GST Slab</label>
+                        <select
+                          className="w-full bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-3.5 text-xs font-black text-emerald-700 outline-none appearance-none cursor-pointer hover:bg-emerald-100 transition-colors"
+                          value={newItem.gst}
+                          onChange={(e) => setNewItem({ ...newItem, gst: e.target.value })}
+                        >
+                          {taxRates.map(rate => (
+                            <option key={`add-gst-${rate}`} value={rate}>{rate}%</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="bg-emerald-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                         <div className="text-white text-6xl font-black">₹</div>
+                      </div>
+                      <div className="flex justify-between items-start relative z-10">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Selling Price (Final)</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-black text-white leading-none tracking-tighter">₹{parseFloat(newItem.price || 0).toFixed(2)}</span>
+                            <span className="text-[9px] font-bold text-emerald-400/50 uppercase">incl. tax</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-4 border-t border-emerald-800 relative z-10">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">Tax Component</span>
+                          <span className="text-sm font-black text-emerald-200">
+                             ₹{newItem.price && newItem.gst ? (parseFloat(newItem.price) - (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100))).toFixed(2) : '0.00'}
+                          </span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">Net Revenue</span>
+                          <span className="text-sm font-black text-emerald-200">
+                             ₹{newItem.price && newItem.gst ? (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100)).toFixed(2) : '0.00'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 3: Media & Actions */}
+                <div className={`space-y-6 lg:block ${modalTab === 'final' ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Grid size={16} />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Finalization</span>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div className="relative group">
+                      <input
+                        id="add-image-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileChange(e, false)}
+                      />
+                      <div 
+                        onClick={() => document.getElementById('add-image-input').click()}
+                        className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-emerald-500 hover:bg-emerald-50 group shadow-inner"
+                      >
+                        {previewUrl ? (
+                          <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-12 h-12 bg-white rounded-2xl shadow-md flex items-center justify-center text-gray-300 group-hover:text-emerald-500 group-hover:scale-110 transition-all">
+                               <Plus size={28} />
+                            </div>
+                            <div className="text-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Upload Image</span>
+                              <span className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">JPEG/PNG Max 5MB</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={`p-5 rounded-[2rem] border-2 transition-all duration-300 flex flex-col gap-4 ${newItem.isFree ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50/30 border-gray-100'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            onClick={() => setNewItem({ ...newItem, isFree: !newItem.isFree })}
+                            className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${newItem.isFree ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                          >
+                            <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${newItem.isFree ? 'translate-x-5' : ''}`} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${newItem.isFree ? 'text-emerald-700' : 'text-gray-400'}`}>Promotional Gift</span>
+                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Zero cost to customer</span>
+                          </div>
+                        </div>
+                        {newItem.isFree && <Gift size={18} className="text-emerald-500 animate-bounce" />}
+                      </div>
+                      
+                      {newItem.isFree && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                          <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
+                          <input
+                            type="number"
+                            className="w-full bg-white border border-emerald-100 rounded-xl px-4 py-2 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
+                            value={newItem.minShopAmount}
+                            onChange={(e) => setNewItem({ ...newItem, minShopAmount: e.target.value })}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full bg-emerald-600 text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700 hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 size={24} className="animate-spin" />
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          Save to Master
+                          <CheckSquare size={20} />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Type</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                    value={newItem.unitId}
-                    onChange={(e) => setNewItem({ ...newItem, unitId: e.target.value })}
+              {/* Action Bar / Footer */}
+              <div className="px-6 lg:px-10 py-6 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddItemModal(false)}
+                    className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 hover:text-rose-500 transition-colors flex items-center gap-2"
                   >
-                    <option value="">Select Unit</option>
-                    {units.map(u => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Count/Value</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 500"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                    value={newItem.unitValue}
-                    onChange={(e) => setNewItem({ ...newItem, unitValue: e.target.value })}
-                  />
-                </div>
-              </div>
+                    <X size={14} /> <span className="sm:inline">Discard</span>
+                  </button>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Product Image</label>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-14 h-14 rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 overflow-hidden cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => document.getElementById('add-image-input').click()}
-                  >
-                    {previewUrl ? (
-                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Plus size={24} />
+                  {/* Mobile Back Button (only visible if not on first tab) */}
+                  <div className="lg:hidden">
+                    {modalTab !== 'info' && (
+                      <button 
+                        type="button" 
+                        onClick={() => setModalTab(modalTab === 'final' ? 'price' : 'info')}
+                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5 px-4 py-3"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <input
-                      id="add-image-input"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileChange(e, false)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => document.getElementById('add-image-input').click()}
-                      className="text-emerald-600 text-xs font-bold px-3 py-1.5 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
-                    >
-                      {selectedFile ? 'Change Image' : 'Select Image'}
-                    </button>
-                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">Max 5MB</p>
+                </div>
+
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  {/* Mobile Guided Navigation */}
+                  <div className="flex-1 lg:hidden">
+                    {modalTab === 'info' && (
+                      <button 
+                        type="button" 
+                        onClick={() => setModalTab('price')}
+                        className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                      >
+                        Section 2: Economics <ArrowLeft size={16} className="rotate-180" />
+                      </button>
+                    )}
+                    {modalTab === 'price' && (
+                      <button 
+                        type="button" 
+                        onClick={() => setModalTab('final')}
+                        className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
+                      >
+                        Step 3: Media & Save <ArrowLeft size={16} className="rotate-180" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="hidden sm:flex items-center gap-4">
+                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest hidden xl:block">Data synchronization active</span>
+                    <div className="w-px h-4 bg-gray-200 hidden xl:block" />
+                    <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
+                       <span className="w-2 h-2 rounded-full bg-blue-500" />
+                       Production Ready
+                    </div>
                   </div>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Landing Price</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={newItem.landingPrice}
-                    onChange={(e) => setNewItem({ ...newItem, landingPrice: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MRP</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={newItem.mrp}
-                    onChange={(e) => {
-                      const m = e.target.value;
-                      setNewItem({
-                        ...newItem,
-                        mrp: m,
-                        price: calculateFinalPrice(m, newItem.discount, newItem.discountType)
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid grid-cols-2 gap-2 flex-1">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount Type</label>
-                    <select
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                      value={newItem.discountType}
-                      onChange={(e) => {
-                        const type = e.target.value;
-                        setNewItem({
-                          ...newItem,
-                          discountType: type,
-                          price: calculateFinalPrice(newItem.mrp, newItem.discount, type)
-                        });
-                      }}
-                    >
-                      <option value="RUPEE">₹</option>
-                      <option value="PERCENT">%</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Value</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      placeholder={newItem.discountType === 'PERCENT' ? '%' : '₹'}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                      value={newItem.discount}
-                      onChange={(e) => {
-                        const d = Math.max(0, parseFloat(e.target.value) || 0);
-                        setNewItem({
-                          ...newItem,
-                          discount: d.toString(),
-                          price: calculateFinalPrice(newItem.mrp, d, newItem.discountType)
-                        });
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
-                    value={newItem.price}
-                    onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GST Slab (%)</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none font-bold"
-                    value={newItem.gst}
-                    onChange={(e) => {
-                      const g = e.target.value;
-                      setNewItem({
-                        ...newItem,
-                        gst: g
-                      });
-                    }}
-                  >
-                    {taxRates.map(rate => (
-                      <option key={`add-gst-${rate}`} value={rate}>{rate}%</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Incl. GST (₹)</label>
-                  <input
-                    type="text"
-                    disabled
-                    placeholder="₹0.00"
-                    className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-emerald-700 cursor-not-allowed"
-                    value={newItem.price && newItem.gst ? (parseFloat(newItem.price) - (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100))).toFixed(2) : '0.00'}
-                  />
-                </div>
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 items-center bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isFree-add"
-                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
-                    checked={newItem.isFree}
-                    onChange={(e) => setNewItem({ ...newItem, isFree: e.target.checked })}
-                  />
-                  <label htmlFor="isFree-add" className="text-sm font-bold text-emerald-700 cursor-pointer">Free Item</label>
-                </div>
-                {newItem.isFree && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Min Shop ₹</label>
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      className="w-full bg-white border border-emerald-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
-                      value={newItem.minShopAmount}
-                      onChange={(e) => setNewItem({ ...newItem, minShopAmount: e.target.value })}
-                    />
-                  </div>
-                )}
-              </div>
-
-
-              <div className="flex gap-3">
-                <div className="space-y-1 flex-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none font-bold"
-                    value={newItem.status}
-                    onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1 flex-[2]">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Description</label>
-                  <textarea
-                    placeholder="Optional details..."
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm h-9 resize-none"
-                    value={newItem.description}
-                    onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 mt-2 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Adding...
-                  </>
-                ) : 'Add to Master'}
-              </button>
             </form>
           </div>
         </div>
@@ -2450,279 +2645,408 @@ export default function AdminInventory() {
 
       {/* Edit Item Modal */}
       {showEditItemModal && editItem && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-5 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Edit Item</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
+            {/* Header */}
+            <div className="px-10 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20">
+                  <Pencil size={24} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Modify Master Entry</h3>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                    Updating Registry: {editItem.name}
+                  </p>
+                </div>
+              </div>
               <button
+                type="button"
                 onClick={() => { setShowEditItemModal(false); setEditItem(null); }}
-                className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+                className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-rose-500 transition-all border border-transparent hover:border-gray-100"
               >
-                <X size={18} />
+                <X size={24} />
               </button>
             </div>
 
-            <form onSubmit={handleUpdateItem} className="space-y-2.5">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</label>
-                  <input
-                    type="text"
-                    required
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={editItem.name}
-                    onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                    value={editItem.categoryId}
-                    onChange={(e) => setEditItem({ ...editItem, categoryId: e.target.value, subCategoryId: 'default' })}
+            {/* Mobile Tab Switcher (Only visible on < lg screens) */}
+            <div className="lg:hidden px-6 pt-4">
+              <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
+                {[
+                  { id: 'info', label: 'General', icon: Package },
+                  { id: 'price', label: 'Pricing', icon: ArrowUpCircle },
+                  { id: 'final', label: 'Media', icon: Grid }
+                ].map((tab) => (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => setModalTab(tab.id)}
+                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}
                   >
-                    <option value="default">Select Category</option>
-                    {categories.map(cat => (
-                      <option key={cat.id} value={cat.id}>{cat.name}</option>
-                    ))}
-                  </select>
+                    <tab.icon size={14} className={tab.id === 'price' ? 'rotate-180' : ''} />
+                    <span className="hidden sm:inline">{tab.label}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <form onSubmit={handleUpdateItem} className="flex flex-col">
+              <div className="p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
+                {/* Column 1: Identity */}
+                <div className={`space-y-6 lg:block ${modalTab === 'info' ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                      <Package size={16} />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">General Information</span>
+                  </div>
+                  
+                  <div className="space-y-4">
+                    <div className="group">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-indigo-600 transition-colors">Item Display Name</label>
+                      <input
+                        type="text"
+                        required
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all shadow-sm"
+                        value={editItem.name}
+                        onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Category</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                          value={editItem.categoryId}
+                          onChange={(e) => setEditItem({ ...editItem, categoryId: e.target.value, subCategoryId: 'default' })}
+                        >
+                          <option value="default">Select</option>
+                          {categories.map(cat => (
+                            <option key={cat.id} value={cat.id}>{cat.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                          value={editItem.status}
+                          onChange={(e) => setEditItem({ ...editItem, status: e.target.value })}
+                        >
+                          <option value="ACTIVE">Active</option>
+                          <option value="INACTIVE">Inactive</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Unit Type</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                          value={editItem.unitId}
+                          onChange={(e) => setEditItem({ ...editItem, unitId: e.target.value })}
+                        >
+                          <option value="">Measure</option>
+                          {units.map(u => (
+                            <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
+                        <input
+                          type="number"
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                          value={editItem.unitValue}
+                          onChange={(e) => setEditItem({ ...editItem, unitValue: e.target.value })}
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Description</label>
+                      <textarea
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-medium focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm h-28 resize-none"
+                        value={editItem.description}
+                        onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Economics */}
+                <div className={`space-y-6 lg:block ${modalTab === 'price' ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                      <ArrowUpCircle size={16} className="rotate-180" />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Economics & Pricing</span>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Purchase Price</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            required
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                            value={editItem.landingPrice}
+                            onChange={(e) => setEditItem({ ...editItem, landingPrice: e.target.value })}
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">MRP Value</label>
+                        <div className="relative">
+                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                          <input
+                            type="number"
+                            required
+                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                            value={editItem.mrp}
+                            onChange={(e) => {
+                              const m = e.target.value;
+                              setEditItem({
+                                ...editItem,
+                                mrp: m,
+                                price: calculateFinalPrice(m, editItem.discount, editItem.discountType)
+                              });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Type</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-xs font-black focus:bg-white outline-none appearance-none"
+                          value={editItem.discountType}
+                          onChange={(e) => {
+                            const type = e.target.value;
+                            setEditItem({
+                              ...editItem,
+                              discountType: type,
+                              price: calculateFinalPrice(editItem.mrp, editItem.discount, type)
+                            });
+                          }}
+                        >
+                          <option value="RUPEE">Flat ₹</option>
+                          <option value="PERCENT">% Off</option>
+                        </select>
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value</label>
+                        <input
+                          type="number"
+                          required
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
+                          value={editItem.discount}
+                          onChange={(e) => {
+                            const d = Math.max(0, parseFloat(e.target.value) || 0);
+                            setEditItem({
+                              ...editItem,
+                              discount: d.toString(),
+                              price: calculateFinalPrice(editItem.mrp, d, editItem.discountType)
+                            });
+                          }}
+                        />
+                      </div>
+                      <div>
+                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1 mb-1 block">GST Slab</label>
+                        <select
+                          className="w-full bg-indigo-50 border border-indigo-100 rounded-2xl px-3 py-3.5 text-xs font-black text-indigo-700 outline-none appearance-none cursor-pointer hover:bg-indigo-100 transition-colors"
+                          value={editItem.gst}
+                          onChange={(e) => setEditItem({ ...editItem, gst: e.target.value })}
+                        >
+                          {taxRates.map(rate => (
+                            <option key={`edit-gst-${rate}`} value={rate}>{rate}%</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="bg-indigo-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-indigo-900/20 relative overflow-hidden group">
+                      <div className="absolute top-0 right-0 p-4 opacity-10">
+                         <div className="text-white text-6xl font-black">₹</div>
+                      </div>
+                      <div className="flex justify-between items-start relative z-10">
+                        <div className="flex flex-col">
+                          <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Current Selling Price</span>
+                          <div className="flex items-baseline gap-2">
+                            <span className="text-4xl font-black text-white leading-none tracking-tighter">₹{parseFloat(editItem.price || 0).toFixed(2)}</span>
+                            <span className="text-[9px] font-bold text-indigo-400/50 uppercase">incl. tax</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex justify-between items-center pt-4 border-t border-indigo-800 relative z-10">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Tax Component</span>
+                          <span className="text-sm font-black text-indigo-200">
+                             ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) - (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100))).toFixed(2) : '0.00'}
+                          </span>
+                        </div>
+                        <div className="flex flex-col text-right">
+                          <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Net Revenue</span>
+                          <span className="text-sm font-black text-indigo-200">
+                             ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100)).toFixed(2) : '0.00'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 3: Media & Actions */}
+                <div className={`space-y-6 lg:block ${modalTab === 'final' ? 'block' : 'hidden'}`}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                      <Grid size={16} />
+                    </div>
+                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Media & Control</span>
+                  </div>
+
+                  <div className="space-y-5">
+                    <div className="relative group">
+                      <input
+                        id="edit-image-input"
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleFileChange(e, true)}
+                      />
+                      <div 
+                        onClick={() => document.getElementById('edit-image-input').click()}
+                        className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-indigo-500 hover:bg-indigo-50 group shadow-inner"
+                      >
+                        {editPreviewUrl ? (
+                          <img src={editPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-12 h-12 bg-white rounded-2xl shadow-md flex items-center justify-center text-gray-300 group-hover:text-indigo-500 group-hover:scale-110 transition-all">
+                               <Plus size={28} />
+                            </div>
+                            <div className="text-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Update Image</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className={`p-5 rounded-[2rem] border-2 transition-all duration-300 flex flex-col gap-4 ${editItem.isFree ? 'bg-indigo-50 border-indigo-100' : 'bg-gray-50/30 border-gray-100'}`}>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div 
+                            onClick={() => setEditItem({ ...editItem, isFree: !editItem.isFree })}
+                            className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${editItem.isFree ? 'bg-indigo-500' : 'bg-gray-200'}`}
+                          >
+                            <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${editItem.isFree ? 'translate-x-5' : ''}`} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className={`text-[10px] font-black uppercase tracking-widest ${editItem.isFree ? 'text-indigo-700' : 'text-gray-400'}`}>Promotional Gift</span>
+                          </div>
+                        </div>
+                        {editItem.isFree && <Gift size={18} className="text-indigo-500 animate-bounce" />}
+                      </div>
+                      
+                      {editItem.isFree && (
+                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                          <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
+                          <input
+                            type="number"
+                            className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-2 text-sm font-black text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all shadow-sm"
+                            value={editItem.minShopAmount}
+                            onChange={(e) => setEditItem({ ...editItem, minShopAmount: e.target.value })}
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full bg-indigo-600 text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-indigo-600/30 hover:bg-indigo-700 hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-3"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <Loader2 size={24} className="animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          Update Changes
+                          <CheckSquare size={20} />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Type</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                    value={editItem.unitId}
-                    onChange={(e) => setEditItem({ ...editItem, unitId: e.target.value })}
+              {/* Action Bar / Footer */}
+              <div className="px-6 lg:px-10 py-6 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
+                <div className="flex items-center justify-between w-full sm:w-auto">
+                  <button
+                    type="button"
+                    onClick={() => { setShowEditItemModal(false); setEditItem(null); }}
+                    className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 hover:text-rose-500 transition-colors flex items-center gap-2"
                   >
-                    <option value="">Select Unit</option>
-                    {units.map(u => (
-                      <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Unit Count/Value</label>
-                  <input
-                    type="number"
-                    placeholder="e.g. 500"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                    value={editItem.unitValue}
-                    onChange={(e) => setEditItem({ ...editItem, unitValue: e.target.value })}
-                  />
-                </div>
-              </div>
+                    <X size={14} /> <span className="sm:inline">Discard</span>
+                  </button>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Product Image</label>
-                <div className="flex items-center gap-3">
-                  <div
-                    className="w-14 h-14 rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center text-gray-400 overflow-hidden cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => document.getElementById('edit-image-input').click()}
-                  >
-                    {editPreviewUrl ? (
-                      <img src={editPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
-                    ) : (
-                      <Plus size={24} />
+                  {/* Mobile Back Button */}
+                  <div className="lg:hidden">
+                    {modalTab !== 'info' && (
+                      <button 
+                        type="button" 
+                        onClick={() => setModalTab(modalTab === 'final' ? 'price' : 'info')}
+                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5 px-4 py-3"
+                      >
+                        <ArrowLeft size={14} /> Back
+                      </button>
                     )}
                   </div>
-                  <div className="flex-1">
-                    <input
-                      id="edit-image-input"
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleFileChange(e, true)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => document.getElementById('edit-image-input').click()}
-                      className="text-emerald-600 text-xs font-bold px-3 py-1.5 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition-colors"
-                    >
-                      Change Image
-                    </button>
-                    <p className="text-[10px] text-gray-400 mt-1 uppercase font-bold">Max 5MB</p>
+                </div>
+
+                <div className="flex items-center gap-4 w-full sm:w-auto">
+                  {/* Mobile Guided Navigation */}
+                  <div className="flex-1 lg:hidden">
+                    {modalTab === 'info' && (
+                      <button 
+                        type="button" 
+                        onClick={() => setModalTab('price')}
+                        className="w-full bg-indigo-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                      >
+                        Section 2: Economics <ArrowLeft size={16} className="rotate-180" />
+                      </button>
+                    )}
+                    {modalTab === 'price' && (
+                      <button 
+                        type="button" 
+                        onClick={() => setModalTab('final')}
+                        className="w-full bg-indigo-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                      >
+                        Step 3: Media & Update <ArrowLeft size={16} className="rotate-180" />
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="hidden sm:flex items-center gap-4">
+                    <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
+                       <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                       Production Record
+                    </div>
                   </div>
                 </div>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Landing Price</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={editItem.landingPrice}
-                    onChange={(e) => setEditItem({ ...editItem, landingPrice: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">MRP</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                    value={editItem.mrp}
-                    onChange={(e) => {
-                      const m = e.target.value;
-                      setEditItem({
-                        ...editItem,
-                        mrp: m,
-                        price: calculateFinalPrice(m, editItem.discount, editItem.discountType)
-                      });
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="grid grid-cols-2 gap-2 flex-1">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount Type</label>
-                    <select
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold"
-                      value={editItem.discountType}
-                      onChange={(e) => {
-                        const type = e.target.value;
-                        setEditItem({
-                          ...editItem,
-                          discountType: type,
-                          price: calculateFinalPrice(editItem.mrp, editItem.discount, type)
-                        });
-                      }}
-                    >
-                      <option value="RUPEE">Rupees (₹)</option>
-                      <option value="PERCENT">Percent (%)</option>
-                    </select>
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Discount Value</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      placeholder={editItem.discountType === 'PERCENT' ? '%' : '₹'}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20"
-                      value={editItem.discount}
-                      onChange={(e) => {
-                        const d = Math.max(0, parseFloat(e.target.value) || 0);
-                        setEditItem({
-                          ...editItem,
-                          discount: d.toString(),
-                          price: calculateFinalPrice(editItem.mrp, d, editItem.discountType)
-                        });
-                      }}
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Final Selling Price</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="₹"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
-                    value={editItem.price}
-                    onChange={(e) => setEditItem({ ...editItem, price: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">GST Slab (%)</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none font-bold"
-                    value={editItem.gst}
-                    onChange={(e) => {
-                      const g = e.target.value;
-                      setEditItem({
-                        ...editItem,
-                        gst: g
-                      });
-                    }}
-                  >
-                    {taxRates.map(rate => (
-                      <option key={`edit-gst-${rate}`} value={rate}>{rate}%</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Incl. GST (₹)</label>
-                  <input
-                    type="text"
-                    disabled
-                    placeholder="₹0.00"
-                    className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm font-bold text-emerald-700 cursor-not-allowed"
-                    value={editItem.price && editItem.gst ? (parseFloat(editItem.price) - (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100))).toFixed(2) : '0.00'}
-                  />
-                </div>
-
-              </div>
-
-              <div className="grid grid-cols-2 gap-3 items-center bg-emerald-50/50 p-3 rounded-xl border border-emerald-100">
-                <div className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    id="isFree-edit"
-                    className="w-4 h-4 text-emerald-600 rounded border-gray-300 focus:ring-emerald-500"
-                    checked={editItem.isFree}
-                    onChange={(e) => setEditItem({ ...editItem, isFree: e.target.checked })}
-                  />
-                  <label htmlFor="isFree-edit" className="text-sm font-bold text-emerald-700 cursor-pointer">Free Item</label>
-                </div>
-                {editItem.isFree && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Min Shop ₹</label>
-                    <input
-                      type="number"
-                      placeholder="Amount"
-                      className="w-full bg-white border border-emerald-100 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 font-bold text-emerald-700"
-                      value={editItem.minShopAmount}
-                      onChange={(e) => setEditItem({ ...editItem, minShopAmount: e.target.value })}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="flex gap-3">
-                <div className="space-y-1 flex-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 appearance-none"
-                    value={editItem.status}
-                    onChange={(e) => setEditItem({ ...editItem, status: e.target.value })}
-                  >
-                    <option value="ACTIVE">Active</option>
-                    <option value="INACTIVE">Inactive</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1 flex-[2]">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Description</label>
-                  <textarea
-                    placeholder="Optional details..."
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm h-9 resize-none"
-                    value={editItem.description}
-                    onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-emerald-600 text-white font-bold py-2.5 rounded-xl shadow-lg shadow-emerald-600/20 mt-2 hover:bg-emerald-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Saving...
-                  </>
-                ) : 'Save Changes'}
-              </button>
             </form>
           </div>
         </div>

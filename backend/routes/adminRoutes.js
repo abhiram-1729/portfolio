@@ -108,6 +108,7 @@ router.route('/villages')
 router.route('/villages/:id')
   .put(villageCtr.updateVillage)
   .delete(villageCtr.deleteVillage);
+router.post('/villages/resolve-link', villageCtr.resolveMapsLink);
 
 // Routes & Assignments
 router.route('/routes')

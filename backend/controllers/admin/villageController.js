@@ -2,12 +2,24 @@ import prisma from '../../utils/prisma.js';
 
 export const createVillage = async (req, res, next) => {
     try {
-        const { name } = req.body;
+        console.log('[VillageControl] Create Body:', req.body);
+        const { name, latitude, longitude } = req.body;
         if (!name) {
             res.status(400);
             throw new Error('Village name is required');
         }
-        const village = await prisma.village.create({ data: { name } });
+
+        // Robust coordinate parsing
+        const lat = latitude !== null && latitude !== '' ? parseFloat(latitude) : null;
+        const lng = longitude !== null && longitude !== '' ? parseFloat(longitude) : null;
+
+        const village = await prisma.village.create({ 
+            data: { 
+                name,
+                latitude: !isNaN(lat) ? lat : null,
+                longitude: !isNaN(lng) ? lng : null
+            } 
+        });
         res.status(201).json(village);
     } catch (error) {
         if (error.code === 'P2002') {
@@ -30,8 +42,21 @@ export const getVillages = async (req, res, next) => {
 export const updateVillage = async (req, res, next) => {
     try {
         const { id } = req.params;
-        const { name } = req.body;
-        const village = await prisma.village.update({ where: { id }, data: { name } });
+        console.log('[VillageControl] Update Body:', req.body, 'ID:', id);
+        const { name, latitude, longitude } = req.body;
+        
+        // Robust coordinate parsing
+        const lat = latitude !== null && latitude !== '' ? parseFloat(latitude) : null;
+        const lng = longitude !== null && longitude !== '' ? parseFloat(longitude) : null;
+
+        const village = await prisma.village.update({ 
+            where: { id }, 
+            data: { 
+                name,
+                latitude: !isNaN(lat) ? lat : null,
+                longitude: !isNaN(lng) ? lng : null
+            } 
+        });
         res.json(village);
     } catch (error) {
         next(error);
@@ -44,6 +69,63 @@ export const deleteVillage = async (req, res, next) => {
         await prisma.village.delete({ where: { id } });
         res.json({ message: 'Village deleted' });
     } catch (error) {
+        next(error);
+    }
+};
+
+export const resolveMapsLink = async (req, res, next) => {
+    try {
+        const { url } = req.body;
+        if (!url) {
+            res.status(400);
+            return next(new Error('URL is required'));
+        }
+
+        // Follow redirect to get full URL
+        const response = await fetch(url, { 
+            method: 'GET', // Some mobile links require GET to resolve fully
+            redirect: 'follow',
+            headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+        });
+        
+        const finalUrl = response.url;
+        const html = await response.text(); // Some coordinates are in the HTML meta tags
+        console.log('[VillageControl] Resolved URL:', finalUrl);
+        
+        // Extract coordinates from the final URL or HTML
+        let lat, lng;
+        
+        // Pattern 1: @lat,lng in URL
+        const atMatch = finalUrl.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+        if (atMatch) {
+            lat = atMatch[1];
+            lng = atMatch[2];
+        } else {
+            // Pattern 2: meta tags or embedded JSON in HTML
+            const metaMatch = html.match(/\[\[\[(-?\d+\.\d+),(-?\d+\.\d+)\]/);
+            if (metaMatch) {
+                lat = metaMatch[2]; // Lat/Lng are sometimes swapped in Google's internal JSON
+                lng = metaMatch[1];
+            } else {
+                const ogMatch = html.match(/center=(-?\d+\.\d+)%2C(-?\d+\.\d+)/) || html.match(/ll=(-?\d+\.\d+),(-?\d+\.\d+)/);
+                if (ogMatch) {
+                    lat = ogMatch[1];
+                    lng = ogMatch[2];
+                }
+            }
+        }
+
+        if (lat && lng) {
+            console.log('[VillageControl] Found Coords:', lat, lng);
+            return res.json({ latitude: lat, longitude: lng });
+        }
+
+        res.status(400);
+        return next(new Error('Could not extract coordinates from this link. Please try right-clicking the map and copying the coordinates directly.'));
+    } catch (error) {
+        console.error('[VillageControl] Resolution Error:', error);
         next(error);
     }
 };

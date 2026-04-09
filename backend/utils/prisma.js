@@ -67,25 +67,47 @@ const prisma = basePrisma.$extends({
             }
             
             // Injection for Write operations
-            if (operation === 'create') {
-              // Models where Prisma insists on relation connectivity instead of scalar ID
-              const useRelationModels = ['Order', 'OrderItem', 'Product', 'User'];
-              
-              if (useRelationModels.includes(model)) {
-                args.data = { ...args.data, tenant: { connect: { id: tenantId } } };
-              } else {
-                args.data = { ...args.data, tenantId };
+            if (operation === 'create' || operation === 'upsert') {
+              const useRelationModels = ['Order', 'OrderItem', 'Product', 'User', 'Category', 'Brand', 'Tenant'];
+              const connectTenant = { tenant: { connect: { id: tenantId } } };
+              const scalarTenant = { tenantId };
+
+              if (operation === 'create') {
+                const hasTenant = args.data.tenantId || args.data.tenant;
+                if (!hasTenant) {
+                  if (useRelationModels.includes(model)) {
+                    args.data = { ...args.data, ...connectTenant };
+                  } else {
+                    args.data = { ...args.data, ...scalarTenant };
+                  }
+                }
+              } else if (operation === 'upsert') {
+                const hasCreateTenant = args.create.tenantId || args.create.tenant;
+                if (!hasCreateTenant) {
+                  if (useRelationModels.includes(model)) {
+                    args.create = { ...args.create, ...connectTenant };
+                    if (model !== 'Tenant') args.update = { ...args.update, ...connectTenant };
+                  } else {
+                    args.create = { ...args.create, ...scalarTenant };
+                    args.update = { ...args.update, ...scalarTenant };
+                  }
+                }
               }
             } else if (operation === 'createMany') {
               if (Array.isArray(args.data)) {
-                args.data = args.data.map(d => ({ ...d, tenantId }));
-              } else {
-                args.data = { ...args.data, tenantId };
+                args.data = args.data.map(d => {
+                  const hasTenant = d.tenantId || d.tenant;
+                  return hasTenant ? d : { ...d, tenantId };
+                });
               }
             }
             
-            if (['update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
-              args.where = { ...args.where, tenantId };
+            if (['findMany', 'findFirst', 'count', 'groupBy', 'aggregate', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
+               const where = args.where || {};
+               const hasUniqueKey = Object.keys(where).some(k => k.includes('_'));
+               if (!where.tenantId && !hasUniqueKey) {
+                 args.where = { ...where, tenantId };
+               }
             }
           }
 

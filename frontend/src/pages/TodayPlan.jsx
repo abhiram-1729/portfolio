@@ -65,6 +65,42 @@ export default function TodayPlan() {
     fetchStatus();
   };
 
+  const [checkingIn, setCheckingIn] = useState(false);
+
+  const handleLocationCheckIn = () => {
+    if (!hasPlan) return;
+    setCheckingIn(true);
+
+    if (!navigator.geolocation) {
+      toast.error("Geolocation is not supported by your browser");
+      setCheckingIn(false);
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { latitude, longitude } = position.coords;
+          await routeService.locationCheckIn({
+            latitude,
+            longitude,
+            villageName: today.villageName
+          });
+          toast.success("Location tracked successfully!");
+          fetchStatus();
+        } catch (err) {
+          toast.error("Failed to track location");
+        } finally {
+          setCheckingIn(false);
+        }
+      },
+      (error) => {
+        toast.error("Unable to retrieve your location. Please enable location services.");
+        setCheckingIn(false);
+      }
+    );
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen pt-12">
@@ -149,6 +185,42 @@ export default function TodayPlan() {
             <Calendar size={48} className="mx-auto text-gray-300 mb-4" />
             <h3 className="text-base font-bold text-gray-600 mb-1">No Plan Today</h3>
             <p className="text-xs text-gray-400">No village is scheduled for today on your route.</p>
+          </div>
+        )}
+        {/* ── Location Check-in Card ─────────────────── */}
+        {hasPlan && (
+          <div className={`rounded-3xl p-5 border transition-all ${statusData.checkIn ? 'bg-blue-50 border-blue-200' : 'bg-white border-gray-100 shadow-sm'}`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${statusData.checkIn ? 'bg-blue-100 text-blue-600' : 'bg-gray-50 text-gray-400'}`}>
+                  <MapPin size={24} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h4 className="font-black text-gray-900 text-sm">Location reached?</h4>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                    {statusData.checkIn ? `Checked in at ${new Date(statusData.checkIn.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Track your arrival'}
+                  </p>
+                </div>
+              </div>
+
+              {statusData.checkIn ? (
+                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border ${statusData.checkIn.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                  <CheckCircle2 size={16} strokeWidth={3} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">
+                    {statusData.checkIn.status === 'ON_TIME' ? 'On Time' : 'Late'}
+                  </span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleLocationCheckIn}
+                  disabled={checkingIn}
+                  className="bg-blue-600 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
+                >
+                  {checkingIn ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  Turn ON Location
+                </button>
+              )}
+            </div>
           </div>
         )}
 

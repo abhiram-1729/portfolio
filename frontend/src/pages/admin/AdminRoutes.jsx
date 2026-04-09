@@ -14,7 +14,8 @@ import {
   LayoutGrid,
   Settings2,
   Home,
-  CheckCircle2
+  CheckCircle2,
+  Search
 } from 'lucide-react';
 import * as routeService from '../../services/routeService';
 import adminAPI from '../../services/adminService';
@@ -36,11 +37,20 @@ export default function AdminRoutes() {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Form States
-  const [villageForm, setVillageForm] = useState({ id: '', name: '' });
+  const [villageForm, setVillageForm] = useState({ id: '', name: '', latitude: '', longitude: '' });
+  const [villageSearchQuery, setVillageSearchQuery] = useState('');
+  const [isVillagesLoading, setIsVillagesLoading] = useState(false);
+  const [routeSearchQuery, setRouteSearchQuery] = useState('');
+  const [isRoutesLoading, setIsRoutesLoading] = useState(false);
+  const [assignmentSearchQuery, setAssignmentSearchQuery] = useState('');
+  const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
   const [routeForm, setRouteForm] = useState({ id: '', routeName: '', selectedVillages: [] });
   const [assignmentForm, setAssignmentForm] = useState({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' });
 
   const fetchData = async () => {
+    setIsVillagesLoading(true);
+    setIsRoutesLoading(true);
+    setIsAssignmentsLoading(true);
     try {
       const [vRes, rRes, aRes, vehRes, uRes] = await Promise.all([
         routeService.getVillages(),
@@ -59,6 +69,9 @@ export default function AdminRoutes() {
       console.error(error);
     } finally {
       setLoading(false);
+      setIsVillagesLoading(false);
+      setIsRoutesLoading(false);
+      setIsAssignmentsLoading(false);
     }
   };
 
@@ -73,14 +86,22 @@ export default function AdminRoutes() {
     setIsSubmitting(true);
     try {
       if (villageForm.id) {
-        await routeService.updateVillage(villageForm.id, { name: villageForm.name });
+        await routeService.updateVillage(villageForm.id, { 
+          name: villageForm.name,
+          latitude: villageForm.latitude ? parseFloat(villageForm.latitude) : null,
+          longitude: villageForm.longitude ? parseFloat(villageForm.longitude) : null
+        });
         toast.success('Village updated');
       } else {
-        await routeService.createVillage({ name: villageForm.name });
+        await routeService.createVillage({ 
+          name: villageForm.name,
+          latitude: villageForm.latitude ? parseFloat(villageForm.latitude) : null,
+          longitude: villageForm.longitude ? parseFloat(villageForm.longitude) : null
+        });
         toast.success('Village created');
       }
       setShowVillageModal(false);
-      setVillageForm({ id: '', name: '' });
+      setVillageForm({ id: '', name: '', latitude: '', longitude: '' });
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save village');
@@ -199,294 +220,407 @@ export default function AdminRoutes() {
 
       {/* --- VILLAGES TAB --- */}
       {activeTab === 'villages' && (
-        <div className="space-y-4">
-          <div className="flex justify-end pr-2">
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search villages..." 
+                className="w-full bg-white border border-gray-100 pl-12 pr-4 py-3.5 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
+                value={villageSearchQuery}
+                onChange={(e) => setVillageSearchQuery(e.target.value)}
+              />
+            </div>
             <button
-              onClick={() => { setVillageForm({ id: '', name: '' }); setShowVillageModal(true); }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+              onClick={() => { setVillageForm({ id: '', name: '', latitude: '', longitude: '' }); setShowVillageModal(true); }}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
             >
               <Plus size={16} strokeWidth={3} /> New Village
             </button>
           </div>
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead className="bg-gray-50/50 border-b border-gray-100">
-                  <tr>
-                    <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px]">Village Designation</th>
-                    <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px] text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {villages.length === 0 ? (
+
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[40vh] flex flex-col">
+            {isVillagesLoading ? (
+              <div className="flex-1 flex flex-col items-center justify-center py-20 gap-4">
+                <Loader2 className="animate-spin text-emerald-600" size={32} />
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hydrating Village Data...</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 border-b border-gray-100">
                     <tr>
-                      <td colSpan="2" className="px-8 py-16 text-center">
-                        <Home size={40} className="mx-auto text-gray-200 mb-3" />
-                        <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest italic">No villages have been registered</p>
-                      </td>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px]">Village Designation</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px] text-center">Coordinates</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.2em] text-[10px] text-right">Actions</th>
                     </tr>
-                  ) : (
-                    villages.map(v => (
-                      <tr key={v.id} className="hover:bg-gray-50/30 transition-colors group">
-                        <td className="px-8 py-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                              <Home size={18} />
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(() => {
+                      const filtered = villages.filter(v => v.name.toLowerCase().includes(villageSearchQuery.toLowerCase()));
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="3" className="px-8 py-20 text-center">
+                              <Home size={40} className="mx-auto text-gray-200 mb-3" />
+                              <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest italic font-bold">
+                                {villageSearchQuery ? `No results for "${villageSearchQuery}"` : 'No villages have been registered'}
+                              </p>
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return filtered.map(v => (
+                        <tr key={v.id} className="hover:bg-gray-50/30 transition-colors group">
+                          <td className="px-8 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/50 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                                <Home size={18} />
+                              </div>
+                              <span className="font-black text-gray-900 tracking-tight uppercase text-sm">{v.name}</span>
                             </div>
-                            <span className="font-black text-gray-900 tracking-tight uppercase text-sm">{v.name}</span>
-                          </div>
-                        </td>
-                        <td className="px-8 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 transition-all">
-                            <button onClick={() => { setVillageForm(v); setShowVillageModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"><Pencil size={15}/></button>
-                            <button onClick={() => handleDeleteVillage(v.id)} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><Trash2 size={15}/></button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                          </td>
+                          <td className="px-8 py-4 text-center">
+                             <div className="flex flex-col items-center gap-0.5">
+                               <div className={`w-2 h-2 rounded-full ${v.latitude && v.longitude ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-gray-200'}`} />
+                               <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+                                 {v.latitude && v.longitude ? 'Geocoded' : 'Missing Area'}
+                               </span>
+                             </div>
+                          </td>
+                          <td className="px-8 py-4">
+                            <div className="flex items-center justify-end gap-2 outline-none">
+                              <button 
+                                onClick={() => { setVillageForm({ id: v.id, name: v.name, latitude: v.latitude || '', longitude: v.longitude || '' }); setShowVillageModal(true); }}
+                                className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"
+                              >
+                                <Pencil size={15} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteVillage(v.id)}
+                                className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"
+                              >
+                                <Trash2 size={15} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {/* --- ROUTES TAB --- */}
       {activeTab === 'routes' && (
-        <div className="space-y-4">
-          <div className="flex justify-end pr-2">
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search routes..." 
+                className="w-full bg-white border border-gray-100 pl-12 pr-4 py-3.5 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
+                value={routeSearchQuery}
+                onChange={(e) => setRouteSearchQuery(e.target.value)}
+              />
+            </div>
             <button
               onClick={() => { setRouteForm({ id: '', routeName: '', selectedVillages: [] }); setShowRouteModal(true); }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+              className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
             >
               <Plus size={16} strokeWidth={3} /> New Route
             </button>
           </div>
           
-          <div className="grid grid-cols-1 md:hidden gap-4">
-            {routes.map(route => (
-              <div key={route.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
-                <div className="flex justify-between items-center">
-                  <h3 className="font-black text-gray-900 flex items-center gap-2 uppercase tracking-tight"><MapPin size={18} className="text-emerald-500 fill-emerald-500/10"/> {route.routeName}</h3>
-                  <div className="flex gap-1">
-                    <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg"><Pencil size={14}/></button>
-                    <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2 text-gray-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg"><Trash2 size={14}/></button>
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50">
-                  {(route.villages || []).map(v => (
-                    <span key={v} className="text-[10px] bg-emerald-50/50 border border-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md font-black uppercase tracking-tighter">{v}</span>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50/50 border-b border-gray-100">
-                <tr>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px]">Route Identifier</th>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Village Coverage</th>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {routes.map(route => (
-                  <tr key={route.id} className="hover:bg-gray-50/30 transition-colors group">
-                    <td className="px-8 py-6 flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 transition-all">
-                        <MapPin size={18} className="fill-emerald-600/10" />
+          {isRoutesLoading ? (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm py-20 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="animate-spin text-emerald-600" size={32} />
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Mapping Route Data...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:hidden gap-4">
+                {(() => {
+                  const filtered = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
+                  if (filtered.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching routes</div>;
+                  return filtered.map(route => (
+                    <div key={route.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
+                      <div className="flex justify-between items-center">
+                        <h3 className="font-black text-gray-900 flex items-center gap-2 uppercase tracking-tight"><MapPin size={18} className="text-emerald-500 fill-emerald-500/10"/> {route.routeName}</h3>
+                        <div className="flex gap-1">
+                          <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-all"><Pencil size={15}/></button>
+                          <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2 text-gray-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"><Trash2 size={15}/></button>
+                        </div>
                       </div>
-                      <span className="font-black text-gray-900 uppercase tracking-tight">{route.routeName}</span>
-                    </td>
-                    <td className="px-8 py-6">
-                      <div className="flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
+                      <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50">
                         {(route.villages || []).map(v => (
-                          <span key={v} className="text-[10px] bg-white border border-gray-100 text-gray-500 px-2.5 py-1 rounded-lg font-black uppercase tracking-tighter shadow-sm">
-                            {v}
-                          </span>
+                          <span key={v} className="text-[10px] bg-emerald-50/50 border border-emerald-100 text-emerald-700 px-2 py-0.5 rounded-md font-black uppercase tracking-tighter">{v}</span>
                         ))}
                       </div>
-                    </td>
-                    <td className="px-8 py-6 text-right">
-                      <div className="flex items-center justify-end gap-2 transition-all">
-                        <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-emerald-600 transition-all">
-                          <Pencil size={15}/>
-                        </button>
-                        <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-rose-600 transition-all">
-                          <Trash2 size={15}/>
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[40vh]">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px]">Route Identifier</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Village Coverage</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(() => {
+                      const filtered = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="3" className="px-8 py-20 text-center text-gray-400 font-bold text-xs uppercase italic">No matching routes found</td>
+                          </tr>
+                        );
+                      }
+                      return filtered.map(route => (
+                        <tr key={route.id} className="hover:bg-gray-50/30 transition-colors group">
+                          <td className="px-8 py-6 flex items-center gap-4">
+                            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 transition-all">
+                              <MapPin size={18} className="fill-emerald-600/10" />
+                            </div>
+                            <span className="font-black text-gray-900 uppercase tracking-tight">{route.routeName}</span>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-wrap gap-1.5 justify-center max-w-sm mx-auto">
+                              {(route.villages || []).map(v => (
+                                <span key={v} className="text-[10px] bg-white border border-gray-100 text-gray-500 px-2.5 py-1 rounded-lg font-black uppercase tracking-tighter shadow-sm">
+                                  {v}
+                                </span>
+                              ))}
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex items-center justify-end gap-2 transition-all">
+                              <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-emerald-600 transition-all">
+                                <Pencil size={15}/>
+                              </button>
+                              <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-rose-600 transition-all">
+                                <Trash2 size={15}/>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
       {/* --- ASSIGNMENTS TAB --- */}
       {activeTab === 'assignments' && (
-        <div className="space-y-4">
-          <div className="flex justify-end pr-2">
+        <div className="space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
+              <input 
+                type="text" 
+                placeholder="Search assignments (agent, route, vehicle)..." 
+                className="w-full bg-white border border-gray-100 pl-12 pr-4 py-3.5 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
+                value={assignmentSearchQuery}
+                onChange={(e) => setAssignmentSearchQuery(e.target.value)}
+              />
+            </div>
             <button
               onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-5 py-2.5 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
             >
               <Plus size={16} strokeWidth={3} /> New Assignment
             </button>
           </div>
 
-          <div className="grid grid-cols-1 md:hidden gap-4">
-            {assignments.map(a => (
-              <div key={a.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
-                <div className="flex justify-between items-center pb-3 border-b border-gray-50">
-                  <h4 className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</h4>
-                  <div className="flex gap-1">
-                    <button onClick={() => {
-                        setAssignmentForm({
-                          id: a.id,
-                          vehicleId: a.vehicleId,
-                          userId: a.userId,
-                          routeId: a.routeId,
-                          morningSession: a.morningSession || '',
-                          afternoonSession: a.afternoonSession || '',
-                          schedule: a.schedule || null
-                        });
-                        setShowAssignModal(true);
-                    }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg"><Pencil size={14}/></button>
-                    <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg"><X size={14}/></button>
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><Truck size={10}/> Vehicle</span>
-                    <span className="text-sm font-black text-gray-800 leading-none">{a.vehicle?.vehicleNumber}</span>
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><User size={10}/> Agent</span>
-                    <span className="text-sm font-black text-gray-800 leading-none">{a.user?.name}</span>
-                  </div>
-                </div>
-                <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 space-y-2">
-                  {(() => {
-                    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const today = days[new Date().getDay()];
-                    const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
-                    return (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Morning ({today})</span>
-                          <span className="text-xs font-black text-indigo-700">{todaySchedule.morning || 'OFF'}</span>
-                        </div>
-                        <div className="flex items-center justify-between pt-1 border-t border-indigo-100/30">
-                          <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Evening ({today})</span>
-                          <span className="text-xs font-black text-indigo-700">{todaySchedule.evening || 'OFF'}</span>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-left">
-              <thead className="bg-gray-50/50 border-b border-gray-100">
-                <tr>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px]">Assignment Details</th>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Weekly Snapshot</th>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Status</th>
-                  <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {assignments.length === 0 ? (
-                  <tr>
-                    <td colSpan="4" className="px-8 py-16 text-center">
-                      <ClipboardList size={40} className="mx-auto text-gray-200 mb-3" />
-                      <p className="text-gray-400 font-black text-[10px] uppercase tracking-widest italic">No route assignments created</p>
-                    </td>
-                  </tr>
-                ) : (
-                  assignments.map(a => (
-                    <tr key={a.id} className="hover:bg-gray-50/30 transition-colors group">
-                      <td className="px-8 py-6">
-                        <div className="flex flex-col gap-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                              <MapPin size={14} className="fill-indigo-600/10" />
-                            </div>
-                            <span className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</span>
-                          </div>
-                          <div className="flex items-center gap-4 pl-1">
-                            <div className="flex flex-col">
-                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Vehicle</span>
-                              <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{a.vehicle?.vehicleNumber}</span>
-                            </div>
-                            <div className="w-px h-6 bg-gray-100 self-center" />
-                            <div className="flex flex-col">
-                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Driver</span>
-                              <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{a.user?.name}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6">
-                        <div className="flex flex-col items-center gap-2">
-                          <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100/30 w-full max-w-[200px]">
-                            {(() => {
-                              const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                              const today = days[new Date().getDay()];
-                              const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
-                              return (
-                                <div className="space-y-1.5 grayscale-[0.3]">
-                                  <div className="flex justify-between items-baseline">
-                                    <span className="text-[8px] font-black text-indigo-400 uppercase">{today} AM</span>
-                                    <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
-                                  </div>
-                                  <div className="flex justify-between items-baseline pt-1 border-t border-indigo-100/20">
-                                    <span className="text-[8px] font-black text-indigo-400 uppercase">{today} PM</span>
-                                    <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
-                                  </div>
-                                </div>
-                              );
-                            })()}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-8 py-6 text-center">
-                        <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-[0.1em] border border-emerald-100 shadow-sm shadow-emerald-500/5">
-                          In Service
-                        </span>
-                      </td>
-                      <td className="px-8 py-6 text-right">
-                        <div className="flex items-center justify-end gap-2 transition-all">
+          {isAssignmentsLoading ? (
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm py-20 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="animate-spin text-indigo-600" size={32} />
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Compiling Assignments...</p>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-1 md:hidden gap-4">
+                {(() => {
+                  const q = assignmentSearchQuery.toLowerCase();
+                  const filtered = assignments.filter(a => 
+                    a.route?.routeName?.toLowerCase().includes(q) || 
+                    a.user?.name?.toLowerCase().includes(q) || 
+                    a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
+                  );
+                  if (filtered.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching assignments</div>;
+                  
+                  return filtered.map(a => (
+                    <div key={a.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
+                      <div className="flex justify-between items-center pb-3 border-b border-gray-50">
+                        <h4 className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</h4>
+                        <div className="flex gap-1">
                           <button onClick={() => {
-                            setAssignmentForm({
-                              id: a.id,
-                              vehicleId: a.vehicleId,
-                              userId: a.userId,
-                              routeId: a.routeId,
-                              morningSession: a.morningSession || '',
-                              afternoonSession: a.afternoonSession || '',
-                              schedule: a.schedule || null
-                            });
-                            setShowAssignModal(true);
-                          }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15}/></button>
-                          <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15}/></button>
+                              setAssignmentForm({
+                                id: a.id,
+                                vehicleId: a.vehicleId,
+                                userId: a.userId,
+                                routeId: a.routeId,
+                                morningSession: a.morningSession || '',
+                                afternoonSession: a.afternoonSession || '',
+                                schedule: a.schedule || null
+                              });
+                              setShowAssignModal(true);
+                          }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15}/></button>
+                          <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15}/></button>
                         </div>
-                      </td>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><Truck size={10}/> Vehicle</span>
+                          <span className="text-sm font-black text-gray-800 leading-none">{a.vehicle?.vehicleNumber}</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><User size={10}/> Agent</span>
+                          <span className="text-sm font-black text-gray-800 leading-none">{a.user?.name}</span>
+                        </div>
+                      </div>
+                      <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 space-y-2">
+                        {(() => {
+                          const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                          const today = days[new Date().getDay()];
+                          const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
+                          return (
+                            <>
+                              <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Morning ({today})</span>
+                                <span className="text-xs font-black text-indigo-700">{todaySchedule.morning || 'OFF'}</span>
+                              </div>
+                              <div className="flex items-center justify-between pt-1 border-t border-indigo-100/30">
+                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Evening ({today})</span>
+                                <span className="text-xs font-black text-indigo-700">{todaySchedule.evening || 'OFF'}</span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+
+              <div className="hidden md:block bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[40vh]">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/50 border-b border-gray-100">
+                    <tr>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px]">Assignment Details</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Weekly Snapshot</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-center">Status</th>
+                      <th className="px-8 py-5 font-black text-gray-400 uppercase tracking-[0.15em] text-[10px] text-right">Actions</th>
                     </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {(() => {
+                      const q = assignmentSearchQuery.toLowerCase();
+                      const filtered = assignments.filter(a => 
+                        a.route?.routeName?.toLowerCase().includes(q) || 
+                        a.user?.name?.toLowerCase().includes(q) || 
+                        a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
+                      );
+                      if (filtered.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan="4" className="px-8 py-20 text-center text-gray-400 font-bold text-xs uppercase italic">
+                              {assignmentSearchQuery ? `No results found for "${assignmentSearchQuery}"` : 'No assignments created'}
+                            </td>
+                          </tr>
+                        );
+                      }
+                      return filtered.map(a => (
+                        <tr key={a.id} className="hover:bg-gray-50/30 transition-colors group">
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col gap-3">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
+                                  <MapPin size={14} className="fill-indigo-600/10" />
+                                </div>
+                                <span className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</span>
+                              </div>
+                              <div className="flex items-center gap-4 pl-1">
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Vehicle</span>
+                                  <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{a.vehicle?.vehicleNumber}</span>
+                                </div>
+                                <div className="w-px h-6 bg-gray-100 self-center" />
+                                <div className="flex flex-col">
+                                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Driver</span>
+                                  <span className="text-[11px] font-black text-gray-700 uppercase tracking-widest">{a.user?.name}</span>
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6">
+                            <div className="flex flex-col items-center gap-2">
+                              <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100/30 w-full max-w-[200px]">
+                                {(() => {
+                                  const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+                                  const today = days[new Date().getDay()];
+                                  const todaySchedule = a.schedule?.[today] || { morning: '', evening: '' };
+                                  return (
+                                    <div className="space-y-1.5 grayscale-[0.3]">
+                                      <div className="flex justify-between items-baseline">
+                                        <span className="text-[8px] font-black text-indigo-400 uppercase">{today} AM</span>
+                                        <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
+                                      </div>
+                                      <div className="flex justify-between items-baseline pt-1 border-t border-indigo-100/20">
+                                        <span className="text-[8px] font-black text-indigo-400 uppercase">{today} PM</span>
+                                        <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-6 text-center">
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-[0.1em] border border-emerald-100 shadow-sm shadow-emerald-500/5">
+                              In Service
+                            </span>
+                          </td>
+                          <td className="px-8 py-6 text-right">
+                            <div className="flex items-center justify-end gap-2 transition-all">
+                              <button onClick={() => {
+                                setAssignmentForm({
+                                  id: a.id,
+                                  vehicleId: a.vehicleId,
+                                  userId: a.userId,
+                                  routeId: a.routeId,
+                                  morningSession: a.morningSession || '',
+                                  afternoonSession: a.afternoonSession || '',
+                                  schedule: a.schedule || null
+                                });
+                                setShowAssignModal(true);
+                              }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15}/></button>
+                              <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15}/></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </div>
       )}
 
@@ -495,11 +629,83 @@ export default function AdminRoutes() {
       {showVillageModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm">
-            <h3 className="text-lg font-bold mb-4">{villageForm.id ? 'Edit Village' : 'New Village'}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">{villageForm.id ? 'Edit Village' : 'New Village'}</h3>
+              <a 
+                href={`https://www.google.com/maps/search/${villageForm.name || ''}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-1.5 rounded-lg hover:bg-blue-100 transition-all"
+              >
+                <MapPin size={10} /> Find GPS
+              </a>
+            </div>
             <form onSubmit={handleSaveVillage} className="space-y-4">
-              <input type="text" placeholder="Village Name" className="w-full bg-gray-50 border p-3 rounded-xl outline-none" value={villageForm.name} onChange={e => setVillageForm({...villageForm, name: e.target.value})} />
-              <button type="submit" className="w-full bg-emerald-600 text-white p-3 rounded-xl font-bold">Save</button>
-              <button type="button" onClick={() => setShowVillageModal(false)} className="w-full bg-gray-100 text-gray-600 p-3 rounded-xl font-bold mt-2">Cancel</button>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village Name</label>
+                <input type="text" placeholder="e.g. Rampur" className="w-full bg-gray-50 border border-gray-100 p-3 rounded-xl outline-none focus:border-emerald-500 font-bold" value={villageForm.name} onChange={e => setVillageForm({...villageForm, name: e.target.value})} />
+              </div>
+
+              <div className="p-4 bg-blue-50/30 rounded-2xl border border-blue-100/50 space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between px-1">
+                    <label className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Map Link / Coordinates</label>
+                    <span className="text-[8px] font-bold text-blue-400 italic">Paste Google Maps Link</span>
+                  </div>
+                  <input 
+                    type="text" 
+                    placeholder="https://maps.app.goo.gl/... or 17.38, 78.48" 
+                    className="w-full bg-white border border-blue-100 p-3 rounded-xl outline-none focus:border-blue-400 text-xs font-bold shadow-sm"
+                    onChange={async (e) => {
+                      const val = e.target.value;
+                      if (!val) return;
+                      
+                      // Check if it's a shortened URL (goo.gl)
+                      if (val.includes('maps.app.goo.gl') || val.includes('goo.gl/maps')) {
+                        const loadingToast = toast.loading('Resolving short link...');
+                        try {
+                          const res = await adminAPI.resolveVillageLink(val);
+                          if (res.data.latitude && res.data.longitude) {
+                            setVillageForm(prev => ({ ...prev, latitude: res.data.latitude, longitude: res.data.longitude }));
+                            toast.success('Coordinates resolved!', { id: loadingToast });
+                          }
+                        } catch (err) {
+                          toast.error('Could not resolve this link automatically.', { id: loadingToast });
+                        }
+                        return;
+                      }
+
+                      // Handle full Google Maps URL (extract @lat,lng)
+                      const urlMatch = val.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+                      if (urlMatch) {
+                        setVillageForm(prev => ({ ...prev, latitude: urlMatch[1], longitude: urlMatch[2] }));
+                        return;
+                      }
+
+                      // Handle coordinates
+                      const parts = val.split(/[,|\s]+/).filter(Boolean).map(p => p.trim());
+                      if (parts.length >= 2) {
+                        setVillageForm(prev => ({ ...prev, latitude: parts[0], longitude: parts[1] }));
+                      }
+                    }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Latitude</label>
+                    <input type="number" step="any" placeholder="0.0000" className="w-full bg-white border border-gray-100 p-2.5 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold" value={villageForm.latitude} onChange={e => setVillageForm({...villageForm, latitude: e.target.value})} />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Longitude</label>
+                    <input type="number" step="any" placeholder="0.0000" className="w-full bg-white border border-gray-100 p-2.5 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold" value={villageForm.longitude} onChange={e => setVillageForm({...villageForm, longitude: e.target.value})} />
+                  </div>
+                </div>
+              </div>
+              <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white p-4 rounded-2xl font-black text-xs uppercase tracking-[0.2em] shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-all active:scale-[0.98] mt-2">
+                {isSubmitting ? 'Processing...' : 'Save Village'}
+              </button>
+              <button type="button" onClick={() => setShowVillageModal(false)} className="w-full bg-gray-50 text-gray-500 p-3 rounded-xl font-bold text-[10px] uppercase tracking-widest hover:bg-gray-100 transition-all">Cancel</button>
             </form>
           </div>
         </div>

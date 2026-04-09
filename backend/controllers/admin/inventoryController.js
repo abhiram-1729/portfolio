@@ -1,7 +1,8 @@
 import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
 import { sendNotification } from '../../services/notificationService.js';
-
+import { getTenantId } from '../../utils/tenantContext.js';
+import fs from 'fs';
 
 // Item Master
 export const getItems = async (req, res) => {
@@ -19,6 +20,7 @@ export const getItems = async (req, res) => {
 };
 
 export const createItem = async (req, res) => {
+  const tenantId = req.user?.tenantId || getTenantId();
   try {
     const {
       name,
@@ -39,6 +41,9 @@ export const createItem = async (req, res) => {
       minShopAmount
     } = req.body;
 
+    // Emergency Logging
+    fs.appendFileSync('inventory_trace.log', `[${new Date().toISOString()}] Creating Item: ${name} | Tenant: ${tenantId} | User: ${req.user?.id}\n`);
+
     // Handle image upload to Supabase if file is present
     let imageUrl = image || null;
     if (req.file) {
@@ -49,12 +54,9 @@ export const createItem = async (req, res) => {
         'product-images',
         'products'
       );
-      if (!imageUrl) {
-        return res.status(500).json({ message: 'Failed to upload image to storage' });
-      }
     }
 
-    // Convert strings to floats safely, returning undefined for empty strings so Prisma ignores them
+    // Convert strings to floats safely
     const parseNumber = (val) => {
       if (val === undefined || val === null || val === '') return undefined;
       const num = parseFloat(val);
@@ -68,20 +70,20 @@ export const createItem = async (req, res) => {
 
     if (!finalCategoryId || finalCategoryId === 'default') {
       const defaultCategory = await prisma.category.upsert({
-        where: { name: 'Uncategorized' },
+        where: { tenantId_name: { tenantId, name: 'Uncategorized' } },
         update: {},
-        create: { name: 'Uncategorized' }
+        create: { name: 'Uncategorized', tenantId }
       });
       finalCategoryId = defaultCategory.id;
     }
 
     if (!finalSubCategoryId || finalSubCategoryId === 'default') {
       let defaultSub = await prisma.subCategory.findFirst({
-        where: { name: 'Uncategorized', categoryId: finalCategoryId }
+        where: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId }
       });
       if (!defaultSub) {
         defaultSub = await prisma.subCategory.create({
-          data: { name: 'Uncategorized', categoryId: finalCategoryId }
+          data: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId }
         });
       }
       finalSubCategoryId = defaultSub.id;
@@ -89,9 +91,9 @@ export const createItem = async (req, res) => {
 
     if (!finalBrandId || finalBrandId === 'default') {
       const defaultBrand = await prisma.brand.upsert({
-        where: { name: 'Unbranded' },
+        where: { tenantId_name: { tenantId, name: 'Unbranded' } },
         update: {},
-        create: { name: 'Unbranded' }
+        create: { name: 'Unbranded', tenantId }
       });
       finalBrandId = defaultBrand.id;
     }
@@ -122,6 +124,10 @@ export const createItem = async (req, res) => {
     res.status(201).json({ message: 'Item created successfully', item });
   } catch (error) {
     console.error('❌ Create Item Error:', error);
+    try {
+      const fs = await import('fs');
+      fs.appendFileSync('emergency_debug.log', `[${new Date().toISOString()}] CREATE ITEM ERROR:\n${error.message}\n${error.stack}\n\n`);
+    } catch (e) {}
     res.status(500).json({ message: 'Error creating item', error: error.message });
   }
 };

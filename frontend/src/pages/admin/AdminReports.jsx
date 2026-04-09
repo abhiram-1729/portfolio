@@ -18,7 +18,8 @@ import {
   Users,
   Activity,
   Globe,
-  Map
+  Map,
+  MapPin
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -46,12 +47,16 @@ export default function AdminReports() {
   const [routeData, setRouteData] = useState(null);
   const [villageData, setVillageData] = useState(null);
   const [agentPerformance, setAgentPerformance] = useState(null);
+  const [locationCheckIns, setLocationCheckIns] = useState(null);
+
 
   // Loading States
   const [isOverviewLoading, setIsOverviewLoading] = useState(false);
   const [isDailyLoading, setIsDailyLoading] = useState(false);
   const [isRouteLoading, setIsRouteLoading] = useState(false);
   const [isAgentLoading, setIsAgentLoading] = useState(false);
+  const [isTrackingLoading, setIsTrackingLoading] = useState(false);
+
 
   const loadDailyData = async () => {
     if (dailyReport) return; // Cache hit
@@ -116,6 +121,20 @@ export default function AdminReports() {
     }
   };
 
+  const loadTrackingData = async () => {
+    if (locationCheckIns) return;
+    setIsTrackingLoading(true);
+    try {
+      const { data } = await adminAPI.getLocationCheckIns();
+      setLocationCheckIns(data);
+    } catch (error) {
+      toast.error('Failed to fetch tracking data');
+    } finally {
+      setIsTrackingLoading(false);
+    }
+  };
+
+
   useEffect(() => {
     // Initial load relies on the active tab
     if (activeTab === 'overview') loadOverviewData();
@@ -127,7 +146,9 @@ export default function AdminReports() {
     if (activeTab === 'overview') loadOverviewData();
     if (activeTab === 'route') loadRouteData();
     if (activeTab === 'targets') loadAgentData();
+    if (activeTab === 'tracking') loadTrackingData();
   }, [activeTab]);
+
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, bgColor }) => (
     <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex items-center gap-4">
@@ -516,6 +537,89 @@ export default function AdminReports() {
     );
   };
 
+  const renderTracking = () => {
+    if (isTrackingLoading) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[40vh] gap-4">
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="text-emerald-900/40 text-[10px] font-black uppercase tracking-widest mt-2">Loading Tracking Data...</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-8 px-1">
+            <div>
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Agent Location Tracking</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Real-time arrival logs from the field</p>
+            </div>
+            <MapPin size={24} className="text-emerald-500" />
+          </div>
+
+          <div className="space-y-4">
+            {locationCheckIns?.map((log, idx) => (
+              <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${log.status === 'ON_TIME' ? 'bg-emerald-500 shadow-emerald-200' : 'bg-amber-500 shadow-amber-200'} shadow-lg`}>
+                    <MapPin size={20} />
+                  </div>
+                  <div>
+                    <p className="text-sm font-black text-gray-900">{log.user?.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{log.villageName || 'Unknown Village'}</span>
+                      <span className="text-gray-300">•</span>
+                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">
+                        {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </p>
+                    </div>
+                    {log.isLocationMatched ? (
+                      <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-1.5 opacity-60">
+                        <CheckCircle2 size={10} strokeWidth={3} />
+                        <span>Location Verified</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center gap-1 text-[8px] font-black text-rose-500 uppercase tracking-widest mt-1.5">
+                        <AlertTriangle size={10} strokeWidth={3} />
+                        <span>Location Mismatch</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${log.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                    <span className="text-[10px] font-black uppercase tracking-widest">{log.status.replace('_', ' ')}</span>
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mt-2">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                      {new Date(log.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                    </p>
+                    <a 
+                      href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`} 
+                      target="_blank" 
+                      rel="noopener noreferrer"
+                      className="p-1.5 rounded-lg bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm"
+                      title="Open in Google Maps"
+                    >
+                      <Globe size={12} />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            ))}
+            {(!locationCheckIns || locationCheckIns.length === 0) && (
+              <div className="py-12 text-center text-gray-300">
+                <Activity size={48} className="mx-auto mb-4 opacity-20" />
+                <p className="text-xs font-bold uppercase tracking-widest">No Tracking Logs Today</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pb-20">
       <div className="flex items-center justify-between">
@@ -534,6 +638,7 @@ export default function AdminReports() {
           { key: 'daily', label: 'Summary' },
           { key: 'route', label: 'Geographical' },
           { key: 'targets', label: 'Targets' },
+          { key: 'tracking', label: 'Tracking' },
         ].map((tab) => (
           <button
             key={tab.key}
@@ -553,6 +658,7 @@ export default function AdminReports() {
         {activeTab === 'daily' && renderDaily()}
         {activeTab === 'route' && renderRouteReport()}
         {activeTab === 'targets' && renderAgentPerformance()}
+        {activeTab === 'tracking' && renderTracking()}
       </div>
     </div>
   );

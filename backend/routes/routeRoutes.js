@@ -6,9 +6,11 @@ import {
     getCoverageStatus,
     getNotifications,
     markNotificationRead,
-    markAllNotificationsRead
+    markAllNotificationsRead,
+    locationCheckIn,
+    getAllLocationCheckIns
 } from '../controllers/routeController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, admin } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
@@ -16,6 +18,8 @@ router.get('/today-plan', protect, getTodayPlan);
 router.get('/tomorrow-plan', protect, getTomorrowPlan);
 router.get('/coverage-status', protect, getCoverageStatus);
 router.post('/mark-coverage', protect, markCoverage);
+router.post('/location-check-in', protect, locationCheckIn);
+router.get('/all-location-check-ins', protect, admin, getAllLocationCheckIns);
 
 // Notifications
 router.get('/notifications', protect, getNotifications);

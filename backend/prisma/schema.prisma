@@ -78,6 +78,8 @@ model User {
   cashTransfers    CashTransfer[]
   dailySummaries   DailyCashSummary[]    @relation("UserDailyCashSummary")
   assetRequests    AssetRequest[]        @relation("UserAssetRequests")
+  locationCheckIns LocationCheckIn[]
+
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -399,6 +401,8 @@ model Village {
   id        String   @id @default(cuid())
   tenantId  String   @default("VK001")
   name      String
+  latitude  Float?
+  longitude Float?
   status    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -966,3 +970,23 @@ enum RequestStatus {
   REJECTED
   COMPLETED
 }
+
+model LocationCheckIn {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("VK001")
+  userId      String
+  date        String   // YYYY-MM-DD
+  time        DateTime @default(now())
+  latitude    Float
+  longitude   Float
+  villageName String?
+  status            String   // ON_TIME, LATE
+  isLocationMatched Boolean  @default(true)
+  createdAt         DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+}
+

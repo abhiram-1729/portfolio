@@ -186,13 +186,20 @@ export const markCoverage = async (req, res, next) => {
 export const getCoverageStatus = async (req, res, next) => {
     try {
         const vehicleId = req.user.assignedVehicleId;
+        const userId = req.user.id;
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
         if (!vehicleId) return res.json({ vehicleAssigned: false });
 
-        const coverage = await prisma.dailyCoverage.findUnique({
-            where: { vehicleId_date: { vehicleId, date: dateString } }
-        });
+        const [coverage, checkIn] = await Promise.all([
+            prisma.dailyCoverage.findUnique({
+                where: { vehicleId_date: { vehicleId, date: dateString } }
+            }),
+            prisma.locationCheckIn.findFirst({
+                where: { userId, date: dateString },
+                orderBy: { createdAt: 'desc' }
+            })
+        ]);
 
         const plan = await fetchPlanForVehicle(vehicleId);
 
@@ -214,7 +221,8 @@ export const getCoverageStatus = async (req, res, next) => {
             today: plan,
             tomorrow: nextPlan,
             tomorrowLabel: nextPlanDate || 'Tomorrow',
-            coverage: coverage || { morningDone: false, eveningDone: false, status: 'PENDING' }
+            coverage: coverage || { morningDone: false, eveningDone: false, status: 'PENDING' },
+            checkIn: checkIn || null
         });
     } catch (error) {
         next(error);
@@ -280,5 +288,84 @@ export const markAllNotificationsRead = async (req, res, next) => {
     } catch (error) {
         next(error);
     }
+};
+// @desc    Check-in location when reaching target
+// @route   POST /api/routes/location-check-in
+// @access  Private
+export const locationCheckIn = async (req, res, next) => {
+    try {
+        const { latitude, longitude, villageName } = req.body;
+        const userId = req.user.id;
+        const tenantId = req.user.tenantId || "VK001";
+        const dateString = format(new Date(), 'yyyy-MM-dd');
+        const now = new Date();
+        const hour = now.getHours();
+
+        const status = (hour >= 6 && hour < 9) ? "ON_TIME" : "LATE";
+
+        // Validate location match
+        let isLocationMatched = true;
+        const village = await prisma.village.findFirst({
+            where: { name: villageName, tenantId }
+        });
+
+        if (village && village.latitude && village.longitude) {
+            const distance = getDistance(latitude, longitude, village.latitude, village.longitude);
+            if (distance > 5000) { // 5km threshold (covers the whole village area)
+                isLocationMatched = false;
+            }
+        }
+
+        const checkIn = await prisma.locationCheckIn.create({
+            data: {
+                tenantId,
+                userId,
+                date: dateString,
+                latitude,
+                longitude,
+                villageName,
+                status,
+                isLocationMatched,
+                time: now
+            }
+        });
+
+        res.json({ success: true, checkIn });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get all location check-ins for admin
+// @route   GET /api/routes/all-location-check-ins
+// @access  Private/Admin
+export const getAllLocationCheckIns = async (req, res, next) => {
+    try {
+        const tenantId = req.user.tenantId || "VK001";
+        const checkIns = await prisma.locationCheckIn.findMany({
+            where: { tenantId },
+            include: { user: { select: { name: true, email: true } } },
+            orderBy: { createdAt: 'desc' }
+        });
+        res.json(checkIns);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// Helper: calculate distance between two points in meters
+const getDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371e3; // metres
+    const φ1 = lat1 * Math.PI/180;
+    const φ2 = lat2 * Math.PI/180;
+    const Δφ = (lat2-lat1) * Math.PI/180;
+    const Δλ = (lon2-lon1) * Math.PI/180;
+
+    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
+            Math.cos(φ1) * Math.cos(φ2) *
+            Math.sin(Δλ/2) * Math.sin(Δλ/2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+
+    return R * c; // in metres
 };
 
