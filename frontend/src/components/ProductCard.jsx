@@ -83,7 +83,7 @@ export default function ProductCard({ product }) {
 
       {/* Product Content */}
       <div className="px-1.5 py-0.5 flex flex-col gap-1">
-        <h3 className="text-[0.75rem] font-extrabold text-emerald-950 leading-[1.1] line-clamp-2 min-h-[2rem] tracking-tight">
+        <h3 className="text-[0.75rem] font-extrabold text-emerald-950 leading-[1.1] min-h-[2rem] tracking-tight">
           {product.name}
         </h3>
 

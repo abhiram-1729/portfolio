@@ -89,7 +89,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
               return (
               <div key={item.productId} className="flex items-center gap-4 p-4 mx-3 my-2 bg-white/70 border border-emerald-50 shadow-sm rounded-2xl animate-fade-in group hover:bg-white transition-colors">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[0.95rem] font-black text-emerald-950 truncate mb-1 leading-tight">{item.name}</p>
+                  <p className="text-[0.95rem] font-black text-emerald-950 mb-1 leading-tight">{item.name}</p>
                   <div className="flex items-center gap-2">
                     {isItemFree && subtotal >= Number(item.minShopAmount || 0) ? (
                       <>
@@ -176,7 +176,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
 
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-1.5 mb-0.5">
-                          <p className="text-[0.8rem] font-black text-emerald-950 truncate leading-tight">{p.name}</p>
+                          <p className="text-[0.8rem] font-black text-emerald-950 leading-tight">{p.name}</p>
                           {qualifies && (
                             <div className="flex items-center gap-0.5 text-emerald-600">
                                 <Sparkles size={8} className="fill-emerald-600" />

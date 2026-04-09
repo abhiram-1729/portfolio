@@ -198,7 +198,7 @@ export default function AgentInventory() {
                       )}
                     </div>
                     <div className="flex-1 flex flex-col justify-center min-w-0">
-                      <h3 className="text-sm font-black text-emerald-950 tracking-tight leading-tight line-clamp-1 mb-1">{item.product?.name}</h3>
+                      <h3 className="text-sm font-black text-emerald-950 tracking-tight leading-tight mb-1">{item.product?.name}</h3>
                       <div className="flex items-center gap-2">
                         <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100/30">
                           {item.product?.category?.name || 'Item'}
@@ -280,7 +280,7 @@ export default function AgentInventory() {
                         {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package size={20} className="text-gray-300" />}
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-800 line-clamp-1">{p.name}</span>
+                        <span className="text-sm font-bold text-gray-800">{p.name}</span>
                         <div className="flex items-center gap-2 mt-1">
                           <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100">
                             Current: {currentStock}
