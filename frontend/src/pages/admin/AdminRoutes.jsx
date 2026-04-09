@@ -291,17 +291,15 @@ export default function AdminRoutes() {
                           </td>
                           <td className="px-8 py-4">
                             <div className="flex items-center justify-end gap-2 outline-none">
-                              {v.latitude && v.longitude && (
-                                <a 
-                                  href={`https://www.google.com/maps?q=${v.latitude},${v.longitude}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all"
-                                  title="Open in Maps"
-                                >
-                                  <MapPin size={15} />
-                                </a>
-                              )}
+                              <a 
+                                href={`https://www.google.com/maps?q=${encodeURIComponent(v.name + ' village')}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-200 shadow-sm transition-all"
+                                title="Open in Maps"
+                              >
+                                <MapPin size={15} />
+                              </a>
                               <button 
                                 onClick={() => { setVillageForm({ id: v.id, name: v.name, latitude: v.latitude || '', longitude: v.longitude || '' }); setShowVillageModal(true); }}
                                 className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"
