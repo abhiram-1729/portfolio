@@ -41,8 +41,11 @@ export const createItem = async (req, res) => {
       minShopAmount
     } = req.body;
 
+    // Ensure we have a valid tenantId
+    const finalTenantId = tenantId || req.user?.tenantId || 'VK001';
+
     // Emergency Logging
-    fs.appendFileSync('inventory_trace.log', `[${new Date().toISOString()}] Creating Item: ${name} | Tenant: ${tenantId} | User: ${req.user?.id}\n`);
+    fs.appendFileSync('inventory_trace.log', `[${new Date().toISOString()}] Creating Item: ${name} | Tenant: ${finalTenantId} | User: ${req.user?.id}\n`);
 
     // Handle image upload to Supabase if file is present
     let imageUrl = image || null;
@@ -70,20 +73,20 @@ export const createItem = async (req, res) => {
 
     if (!finalCategoryId || finalCategoryId === 'default') {
       const defaultCategory = await prisma.category.upsert({
-        where: { tenantId_name: { tenantId, name: 'Uncategorized' } },
+        where: { tenantId_name: { tenantId: finalTenantId, name: 'Uncategorized' } },
         update: {},
-        create: { name: 'Uncategorized', tenantId }
+        create: { name: 'Uncategorized', tenantId: finalTenantId }
       });
       finalCategoryId = defaultCategory.id;
     }
 
     if (!finalSubCategoryId || finalSubCategoryId === 'default') {
       let defaultSub = await prisma.subCategory.findFirst({
-        where: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId }
+        where: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId: finalTenantId }
       });
       if (!defaultSub) {
         defaultSub = await prisma.subCategory.create({
-          data: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId }
+          data: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId: finalTenantId }
         });
       }
       finalSubCategoryId = defaultSub.id;
@@ -91,14 +94,15 @@ export const createItem = async (req, res) => {
 
     if (!finalBrandId || finalBrandId === 'default') {
       const defaultBrand = await prisma.brand.upsert({
-        where: { tenantId_name: { tenantId, name: 'Unbranded' } },
+        where: { tenantId_name: { tenantId: finalTenantId, name: 'Unbranded' } },
         update: {},
-        create: { name: 'Unbranded', tenantId }
+        create: { name: 'Unbranded', tenantId: finalTenantId }
       });
       finalBrandId = defaultBrand.id;
     }
 
     const itemData = {
+      tenantId: finalTenantId,
       name,
       description,
       mrp: parseNumber(mrp),
@@ -153,6 +157,9 @@ export const updateItem = async (req, res) => {
       brandId
     } = req.body;
 
+    // Ensure we have a valid tenantId
+    const finalTenantId = req.user?.tenantId || getTenantId() || 'VK001';
+
     // Handle image upload to Supabase if file is present
     let imageUrl = image || undefined;
     if (req.file) {
@@ -174,6 +181,41 @@ export const updateItem = async (req, res) => {
       return isNaN(num) ? undefined : num;
     };
 
+    // Handle default relations logic similar to createItem
+    let finalCategoryId = categoryId;
+    let finalSubCategoryId = subCategoryId;
+    let finalBrandId = brandId;
+
+    if (finalCategoryId === 'default') {
+      const defaultCategory = await prisma.category.upsert({
+        where: { tenantId_name: { tenantId: finalTenantId, name: 'Uncategorized' } },
+        update: {},
+        create: { name: 'Uncategorized', tenantId: finalTenantId }
+      });
+      finalCategoryId = defaultCategory.id;
+    }
+
+    if (finalSubCategoryId === 'default') {
+      let defaultSub = await prisma.subCategory.findFirst({
+        where: { name: 'Uncategorized', categoryId: finalCategoryId || undefined, tenantId: finalTenantId }
+      });
+      if (!defaultSub && finalCategoryId) {
+        defaultSub = await prisma.subCategory.create({
+          data: { name: 'Uncategorized', categoryId: finalCategoryId, tenantId: finalTenantId }
+        });
+      }
+      finalSubCategoryId = defaultSub?.id;
+    }
+
+    if (finalBrandId === 'default') {
+      const defaultBrand = await prisma.brand.upsert({
+        where: { tenantId_name: { tenantId: finalTenantId, name: 'Unbranded' } },
+        update: {},
+        create: { name: 'Unbranded', tenantId: finalTenantId }
+      });
+      finalBrandId = defaultBrand.id;
+    }
+
     const updateData = {
       name,
       mrp: parseNumber(mrp),
@@ -187,9 +229,9 @@ export const updateItem = async (req, res) => {
       minShopAmount: parseNumber(minShopAmount),
       unitId: unitId || undefined,
       unitValue: parseNumber(unitValue),
-      categoryId: categoryId || undefined,
-      subCategoryId: subCategoryId || undefined,
-      brandId: brandId || undefined
+      categoryId: finalCategoryId || undefined,
+      subCategoryId: finalSubCategoryId || undefined,
+      brandId: finalBrandId || undefined
     };
 
     const item = await prisma.product.update({
@@ -327,6 +369,7 @@ export const returnStock = async (req, res) => {
 
 export const bulkCreateItems = async (req, res) => {
   try {
+    const tenantId = req.user?.tenantId || getTenantId() || 'VK001';
     const products = req.body;
     if (!Array.isArray(products)) {
       return res.status(400).json({ message: 'Products data must be an array' });
@@ -336,23 +379,23 @@ export const bulkCreateItems = async (req, res) => {
 
     // Ensure default relations exist
     const defaultCategory = await prisma.category.upsert({
-      where: { name: 'Uncategorized' },
+      where: { tenantId_name: { tenantId, name: 'Uncategorized' } },
       update: {},
-      create: { name: 'Uncategorized' }
+      create: { name: 'Uncategorized', tenantId }
     });
 
     const defaultBrand = await prisma.brand.upsert({
-      where: { name: 'Unbranded' },
+      where: { tenantId_name: { tenantId, name: 'Unbranded' } },
       update: {},
-      create: { name: 'Unbranded' }
+      create: { name: 'Unbranded', tenantId }
     });
 
     let defaultSub = await prisma.subCategory.findFirst({
-      where: { name: 'Uncategorized', categoryId: defaultCategory.id }
+      where: { name: 'Uncategorized', categoryId: defaultCategory.id, tenantId }
     });
     if (!defaultSub) {
       defaultSub = await prisma.subCategory.create({
-        data: { name: 'Uncategorized', categoryId: defaultCategory.id }
+        data: { name: 'Uncategorized', categoryId: defaultCategory.id, tenantId }
       });
     }
 
@@ -371,6 +414,7 @@ export const bulkCreateItems = async (req, res) => {
       }
 
       const itemData = {
+        tenantId: tenantId,
         name: prod.name,
         description: prod.description || '',
         mrp: parseNumber(prod.mrp),
