@@ -37,6 +37,7 @@ model Tenant {
   incentiveConfig   VgeIncentiveConfig?
   orderItems        OrderItem[]
   payments          Payment[]
+  assetCategories   AssetCategory[]
 }
 
 enum TenantStatus {
@@ -863,24 +864,40 @@ enum AssetIssueStatus {
 }
 
 model Asset {
-  id            String         @id @default(cuid())
-  tenantId      String         @default("VK001")
-  name          String
-  assetType     AssetType
-  model         String?
-  brand         String?
-  image         String?
-  description   String?
-  estimatedCost Float          @default(0)
-  totalQuantity Int            @default(0)
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  tenant        Tenant         @relation(fields: [tenantId], references: [id])
-  units         AssetUnit[]
-  requests      AssetRequest[]
+  id              String         @id @default(cuid())
+  tenantId        String         @default("VK001")
+  name            String
+  categoryId      String?        // Link to dynamic categories
+  assetType       String?        // Legacy fallback/Direct name
+  model           String?
+  brand           String?
+  image           String?
+  description     String?
+  estimatedCost   Float          @default(0)
+  totalQuantity   Int            @default(0)
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  tenant          Tenant         @relation(fields: [tenantId], references: [id])
+  category        AssetCategory? @relation(fields: [categoryId], references: [id])
+  units           AssetUnit[]
+  requests        AssetRequest[]
 
   @@index([tenantId])
-  @@index([assetType])
+  @@index([categoryId])
+}
+
+model AssetCategory {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("VK001")
+  name      String
+  status    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  assets    Asset[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model AssetUnit {

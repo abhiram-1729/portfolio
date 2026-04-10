@@ -11,6 +11,7 @@ import * as routeCtr from '../controllers/admin/routeController.js';
 import * as villageCtr from '../controllers/admin/villageController.js';
 import * as unitCtr from '../controllers/admin/unitController.js';
 import * as categoryCtr from '../controllers/admin/categoryController.js';
+import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
@@ -142,6 +143,14 @@ router.route('/categories')
 router.route('/categories/:id')
   .put(categoryCtr.updateCategory)
   .delete(categoryCtr.deleteCategory);
+
+// Asset Categories Management
+router.route('/asset-categories')
+  .get(assetCategoryCtr.getAssetCategories)
+  .post(assetCategoryCtr.createAssetCategory);
+router.route('/asset-categories/:id')
+  .put(assetCategoryCtr.updateAssetCategory)
+  .delete(assetCategoryCtr.deleteAssetCategory);
 
 // ─── Asset Management ─────────────────────────────────────
 router.route('/assets')

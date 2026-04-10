@@ -153,6 +153,50 @@ export const updateExpenseStatus = async (req, res, next) => {
     }
 };
 
+// @desc    Agent: Claim an approved expense (Finalize)
+// @route   PUT /api/expenses/:id/claim
+// @access  Private (VGE)
+export const claimExpense = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const userId = req.user.id;
+
+        const expense = await prisma.expense.findUnique({
+            where: { id: id }
+        });
+
+        if (!expense) {
+            res.status(404);
+            throw new Error('Expense not found');
+        }
+
+        if (expense.userId !== userId) {
+            res.status(403);
+            throw new Error('Not authorized to claim this expense');
+        }
+
+        if (expense.status !== 'APPROVED') {
+            res.status(400);
+            throw new Error('Only approved expenses can be claimed');
+        }
+
+        const updatedExpense = await prisma.expense.update({
+            where: { id: id },
+            data: { status: 'PAID' }
+        });
+
+        // Trigger sync with daily summary IF it was a cash expense
+        // This is where it finally hits the account books
+        if (updatedExpense.paymentMode === 'CASH') {
+            await recalculateDailySummary(updatedExpense.vehicleId, updatedExpense.date);
+        }
+
+        res.json(updatedExpense);
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Expense Category Management - List
 // @route   GET /api/admin/expense-categories
 // @access  Admin

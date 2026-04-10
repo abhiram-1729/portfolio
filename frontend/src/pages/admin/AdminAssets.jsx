@@ -25,9 +25,10 @@ export default function AdminAssets() {
   const [issues, setIssues] = useState([]);
   const [requests, setRequests] = useState([]);
   const [reports, setReports] = useState(null);
+  const [assetCategories, setAssetCategories] = useState([]);
 
   // Form states
-  const [form, setForm] = useState({ name: '', assetType: 'NON_ELECTRONIC', model: '', brand: '', description: '', estimatedCost: '' });
+  const [form, setForm] = useState({ name: '', categoryId: '', assetType: 'NON_ELECTRONIC', model: '', brand: '', description: '', estimatedCost: '' });
   const [editForm, setEditForm] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [editFile, setEditFile] = useState(null);
@@ -55,12 +56,14 @@ export default function AdminAssets() {
 
   const fetchAll = async () => {
     try {
-      const [aRes, uRes] = await Promise.all([
+      const [aRes, uRes, cRes] = await Promise.all([
         adminAPI.getAssets(),
-        adminAPI.getUsers()
+        adminAPI.getUsers(),
+        adminAPI.getAssetCategories()
       ]);
       setAssets(aRes.data);
       setUsers(uRes.data.filter(u => u.role === 'SALES_AGENT' || u.role === 'SUPERVISOR' || u.role === 'HELPER'));
+      setAssetCategories(cRes.data);
     } catch (err) {
       toast.error('Failed to load assets');
     } finally {
@@ -114,7 +117,7 @@ export default function AdminAssets() {
       await adminAPI.createAsset(fd);
       toast.success('Asset created');
       setShowCreateModal(false);
-      setForm({ name: '', assetType: 'NON_ELECTRONIC', model: '', brand: '', description: '', estimatedCost: '' });
+      setForm({ name: '', categoryId: '', assetType: 'NON_ELECTRONIC', model: '', brand: '', description: '', estimatedCost: '' });
       setSelectedFile(null);
       fetchAll();
     } catch (err) {
@@ -276,7 +279,7 @@ export default function AdminAssets() {
                   )}
                   <span className={`absolute top-3 right-3 text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider ${
                     asset.assetType === 'ELECTRONIC' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
-                  }`}>{asset.assetType === 'ELECTRONIC' ? 'Electronic' : 'Non-Electronic'}</span>
+                  }`}>{asset.category?.name || (asset.assetType === 'ELECTRONIC' ? 'Electronic' : 'Non-Electronic')}</span>
                 </div>
 
                 <div className="p-4 space-y-3">
@@ -311,7 +314,7 @@ export default function AdminAssets() {
                       className="flex-1 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 py-2 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-100">
                       + Add Units
                     </button>
-                    <button onClick={() => { setEditForm({ id: asset.id, name: asset.name, assetType: asset.assetType, model: asset.model || '', brand: asset.brand || '', description: asset.description || '', estimatedCost: asset.estimatedCost?.toString() || '' }); setShowEditModal(true); }}
+                    <button onClick={() => { setEditForm({ id: asset.id, name: asset.name, categoryId: asset.categoryId || '', assetType: asset.assetType, model: asset.model || '', brand: asset.brand || '', description: asset.description || '', estimatedCost: asset.estimatedCost?.toString() || '' }); setShowEditModal(true); }}
                       className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors">
                       <Pencil size={14} />
                     </button>
@@ -749,11 +752,19 @@ export default function AdminAssets() {
             </div>
             <form onSubmit={handleCreate} className="space-y-3">
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asset Type</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asset Category</label>
+                <select value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })} required
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="">Select Category</option>
+                  {assetCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nature (Behavior)</label>
                 <select value={form.assetType} onChange={e => setForm({ ...form, assetType: e.target.value })}
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="ELECTRONIC">Electronic</option>
-                  <option value="NON_ELECTRONIC">Non-Electronic</option>
+                  <option value="ELECTRONIC">Electronic (Has Serials)</option>
+                  <option value="NON_ELECTRONIC">Non-Electronic (Bulk)</option>
                 </select>
               </div>
               <div className="space-y-1">
@@ -806,6 +817,22 @@ export default function AdminAssets() {
               <button onClick={() => { setShowEditModal(false); setEditForm(null); }} className="p-1 hover:bg-gray-100 rounded-full text-gray-400"><X size={18} /></button>
             </div>
             <form onSubmit={handleUpdate} className="space-y-3">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asset Category</label>
+                <select value={editForm.categoryId} onChange={e => setEditForm({ ...editForm, categoryId: e.target.value })} required
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="">Select Category</option>
+                  {assetCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nature (Behavior)</label>
+                <select value={editForm.assetType} onChange={e => setEditForm({ ...editForm, assetType: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="ELECTRONIC">Electronic (Has Serials)</option>
+                  <option value="NON_ELECTRONIC">Non-Electronic (Bulk)</option>
+                </select>
+              </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asset Name *</label>
                 <input type="text" required value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}

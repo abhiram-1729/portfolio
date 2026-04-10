@@ -106,6 +106,12 @@ export const adminAPI = {
   updateAssetRequest: (id, data) => api.put(`/admin/assets/requests/${id}`, data),
   getAssetReports: () => api.get('/admin/assets/reports'),
 
+  // Asset Categories
+  getAssetCategories: () => api.get('/admin/asset-categories'),
+  createAssetCategory: (data) => api.post('/admin/asset-categories', data),
+  updateAssetCategory: (id, data) => api.put(`/admin/asset-categories/${id}`, data),
+  deleteAssetCategory: (id) => api.delete(`/admin/asset-categories/${id}`),
+
   // Financial Reports
   getFinancialReport: async (params) => {
     const response = await api.get('/admin/finance/reports', { params });

@@ -1,7 +1,14 @@
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
-import { getMyAssets, reportIssue, createAssetRequest, getMyAssetRequests, getAssetCatalog } from '../controllers/admin/assetController.js';
+import { 
+    getMyAssets, 
+    reportIssue, 
+    createAssetRequest, 
+    getMyAssetRequests, 
+    getAssetCatalog 
+} from '../controllers/admin/assetController.js';
+import { getAssetCategories } from '../controllers/admin/assetCategoryController.js';
 
 const router = express.Router();
 
@@ -17,5 +24,6 @@ router.post('/report-issue', uploadMiddleware.array('photos', 5), reportIssue);
 router.post('/requests', createAssetRequest);
 router.get('/requests', getMyAssetRequests);
 router.get('/catalog', getAssetCatalog);
+router.get('/categories', getAssetCategories);
 
 export default router;

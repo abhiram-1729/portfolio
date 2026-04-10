@@ -28,10 +28,17 @@ export default function AdminSettings() {
   const [newCategory, setNewCategory] = useState({ name: '' });
   const [editingCategoryId, setEditingCategoryId] = useState(null);
 
+  // Asset Categories State
+  const [assetCategories, setAssetCategories] = useState([]);
+  const [assetCategoriesLoading, setAssetCategoriesLoading] = useState(false);
+  const [newAssetCategory, setNewAssetCategory] = useState({ name: '' });
+  const [editingAssetCategoryId, setEditingAssetCategoryId] = useState(null);
+
   useEffect(() => {
     fetchSettings();
     fetchUnits();
     fetchCategories();
+    fetchAssetCategories();
   }, []);
 
   const fetchUnits = async () => {
@@ -55,6 +62,18 @@ export default function AdminSettings() {
       toast.error('Failed to load categories');
     } finally {
       setCategoriesLoading(false);
+    }
+  };
+
+  const fetchAssetCategories = async () => {
+    setAssetCategoriesLoading(true);
+    try {
+      const { data } = await adminAPI.getAssetCategories();
+      setAssetCategories(data);
+    } catch (error) {
+      toast.error('Failed to load asset categories');
+    } finally {
+      setAssetCategoriesLoading(false);
     }
   };
 
@@ -155,13 +174,48 @@ export default function AdminSettings() {
     }
   };
 
+  const handleSaveAssetCategory = async (e) => {
+    e.preventDefault();
+    if (!newAssetCategory.name) return toast.error('Please enter category name');
+    setSaving(true);
+    try {
+      if (editingAssetCategoryId) {
+        const { data } = await adminAPI.updateAssetCategory(editingAssetCategoryId, newAssetCategory);
+        setAssetCategories(assetCategories.map(c => c.id === editingAssetCategoryId ? data : c));
+        toast.success('Asset Category updated');
+      } else {
+        const { data } = await adminAPI.createAssetCategory(newAssetCategory);
+        setAssetCategories([data, ...assetCategories]);
+        toast.success('Asset Category created');
+      }
+      setNewAssetCategory({ name: '' });
+      setEditingAssetCategoryId(null);
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save asset category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteAssetCategory = async (id) => {
+    if (!confirm('Are you sure you want to delete this asset category?')) return;
+    try {
+      await adminAPI.deleteAssetCategory(id);
+      setAssetCategories(assetCategories.filter(c => c.id !== id));
+      toast.success('Asset Category deleted');
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to delete asset category');
+    }
+  };
+
   const sections = [
     { 
       title: 'Inventory Settings', 
       icon: Package, 
       items: [
         { label: 'Unit Management', action: () => setActiveModal('UNITS') },
-        { label: 'Category Management', action: () => setActiveModal('CATEGORIES') }
+        { label: 'Category Management', action: () => setActiveModal('CATEGORIES') },
+        { label: 'Asset Type Management', action: () => setActiveModal('ASSET_CATEGORIES') }
       ] 
     },
     { 
@@ -676,6 +730,143 @@ export default function AdminSettings() {
                                   </button>
                                   <button 
                                     onClick={() => handleDeleteCategory(category.id)}
+                                    className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors group-hover:opacity-100 opacity-70"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Asset Categories Modal */}
+      {activeModal === 'ASSET_CATEGORIES' && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-slate-50 w-full max-w-5xl rounded-[2rem] shadow-2xl flex flex-col h-[90vh] max-h-[800px] overflow-hidden animate-in slide-in-from-bottom-4 duration-300">
+            {/* Header */}
+            <div className="flex items-center justify-between p-6 bg-white border-b border-gray-100 z-10 shadow-sm shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="p-2.5 bg-indigo-100 text-indigo-600 rounded-xl">
+                  <Package size={22} className="drop-shadow-sm" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight leading-none mb-1">Asset Category Management</h3>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Asset Classification</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setActiveModal(null)}
+                className="p-2 bg-gray-50 hover:bg-red-50 text-gray-400 hover:text-red-500 rounded-full transition-all active:scale-95"
+              >
+                <X size={20} strokeWidth={2.5} />
+              </button>
+            </div>
+
+            {/* Grid Content */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="grid grid-cols-1 lg:grid-cols-[3fr_5fr] gap-6 max-w-none">
+                
+                {/* Form Side */}
+                <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-sm h-fit sticky top-0">
+                  <h4 className="text-sm font-black text-indigo-900 uppercase tracking-wider mb-5 flex items-center gap-2">
+                    <span className="w-1.5 h-4 bg-indigo-500 rounded-full inline-block"></span>
+                    {editingAssetCategoryId ? 'Edit Asset Category' : 'Create Asset Category'}
+                  </h4>
+                  <form onSubmit={handleSaveAssetCategory} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest ml-1">Category Name</label>
+                      <input 
+                        type="text"
+                        required
+                        placeholder="Enter Category Name (e.g., Furniture)"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-sm font-bold focus:bg-white focus:ring-2 focus:ring-indigo-500/20 text-indigo-950 transition-all outline-none placeholder-gray-300"
+                        value={newAssetCategory.name}
+                        onChange={(e) => setNewAssetCategory({...newAssetCategory, name: e.target.value})}
+                      />
+                    </div>
+
+                    <div className="pt-2">
+                      <button 
+                        type="submit" 
+                        disabled={saving}
+                        className="w-full bg-indigo-600 text-white font-black py-3.5 rounded-xl shadow-lg shadow-indigo-500/20 hover:bg-indigo-700 transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2 disabled:opacity-60 active:scale-[0.98]"
+                      >
+                        {saving ? <Loader2 size={16} className="animate-spin" /> : (editingAssetCategoryId ? <Save size={16} /> : <span className="text-lg leading-none shrink-0 border-2 border-white/30 rounded-full w-5 h-5 flex items-center justify-center -mr-1">+</span>)}
+                        {saving ? 'Processing...' : (editingAssetCategoryId ? 'Update Category' : 'Create Category')}
+                      </button>
+                      
+                      {editingAssetCategoryId && (
+                        <button 
+                          type="button"
+                          onClick={() => { setEditingAssetCategoryId(null); setNewAssetCategory({name:''}) }}
+                          className="w-full mt-2 bg-slate-100 text-slate-500 font-bold py-3 text-xs uppercase tracking-widest rounded-xl hover:bg-slate-200 transition-colors"
+                        >
+                          Cancel Editing
+                        </button>
+                      )}
+                    </div>
+                  </form>
+                </div>
+
+                {/* Table Side */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+                  <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-indigo-900 text-indigo-50 shrink-0">
+                    <h4 className="text-sm font-black uppercase tracking-wider flex items-center gap-2">
+                      <FileText size={16} className="text-indigo-400" />
+                      Showing categories
+                    </h4>
+                    <span className="text-xs font-bold px-2.5 py-1 bg-indigo-800 rounded-lg whitespace-nowrap">
+                      {assetCategories.length} Records
+                    </span>
+                  </div>
+
+                  <div className="w-full overflow-x-auto flex-1">
+                    <table className="w-full min-w-[500px] text-left border-collapse">
+                      <thead>
+                        <tr className="bg-slate-50/80 border-b border-gray-100">
+                          <th className="py-3 px-5 text-[10px] uppercase tracking-widest font-black text-slate-400 whitespace-nowrap">Category Name</th>
+                          <th className="py-3 px-5 text-[10px] uppercase tracking-widest font-black text-slate-400 whitespace-nowrap text-right">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {assetCategoriesLoading ? (
+                          <tr>
+                            <td colSpan="2" className="py-12 text-center text-slate-400 text-sm font-bold">
+                              <Loader2 className="mx-auto animate-spin mb-2" size={24} />
+                              Loading records...
+                            </td>
+                          </tr>
+                        ) : assetCategories.length === 0 ? (
+                          <tr>
+                            <td colSpan="2" className="py-12 text-center text-slate-400 text-sm font-bold bg-slate-50/30">
+                              No asset categories created yet.
+                            </td>
+                          </tr>
+                        ) : (
+                          assetCategories.map((category) => (
+                            <tr key={category.id} className="border-b border-gray-50 hover:bg-indigo-50/30 transition-colors group">
+                              <td className="py-3 px-5 text-sm font-black text-slate-700 whitespace-nowrap">{category.name}</td>
+                              <td className="py-3 px-5 text-right whitespace-nowrap">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button 
+                                    onClick={() => { setEditingAssetCategoryId(category.id); setNewAssetCategory({ name: category.name }) }}
+                                    className="p-1.5 text-indigo-600 hover:bg-indigo-100 rounded-lg transition-colors group-hover:opacity-100 opacity-70"
+                                  >
+                                    <Edit size={16} />
+                                  </button>
+                                  <button 
+                                    onClick={() => handleDeleteAssetCategory(category.id)}
                                     className="p-1.5 text-red-500 hover:bg-red-50 rounded-lg transition-colors group-hover:opacity-100 opacity-70"
                                   >
                                     <Trash2 size={16} />

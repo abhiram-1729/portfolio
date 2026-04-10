@@ -48,13 +48,19 @@ export const getAssetCatalog = async (req, res) => {
         name: true,
         model: true,
         brand: true,
-        assetType: true,
+        categoryId: true,
+        category: { select: { name: true } },
         image: true,
         description: true
       },
       orderBy: { name: 'asc' }
     });
-    res.json(assets);
+    // Flatten category for catalog
+    const flattened = assets.map(a => ({
+        ...a,
+        assetType: a.category?.name || 'Uncategorized'
+    }));
+    res.json(flattened);
   } catch (error) {
     console.error('❌ Get Asset Catalog Error:', error);
     res.status(500).json({ message: 'Error fetching catalog', error: error.message });
@@ -68,6 +74,9 @@ export const getAssets = async (req, res) => {
       include: {
         units: {
           select: { id: true, serialNumber: true, status: true, condition: true }
+        },
+        category: {
+          select: { id: true, name: true }
         },
         _count: {
           select: { units: true }
@@ -99,6 +108,7 @@ export const createAsset = async (req, res) => {
     const asset = await prisma.asset.create({
       data: {
         name,
+        categoryId: req.body.categoryId || null,
         assetType: assetType || 'NON_ELECTRONIC',
         model: model || null,
         brand: brand || null,
@@ -135,6 +145,7 @@ export const updateAsset = async (req, res) => {
       where: { id },
       data: {
         name,
+        categoryId: req.body.categoryId || undefined,
         assetType: assetType || undefined,
         model: model || undefined,
         brand: brand || undefined,
