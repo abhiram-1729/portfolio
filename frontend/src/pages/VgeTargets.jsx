@@ -145,6 +145,32 @@ export default function VgeTargets() {
       {/* TAB: Today */}
       {activeTab === 'today' && perf && (
         <div className="space-y-5 animate-in fade-in duration-300">
+          {/* Earnings Potential Summary Card */}
+          <div className={`bg-gradient-to-br ${perf.vgeType === 'FREELANCER' ? 'from-indigo-600 to-indigo-800' : 'from-emerald-600 to-emerald-800'} rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/10`}>
+             <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Monthly Payout Projection</p>
+                  <p className="text-3xl font-black tracking-tight">
+                    ₹{( (perf.vgeType === 'FREELANCER' ? 0 : perf.baseSalary) + (perf.totalIncentive * 30)).toLocaleString()}
+                  </p>
+                </div>
+                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+                  <TrendingUp size={24} />
+                </div>
+             </div>
+             <div className="flex items-center gap-3">
+                <div className="flex-1 bg-white/10 backdrop-blur px-3 py-2 rounded-xl border border-white/10">
+                   <p className="text-[8px] font-black uppercase opacity-60">Base Pay</p>
+                   <p className="text-sm font-black">₹{perf.vgeType === 'FREELANCER' ? '0' : (perf.baseSalary || 0).toLocaleString()}</p>
+                </div>
+                <div className="flex-1 bg-white/10 backdrop-blur px-3 py-2 rounded-xl border border-white/10">
+                   <p className="text-[8px] font-black uppercase opacity-60">Est. Incentives</p>
+                   <p className="text-sm font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
+                </div>
+             </div>
+             <p className="text-[9px] font-bold opacity-60 mt-4 italic text-center">"Earn more today to increase your monthly estimate!"</p>
+          </div>
+
           {/* Sales Progress Card */}
           <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm">
             <div className="flex items-center justify-between mb-5">

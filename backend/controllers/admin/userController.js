@@ -17,7 +17,7 @@ export const getUsers = async (req, res) => {
 // Create a new user (Agent/helper/supervisor)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, role, assignedVehicleId, dailyTarget, vgeType } = req.body;
+    const { name, email, password, mobile, role, assignedVehicleId, dailyTarget, vgeType, baseSalary } = req.body;
 
     const userExists = await prisma.user.findFirst({
       where: {
@@ -41,7 +41,8 @@ export const createUser = async (req, res) => {
         role: role || 'SALES_AGENT',
         vgeType: vgeType || 'EMPLOYEE',
         assignedVehicle: assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined,
-        dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined
+        dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined,
+        baseSalary: baseSalary ? parseFloat(baseSalary) : undefined
       }
     });
 
@@ -56,7 +57,7 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget, vgeType, password } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget, vgeType, password, baseSalary } = req.body;
 
     const updateData = {
       name,
@@ -68,7 +69,8 @@ export const updateUser = async (req, res) => {
       assignedVehicle: assignedVehicleId === null 
         ? { disconnect: true } 
         : (assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined),
-      dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined
+      dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined,
+      baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined
     };
 
     // Safely update password if provided

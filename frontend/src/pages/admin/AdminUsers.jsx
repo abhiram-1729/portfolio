@@ -15,6 +15,7 @@ export default function AdminUsers({ type }) {
     role: 'SALES_AGENT',
     vgeType: 'EMPLOYEE',
     dailyTarget: 10000,
+    baseSalary: 12000,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -255,7 +256,11 @@ export default function AdminUsers({ type }) {
                     </div>
                     
                     <div className="flex items-center gap-1">
-                      <button onClick={() => { setEditingUser(user); setShowEditModal(true); }}
+                      <button onClick={() => { 
+                        const { password, ...userWithoutPass } = user;
+                        setEditingUser({ ...userWithoutPass, password: '' }); 
+                        setShowEditModal(true); 
+                      }}
                         className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
                         <Pencil size={15} />
                       </button>
@@ -281,13 +286,12 @@ export default function AdminUsers({ type }) {
                       <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'Unassigned'}</span>
                     </div>
                   </div>
-                  
-                  {user.dailyTarget && (
-                    <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/50 flex justify-between items-center">
-                       <span className="text-[9px] font-black uppercase text-emerald-600 tracking-widest">Daily Revenue Target</span>
-                       <span className="text-sm font-black text-emerald-950">₹{parseFloat(user.dailyTarget).toLocaleString()}</span>
+                  <div className="mt-1">
+                    <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col items-center">
+                       <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
+                       <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
                     </div>
-                  )}
+                  </div>
                 </div>
               ))}
             </div>
@@ -300,7 +304,7 @@ export default function AdminUsers({ type }) {
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Daily Target</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>
                     <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
                   </tr>
                 </thead>
@@ -344,14 +348,18 @@ export default function AdminUsers({ type }) {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                         <span className={`text-sm font-black ${user.dailyTarget > 0 ? 'text-emerald-700' : 'text-gray-300 italic'}`}>
-                           {user.dailyTarget ? `₹${parseFloat(user.dailyTarget).toLocaleString()}` : 'Not Set'}
-                         </span>
+                        <span className="text-sm font-black text-indigo-600">
+                           ₹{(user.baseSalary || 0).toLocaleString()}
+                        </span>
                       </td>
                       <td className="px-6 py-4">
                         <div className="flex items-center justify-end gap-1.5">
                           <button 
-                            onClick={() => { setEditingUser(user); setShowEditModal(true); }}
+                            onClick={() => { 
+                              const { password, ...userWithoutPass } = user;
+                              setEditingUser({ ...userWithoutPass, password: '' }); 
+                              setShowEditModal(true); 
+                            }}
                             title="Edit Profile"
                             className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
                           >
@@ -463,14 +471,14 @@ export default function AdminUsers({ type }) {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Daily Sales Target (₹)</label>
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CTC Monthly Pay (₹)</label>
                 <input 
                   type="number"
                   required
-                  placeholder="Daily Sales Target"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                  value={newUser.dailyTarget}
-                  onChange={(e) => setNewUser({...newUser, dailyTarget: e.target.value})}
+                  placeholder="e.g. 15000"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
+                  value={newUser.baseSalary}
+                  onChange={(e) => setNewUser({...newUser, baseSalary: e.target.value})}
                 />
               </div>
 
@@ -574,28 +582,27 @@ export default function AdminUsers({ type }) {
                 </select>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Daily Sales Target (₹)</label>
-                  <input 
-                    type="number"
-                    required
-                    placeholder="Daily Sales Target"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                    value={editingUser.dailyTarget}
-                    onChange={(e) => setEditingUser({...editingUser, dailyTarget: e.target.value})}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Update Password</label>
-                  <input 
-                    type="text"
-                    placeholder="Leave blank to keep current"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
-                    value={editingUser.password || ''}
-                    onChange={(e) => setEditingUser({...editingUser, password: e.target.value})}
-                  />
-                </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monthly CTC (₹)</label>
+                <input 
+                  type="number"
+                  required
+                  placeholder="Monthly Base"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none font-bold text-indigo-600"
+                  value={editingUser.baseSalary || ''}
+                  onChange={(e) => setEditingUser({...editingUser, baseSalary: e.target.value})}
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Update Password</label>
+                <input 
+                  type="text"
+                  placeholder="Leave blank to keep current"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
+                  value={editingUser.password || ''}
+                  onChange={(e) => setEditingUser({...editingUser, password: e.target.value})}
+                />
               </div>
 
               <div className="pt-2">

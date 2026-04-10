@@ -44,7 +44,7 @@ export const getMyPerformance = async (req, res) => {
     // Get user's daily target fallback
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { dailyTarget: true, tenantId: true }
+      select: { dailyTarget: true, baseSalary: true, tenantId: true, vgeType: true }
     });
 
     // Load config for progress info and base salary
@@ -67,7 +67,7 @@ export const getMyPerformance = async (req, res) => {
       ...perf,
       nextLevel,
       nextSlab,
-      baseSalary: config?.baseSalary || 15000,
+      baseSalary: user.baseSalary || config?.baseSalary || 12000,
       vgeType: user.vgeType,
       rules: config?.rules || [],
       dailyTarget,
@@ -166,7 +166,7 @@ export const getAllPerformance = async (req, res) => {
       include: {
         user: {
           select: { 
-            id: true, name: true, vgeType: true,
+            id: true, name: true, vgeType: true, baseSalary: true,
             assignedVehicle: { select: { vehicleNumber: true } }
           }
         }
@@ -213,18 +213,64 @@ export const getMonthlyReport = async (req, res) => {
   try {
     const month = req.query.month || toISTMonthString();
 
+    // 1. Get all relevant users (SALES_AGENT, SUPERVISOR, HELPER)
+    const users = await prisma.user.findMany({
+      where: {
+        role: { in: ['SALES_AGENT', 'SUPERVISOR', 'HELPER'] },
+        status: 'ACTIVE'
+      },
+      select: {
+        id: true,
+        name: true,
+        vgeType: true,
+        baseSalary: true,
+        assignedVehicle: { select: { vehicleNumber: true } }
+      }
+    });
+
+    // 2. Get existing summaries for this month
     const summaries = await prisma.vgeMonthlySummary.findMany({
       where: { month },
-      orderBy: { totalSales: 'desc' },
       include: {
         user: {
-          select: { id: true, name: true, vgeType: true, assignedVehicle: { select: { vehicleNumber: true } } }
+          select: { id: true, name: true, vgeType: true, baseSalary: true, assignedVehicle: { select: { vehicleNumber: true } } }
         }
       }
     });
 
-    res.json(summaries);
+    // 3. Merge: Every user should have a row. If summary exists, use it. Otherwise use defaults.
+    const reportList = users.map(user => {
+      const existingSummary = summaries.find(s => s.userId === user.id);
+      
+      if (existingSummary) return existingSummary;
+
+      // Virtual summary for new/inactive users
+      return {
+        id: `uninitialized-${user.id}`,
+        userId: user.id,
+        user,
+        month,
+        totalSales: 0,
+        totalRegistrations: 0,
+        totalIncentive: 0,
+        totalOrders: 0,
+        workingDays: 0,
+        bestLevel: 'NONE',
+        metadata: {
+          baseSalary: user.baseSalary || (user.vgeType === 'FREELANCER' ? 0 : 12000),
+          bonus: 0,
+          awards: [],
+          totalEarnings: user.baseSalary || (user.vgeType === 'FREELANCER' ? 0 : 12000)
+        }
+      };
+    });
+
+    // Sort by totalSales desc
+    reportList.sort((a, b) => b.totalSales - a.totalSales);
+
+    res.json(reportList);
   } catch (error) {
+    console.error('[VGE] Monthly report error:', error);
     res.status(500).json({ message: 'Error', error: error.message });
   }
 };

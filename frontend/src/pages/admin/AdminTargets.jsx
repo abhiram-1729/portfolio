@@ -522,7 +522,7 @@ export default function AdminTargets() {
                   ) : (
                     monthlySummaries.map((s) => {
                       const meta = s.metadata || {};
-                      const basePay = meta.baseSalary ?? (s.user?.vgeType === 'FREELANCER' ? 0 : 12000);
+                      const basePay = (s.user?.vgeType === 'FREELANCER') ? 0 : (s.user?.baseSalary ?? (meta.baseSalary || 12000));
                       const totalEarnings = meta.totalEarnings ?? (basePay + s.totalIncentive + (meta.bonus || 0));
                       
                       return (
