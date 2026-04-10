@@ -331,26 +331,78 @@ export default function ClosingCashEntry() {
                   </div>
                 </div>
 
-                <button
-                  type={isCurrentShiftClosed ? "button" : "submit"}
-                  disabled={loading || isCurrentShiftClosed}
-                  className={`w-full font-black text-xl py-5 rounded-[1.5rem] shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-3 group ${
-                    isCurrentShiftClosed
-                      ? 'bg-slate-300 text-white cursor-not-allowed'
-                      : activeShift === 1
-                        ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200'
-                        : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
-                  }`}
-                >
-                  {isCurrentShiftClosed ? `Shift ${activeShift} Already Submitted` : (
-                    loading ? 'Submitting...' : (
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    disabled={loading || isCurrentShiftClosed}
+                    onClick={() => {
+                      const reason = window.prompt("Please enter the reason for No Service (e.g., Vehicle Damage, Flat Tyre):");
+                      if (reason) {
+                        setLoading(true);
+                        submitClosingCash({
+                          vehicleId: user.assignedVehicle?.id || user.assignedVehicleId,
+                          actualCash: 0,
+                          denominations: {},
+                          remark: reason,
+                          shift: activeShift,
+                          isNoService: true
+                        }).then(() => {
+                          toast.success(`Shift ${activeShift} marked as No Service`);
+                          if (activeShift === 1 && shift2?.openingAssigned) {
+                            // Instead of auto-loading, we stay here and the main button will become "Proceed to Shift 2"
+                            window.location.reload(); // Simplest way to refresh state
+                          } else {
+                            navigate('/reports');
+                          }
+                        }).catch(err => {
+                          toast.error(err.response?.data?.message || 'Failed to submit');
+                        }).finally(() => setLoading(false));
+                      }
+                    }}
+                    className={`flex-1 font-black text-sm uppercase tracking-widest py-5 rounded-[1.5rem] border-2 transition-all active:scale-[0.98] flex items-center justify-center gap-2 ${
+                      isCurrentShiftClosed 
+                        ? 'border-gray-100 text-gray-300 cursor-not-allowed'
+                        : 'border-rose-200 text-rose-500 hover:bg-rose-50'
+                    }`}
+                  >
+                    <AlertCircle size={18} />
+                    {activeShift === 1 ? 'S1 Damage' : 'S2 Damage'}
+                  </button>
+
+                  <button
+                    type={isCurrentShiftClosed && !(activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted) ? "button" : "submit"}
+                    disabled={loading || (isCurrentShiftClosed && !(activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted))}
+                    onClick={() => {
+                      if (activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted) {
+                        setActiveShift(2);
+                      }
+                    }}
+                    className={`flex-[2] font-black text-xl py-5 rounded-[1.5rem] shadow-xl transition-all active:scale-[0.98] flex items-center justify-center gap-3 group ${
+                      isCurrentShiftClosed && !(activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted)
+                        ? 'bg-slate-300 text-white cursor-not-allowed'
+                        : activeShift === 1
+                          ? 'bg-amber-600 hover:bg-amber-700 text-white shadow-amber-200'
+                          : 'bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-200'
+                    }`}
+                  >
+                    {activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted ? (
                       <>
-                        Submit Shift {activeShift} Closing
+                        <ArrowRight className="rotate-180" size={20} />
+                        Next Shift (Afternoon)
                         <ArrowRight className="group-hover:translate-x-1 transition-transform" />
                       </>
-                    )
-                  )}
-                </button>
+                    ) : isCurrentShiftClosed ? (
+                      `Shift ${activeShift} Already Submitted`
+                    ) : loading ? (
+                      'Submitting...'
+                    ) : (
+                      <>
+                        Submit Shift {activeShift}
+                        <ArrowRight className="group-hover:translate-x-1 transition-transform" />
+                      </>
+                    )}
+                  </button>
+                </div>
               </form>
             )}
           </>

@@ -424,6 +424,7 @@ model OpeningCash {
   denominations    Json
   totalOpeningCash Float
   status           String   @default("SUBMITTED")
+  isNoService      Boolean  @default(false)
   createdAt        DateTime @default(now())
   vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
   user             User     @relation(fields: [userId], references: [id])
@@ -448,6 +449,7 @@ model ClosingCash {
   denominations Json
   remark        String?
   status        String   @default("SUBMITTED")
+  isNoService   Boolean  @default(false)
   createdAt     DateTime @default(now())
   vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
   user          User     @relation(fields: [userId], references: [id])

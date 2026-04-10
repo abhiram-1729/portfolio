@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Truck, Coins, ArrowRight, Info, ArrowLeft, CheckCircle2, Sun, Moon, Clock } from 'lucide-react';
+import { Truck, Coins, ArrowRight, Info, ArrowLeft, CheckCircle2, AlertCircle, Sun, Moon, Clock } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
@@ -74,21 +74,37 @@ export default function OpeningCashEntry() {
         <div className="p-6 bg-white">
           {data?.openingAssigned ? (
             <div className="space-y-4">
-              <div className="text-center">
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Opening Float</span>
-                <span className="text-4xl font-black text-slate-900 tracking-tighter">₹{(data.openingCash || 0).toLocaleString()}</span>
-              </div>
-
-              {/* Denomination breakdown */}
-              {denominations && (
-                <div className="grid grid-cols-3 gap-2 pt-2">
-                  {DENOMINATIONS.filter(d => denominations[d] > 0).map(d => (
-                    <div key={d} className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100">
-                      <span className="text-[9px] font-black text-slate-400 block">₹{d}</span>
-                      <span className="text-xs font-black text-slate-700">× {denominations[d]}</span>
-                    </div>
-                  ))}
+              {data.isNoService ? (
+                <div className="text-center py-4 space-y-3">
+                  <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto text-rose-500 border border-rose-100">
+                    <AlertCircle size={24} />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-sm font-black text-rose-600 uppercase tracking-widest block">No Service Day</span>
+                    <p className="text-[10px] font-bold text-gray-400 max-w-[180px] mx-auto leading-relaxed">
+                      This shift has been marked as No Service by admin (Vehicle Damage/Maintenance).
+                    </p>
+                  </div>
                 </div>
+              ) : (
+                <>
+                  <div className="text-center">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Opening Float</span>
+                    <span className="text-4xl font-black text-slate-900 tracking-tighter">₹{(data.openingCash || 0).toLocaleString()}</span>
+                  </div>
+
+                  {/* Denomination breakdown */}
+                  {denominations && (
+                    <div className="grid grid-cols-3 gap-2 pt-2">
+                      {DENOMINATIONS.filter(d => denominations[d] > 0).map(d => (
+                        <div key={d} className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100">
+                          <span className="text-[9px] font-black text-slate-400 block">₹{d}</span>
+                          <span className="text-xs font-black text-slate-700">× {denominations[d]}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </>
               )}
             </div>
           ) : (

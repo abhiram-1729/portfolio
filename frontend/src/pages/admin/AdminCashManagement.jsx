@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon } from 'lucide-react';
 import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation } from '../../services/cashService';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
@@ -90,7 +90,9 @@ export default function AdminCashManagement() {
   const handleAssignFloat = async (e) => {
     e.preventDefault();
     if (!assignmentData.vehicleId) return toast.error('Select a vehicle');
-    if (assignmentData.amount <= 0) return toast.error('Enter valid denominations');
+    if (!assignmentData.isNoService && assignmentData.amount <= 0) {
+      return toast.error('Enter valid denominations or mark as No Service');
+    }
 
     const selectedVehicle = vehicles.find(v => v.id === assignmentData.vehicleId);
     const agent = selectedVehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
@@ -103,16 +105,23 @@ export default function AdminCashManagement() {
       await adminSubmitOpeningCash({
         vehicleId: assignmentData.vehicleId,
         userId: agent.id,
-        totalOpeningCash: assignmentData.amount,
-        denominations: assignmentData.denominations,
+        totalOpeningCash: assignmentData.isNoService ? 0 : assignmentData.amount,
+        denominations: assignmentData.isNoService ? {} : assignmentData.denominations,
         shift: assignmentData.shift,
+        isNoService: assignmentData.isNoService || false
       });
-      toast.success(`Shift ${assignmentData.shift} float assigned to ${selectedVehicle.vehicleNumber}`);
+      
+      const msg = assignmentData.isNoService 
+        ? `Shift ${assignmentData.shift} marked as No Service for ${selectedVehicle.vehicleNumber}`
+        : `Shift ${assignmentData.shift} float assigned to ${selectedVehicle.vehicleNumber}`;
+      
+      toast.success(msg);
       setShowAssignModal(false);
       setAssignmentData({
         vehicleId: '',
         shift: 1,
         amount: 0,
+        isNoService: false,
         denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
       });
       fetchSummaries();
@@ -189,6 +198,12 @@ export default function AdminCashManagement() {
   // Helper: shift status badge
   const ShiftStatusBadge = ({ opening, closing }) => {
     if (closing) {
+      if (closing.isNoService) return (
+        <div className="flex items-center gap-1">
+          <AlertTriangle size={12} className="text-rose-500" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-rose-600">No Service</span>
+        </div>
+      );
       const diff = closing.difference || 0;
       if (diff === 0) return (
         <div className="flex items-center gap-1">
@@ -215,30 +230,38 @@ export default function AdminCashManagement() {
   };
 
   // Shift selector component
-  const ShiftSelector = ({ value, onChange }) => (
+  const ShiftSelector = ({ value, onChange, disabledShifts = [] }) => (
     <div className="flex gap-2">
       {[
         { id: 1, label: 'Shift 1', sub: 'Morning', icon: Sun, color: 'amber' },
         { id: 2, label: 'Shift 2', sub: 'Afternoon', icon: Moon, color: 'indigo' },
-      ].map(s => (
-        <button
-          key={s.id}
-          type="button"
-          onClick={() => onChange(s.id)}
-          className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs uppercase tracking-wider ${value === s.id
-            ? s.color === 'amber'
-              ? 'border-amber-400 bg-amber-50 text-amber-700'
-              : 'border-indigo-400 bg-indigo-50 text-indigo-700'
-            : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
-            }`}
-        >
-          <s.icon size={16} />
-          <div className="flex flex-col items-start">
-            <span className="text-[10px] font-black">{s.label}</span>
-            <span className="text-[8px] font-bold opacity-60">{s.sub}</span>
-          </div>
-        </button>
-      ))}
+      ].map(s => {
+        const isDisabled = disabledShifts.includes(s.id);
+        return (
+          <button
+            key={s.id}
+            type="button"
+            disabled={isDisabled}
+            onClick={() => onChange(s.id)}
+            className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs uppercase tracking-wider ${
+              isDisabled ? 'border-gray-50 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50' :
+              value === s.id
+                ? s.color === 'amber'
+                  ? 'border-amber-400 bg-amber-50 text-amber-700'
+                  : 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
+              }`}
+          >
+            <s.icon size={16} />
+            <div className="flex flex-col items-start text-left">
+              <span className="text-[10px] font-black">{s.label}</span>
+              <span className="text-[8px] font-bold opacity-60 truncate">
+                {isDisabled ? 'Close S1 first' : s.sub}
+              </span>
+            </div>
+          </button>
+        );
+      })}
     </div>
   );
 
@@ -329,133 +352,198 @@ export default function AdminCashManagement() {
         </button>
       </div>
 
-      {/* Reconciliation Table */}
-      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead>
-              <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Open</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-400">S1 Close</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Open</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-400">S2 Close</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Status</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Status</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-rose-500">Expenses</th>
-                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50">
-              {loading ? (
-                <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center text-gray-400 font-bold italic">
-                    Loading cash summaries...
-                  </td>
+      {/* TAB CONTENT */}
+      {activeTab === 'reconciliation' ? (
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Open</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-400">S1 Close</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Open</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-400">S2 Close</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Status</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Status</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-rose-500">Day Exp.</th>
+                  <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
                 </tr>
-              ) : filteredSummaries.length === 0 ? (
-                <tr>
-                  <td colSpan="8" className="px-6 py-12 text-center">
-                    <Coins size={32} className="mx-auto text-gray-200 mb-2" />
-                    <p className="text-sm font-bold text-gray-400">No matching cash records found</p>
-                  </td>
-                </tr>
-              ) : (
-                filteredSummaries.map((summary) => {
-                  const s1 = summary.shiftDetails?.shift1;
-                  const s2 = summary.shiftDetails?.shift2;
-                  const s1Open = s1?.opening?.totalOpeningCash || 0;
-                  const s1Close = s1?.closing?.actualCash || 0;
-                  const s2Open = s2?.opening?.totalOpeningCash || 0;
-                  const s2Close = s2?.closing?.actualCash || 0;
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {loading ? (
+                  <tr>
+                    <td colSpan="9" className="px-6 py-12 text-center text-gray-400 font-bold italic">
+                      Loading cash summaries...
+                    </td>
+                  </tr>
+                ) : filteredSummaries.length === 0 ? (
+                  <tr>
+                    <td colSpan="9" className="px-6 py-12 text-center">
+                      <Coins size={32} className="mx-auto text-gray-200 mb-2" />
+                      <p className="text-sm font-bold text-gray-400">No matching cash records found</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredSummaries.map((summary) => {
+                    const s1 = summary.shiftDetails?.shift1;
+                    const s2 = summary.shiftDetails?.shift2;
+                    const s1Open = s1?.opening?.totalOpeningCash || 0;
+                    const s1Close = s1?.closing?.actualCash || s1?.live?.expected || 0;
+                    const s2Open = s2?.opening?.totalOpeningCash || 0;
+                    const s2Close = s2?.closing?.actualCash || s2?.live?.expected || 0;
 
-                  return (
-                    <tr key={summary.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="px-5 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                            <Truck size={16} strokeWidth={2.5} />
+                    return (
+                      <tr key={summary.id} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                              <Truck size={16} strokeWidth={2.5} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-gray-900 leading-none">{summary.vehicle.vehicleNumber}</span>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase">{summary.vehicle.vehicleName || 'Standard'}</span>
+                            </div>
                           </div>
-                          <div className="flex flex-col">
-                            <span className="text-sm font-black text-gray-900 leading-none">{summary.vehicle.vehicleNumber}</span>
-                            <span className="text-[10px] text-gray-400 font-bold uppercase">{summary.vehicle.vehicleName || 'Standard'}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`text-sm font-bold ${s1Open > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                            ₹{s1Open.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          {s1?.closing ? (
+                            <span className="text-sm font-bold text-amber-700">₹{s1Close.toLocaleString()}</span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-gray-300 uppercase">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className={`text-sm font-bold ${s2Open > 0 ? 'text-indigo-600' : 'text-gray-300'}`}>
+                            ₹{s2Open.toLocaleString()}
+                          </span>
+                        </td>
+                        <td className="px-4 py-4">
+                          {s2?.closing ? (
+                            <span className="text-sm font-bold text-indigo-700">₹{s2Close.toLocaleString()}</span>
+                          ) : (
+                            <span className="text-[9px] font-bold text-gray-300 uppercase">—</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <ShiftStatusBadge opening={s1?.opening} closing={s1?.closing} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-rose-500">₹{(summary.dailySales?.totalCash === 0 && summary.dailySales?.grandTotal > 0 ? 0 : summary.shiftDetails?.shift1?.live?.expenses + summary.shiftDetails?.shift2?.live?.expenses || 0).toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex items-center justify-end gap-1.5 text-gray-400">
+                            <button onClick={() => handleOpenView(summary)} className="p-2 hover:bg-emerald-50 rounded-xl hover:text-emerald-600 transition-all"><Eye size={18} /></button>
+                            <button onClick={() => handleOpenEdit(summary)} className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"><Pencil size={18} /></button>
+                            <button onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }} className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
                           </div>
-                        </div>
-                      </td>
-                      {/* S1 Open */}
-                      <td className="px-4 py-4">
-                        <span className={`text-sm font-bold ${s1Open > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
-                          ₹{s1Open.toLocaleString()}
-                        </span>
-                      </td>
-                      {/* S1 Close */}
-                      <td className="px-4 py-4">
-                        {s1?.closing ? (
-                          <span className="text-sm font-bold text-amber-700">₹{s1Close.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-[9px] font-bold text-gray-300 uppercase">Pending</span>
-                        )}
-                      </td>
-                      {/* S2 Open */}
-                      <td className="px-4 py-4">
-                        <span className={`text-sm font-bold ${s2Open > 0 ? 'text-indigo-600' : 'text-gray-300'}`}>
-                          ₹{s2Open.toLocaleString()}
-                        </span>
-                      </td>
-                      {/* S2 Close */}
-                      <td className="px-4 py-4">
-                        {s2?.closing ? (
-                          <span className="text-sm font-bold text-indigo-700">₹{s2Close.toLocaleString()}</span>
-                        ) : (
-                          <span className="text-[9px] font-bold text-gray-300 uppercase">{s2?.opening ? 'Pending' : '—'}</span>
-                        )}
-                      </td>
-                      {/* S1 Status */}
-                      <td className="px-4 py-4">
-                        <ShiftStatusBadge opening={s1?.opening} closing={s1?.closing} />
-                      </td>
-                      {/* S2 Status */}
-                      <td className="px-4 py-4">
-                        <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
-                      </td>
-                      {/* Expenses */}
-                      <td className="px-4 py-4">
-                        <span className="text-sm font-bold text-rose-500">-₹{(summary.expenses || 0).toLocaleString()}</span>
-                      </td>
-                      {/* Actions */}
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1.5 text-gray-400">
-                          <button
-                            onClick={() => handleOpenView(summary)}
-                            className="p-2 hover:bg-emerald-50 rounded-xl hover:text-emerald-600 transition-all"
-                            title="View Details"
-                          >
-                            <Eye size={18} />
-                          </button>
-                          <button
-                            onClick={() => handleOpenEdit(summary)}
-                            className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"
-                            title="Edit"
-                          >
-                            <Pencil size={18} />
-                          </button>
-                          <button
-                            onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }}
-                            className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"
-                            title="Delete"
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      ) : (
+        /* LIVE CASH STATUS TABLE */
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-emerald-50/50 border-b border-emerald-100">
+                  <th className="px-5 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-600">Vehicle / Agent</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-600">Active Status</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-600 font-bold">Total Sales</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-500">Cash Sales</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-blue-500">UPI Sales</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-rose-500">Live Exp.</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-700">In-Hand Cash</th>
+                  <th className="px-5 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredSummaries.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-12 text-center text-gray-400 font-bold">No active vehicles found</td>
+                  </tr>
+                ) : (
+                  filteredSummaries.map((summary) => {
+                    const s1 = summary.shiftDetails?.shift1;
+                    const s2 = summary.shiftDetails?.shift2;
+                    const activeShift = s2?.opening && !s2?.closing ? 2 : (s1?.opening && !s1?.closing ? 1 : null);
+                    const metrics = activeShift === 2 ? s2.live : (activeShift === 1 ? s1.live : null);
+                    const agent = summary.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
+
+                    return (
+                      <tr key={summary.id} className="hover:bg-emerald-50/20 transition-colors group">
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="w-9 h-9 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-white group-hover:shadow-sm transition-all">
+                              <Truck size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-sm font-black text-gray-900 leading-none">{summary.vehicle.vehicleNumber}</span>
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1 group-hover:text-emerald-600 transition-colors">{agent?.name || 'No Agent'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-4">
+                          {activeShift ? (
+                            <div className="flex items-center gap-2">
+                              <div className="relative">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                <div className="absolute inset-0 w-2 h-2 rounded-full bg-emerald-500 animate-ping opacity-75" />
+                              </div>
+                              <span className="text-[10px] font-black text-emerald-700 uppercase">Live — Shift {activeShift}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Closed / Pending</span>
+                          )}
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-black text-gray-900 leading-none">₹{summary.dailySales.grandTotal.toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-emerald-600">₹{summary.dailySales.totalCash.toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-blue-600">₹{summary.dailySales.totalUpi.toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-rose-500">₹{(metrics?.expenses || 0).toLocaleString()}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <div className="bg-emerald-100/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-200/50">
+                            <span className="text-sm font-black text-emerald-700">₹{(metrics?.expected || 0).toLocaleString()}</span>
+                          </div>
+                        </td>
+                        <td className="px-5 py-4 text-right">
+                          <button 
+                            onClick={() => handleOpenView(summary)}
+                            className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-gray-400 hover:text-emerald-600 transition-all"
+                          >
+                            <ArrowRight size={18} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* ========== VIEW DETAIL MODAL ========== */}
       {showViewModal && viewingSummary && (() => {
@@ -692,7 +780,17 @@ export default function AdminCashManagement() {
               {/* Shift Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Select Shift</label>
-                <ShiftSelector value={assignmentData.shift} onChange={(s) => setAssignmentData({ ...assignmentData, shift: s })} />
+                <ShiftSelector 
+                  value={assignmentData.shift} 
+                  onChange={(s) => setAssignmentData({ ...assignmentData, shift: s })} 
+                  disabledShifts={(() => {
+                    if (!assignmentData.vehicleId) return [];
+                    const summary = summaries.find(s => s.vehicleId === assignmentData.vehicleId);
+                    const s1Closed = summary?.shiftDetails?.shift1?.closing;
+                    // If S1 is not closed, disable S2 assignment
+                    return !s1Closed ? [2] : [];
+                  })()}
+                />
               </div>
 
               <div className="space-y-1.5">
@@ -719,56 +817,175 @@ export default function AdminCashManagement() {
                 </select>
               </div>
 
-              {/* Denominations Section */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Denominations</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
-                  {denominationsList.map((denom) => (
-                    <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-emerald-200 transition-all">
-                      <div className="flex items-center justify-between border-b border-gray-50 pb-1 mb-1">
-                        <span className="text-[10px] font-black text-gray-400 group-hover:text-emerald-600">₹{denom}</span>
-                        <span className="text-[9px] font-bold text-emerald-600/40 uppercase">₹{(denom * (assignmentData.denominations[denom] || 0)).toLocaleString()}</span>
+              {(() => {
+                if (!assignmentData.vehicleId) return null;
+                const summary = summaries.find(s => s.vehicleId === assignmentData.vehicleId);
+                const shiftData = assignmentData.shift === 1 ? summary?.shiftDetails?.shift1 : summary?.shiftDetails?.shift2;
+                const opening = shiftData?.opening;
+                const closing = shiftData?.closing;
+                
+                if (!opening) return (
+                  <>
+                    <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100/50 group cursor-pointer" onClick={() => setAssignmentData({ ...assignmentData, isNoService: !assignmentData.isNoService })}>
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${assignmentData.isNoService ? 'bg-rose-500 text-white' : 'bg-white text-rose-300 group-hover:text-rose-400'}`}>
+                        <AlertTriangle size={20} />
                       </div>
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <span className="text-[10px] text-gray-200">×</span>
-                        <input
-                          type="number"
-                          placeholder="0"
-                          min="0"
-                          className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200 text-center"
-                          value={assignmentData.denominations[denom] || ''}
-                          onChange={(e) => handleDenominationChange(e.target.value, denom, 'assign')}
-                        />
+                      <div className="flex-1">
+                        <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block leading-none mb-1">Vehicle Damage / Service</span>
+                        <span className="text-xs font-bold text-rose-900 opacity-70">Mark Shift {assignmentData.shift} as "No Service" for today</span>
+                      </div>
+                      <input 
+                        type="checkbox" 
+                        checked={assignmentData.isNoService || false}
+                        onChange={(e) => setAssignmentData({ ...assignmentData, isNoService: e.target.checked })}
+                        className="w-5 h-5 rounded-lg border-rose-200 text-rose-500 focus:ring-rose-500 cursor-pointer"
+                      />
+                    </div>
+
+                    {!assignmentData.isNoService && (
+                      <div className="space-y-2">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Denominations</label>
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
+                          {denominationsList.map((denom) => (
+                            <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-emerald-200 transition-all">
+                              <div className="flex items-center justify-between border-b border-gray-50 pb-1 mb-1">
+                                <span className="text-[10px] font-black text-gray-400 group-hover:text-emerald-600">₹{denom}</span>
+                                <span className="text-[9px] font-bold text-emerald-600/40 uppercase">₹{(denom * (assignmentData.denominations[denom] || 0)).toLocaleString()}</span>
+                              </div>
+                              <div className="flex items-center gap-1.5 justify-center">
+                                <span className="text-[10px] text-gray-200">×</span>
+                                <input
+                                  type="number"
+                                  placeholder="0"
+                                  min="0"
+                                  className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200 text-center"
+                                  value={assignmentData.denominations[denom] || ''}
+                                  onChange={(e) => handleDenominationChange(e.target.value, denom, 'assign')}
+                                />
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white group overflow-hidden transition-all ${
+                      assignmentData.isNoService 
+                        ? 'bg-rose-600 shadow-rose-600/20' 
+                        : (assignmentData.shift === 1 ? 'bg-amber-600 shadow-amber-600/20' : 'bg-indigo-600 shadow-indigo-600/20')
+                    }`}>
+                      <div className="flex flex-col">
+                        <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">
+                          {assignmentData.isNoService ? 'No Service Applied' : `Shift ${assignmentData.shift} Total`}
+                        </p>
+                        <h4 className="text-2xl font-black tracking-tight">₹{assignmentData.isNoService ? '0' : assignmentData.amount.toLocaleString()}</h4>
+                      </div>
+                      <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
+                        {assignmentData.isNoService ? <AlertTriangle size={20} className="text-white opacity-40" /> : assignmentData.shift === 1 ? <Sun size={20} className="text-white opacity-40" /> : <Moon size={20} className="text-white opacity-40" />}
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
 
-              <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white group overflow-hidden ${assignmentData.shift === 1 ? 'bg-amber-600 shadow-amber-600/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}>
-                <div className="flex flex-col">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">Shift {assignmentData.shift} Total</p>
-                  <h4 className="text-2xl font-black tracking-tight">₹{assignmentData.amount.toLocaleString()}</h4>
-                </div>
-                <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-                  {assignmentData.shift === 1 ? <Sun size={20} className="text-white opacity-40" /> : <Moon size={20} className="text-white opacity-40" />}
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting || assignmentData.amount <= 0}
-                className="w-full bg-emerald-600 text-white font-black text-base py-3.5 rounded-xl active:scale-[0.98] transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2 hover:bg-emerald-700 disabled:opacity-50"
-              >
-                {isSubmitting ? (
-                  <Loader2 className="animate-spin" size={20} />
-                ) : (
-                  <>
-                    <CheckCircle2 size={20} />
-                    Confirm & Submit
+                    <button
+                      type="submit"
+                      disabled={isSubmitting || (!assignmentData.isNoService && assignmentData.amount <= 0)}
+                      className="w-full bg-emerald-600 text-white font-black text-base py-3.5 rounded-xl active:scale-[0.98] transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-2 hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20} />Confirm & Submit</>}
+                    </button>
                   </>
-                )}
-              </button>
+                );
+
+                if (opening.isNoService) {
+                  return (
+                    <div className="bg-rose-950 rounded-[1.5rem] p-5 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-300 border border-rose-900/50">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle size={16} className="text-rose-400" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">Shift Cancelled</span>
+                        </div>
+                      </div>
+                      <div className="space-y-3">
+                        <span className="text-xs font-black text-rose-100 block">Vehicle Damage / Service</span>
+                        <div className="p-3 bg-white/5 rounded-xl border border-white/5">
+                          <p className="text-[10px] font-bold text-rose-200/60 leading-relaxed uppercase tracking-wider">
+                            This shift was marked as non-operational by administration. No assignment or sales possible.
+                          </p>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setShowAssignModal(false)} className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-black uppercase tracking-widest transition-colors">Close View</button>
+                    </div>
+                  );
+                }
+
+                if (closing) {
+                  return (
+                    <div className="bg-slate-900 rounded-[1.5rem] p-5 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                      <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+                        <div className="flex items-center gap-2">
+                          <CheckCircle2 size={16} className="text-emerald-400" />
+                          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">Shift Completed</span>
+                        </div>
+                        <span className="text-[10px] font-bold text-white/40">Final Summary</span>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black uppercase text-white/30 block">Sales</span>
+                          <span className="text-sm font-black">₹{closing.cashSales?.toLocaleString()}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black uppercase text-white/30 block">Actual</span>
+                          <span className="text-sm font-black text-emerald-400">₹{closing.actualCash?.toLocaleString()}</span>
+                        </div>
+                        <div className="space-y-1">
+                          <span className="text-[9px] font-black uppercase text-white/30 block">Status</span>
+                          <div className="flex items-center gap-1">
+                            <span className={`text-[10px] font-black uppercase truncate ${closing.difference === 0 ? 'text-white' : 'text-rose-400'}`}>
+                              {closing.difference === 0 ? 'Matched' : closing.difference > 0 ? `+₹${closing.difference}` : `-₹${Math.abs(closing.difference)}`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 pt-3 border-t border-white/10 flex items-center justify-between">
+                        <div className="flex flex-col">
+                          <span className="text-[8px] font-bold text-white/40 uppercase">Float Used</span>
+                          <span className="text-xs font-black opacity-80">₹{opening.totalOpeningCash?.toLocaleString()}</span>
+                        </div>
+                        <div className="px-3 py-1 bg-white/10 rounded-lg border border-white/5">
+                          <span className="text-[9px] font-black uppercase tracking-widest text-white/60">Session Ended</span>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => setShowAssignModal(false)} className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-black uppercase tracking-widest transition-colors">Close View</button>
+                    </div>
+                  );
+                }
+
+                // Assigned but not closed
+                return (
+                  <div className="bg-slate-900 rounded-[1.5rem] p-5 text-white shadow-xl animate-in fade-in slide-in-from-top-2 duration-300">
+                    <div className="flex items-center justify-between border-b border-white/10 pb-3 mb-4">
+                      <div className="flex items-center gap-2">
+                        <Clock size={16} className="text-amber-400" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-400">Float Assigned</span>
+                      </div>
+                      <span className="text-[10px] font-bold text-white/40">Work in Progress</span>
+                    </div>
+
+                    <div className="text-center py-4 space-y-4">
+                      <div className="space-y-1">
+                        <span className="text-[10px] font-black uppercase text-white/30 block">Current Float In Hand</span>
+                        <span className="text-4xl font-black text-white tracking-tighter">₹{opening.totalOpeningCash?.toLocaleString()}</span>
+                      </div>
+                      <p className="text-[10px] font-bold text-white/40 leading-relaxed max-w-[200px] mx-auto uppercase tracking-wider">
+                        The agent is currently operating with this float. Re-assignment is locked.
+                      </p>
+                    </div>
+
+                    <button type="button" onClick={() => setShowAssignModal(false)} className="w-full mt-6 py-3 bg-white/10 hover:bg-white/20 rounded-xl text-xs font-black uppercase tracking-widest transition-colors">Close View</button>
+                  </div>
+                );
+              })()}
             </form>
           </div>
         </div>
