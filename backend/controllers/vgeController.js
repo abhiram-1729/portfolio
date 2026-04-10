@@ -68,6 +68,7 @@ export const getMyPerformance = async (req, res) => {
       nextLevel,
       nextSlab,
       baseSalary: config?.baseSalary || 15000,
+      vgeType: user.vgeType,
       rules: config?.rules || [],
       dailyTarget,
       targetProgress: dailyTarget ? Math.min(100, (perf.totalSales / dailyTarget) * 100) : 0,
@@ -165,7 +166,7 @@ export const getAllPerformance = async (req, res) => {
       include: {
         user: {
           select: { 
-            id: true, name: true, 
+            id: true, name: true, vgeType: true,
             assignedVehicle: { select: { vehicleNumber: true } }
           }
         }
@@ -217,7 +218,7 @@ export const getMonthlyReport = async (req, res) => {
       orderBy: { totalSales: 'desc' },
       include: {
         user: {
-          select: { id: true, name: true, assignedVehicle: { select: { vehicleNumber: true } } }
+          select: { id: true, name: true, vgeType: true, assignedVehicle: { select: { vehicleNumber: true } } }
         }
       }
     });

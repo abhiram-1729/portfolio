@@ -16,7 +16,7 @@ const DEFAULT_CONFIG = {
 /**
  * Calculate the cumulative incentive based on passed levels
  */
-export function calculateIncentive(totalSales, totalRegistrations = 0, config = DEFAULT_CONFIG) {
+export function calculateIncentive(totalSales, totalRegistrations = 0, config = DEFAULT_CONFIG, userType = 'EMPLOYEE') {
   let rules = Array.isArray(config.rules) ? config.rules : [];
   if (typeof config.rules === 'string') {
     try { rules = JSON.parse(config.rules); } catch(e){}
@@ -33,8 +33,7 @@ export function calculateIncentive(totalSales, totalRegistrations = 0, config = 
     const sTo = Number(level.salesTo) || 0;
     const aTarget = Number(level.appsTarget) || 0;
 
-    // Must meet BOTH targets to unlock this level's incentive. 
-    // Usually ranges determine if you land in a specific slab for that level.
+    // Range-base mapping
     const inRange = sTo > 0 ? (totalSales >= sFrom && totalSales <= sTo) : (totalSales >= sFrom);
 
     if (inRange && totalRegistrations >= aTarget) {
@@ -44,8 +43,11 @@ export function calculateIncentive(totalSales, totalRegistrations = 0, config = 
       const aSlab = Number(level.appsSlab) || 0;
       const aRate = Number(level.appsRate) || 0;
 
-      const salesIncentive = sType === 'PERCENTAGE' ? (sSlab * sVal / 100) : sVal;
-      const levelReward = salesIncentive + (aSlab * aRate);
+      // FREELANCERS: Only get App part, NO Sales Incentives
+      const salesIncentive = (userType === 'FREELANCER') ? 0 : (sType === 'PERCENTAGE' ? (sSlab * sVal / 100) : sVal);
+      const appIncentive = aSlab * aRate;
+
+      const levelReward = salesIncentive + appIncentive;
       totalDailyIncentive += levelReward;
       currentLevel = level.name;
     }

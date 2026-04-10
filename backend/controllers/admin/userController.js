@@ -9,6 +9,7 @@ export const getUsers = async (req, res) => {
     });
     res.json(users);
   } catch (error) {
+    console.error('[AdminUsers] Fetch error:', error);
     res.status(500).json({ message: 'Error fetching users', error: error.message });
   }
 };
@@ -16,7 +17,7 @@ export const getUsers = async (req, res) => {
 // Create a new user (Agent/helper/supervisor)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, role, assignedVehicleId, dailyTarget } = req.body;
+    const { name, email, password, mobile, role, assignedVehicleId, dailyTarget, vgeType } = req.body;
 
     const userExists = await prisma.user.findFirst({
       where: {
@@ -38,13 +39,15 @@ export const createUser = async (req, res) => {
         mobile,
         password: hashedPassword,
         role: role || 'SALES_AGENT',
-        assignedVehicleId: assignedVehicleId || null,
+        vgeType: vgeType || 'EMPLOYEE',
+        assignedVehicle: assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined,
         dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined
       }
     });
 
     res.status(201).json({ message: 'User created', user: { id: user.id, name: user.name, role: user.role } });
   } catch (error) {
+    console.error('[AdminUsers] Create error:', error);
     res.status(500).json({ message: 'Error creating user', error: error.message });
   }
 };
@@ -53,7 +56,7 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget, password } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget, vgeType, password } = req.body;
 
     const updateData = {
       name,
@@ -61,7 +64,10 @@ export const updateUser = async (req, res) => {
       mobile,
       role,
       status,
-      assignedVehicleId: assignedVehicleId !== undefined ? assignedVehicleId : undefined,
+      vgeType,
+      assignedVehicle: assignedVehicleId === null 
+        ? { disconnect: true } 
+        : (assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined),
       dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined
     };
 

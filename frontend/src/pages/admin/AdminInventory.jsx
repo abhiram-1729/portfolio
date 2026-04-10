@@ -1073,9 +1073,14 @@ export default function AdminInventory() {
                       <input
                         type="number"
                         placeholder="0"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
                         className="w-20 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
                         value={stockQuantities[item.id] || ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          handleQuantityChange(item.id, val);
+                        }}
                       />
                     </div>
                   </td>
@@ -1262,9 +1267,14 @@ export default function AdminInventory() {
                       <input
                         type="number"
                         placeholder="0"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
                         className="w-20 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-sm"
                         value={stockQuantities[item.id] || ''}
-                        onChange={(e) => handleQuantityChange(item.id, e.target.value)}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          handleQuantityChange(item.id, val);
+                        }}
                       />
                     </div>
                   </td>
@@ -1521,9 +1531,13 @@ export default function AdminInventory() {
                                <input 
                                  type="number"
                                  min="0"
+                                 onWheel={(e) => e.target.blur()}
                                  className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none text-right"
                                  value={auditQuantities[item.productId] ?? item.quantity}
-                                 onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: e.target.value})}
+                                 onChange={(e) => {
+                                   const val = Math.max(0, parseInt(e.target.value) || 0);
+                                   setAuditQuantities({...auditQuantities, [item.productId]: val});
+                                 }}
                                />
                                <span className="text-[8px] font-black text-emerald-600/50 uppercase mt-1">Auditing</span>
                             </div>
@@ -1576,9 +1590,13 @@ export default function AdminInventory() {
                                     <input 
                                       type="number"
                                       min="0"
+                                      onWheel={(e) => e.target.blur()}
                                       className="w-20 bg-emerald-50 border border-emerald-200 rounded-xl px-2 py-2 text-sm text-center font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none"
                                       value={auditQuantities[item.productId] ?? item.quantity}
-                                      onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: e.target.value})}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setAuditQuantities({...auditQuantities, [item.productId]: val});
+                                      }}
                                     />
                                   ) : (
                                     <span className="text-sm font-black text-gray-900">{qty}</span>
@@ -1918,9 +1936,14 @@ export default function AdminInventory() {
                                        <input
                                          type="number"
                                          min="0"
+                                         onWheel={(e) => e.target.blur()}
                                          max={item.quantity}
                                          value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
-                                         onChange={(e) => setEditedQuantities(prev => ({...prev, [item.id]: e.target.value}))}
+                                         onChange={(e) => {
+                                           const maxVal = item.quantity;
+                                           const val = Math.min(maxVal, Math.max(0, parseInt(e.target.value) || 0));
+                                           setEditedQuantities(prev => ({...prev, [item.id]: val}));
+                                         }}
                                          className="w-14 text-center font-black text-emerald-600 bg-white border border-gray-200 rounded-lg py-1 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm transition-all"
                                        />
                                      ) : (
@@ -2387,10 +2410,15 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
                         <input
                           type="number"
+                          min="0"
+                          onWheel={(e) => e.target.blur()}
                           placeholder="500"
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
                           value={newItem.unitValue}
-                          onChange={(e) => setNewItem({ ...newItem, unitValue: e.target.value })}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                            setNewItem({ ...newItem, unitValue: val.toString() });
+                          }}
                         />
                       </div>
                     </div>
@@ -2424,10 +2452,15 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            min="0"
+                            onWheel={(e) => e.target.blur()}
                             required
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
                             value={newItem.landingPrice}
-                            onChange={(e) => setNewItem({ ...newItem, landingPrice: e.target.value })}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              setNewItem({ ...newItem, landingPrice: val.toString() });
+                            }}
                           />
                         </div>
                       </div>
@@ -2437,15 +2470,17 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            min="0"
+                            onWheel={(e) => e.target.blur()}
                             required
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
                             value={newItem.mrp}
                             onChange={(e) => {
-                              const m = e.target.value;
+                              const m = Math.max(0, parseFloat(e.target.value) || 0);
                               setNewItem({
                                 ...newItem,
-                                mrp: m,
-                                price: calculateFinalPrice(m, newItem.discount, newItem.discountType)
+                                mrp: m.toString(),
+                                price: calculateFinalPrice(m.toString(), newItem.discount, newItem.discountType)
                               });
                             }}
                           />
@@ -2476,6 +2511,8 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Disc.</label>
                         <input
                           type="number"
+                          min="0"
+                          onWheel={(e) => e.target.blur()}
                           required
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
                           value={newItem.discount}
@@ -2484,7 +2521,7 @@ export default function AdminInventory() {
                             setNewItem({
                               ...newItem,
                               discount: d.toString(),
-                              price: calculateFinalPrice(newItem.mrp, d, newItem.discountType)
+                              price: calculateFinalPrice(newItem.mrp, d.toString(), newItem.discountType)
                             });
                           }}
                         />
@@ -2594,9 +2631,14 @@ export default function AdminInventory() {
                           <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
                           <input
                             type="number"
+                            min="0"
+                            onWheel={(e) => e.target.blur()}
                             className="w-full bg-white border border-emerald-100 rounded-xl px-4 py-2 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
                             value={newItem.minShopAmount}
-                            onChange={(e) => setNewItem({ ...newItem, minShopAmount: e.target.value })}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              setNewItem({ ...newItem, minShopAmount: val.toString() });
+                            }}
                           />
                         </div>
                       )}
@@ -2879,9 +2921,14 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
                         <input
                           type="number"
+                          min="0"
+                          onWheel={(e) => e.target.blur()}
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
                           value={editItem.unitValue}
-                          onChange={(e) => setEditItem({ ...editItem, unitValue: e.target.value })}
+                          onChange={(e) => {
+                            const val = Math.max(0, parseFloat(e.target.value) || 0);
+                            setEditItem({ ...editItem, unitValue: val.toString() });
+                          }}
                         />
                       </div>
                     </div>
@@ -2914,10 +2961,15 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            min="0"
+                            onWheel={(e) => e.target.blur()}
                             required
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
                             value={editItem.landingPrice}
-                            onChange={(e) => setEditItem({ ...editItem, landingPrice: e.target.value })}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              setEditItem({ ...editItem, landingPrice: val.toString() });
+                            }}
                           />
                         </div>
                       </div>
@@ -2927,15 +2979,17 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            min="0"
+                            onWheel={(e) => e.target.blur()}
                             required
                             className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
                             value={editItem.mrp}
                             onChange={(e) => {
-                              const m = e.target.value;
+                              const m = Math.max(0, parseFloat(e.target.value) || 0);
                               setEditItem({
                                 ...editItem,
-                                mrp: m,
-                                price: calculateFinalPrice(m, editItem.discount, editItem.discountType)
+                                mrp: m.toString(),
+                                price: calculateFinalPrice(m.toString(), editItem.discount, editItem.discountType)
                               });
                             }}
                           />
@@ -2966,6 +3020,8 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value</label>
                         <input
                           type="number"
+                          min="0"
+                          onWheel={(e) => e.target.blur()}
                           required
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
                           value={editItem.discount}
@@ -2974,7 +3030,7 @@ export default function AdminInventory() {
                             setEditItem({
                               ...editItem,
                               discount: d.toString(),
-                              price: calculateFinalPrice(editItem.mrp, d, editItem.discountType)
+                              price: calculateFinalPrice(editItem.mrp, d.toString(), editItem.discountType)
                             });
                           }}
                         />
@@ -3082,9 +3138,14 @@ export default function AdminInventory() {
                           <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
                           <input
                             type="number"
+                            min="0"
+                            onWheel={(e) => e.target.blur()}
                             className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-2 text-sm font-black text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all shadow-sm"
                             value={editItem.minShopAmount}
-                            onChange={(e) => setEditItem({ ...editItem, minShopAmount: e.target.value })}
+                            onChange={(e) => {
+                              const val = Math.max(0, parseFloat(e.target.value) || 0);
+                              setEditItem({ ...editItem, minShopAmount: val.toString() });
+                            }}
                           />
                         </div>
                       )}
@@ -3227,9 +3288,14 @@ const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStoc
         <input
           type="number"
           placeholder="0"
+          min="0"
+          onWheel={(e) => e.target.blur()}
           className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300'}`}
           value={quantity || ''}
-          onChange={(e) => onChange(item.id, e.target.value)}
+          onChange={(e) => {
+            const val = Math.max(0, parseInt(e.target.value) || 0);
+            onChange(item.id, val);
+          }}
         />
       </div>
     </div>

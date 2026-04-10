@@ -390,11 +390,14 @@ export default function VgeTargets() {
       {activeTab === 'rewards' && (
         <div className="space-y-6 animate-in fade-in duration-300">
           {/* CTC Awareness Card */}
-          <div className="bg-gradient-to-br from-emerald-600 to-emerald-800 rounded-[2.5rem] p-6 text-white shadow-xl">
+          <div className={`bg-gradient-to-br ${perf.vgeType === 'FREELANCER' ? 'from-blue-600 to-blue-800' : 'from-emerald-600 to-emerald-800'} rounded-[2.5rem] p-6 text-white shadow-xl`}>
              <div className="flex items-center justify-between mb-6">
                 <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-emerald-100">Monthly Compensation</p>
-                  <p className="text-3xl font-black tracking-tight">₹{(perf.baseSalary + (perf.totalIncentive * 30)).toLocaleString()} <span className="text-xs font-bold opacity-60">Est. CTC</span></p>
+                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-white/70">{perf.vgeType === 'FREELANCER' ? 'Project Earnings' : 'Monthly Compensation'}</p>
+                  <p className="text-3xl font-black tracking-tight">
+                    ₹{( (perf.vgeType === 'FREELANCER' ? 0 : perf.baseSalary) + (perf.totalIncentive * 30)).toLocaleString()} 
+                    <span className="text-xs font-bold opacity-60 ml-2">{perf.vgeType === 'FREELANCER' ? 'Est. Monthly' : 'Est. CTC'}</span>
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
                   <TrendingUp size={24} />
@@ -404,13 +407,13 @@ export default function VgeTargets() {
              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
                   <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Fixed Salary</p>
-                  <p className="text-xl font-black">₹{perf.baseSalary?.toLocaleString()}</p>
-                  <p className="text-[10px] font-bold opacity-60 mt-1">Guaranteed Base</p>
+                  <p className="text-xl font-black">₹{perf.vgeType === 'FREELANCER' ? '0' : perf.baseSalary?.toLocaleString()}</p>
+                  <p className="text-[10px] font-bold opacity-60 mt-1">{perf.vgeType === 'FREELANCER' ? 'Not Applicable' : 'Guaranteed Base'}</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Performance (Est.)</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Incentives (Est.)</p>
                   <p className="text-xl font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
-                  <p className="text-[10px] font-bold opacity-60 mt-1">Monthly Incentives</p>
+                  <p className="text-[10px] font-bold opacity-60 mt-1">App Commissions</p>
                 </div>
              </div>
           </div>

@@ -13,6 +13,7 @@ export default function AdminUsers({ type }) {
     password: '',
     mobile: '',
     role: 'SALES_AGENT',
+    vgeType: 'EMPLOYEE',
     dailyTarget: 10000,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -128,6 +129,21 @@ export default function AdminUsers({ type }) {
     return null;
   };
 
+  const getVgeTypeBadge = (vgeType) => {
+    if (vgeType === 'FREELANCER') {
+      return (
+        <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border border-blue-100 bg-blue-50 text-blue-600 uppercase tracking-tighter">
+          Freelancer (Apps)
+        </span>
+      );
+    }
+    return (
+      <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border border-emerald-100 bg-emerald-50 text-emerald-600 uppercase tracking-tighter">
+        Employee
+      </span>
+    );
+  };
+
   const getInitials = (name) => {
     return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '??';
   };
@@ -231,8 +247,9 @@ export default function AdminUsers({ type }) {
                           <h3 className={`font-black text-gray-900 tracking-tight leading-none ${user.status === 'SUSPENDED' ? 'line-through' : ''}`}>{user.name}</h3>
                           {getStatusBadge(user.status)}
                         </div>
-                        <div className="mt-1 flex flex-wrap gap-1">
+                        <div className="mt-1 flex flex-wrap gap-1 items-center">
                           {getRoleBadge(user.role)}
+                          {getVgeTypeBadge(user.vgeType)}
                         </div>
                       </div>
                     </div>
@@ -323,6 +340,7 @@ export default function AdminUsers({ type }) {
                             <Truck size={10} />
                             {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
                           </div>
+                          {getVgeTypeBadge(user.vgeType)}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
@@ -426,6 +444,14 @@ export default function AdminUsers({ type }) {
                   <option value="TENANT_OWNER">Tenant Owner</option>
                   <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
+                <select 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none"
+                  value={newUser.vgeType}
+                  onChange={(e) => setNewUser({...newUser, vgeType: e.target.value})}
+                >
+                  <option value="EMPLOYEE">Full-time Employee</option>
+                  <option value="FREELANCER">Freelancer (Apps only)</option>
+                </select>
                 <input 
                   type="password"
                   required
@@ -526,7 +552,14 @@ export default function AdminUsers({ type }) {
               </div>
 
               <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Role</label>
+                <select 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all font-bold text-gray-700"
+                  value={editingUser.vgeType}
+                  onChange={(e) => setEditingUser({...editingUser, vgeType: e.target.value})}
+                >
+                  <option value="EMPLOYEE">Full-time Employee</option>
+                  <option value="FREELANCER">Freelancer (Apps only)</option>
+                </select>
                 <select 
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all"
                   value={editingUser.role}

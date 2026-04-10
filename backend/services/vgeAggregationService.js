@@ -124,7 +124,7 @@ export async function updateDailyPerformance(userId, date = null) {
 
     // 3. Calculate incentives
     const config = await getConfig(user.tenantId);
-    const result = calculateIncentive(totalSales, totalRegistrations, config);
+    const result = calculateIncentive(totalSales, totalRegistrations, config, user.vgeType);
 
     // 4. Upsert into VgeDailyPerformance
     // Note: tenantId will be automatically handled if we are in a context, 
@@ -284,8 +284,6 @@ export async function generateMonthlySummary(monthStr = null) {
     for (const [userId, records] of Object.entries(groups)) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
       const config = await getConfig(user?.tenantId);
-      const baseSalary = config?.baseSalary || user?.baseSalary || 15000;
-      
       const totalSales = records.reduce((sum, r) => sum + r.totalSales, 0);
       const totalRegistrations = records.reduce((sum, r) => sum + r.totalRegistrations, 0);
       const totalIncentive = records.reduce((sum, r) => sum + r.totalIncentive, 0);
@@ -296,8 +294,10 @@ export async function generateMonthlySummary(monthStr = null) {
       const levelValues = records.map(r => levelOrder.indexOf(r.level));
       const bestLevelIndex = Math.max(...levelValues);
       const bestLevel = levelOrder[bestLevelIndex] || 'NONE';
+
+      const monthlyIncentiveRes = calculateIncentive(totalSales / (workingDays || 1), totalRegistrations / (workingDays || 1), config, user.vgeType);
       
-      const monthlyIncentiveRes = calculateIncentive(totalSales / (workingDays || 1), totalRegistrations / (workingDays || 1), config);
+      const baseSalary = (user.vgeType === 'FREELANCER') ? 0 : (config?.baseSalary || user?.baseSalary || 15000);
       
       let bonus = 0; // Cumulative logic is already handled in daily totalIncentive
       let awards = [];

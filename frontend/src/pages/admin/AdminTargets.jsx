@@ -357,6 +357,11 @@ export default function AdminTargets() {
                             {lev.label}
                           </span>
                           <span className="text-[10px] font-bold text-gray-400">{p.user?.assignedVehicle?.vehicleNumber}</span>
+                          {p.user?.vgeType === 'FREELANCER' ? (
+                            <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">Freelancer</span>
+                          ) : (
+                            <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">Employee</span>
+                          )}
                           {p.isLocked && <Lock size={10} className="text-amber-400" />}
                         </div>
                       </div>
@@ -429,6 +434,11 @@ export default function AdminTargets() {
                         </div>
                         <div className="text-right shrink-0">
                           <p className="text-sm font-black text-emerald-600">₹{s.totalIncentive.toLocaleString('en-IN')}</p>
+                          {s.user?.vgeType === 'FREELANCER' ? (
+                            <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-100 uppercase tracking-tighter">Freelancer</span>
+                          ) : (
+                            <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100 uppercase tracking-tighter">Employee</span>
+                          )}
                           {meta.bonus > 0 && <p className="text-[9px] font-black text-amber-500">+₹{meta.bonus} Bonus</p>}
                         </div>
                       </div>

@@ -59,6 +59,7 @@ model User {
   dailyTarget       Float?     @default(10000)
   baseSalary        Float?     @default(12000)
   status            UserStatus @default(ACTIVE)
+  vgeType           String     @default("EMPLOYEE") // EMPLOYEE or FREELANCER
   fcmToken          String?
 
   tenant           Tenant                @relation(fields: [tenantId], references: [id])
