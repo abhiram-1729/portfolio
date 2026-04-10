@@ -3,12 +3,12 @@ import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
 
 
-// @desc    Submit opening cash for a vehicle
+// @desc    Submit opening cash for a vehicle (agent — kept for backward compat but agents are blocked on frontend)
 // @route   POST /api/cash/opening
 // @access  Private
 export const submitOpeningCash = async (req, res, next) => {
     try {
-        const { vehicleId, denominations, totalOpeningCash } = req.body;
+        const { vehicleId, denominations, totalOpeningCash, shift = 1 } = req.body;
         const userId = req.user.id;
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
@@ -19,9 +19,10 @@ export const submitOpeningCash = async (req, res, next) => {
 
         const openingCash = await prisma.openingCash.upsert({
             where: {
-                vehicleId_date: {
+                vehicleId_date_shift: {
                     vehicleId,
                     date: dateString,
+                    shift,
                 },
             },
             update: {
@@ -33,55 +34,36 @@ export const submitOpeningCash = async (req, res, next) => {
                 vehicleId,
                 userId,
                 date: dateString,
+                shift,
                 denominations,
                 totalOpeningCash,
             },
         });
 
-        // Also update or create daily summary
-        await prisma.dailyCashSummary.upsert({
-            where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
-            },
-            update: {
-                openingCash: totalOpeningCash,
-                expectedCash: totalOpeningCash,
-                userId,
-            },
-            create: {
-                vehicleId,
-                userId,
-                date: dateString,
-                openingCash: totalOpeningCash,
-                expectedCash: totalOpeningCash,
-            },
-        });
+        // Recalculate daily summary (aggregates both shifts)
+        await recalculateDailySummary(vehicleId, dateString);
 
         res.status(201).json(openingCash);
 
         sendNotification({
             roles: ['ADMIN'],
             title: 'Opening Cash Submitted',
-            message: `Opening cash of ₹${totalOpeningCash} submitted for ${vehicleId}.`,
+            message: `Opening cash of ₹${totalOpeningCash} submitted for Shift ${shift}.`,
             type: 'cash',
             priority: 'low',
-            metadata: { vehicleId, amount: totalOpeningCash }
+            metadata: { vehicleId, amount: totalOpeningCash, shift }
         });
     } catch (error) {
-
         next(error);
     }
 };
 
-// @desc    Admin: Submit opening cash for any vehicle/agent
+// @desc    Admin: Submit opening cash for any vehicle/agent (for a specific shift)
 // @route   POST /api/cash/admin/opening
 // @access  Admin
 export const adminSubmitOpeningCash = async (req, res, next) => {
     try {
-        const { vehicleId, denominations, totalOpeningCash, userId } = req.body;
+        const { vehicleId, denominations, totalOpeningCash, userId, shift = 1 } = req.body;
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
         if (!vehicleId || !userId || totalOpeningCash === undefined) {
@@ -89,11 +71,17 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
             throw new Error('Vehicle ID, User ID, and total are required');
         }
 
+        if (![1, 2].includes(shift)) {
+            res.status(400);
+            throw new Error('Shift must be 1 (Morning) or 2 (Afternoon)');
+        }
+
         const openingCash = await prisma.openingCash.upsert({
             where: {
-                vehicleId_date: {
+                vehicleId_date_shift: {
                     vehicleId,
                     date: dateString,
+                    shift,
                 },
             },
             update: {
@@ -105,67 +93,30 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
                 vehicleId,
                 userId,
                 date: dateString,
+                shift,
                 denominations: denominations || {},
                 totalOpeningCash,
             },
         });
 
-        // Also update or create daily summary
-        await prisma.dailyCashSummary.upsert({
-            where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
-            },
-            update: {
-                openingCash: totalOpeningCash,
-                userId,
-            },
-            create: {
-                vehicleId,
-                userId,
-                date: dateString,
-                openingCash: totalOpeningCash,
-                expectedCash: totalOpeningCash,
-                cashSales: 0
-            },
-        });
-
-        // Re-fetch and accurately update expectedCash if it was an update
-        const finalSummary = await prisma.dailyCashSummary.findUnique({
-            where: { vehicleId_date: { vehicleId, date: dateString } }
-        });
-        
-        const newExpected = totalOpeningCash + (finalSummary.cashSales || 0);
-        const newDiff = (finalSummary.actualCash || 0) - newExpected;
-
-        await prisma.dailyCashSummary.update({
-            where: { vehicleId_date: { vehicleId, date: dateString } },
-            data: {
-                expectedCash: newExpected,
-                difference: newDiff,
-                status: finalSummary.actualCash > 0 ? (newDiff === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
-            }
-        });
+        // Recalculate daily summary (aggregates both shifts)
+        await recalculateDailySummary(vehicleId, dateString);
 
         res.status(201).json(openingCash);
 
         sendNotification({
             userIds: [userId],
             roles: ['ADMIN'],
-            title: 'Opening Cash Entry Submitted',
-            message: `Opening cash of ₹${totalOpeningCash} has been registered by admin for your vehicle.`,
+            title: `Shift ${shift} Float Assigned`,
+            message: `₹${totalOpeningCash} opening cash assigned for Shift ${shift}.`,
             type: 'cash',
             priority: 'medium',
-            metadata: { vehicleId, amount: totalOpeningCash }
+            metadata: { vehicleId, amount: totalOpeningCash, shift }
         });
     } catch (error) {
         next(error);
     }
 };
-
-// ... existing code ...
 
 // @desc    Admin: Delete reconciliation and associated records
 // @route   DELETE /api/cash/admin/reconciliation/:vehicleId/:date
@@ -196,54 +147,59 @@ export const deleteReconciliation = async (req, res, next) => {
     }
 };
 
-// @desc    Submit closing cash for a vehicle
+// @desc    Submit closing cash for a vehicle (agent submits for a specific shift)
 // @route   POST /api/cash/closing
 // @access  Private
 export const submitClosingCash = async (req, res, next) => {
     try {
-        const { vehicleId, actualCash, denominations, remark } = req.body;
+        const { vehicleId, actualCash, denominations, remark, shift = 1 } = req.body;
         const userId = req.user.id;
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
-        // 1. Get Opening Cash and calculate Cash Sales
-        const summary = await prisma.dailyCashSummary.findUnique({
-            where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
-            },
-        });
-
-        if (!summary) {
+        if (![1, 2].includes(shift)) {
             res.status(400);
-            throw new Error('Opening cash must be submitted first');
+            throw new Error('Shift must be 1 (Morning) or 2 (Afternoon)');
         }
 
-        // Calculate Cash Sales for today
+        // Enforce: Shift 1 must be closed before Shift 2
+        if (shift === 2) {
+            const shift1Closing = await prisma.closingCash.findUnique({
+                where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } }
+            });
+            if (!shift1Closing) {
+                res.status(400);
+                throw new Error('Shift 1 must be closed before closing Shift 2');
+            }
+        }
+
+        // Get the opening cash for THIS shift only
+        const shiftOpening = await prisma.openingCash.findUnique({
+            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift } }
+        });
+
+        if (!shiftOpening) {
+            res.status(400);
+            throw new Error(`Opening cash for Shift ${shift} must be assigned first`);
+        }
+
+        // Calculate total day's Cash Sales
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
         const cashSalesResult = await prisma.order.aggregate({
-            _sum: {
-                totalAmount: true,
-            },
+            _sum: { totalAmount: true },
             where: {
                 vehicleId,
                 paymentMode: 'CASH',
                 status: 'COMPLETED',
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay,
-                },
+                createdAt: { gte: startOfDay, lte: endOfDay },
             },
         });
+        const totalDaySales = cashSalesResult._sum.totalAmount || 0;
 
-        const cashSales = cashSalesResult._sum.totalAmount || 0;
-        
-        // Get total cash expenses for today
+        // Calculate total day's expenses
         const expensesResult = await prisma.expense.aggregate({
             _sum: { amount: true },
             where: {
@@ -253,9 +209,25 @@ export const submitClosingCash = async (req, res, next) => {
                 NOT: { status: 'REJECTED' }
             }
         });
-        const expenses = expensesResult._sum.amount || 0;
+        const totalDayExpenses = expensesResult._sum.amount || 0;
 
-        const expectedCash = summary.openingCash + cashSales - expenses;
+        // Per-shift calculation: each shift is INDEPENDENT
+        let shiftCashSales = totalDaySales;
+        let shiftExpenses = totalDayExpenses;
+
+        if (shift === 2) {
+            // Shift 2 gets only what's NEW since Shift 1 closed
+            const shift1Record = await prisma.closingCash.findUnique({
+                where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } }
+            });
+            const s1Sales = shift1Record?.cashSales || 0;
+            const s1Expenses = shift1Record?.expenses || 0;
+            shiftCashSales = totalDaySales - s1Sales;
+            shiftExpenses = totalDayExpenses - s1Expenses;
+        }
+
+        // Expected = THIS shift's opening + THIS shift's sales - THIS shift's expenses
+        const expectedCash = shiftOpening.totalOpeningCash + shiftCashSales - shiftExpenses;
         const difference = actualCash - expectedCash;
 
         if (difference !== 0 && !remark) {
@@ -265,14 +237,12 @@ export const submitClosingCash = async (req, res, next) => {
 
         const closingCash = await prisma.closingCash.upsert({
             where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
+                vehicleId_date_shift: { vehicleId, date: dateString, shift },
             },
             update: {
-                openingCash: summary.openingCash,
-                cashSales,
+                openingCash: shiftOpening.totalOpeningCash,
+                cashSales: shiftCashSales,
+                expenses: shiftExpenses,
                 expectedCash,
                 actualCash,
                 difference,
@@ -284,8 +254,10 @@ export const submitClosingCash = async (req, res, next) => {
                 vehicleId,
                 userId,
                 date: dateString,
-                openingCash: summary.openingCash,
-                cashSales,
+                shift,
+                openingCash: shiftOpening.totalOpeningCash,
+                cashSales: shiftCashSales,
+                expenses: shiftExpenses,
                 expectedCash,
                 actualCash,
                 difference,
@@ -294,35 +266,20 @@ export const submitClosingCash = async (req, res, next) => {
             },
         });
 
-        // Update Daily Summary
-        await prisma.dailyCashSummary.update({
-            where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
-            },
-            data: {
-                cashSales,
-                expenses,
-                expectedCash,
-                actualCash,
-                difference,
-                status: difference === 0 ? 'MATCHED' : 'MISMATCHED',
-            },
-        });
+        // Recalculate daily summary
+        await recalculateDailySummary(vehicleId, dateString);
 
         res.status(201).json(closingCash);
 
         if (difference !== 0) {
             sendNotification({
-                userIds: [userId], // Notify the Agent too!
+                userIds: [userId],
                 roles: ['ADMIN', 'SUPERVISOR'],
                 title: Math.abs(difference) >= 1000 ? 'CRITICAL: Large Cash Mismatch' : 'Cash Mismatch Detected',
-                message: `Closing cash mismatch of ₹${difference} detected. Please review your entries.`,
+                message: `Shift ${shift} closing mismatch of ₹${difference}.`,
                 type: 'cash',
                 priority: Math.abs(difference) >= 1000 ? 'high' : 'medium',
-                metadata: { vehicleId, difference, actualCash, expectedCash }
+                metadata: { vehicleId, difference, actualCash, expectedCash, shift }
             });
         }
     } catch (error) {
@@ -330,7 +287,7 @@ export const submitClosingCash = async (req, res, next) => {
     }
 };
 
-// @desc    Get current cash status for the logged-in agent's vehicle
+// @desc    Get current cash status for the logged-in agent's vehicle (both shifts)
 // @route   GET /api/cash/status
 // @access  Private
 export const getCashStatus = async (req, res, next) => {
@@ -342,22 +299,18 @@ export const getCashStatus = async (req, res, next) => {
 
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
-        const opening = await prisma.openingCash.findUnique({
-            where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
-            },
+        // Fetch both shifts
+        const opening1 = await prisma.openingCash.findUnique({
+            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } },
         });
-
-        const closing = await prisma.closingCash.findUnique({
-            where: {
-                vehicleId_date: {
-                    vehicleId,
-                    date: dateString,
-                },
-            },
+        const opening2 = await prisma.openingCash.findUnique({
+            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 } },
+        });
+        const closing1 = await prisma.closingCash.findUnique({
+            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } },
+        });
+        const closing2 = await prisma.closingCash.findUnique({
+            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 } },
         });
 
         const startOfDay = new Date();
@@ -366,23 +319,16 @@ export const getCashStatus = async (req, res, next) => {
         endOfDay.setHours(23, 59, 59, 999);
 
         const cashSalesResult = await prisma.order.aggregate({
-            _sum: {
-                totalAmount: true,
-            },
+            _sum: { totalAmount: true },
             where: {
                 vehicleId,
                 paymentMode: 'CASH',
                 status: 'COMPLETED',
-                createdAt: {
-                    gte: startOfDay,
-                    lte: endOfDay,
-                },
+                createdAt: { gte: startOfDay, lte: endOfDay },
             },
         });
+        const totalCashSales = cashSalesResult._sum.totalAmount || 0;
 
-        const cashSales = cashSalesResult._sum.totalAmount || 0;
-
-        // Get current expenses
         const expensesResult = await prisma.expense.aggregate({
             _sum: { amount: true },
             where: {
@@ -392,16 +338,49 @@ export const getCashStatus = async (req, res, next) => {
                 NOT: { status: 'REJECTED' }
             }
         });
+        const totalExpenses = expensesResult._sum.amount || 0;
+
+        // Per-shift sales/expenses split
+        const s1Sales = closing1?.cashSales || (closing1 ? 0 : totalCashSales); // if S1 not closed, all current sales belong to S1
+        const s1Expenses = closing1?.expenses || (closing1 ? 0 : totalExpenses);
+        const s2Sales = closing1 ? totalCashSales - s1Sales : 0; // S2 only gets sales after S1 closed
+        const s2Expenses = closing1 ? totalExpenses - s1Expenses : 0;
+
+        const totalOpening = (opening1?.totalOpeningCash || 0) + (opening2?.totalOpeningCash || 0);
 
         res.json({
             vehicleAssigned: true,
-            openingSubmitted: !!opening,
-            closingSubmitted: !!closing,
-            openingCash: opening?.totalOpeningCash || 0,
-            openingDenominations: opening?.denominations || null,
-            closingDenominations: closing?.denominations || null,
-            cashSales,
-            expenses: expensesResult._sum.amount || 0
+            // Aggregated values (backward compat)
+            openingSubmitted: !!opening1,
+            closingSubmitted: !!closing2 || !!closing1,
+            openingCash: totalOpening,
+            cashSales: totalCashSales,
+            expenses: totalExpenses,
+            // Per-shift detail
+            shifts: {
+                shift1: {
+                    openingAssigned: !!opening1,
+                    openingCash: opening1?.totalOpeningCash || 0,
+                    openingDenominations: opening1?.denominations || null,
+                    closingSubmitted: !!closing1,
+                    closingDenominations: closing1?.denominations || null,
+                    closingActual: closing1?.actualCash || 0,
+                    closingDifference: closing1?.difference || 0,
+                    cashSales: closing1 ? s1Sales : totalCashSales, // if S1 not yet closed, show all current sales
+                    expenses: closing1 ? s1Expenses : totalExpenses,
+                },
+                shift2: {
+                    openingAssigned: !!opening2,
+                    openingCash: opening2?.totalOpeningCash || 0,
+                    openingDenominations: opening2?.denominations || null,
+                    closingSubmitted: !!closing2,
+                    closingDenominations: closing2?.denominations || null,
+                    closingActual: closing2?.actualCash || 0,
+                    closingDifference: closing2?.difference || 0,
+                    cashSales: s2Sales,
+                    expenses: s2Expenses,
+                },
+            },
         });
     } catch (error) {
         next(error);
@@ -417,27 +396,77 @@ export const getAdminCashSummary = async (req, res, next) => {
         const dateString = date || format(new Date(), 'yyyy-MM-dd');
 
         const summaries = await prisma.dailyCashSummary.findMany({
-            where: {
-                date: dateString,
-            },
+            where: { date: dateString },
             include: {
                 vehicle: {
                     select: {
                         vehicleNumber: true,
                         vehicleName: true,
+                        assignedUsers: {
+                            select: { id: true, name: true, role: true }
+                        }
                     },
                 },
             },
         });
 
-        // Attach opening denominations from OpeningCash records
+        // Enrich with per-shift opening data
         const enriched = await Promise.all(
             summaries.map(async (s) => {
-                const opening = await prisma.openingCash.findUnique({
-                    where: { vehicleId_date: { vehicleId: s.vehicleId, date: s.date } },
-                    select: { denominations: true },
+                const openings = await prisma.openingCash.findMany({
+                    where: { vehicleId: s.vehicleId, date: s.date },
+                    select: { shift: true, totalOpeningCash: true, denominations: true },
+                    orderBy: { shift: 'asc' }
                 });
-                return { ...s, openingDenominations: opening?.denominations || {} };
+                const closings = await prisma.closingCash.findMany({
+                    where: { vehicleId: s.vehicleId, date: s.date },
+                    select: { shift: true, actualCash: true, difference: true, denominations: true, cashSales: true, expenses: true, expectedCash: true, openingCash: true, remark: true },
+                    orderBy: { shift: 'asc' }
+                });
+
+                // Fetch total sales by payment mode for the whole day
+                const startOfDay = new Date(s.date);
+                startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(s.date);
+                endOfDay.setHours(23, 59, 59, 999);
+
+                const salesByMode = await prisma.order.groupBy({
+                    by: ['paymentMode'],
+                    _sum: { totalAmount: true },
+                    where: {
+                        vehicleId: s.vehicleId,
+                        status: 'COMPLETED',
+                        createdAt: { gte: startOfDay, lte: endOfDay }
+                    }
+                });
+
+                let dailyCashSales = 0, dailyUpiSales = 0, dailyCardSales = 0;
+                salesByMode.forEach(item => {
+                    if (item.paymentMode === 'CASH') dailyCashSales += item._sum.totalAmount || 0;
+                    if (item.paymentMode === 'UPI') dailyUpiSales += item._sum.totalAmount || 0;
+                    if (item.paymentMode === 'CARD') dailyCardSales += item._sum.totalAmount || 0;
+                });
+
+                return {
+                    ...s,
+                    dailySales: {
+                        totalCash: dailyCashSales,
+                        totalUpi: dailyUpiSales,
+                        totalCard: dailyCardSales,
+                        grandTotal: dailyCashSales + dailyUpiSales + dailyCardSales
+                    },
+                    openingDenominations: openings[0]?.denominations || {},
+                    shiftDetails: {
+                        shift1: {
+                            opening: openings.find(o => o.shift === 1) || null,
+                            closing: closings.find(c => c.shift === 1) || null,
+                        },
+                        shift2: {
+                            opening: openings.find(o => o.shift === 2) || null,
+                            closing: closings.find(c => c.shift === 2) || null,
+                        }
+                    }
+                };
             })
         );
 
@@ -452,26 +481,16 @@ export const getAdminCashSummary = async (req, res, next) => {
 // @access  Admin
 export const adminUpdateReconciliation = async (req, res, next) => {
     try {
-        const { vehicleId, date, openingCash, denominations, remark } = req.body;
+        const { vehicleId, date, openingCash, denominations, remark, shift = 1 } = req.body;
 
         if (!vehicleId || !date || openingCash === undefined) {
             res.status(400);
             throw new Error('Vehicle ID, Date, and Opening Cash are required');
         }
 
-        // 1. Get current summary to access existing cashSales and actualCash
-        const summary = await prisma.dailyCashSummary.findUnique({
-            where: { vehicleId_date: { vehicleId, date } }
-        });
-
-        if (!summary) {
-            res.status(404);
-            throw new Error('Summary not found for this date/vehicle');
-        }
-
-        // 2. Update the OpeningCash record
+        // Update the specific shift's OpeningCash record
         await prisma.openingCash.upsert({
-            where: { vehicleId_date: { vehicleId, date } },
+            where: { vehicleId_date_shift: { vehicleId, date, shift } },
             update: {
                 totalOpeningCash: openingCash,
                 denominations: denominations || {},
@@ -479,64 +498,51 @@ export const adminUpdateReconciliation = async (req, res, next) => {
             create: {
                 vehicleId,
                 date,
+                shift,
                 userId: req.user.id,
                 totalOpeningCash: openingCash,
                 denominations: denominations || {},
             },
         });
 
-        // 3. Recalculate expectedCash, difference, and status based on new opening cash
-        const cashSales = summary.cashSales || 0;
-        const newExpectedCash = openingCash + cashSales;
-        const actualCash = summary.actualCash || 0;
-        const newDifference = actualCash - newExpectedCash;
-        const newStatus = actualCash > 0
-            ? (newDifference === 0 ? 'MATCHED' : 'MISMATCHED')
-            : 'PENDING';
+        // Recalculate daily summary (aggregates both shifts)
+        const updatedSummary = await recalculateDailySummary(vehicleId, date);
 
-        // 4. Update DailyCashSummary with recalculated values
-        const updatedSummary = await prisma.dailyCashSummary.update({
+        const finalSummary = await prisma.dailyCashSummary.findUnique({
             where: { vehicleId_date: { vehicleId, date } },
-            data: {
-                openingCash,
-                expectedCash: newExpectedCash,
-                difference: newDifference,
-                status: newStatus,
-            },
             include: {
                 vehicle: {
-                    select: {
-                        vehicleNumber: true,
-                        vehicleName: true,
-                    }
+                    select: { vehicleNumber: true, vehicleName: true }
                 }
             }
         });
 
-        res.json(updatedSummary);
+        res.json(finalSummary);
 
         sendNotification({
-            userIds: [summary.userId],
+            userIds: [finalSummary?.userId],
             roles: ['ADMIN'],
-            title: 'Cash Summary Updated',
-            message: `Admin has updated the cash summary for ${date}. Status: ${newStatus}. Difference: ₹${newDifference}.`,
+            title: `Shift ${shift} Cash Updated`,
+            message: `Admin updated Shift ${shift} opening cash for ${date}.`,
             type: 'cash',
             priority: 'medium',
-            metadata: { vehicleId, date, difference: newDifference, status: newStatus }
+            metadata: { vehicleId, date, shift, openingCash }
         });
     } catch (error) {
         next(error);
     }
 };
 
-// Shared utility to recalculate daily summary
+// Shared utility to recalculate daily summary (aggregates BOTH shifts)
 export async function recalculateDailySummary(vehicleId, date) {
     if (!vehicleId || !date) return;
 
-    // 1. Get Opening Cash
-    const opening = await prisma.openingCash.findUnique({
-        where: { vehicleId_date: { vehicleId, date } }
+    // 1. Get Opening Cash from BOTH shifts
+    const openings = await prisma.openingCash.findMany({
+        where: { vehicleId, date }
     });
+    const totalOpeningCash = openings.reduce((sum, o) => sum + o.totalOpeningCash, 0);
+    const primaryUserId = openings[0]?.userId || 'SYSTEM';
 
     // 2. Calculate Cash Sales from Orders
     const startOfDay = new Date(date);
@@ -550,10 +556,7 @@ export async function recalculateDailySummary(vehicleId, date) {
             vehicleId,
             paymentMode: 'CASH',
             status: 'COMPLETED',
-            createdAt: {
-                gte: startOfDay,
-                lte: endOfDay
-            }
+            createdAt: { gte: startOfDay, lte: endOfDay }
         }
     });
     const cashSales = cashSalesRes._sum.totalAmount || 0;
@@ -570,22 +573,25 @@ export async function recalculateDailySummary(vehicleId, date) {
     });
     const expenses = expensesRes._sum.amount || 0;
 
-    // 4. Get Actual Cash (from closing cash submission)
-    const closing = await prisma.closingCash.findUnique({
-        where: { vehicleId_date: { vehicleId, date } }
+    // 4. Get Actual Cash from the LATEST closing (Shift 2 takes priority, fallback to Shift 1)
+    const closing2 = await prisma.closingCash.findUnique({
+        where: { vehicleId_date_shift: { vehicleId, date, shift: 2 } }
     });
-    const actualCash = closing?.actualCash || 0;
+    const closing1 = await prisma.closingCash.findUnique({
+        where: { vehicleId_date_shift: { vehicleId, date, shift: 1 } }
+    });
+    const latestClosing = closing2 || closing1;
+    const actualCash = latestClosing?.actualCash || 0;
 
     // 5. Calculate Expected and Difference
-    const openingCash = opening?.totalOpeningCash || 0;
-    const expectedCash = openingCash + cashSales - expenses;
+    const expectedCash = totalOpeningCash + cashSales - expenses;
     const difference = actualCash - expectedCash;
 
     // 6. Upsert Daily Summary
     return await prisma.dailyCashSummary.upsert({
         where: { vehicleId_date: { vehicleId, date } },
         update: {
-            openingCash,
+            openingCash: totalOpeningCash,
             cashSales,
             expenses,
             expectedCash,
@@ -595,9 +601,9 @@ export async function recalculateDailySummary(vehicleId, date) {
         },
         create: {
             vehicleId,
-            userId: opening?.userId || 'SYSTEM',
+            userId: primaryUserId,
             date,
-            openingCash,
+            openingCash: totalOpeningCash,
             cashSales,
             expenses,
             expectedCash,
@@ -686,4 +692,3 @@ export const getFinanceReports = async (req, res, next) => {
         next(error);
     }
 };
-

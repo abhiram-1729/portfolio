@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Truck, Coins, ArrowRight, Info, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Truck, Coins, ArrowRight, Info, ArrowLeft, CheckCircle2, Sun, Moon, Clock } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
-import { submitOpeningCash, getCashStatus } from '../services/cashService';
+import { getCashStatus } from '../services/cashService';
 import toast from 'react-hot-toast';
 
 const DENOMINATIONS = [500, 200, 100, 50, 20, 10, 5, 2, 1];
@@ -11,12 +11,8 @@ export default function OpeningCashEntry() {
   const navigate = useNavigate();
   const location = useLocation();
   const { user } = useUserStore();
-  const [counts, setCounts] = useState(
-    DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {})
-  );
-  const [loading, setLoading] = useState(false);
-  const [checking, setChecking] = useState(true);
-  const [openingSubmitted, setOpeningSubmitted] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState(null);
 
   useEffect(() => {
     if (!user?.assignedVehicle) {
@@ -29,64 +25,93 @@ export default function OpeningCashEntry() {
 
   const checkStatus = async () => {
     try {
-      const status = await getCashStatus();
-      if (status.openingSubmitted) {
-        setOpeningSubmitted(true);
-        if (status.openingDenominations) {
-          setCounts(status.openingDenominations);
-        }
-      }
+      const data = await getCashStatus();
+      setStatus(data);
     } catch (err) {
       console.error(err);
-    } finally {
-      setChecking(false);
-    }
-  };
-
-  const handleCountChange = (denom, value) => {
-    const val = value === '' ? '' : parseInt(value) || 0;
-    setCounts((prev) => ({ ...prev, [denom]: val }));
-  };
-
-  const totalAmount = DENOMINATIONS.reduce((sum, d) => {
-    return sum + d * (counts[d] || 0);
-  }, 0);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (totalAmount <= 0) {
-      toast.error('Total opening cash must be greater than zero');
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await submitOpeningCash({
-        vehicleId: user.assignedVehicle?.id,
-        denominations: counts,
-        totalOpeningCash: totalAmount,
-      });
-      toast.success('Opening cash submitted successfully');
-      setOpeningSubmitted(true);
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit opening cash');
     } finally {
       setLoading(false);
     }
   };
 
-  if (checking) return null;
+  if (loading) return null;
+
+  const shift1 = status?.shifts?.shift1;
+  const shift2 = status?.shifts?.shift2;
+  const anyShiftAssigned = shift1?.openingAssigned || shift2?.openingAssigned;
+
+  const ShiftCard = ({ shiftNum, data, icon: Icon, color, gradientFrom, gradientTo }) => {
+    const denominations = data?.openingDenominations;
+    return (
+      <div className={`rounded-[2rem] border overflow-hidden shadow-xl ${data?.openingAssigned ? `border-${color}-200 shadow-${color}-100/30` : 'border-gray-100 shadow-gray-100/30'}`}>
+        {/* Shift Header */}
+        <div className={`p-5 flex items-center justify-between ${data?.openingAssigned ? `bg-gradient-to-r from-${color}-500 to-${color}-600 text-white` : 'bg-gray-100 text-gray-400'}`}>
+          <div className="flex items-center gap-3">
+            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${data?.openingAssigned ? 'bg-white/20' : 'bg-white'}`}>
+              <Icon size={20} className={data?.openingAssigned ? 'text-white' : 'text-gray-300'} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black uppercase tracking-widest">Shift {shiftNum}</h3>
+              <p className="text-[9px] font-bold uppercase tracking-wider opacity-70">
+                {shiftNum === 1 ? 'Morning Session' : 'Afternoon Session'}
+              </p>
+            </div>
+          </div>
+          {data?.openingAssigned ? (
+            <div className="flex items-center gap-1.5 bg-white/20 px-3 py-1.5 rounded-full">
+              <CheckCircle2 size={12} />
+              <span className="text-[9px] font-black uppercase tracking-widest">Assigned</span>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full">
+              <Clock size={12} className="text-gray-400" />
+              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Pending</span>
+            </div>
+          )}
+        </div>
+
+        {/* Amount */}
+        <div className="p-6 bg-white">
+          {data?.openingAssigned ? (
+            <div className="space-y-4">
+              <div className="text-center">
+                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Opening Float</span>
+                <span className="text-4xl font-black text-slate-900 tracking-tighter">₹{(data.openingCash || 0).toLocaleString()}</span>
+              </div>
+
+              {/* Denomination breakdown */}
+              {denominations && (
+                <div className="grid grid-cols-3 gap-2 pt-2">
+                  {DENOMINATIONS.filter(d => denominations[d] > 0).map(d => (
+                    <div key={d} className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100">
+                      <span className="text-[9px] font-black text-slate-400 block">₹{d}</span>
+                      <span className="text-xs font-black text-slate-700">× {denominations[d]}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-6 space-y-2">
+              <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto border border-gray-100">
+                <Clock size={24} className="text-gray-300" />
+              </div>
+              <p className="text-xs font-bold text-gray-400">Awaiting admin assignment</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col p-5 pb-10 relative">
-      {openingSubmitted && (
-        <button 
-          onClick={() => navigate('/')} 
-          className="absolute top-5 left-5 p-2 bg-white rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors z-10 shadow-sm"
-        >
-          <ArrowLeft size={20} />
-        </button>
-      )}
+      <button 
+        onClick={() => navigate('/')} 
+        className="absolute top-5 left-5 p-2 bg-white rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors z-10 shadow-sm"
+      >
+        <ArrowLeft size={20} />
+      </button>
 
       <div className="max-w-lg mx-auto w-full space-y-8">
         {/* Header Section */}
@@ -95,11 +120,11 @@ export default function OpeningCashEntry() {
             <Coins size={32} strokeWidth={2.5} />
           </div>
           <h1 className="text-3xl font-black text-slate-900 tracking-tight">Start Your Day</h1>
-          <p className="text-slate-500 font-bold">Please record your opening cash float</p>
+          <p className="text-slate-500 font-bold">Your daily opening cash floats (Admin assigned)</p>
         </div>
 
         {/* Tab Navigation */}
-        {openingSubmitted && (
+        {anyShiftAssigned && (
           <div className="flex gap-2 bg-slate-200/50 p-1.5 rounded-2xl">
             <button
               type="button"
@@ -144,93 +169,53 @@ export default function OpeningCashEntry() {
           </div>
         )}
 
-        {/* Denomination Table */}
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="glass rounded-[2rem] border border-slate-200 bg-white shadow-xl shadow-slate-200/50 overflow-hidden">
-            <div className="bg-slate-900 p-5 text-white flex justify-between items-center">
-              <span className="font-black text-sm uppercase tracking-widest">Denominations</span>
-              <span className="font-black text-xs opacity-50 uppercase tracking-widest">Counts</span>
-            </div>
-            
-            <div className="divide-y divide-slate-100">
-              {DENOMINATIONS.map((denom) => (
-                <div key={denom} className="flex items-center justify-between p-5 hover:bg-slate-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-950 font-black text-sm">
-                      ₹{denom}
-                    </div>
-                    <span className="font-black text-slate-400">×</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <input
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="0"
-                      value={counts[denom]}
-                      disabled={openingSubmitted}
-                      onChange={(e) => handleCountChange(denom, e.target.value)}
-                      className={`w-24 bg-slate-50 border-2 border-transparent outline-none rounded-xl py-3 px-4 text-right font-black transition-all text-lg ${
-                        openingSubmitted
-                          ? 'opacity-50 cursor-not-allowed text-slate-500' 
-                          : 'focus:border-emerald-500 focus:bg-white text-slate-950'
-                      }`}
-                    />
-                    <div className="w-24 text-right">
-                      <span className="text-xs font-black text-slate-400 block leading-none mb-1">Total</span>
-                      <span className="font-black text-slate-900">₹{(denom * (counts[denom] || 0)).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {/* Two Shift Cards */}
+        <div className="space-y-4">
+          <ShiftCard shiftNum={1} data={shift1} icon={Sun} color="amber" />
+          <ShiftCard shiftNum={2} data={shift2} icon={Moon} color="indigo" />
+        </div>
 
-            {/* Final Total Section */}
-            <div className="bg-emerald-50 p-6 flex items-center justify-between border-t border-emerald-100">
-              <div>
-                <span className="text-xs font-black text-emerald-800/40 uppercase tracking-widest block mb-1">Total Float Amount</span>
-                <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toLocaleString()}</span>
-              </div>
-              <div className="bg-white p-3 rounded-2xl border border-emerald-100 text-emerald-600">
-                <Info size={20} />
-              </div>
+        {/* Navigation */}
+        {anyShiftAssigned ? (
+          <div className="space-y-4">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
+              <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
+              <p className="text-xs font-bold text-emerald-800">
+                {shift1?.openingAssigned && shift2?.openingAssigned
+                  ? 'Both shifts have been assigned. You are ready to start selling!'
+                  : shift1?.openingAssigned
+                    ? 'Shift 1 float assigned. Shift 2 will be assigned by admin later.'
+                    : 'Shift 2 float assigned. Check with admin for Shift 1.'
+                }
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={() => navigate('/', { replace: true })}
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+            >
+              Continue to Sales
+              <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
+            </button>
           </div>
-
-          {openingSubmitted ? (
-            <div className="space-y-4">
-              <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-                <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
-                <p className="text-xs font-bold text-emerald-800">The daily opening float has been assigned and confirmed by the administrator.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => navigate('/', { replace: true })}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
-              >
-                Continue to Sales
-                <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            </div>
-          ) : (
-            <div className="bg-rose-50 border border-rose-100 rounded-3xl p-10 text-center space-y-4 shadow-xl shadow-rose-200/20">
-               <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-rose-500 mx-auto shadow-sm border border-rose-50">
-                  <Info size={32} strokeWidth={2.5} />
-               </div>
-               <h3 className="text-xl font-black text-slate-900 tracking-tight">Access Restricted</h3>
-               <p className="text-sm font-bold text-slate-500 max-w-[240px] mx-auto leading-relaxed">
-                  Opening cash entry is now managed by the administrator. Please wait for the daily float to be assigned.
-               </p>
-               <button 
-                type="button"
-                onClick={() => navigate('/')}
-                className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest"
-               >
-                 Go Back
-               </button>
-            </div>
-          )}
-        </form>
+        ) : (
+          <div className="bg-rose-50 border border-rose-100 rounded-3xl p-10 text-center space-y-4 shadow-xl shadow-rose-200/20">
+             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-rose-500 mx-auto shadow-sm border border-rose-50">
+               <Info size={32} strokeWidth={2.5} />
+             </div>
+             <h3 className="text-xl font-black text-slate-900 tracking-tight">Access Restricted</h3>
+             <p className="text-sm font-bold text-slate-500 max-w-[240px] mx-auto leading-relaxed">
+               Opening cash is managed by the admin. Please wait for the daily float to be assigned for at least one shift.
+             </p>
+             <button 
+              type="button"
+              onClick={() => navigate('/')}
+              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest"
+             >
+              Go Back
+             </button>
+          </div>
+        )}
       </div>
     </div>
   );

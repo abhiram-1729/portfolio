@@ -283,7 +283,8 @@ export async function generateMonthlySummary(monthStr = null) {
 
     for (const [userId, records] of Object.entries(groups)) {
       const user = await prisma.user.findUnique({ where: { id: userId } });
-      const baseSalary = user?.baseSalary || 12000;
+      const config = await getConfig(user?.tenantId);
+      const baseSalary = config?.baseSalary || user?.baseSalary || 15000;
       
       const totalSales = records.reduce((sum, r) => sum + r.totalSales, 0);
       const totalRegistrations = records.reduce((sum, r) => sum + r.totalRegistrations, 0);
@@ -296,14 +297,17 @@ export async function generateMonthlySummary(monthStr = null) {
       const bestLevelIndex = Math.max(...levelValues);
       const bestLevel = levelOrder[bestLevelIndex] || 'NONE';
       
-      let bonus = 0;
+      const monthlyIncentiveRes = calculateIncentive(totalSales / (workingDays || 1), totalRegistrations / (workingDays || 1), config);
+      
+      let bonus = 0; // Cumulative logic is already handled in daily totalIncentive
       let awards = [];
       
-      if (bestLevel === 'CHAMPION') { bonus = 500; awards.push('Monthly Champion Badge'); }
-      if (bestLevel === 'STAR') { bonus = 1000; awards.push('High Achiever Cash Bonus'); }
-      if (bestLevel === 'SUPER_STAR') { bonus = 2500; awards.push('VGE Super Star Award'); }
+      // Just some baseline awards
+      if (bestLevel === 'CHAMPION') { awards.push('Monthly Champion Badge'); }
+      if (bestLevel === 'STAR') { awards.push('High Achiever Badge'); }
+      if (bestLevel === 'SUPER_STAR') { awards.push('VGE Super Star Award'); }
 
-      const totalEarnings = baseSalary + totalIncentive + bonus;
+      const totalEarnings = baseSalary + totalIncentive;
 
       await prisma.vgeMonthlySummary.upsert({
         where: { userId_month: { userId, month } },

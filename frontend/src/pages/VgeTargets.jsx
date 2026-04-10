@@ -78,21 +78,26 @@ export default function VgeTargets() {
     );
   }
 
-  const levelInfo = LEVEL_CONFIG[perf?.level || 'NONE'];
+  const getLevelInfo = (levelName) => {
+    const key = levelName?.toUpperCase().replace(/\s+/g, '_') || 'NONE';
+    return LEVEL_CONFIG[key] || { ...LEVEL_CONFIG.NONE, label: levelName || 'None' };
+  };
+
+  const levelInfo = getLevelInfo(perf?.level);
   const LevelIcon = levelInfo.icon;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 pb-8 min-h-screen pt-4 px-4 md:px-6">
       {/* Level Unlock Alert */}
       {showLevelAlert && (
-        <div className={`fixed top-4 left-4 right-4 z-50 p-5 rounded-3xl bg-gradient-to-r ${LEVEL_CONFIG[showLevelAlert].gradient} text-white shadow-2xl animate-in slide-in-from-top-4 duration-500`}>
+        <div className={`fixed top-4 left-4 right-4 z-50 p-5 rounded-3xl bg-gradient-to-r ${getLevelInfo(showLevelAlert).gradient} text-white shadow-2xl animate-in slide-in-from-top-4 duration-500`}>
           <div className="flex items-center gap-4">
             <div className="w-14 h-14 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-              {React.createElement(LEVEL_CONFIG[showLevelAlert].icon, { size: 28 })}
+              {React.createElement(getLevelInfo(showLevelAlert).icon, { size: 28 })}
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-widest opacity-80">Level Unlocked!</p>
-              <p className="text-2xl font-black tracking-tight">{LEVEL_CONFIG[showLevelAlert].label} 🎉</p>
+              <p className="text-2xl font-black tracking-tight">{showLevelAlert} 🎉</p>
             </div>
           </div>
         </div>
@@ -192,21 +197,26 @@ export default function VgeTargets() {
               {perf.nextLevel?.nextLevel && (
                 <div className="text-right">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Next Level</p>
-                  <p className="text-sm font-black text-emerald-600">{LEVEL_CONFIG[perf.nextLevel.nextLevel]?.label}</p>
+                  <p className="text-sm font-black text-emerald-600">{perf.nextLevel.nextLevel}</p>
                 </div>
               )}
             </div>
 
-            {/* Level Ladder */}
+            {/* Dynamic Level Ladder */}
             <div className="space-y-2">
-              {LEVEL_ORDER.slice(1).map((level, idx) => {
-                const config = LEVEL_CONFIG[level];
-                const isActive = perf.level === level;
-                const isReached = LEVEL_ORDER.indexOf(perf.level) >= LEVEL_ORDER.indexOf(level);
-                const Icon = config.icon;
+              {(perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).map((rule, idx) => {
+                const ruleKey = rule.name?.toUpperCase().replace(/\s+/g, '_');
+                const config = LEVEL_CONFIG[ruleKey] || LEVEL_CONFIG.NONE;
+                const isActive = perf.level === rule.name;
+                
+                // Logic to check if this level is already surpassed (using simple index for sorted rules)
+                const currentIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
+                const isReached = currentIdx >= idx;
+                
+                const Icon = config.icon || Target;
 
                 return (
-                  <div key={level} className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all ${
+                  <div key={rule.id || idx} className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all ${
                     isActive ? `bg-gradient-to-r ${config.gradient} text-white shadow-md` :
                     isReached ? 'bg-gray-50 text-gray-600' : 'text-gray-300'
                   }`}>
@@ -215,7 +225,12 @@ export default function VgeTargets() {
                     }`}>
                       <Icon size={16} />
                     </div>
-                    <span className={`text-xs font-black flex-1 ${isActive ? '' : ''}`}>{config.label}</span>
+                    <div className="flex-1">
+                       <span className="text-xs font-black block">{rule.name}</span>
+                       {!isActive && !isReached && (
+                          <span className="text-[8px] font-bold opacity-60">From ₹{rule.salesFrom?.toLocaleString()}</span>
+                       )}
+                    </div>
                     {isReached && !isActive && <span className="text-[9px] font-black uppercase tracking-widest opacity-50">✓</span>}
                     {isActive && <Flame size={14} className="animate-pulse" />}
                   </div>
@@ -226,7 +241,7 @@ export default function VgeTargets() {
             {perf.nextLevel?.amountNeeded > 0 && (
               <div className="mt-4 p-3 rounded-2xl bg-emerald-50 border border-emerald-100">
                 <p className="text-xs font-black text-emerald-700 text-center">
-                  ₹{perf.nextLevel.amountNeeded.toLocaleString('en-IN')} more to {LEVEL_CONFIG[perf.nextLevel.nextLevel]?.label}
+                  ₹{perf.nextLevel.amountNeeded.toLocaleString('en-IN')} more to {perf.nextLevel.nextLevel}
                 </p>
               </div>
             )}
@@ -379,7 +394,7 @@ export default function VgeTargets() {
              <div className="flex items-center justify-between mb-6">
                 <div>
                   <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-emerald-100">Monthly Compensation</p>
-                  <p className="text-3xl font-black tracking-tight">₹15,000 <span className="text-xs font-bold opacity-60">CTC</span></p>
+                  <p className="text-3xl font-black tracking-tight">₹{(perf.baseSalary + (perf.totalIncentive * 30)).toLocaleString()} <span className="text-xs font-bold opacity-60">Est. CTC</span></p>
                 </div>
                 <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
                   <TrendingUp size={24} />
@@ -389,29 +404,32 @@ export default function VgeTargets() {
              <div className="grid grid-cols-2 gap-4">
                 <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
                   <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Fixed Salary</p>
-                  <p className="text-xl font-black">₹12,000</p>
+                  <p className="text-xl font-black">₹{perf.baseSalary?.toLocaleString()}</p>
                   <p className="text-[10px] font-bold opacity-60 mt-1">Guaranteed Base</p>
                 </div>
                 <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Performance</p>
-                  <p className="text-xl font-black">₹3,000+</p>
-                  <p className="text-[10px] font-bold opacity-60 mt-1">Variable Incentive</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Performance (Est.)</p>
+                  <p className="text-xl font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
+                  <p className="text-[10px] font-bold opacity-60 mt-1">Monthly Incentives</p>
                 </div>
              </div>
           </div>
 
           <div className="space-y-4">
             <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider px-2">Digital Awards & Badges</h3>
-            {LEVEL_ORDER.slice(4).map(level => {
-              const config = LEVEL_CONFIG[level];
-              const isUnlocked = LEVEL_ORDER.indexOf(perf?.level || 'NONE') >= LEVEL_ORDER.indexOf(level);
+            {(perf.rules || []).filter(r => (r.salesFrom || 0) >= 20000).map(rule => {
+              const info = getLevelInfo(rule.name);
+              const currentIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
+              const ruleIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === rule.name);
+              const isUnlocked = currentIdx >= ruleIdx;
+
               return (
-                <div key={level} className={`bg-white p-5 rounded-[2rem] border transition-all flex items-center gap-4 ${isUnlocked ? 'border-amber-100 shadow-sm' : 'border-gray-50 opacity-40 grayscale'}`}>
-                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br ${config.gradient} text-white shadow-lg`}>
-                    {React.createElement(config.icon, { size: 28 })}
+                <div key={rule.id} className={`bg-white p-5 rounded-[2rem] border transition-all flex items-center gap-4 ${isUnlocked ? 'border-amber-100 shadow-sm' : 'border-gray-50 opacity-40 grayscale'}`}>
+                  <div className={`w-14 h-14 rounded-2xl flex items-center justify-center bg-gradient-to-br ${info.gradient} text-white shadow-lg`}>
+                    {React.createElement(info.icon || Target, { size: 28 })}
                   </div>
                   <div className="flex-1">
-                    <p className="text-base font-black text-gray-900 leading-tight">{config.label} Badge</p>
+                    <p className="text-base font-black text-gray-900 leading-tight">{rule.name} Badge</p>
                     <p className="text-[10px] font-bold text-gray-400 mt-0.5">{isUnlocked ? 'Unlocked & Active' : 'Level-specific Achievement'}</p>
                   </div>
                   {isUnlocked && (

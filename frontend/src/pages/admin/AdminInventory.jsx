@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid } from 'lucide-react';
+import { Plus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -25,6 +25,9 @@ export default function AdminInventory() {
   const [isUploading, setIsUploading] = useState(false);
   const [selectedItems, setSelectedItems] = useState([]); // [id, id, ...]
   const [refillRequests, setRefillRequests] = useState([]);
+  const [unselectedRefillItems, setUnselectedRefillItems] = useState([]);
+  const [editedQuantities, setEditedQuantities] = useState({});
+  const [itemRemarks, setItemRemarks] = useState({});
   const [expandedAgentId, setExpandedAgentId] = useState(null);
   const [viewingAgentId, setViewingAgentId] = useState(null);
   const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
@@ -1702,14 +1705,65 @@ export default function AdminInventory() {
     );
   };
 
-  const handleApproveRefill = async (id) => {
+  const toggleRefillItemSelection = (itemId) => {
+    setUnselectedRefillItems(prev => 
+      prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
+    );
+  };
+
+  const handleApproveRefill = async (id, allItems) => {
     try {
       setIsSubmitting(true);
-      await adminAPI.approveRefillRequest(id);
+      const approvedItemIds = allItems.filter(i => !unselectedRefillItems.includes(i.id)).map(i => i.id);
+      
+      if (approvedItemIds.length === 0) {
+        toast.error('Please select at least one item to approve, or reject the entire session.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      await adminAPI.approveRefillRequest(id, { 
+        approvedItemIds,
+        quantities: editedQuantities,
+        remarks: itemRemarks
+      });
       toast.success('Refill approved and stock loaded successfully');
+      setUnselectedRefillItems([]); // reset
+      setEditedQuantities({});
+      setItemRemarks({});
       loadRefillRequests();
     } catch (error) {
       toast.error('Failed to approve refill');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleApproveSingleItem = async (reqId, itemId) => {
+    try {
+      setIsSubmitting(true);
+      await adminAPI.approveRefillRequest(reqId, { 
+        approvedItemIds: [itemId],
+        quantities: editedQuantities,
+        remarks: itemRemarks
+      });
+      toast.success('Product approved and stock loaded successfully');
+      loadRefillRequests();
+    } catch (error) {
+      toast.error('Failed to approve product');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectSingleItem = async (reqId, itemId) => {
+    try {
+      setIsSubmitting(true);
+      await adminAPI.rejectRefillRequest(reqId, { rejectedItemIds: [itemId] });
+      toast.success('Product request rejected');
+      loadRefillRequests();
+    } catch (error) {
+      toast.error('Failed to reject product');
     } finally {
       setIsSubmitting(false);
     }
@@ -1831,21 +1885,87 @@ export default function AdminInventory() {
                             }
                           }
 
+                          const isSelected = !unselectedRefillItems.includes(item.id);
                           return (
-                            <div key={item.id} className="bg-gray-50 p-4 rounded-2xl border border-gray-100/50 flex items-center justify-between group-hover/session:border-emerald-200 transition-colors">
-                              <div className="flex items-center gap-3 min-w-0">
-                                 <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-500 border border-gray-100 shrink-0">
-                                    <Package size={18} />
-                                 </div>
-                                 <div className="flex flex-col min-w-0">
-                                   <span className="text-sm font-bold text-gray-700 truncate">{item.product?.name}</span>
-                                   {excessBadge}
-                                 </div>
+                            <div key={item.id} className={`bg-gray-50 p-4 rounded-2xl border ${!isSelected ? 'border-gray-100 opacity-50' : 'border-emerald-100/50'} flex flex-col gap-3 transition-colors`}>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="flex items-start flex-1 gap-3 min-w-0">
+                                   {req.status === 'PENDING' && (
+                                     <button
+                                       onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
+                                       className={`p-1 mt-1 rounded-md transition-colors shrink-0 ${isSelected ? 'text-emerald-600' : 'text-gray-300'}`}
+                                     >
+                                       {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                                     </button>
+                                   )}
+                                   <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center border shrink-0 ${isSelected || req.status !== 'PENDING' ? 'text-emerald-500 border-gray-100' : 'text-gray-400 border-gray-200'}`}>
+                                      <Package size={18} />
+                                   </div>
+                                   <div className="flex flex-col min-w-0 flex-1 pt-1">
+                                      <span className="text-sm font-bold text-gray-700 truncate block">{item.product?.name}</span>
+                                      {item.adminRemark && req.status !== 'PENDING' && (
+                                        <p className="text-[10px] text-gray-500 italic truncate before:content-['Note:'] before:mr-1 before:font-bold before:text-gray-400 mt-0.5">
+                                          {item.adminRemark}
+                                        </p>
+                                      )}
+                                      {excessBadge}
+                                   </div>
+                                </div>
+                                <div className="flex items-center gap-3 shrink-0 pl-1 pt-1">
+                                  <div className="flex flex-col items-end">
+                                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Qty</span>
+                                     {req.status === 'PENDING' ? (
+                                       <input
+                                         type="number"
+                                         min="0"
+                                         max={item.quantity}
+                                         value={editedQuantities[item.id] !== undefined ? editedQuantities[item.id] : item.quantity}
+                                         onChange={(e) => setEditedQuantities(prev => ({...prev, [item.id]: e.target.value}))}
+                                         className="w-14 text-center font-black text-emerald-600 bg-white border border-gray-200 rounded-lg py-1 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 shadow-sm transition-all"
+                                       />
+                                     ) : (
+                                       <span className="text-lg font-black text-emerald-600 tracking-tight leading-none">{item.quantity}</span>
+                                     )}
+                                     {item.requestedQuantity && item.requestedQuantity !== item.quantity && (
+                                       <span className="text-[9px] font-black text-orange-500 uppercase tracking-tighter mt-1 bg-orange-50 px-1 rounded">
+                                         REQ: {item.requestedQuantity}
+                                       </span>
+                                     )}
+                                  </div>
+                                  {req.status === 'PENDING' && (
+                                    <div className="flex flex-col items-center gap-1.5">
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
+                                        disabled={isSubmitting}
+                                        title="Quick Reject Product"
+                                        className="p-1 rounded bg-red-50 text-red-500 hover:bg-red-500 hover:text-white transition-all disabled:opacity-50 border border-red-100 shadow-sm"
+                                      >
+                                        <X size={14} strokeWidth={3} />
+                                      </button>
+                                      <button
+                                        onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
+                                        disabled={isSubmitting}
+                                        title="Quick Approve Product"
+                                        className="p-1 rounded bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white transition-all disabled:opacity-50 border border-emerald-100 shadow-sm"
+                                      >
+                                        <Check size={14} strokeWidth={3} />
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div className="flex flex-col items-end shrink-0 pl-2">
-                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
-                                 <span className="text-lg font-black text-emerald-600 tracking-tight leading-none">{item.quantity}</span>
-                              </div>
+                              {req.status === 'PENDING' && (
+                                <div className="w-full">
+                                  <input 
+                                    type="text" 
+                                    placeholder="Admin Note (Optional)" 
+                                    style={{ opacity: isSelected ? 1 : 0.5 }}
+                                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-700 placeholder:text-gray-300"
+                                    value={itemRemarks[item.id] || ''}
+                                    onChange={(e) => setItemRemarks(prev => ({...prev, [item.id]: e.target.value}))}
+                                  />
+                                </div>
+                              )}
                             </div>
                           );
                         })}
@@ -1863,7 +1983,7 @@ export default function AdminInventory() {
                             Reject Session
                           </button>
                           <button 
-                            onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id); }} 
+                            onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id, req.items); }} 
                             disabled={isSubmitting} 
                             className="px-8 py-2.5 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-2"
                           >

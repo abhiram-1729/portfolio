@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2 } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon } from 'lucide-react';
 import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation } from '../../services/cashService';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
@@ -18,6 +18,7 @@ export default function AdminCashManagement() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [assignmentData, setAssignmentData] = useState({
     vehicleId: '',
+    shift: 1,
     amount: 0,
     denominations: {
       "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0
@@ -29,6 +30,7 @@ export default function AdminCashManagement() {
   const [editingSummary, setEditingSummary] = useState(null);
   const [editData, setEditData] = useState({
     openingCash: 0,
+    shift: 1,
     remark: '',
     denominations: {
       "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0
@@ -39,6 +41,10 @@ export default function AdminCashManagement() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deletingSummary, setDeletingSummary] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // View Detail Modal
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [viewingSummary, setViewingSummary] = useState(null);
 
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
@@ -81,16 +87,6 @@ export default function AdminCashManagement() {
     fetchVehicles();
   }, [date]);
 
-  const stats = {
-    totalExpected: summaries.reduce((sum, s) => sum + s.expectedCash, 0),
-    totalActual: summaries.reduce((sum, s) => sum + s.actualCash, 0),
-    totalExpenses: summaries.reduce((sum, s) => sum + (s.expenses || 0), 0),
-    totalDifference: summaries.reduce((sum, s) => sum + s.difference, 0),
-    matchedCount: summaries.filter(s => s.status === 'MATCHED').length,
-    mismatchCount: summaries.filter(s => s.status === 'MISMATCHED').length,
-    pendingCount: summaries.filter(s => s.status === 'PENDING').length,
-  };
-
   const handleAssignFloat = async (e) => {
     e.preventDefault();
     if (!assignmentData.vehicleId) return toast.error('Select a vehicle');
@@ -109,11 +105,13 @@ export default function AdminCashManagement() {
         userId: agent.id,
         totalOpeningCash: assignmentData.amount,
         denominations: assignmentData.denominations,
+        shift: assignmentData.shift,
       });
-      toast.success(`Float assigned to ${selectedVehicle.vehicleNumber}`);
+      toast.success(`Shift ${assignmentData.shift} float assigned to ${selectedVehicle.vehicleNumber}`);
       setShowAssignModal(false);
       setAssignmentData({
         vehicleId: '',
+        shift: 1,
         amount: 0,
         denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
       });
@@ -129,6 +127,7 @@ export default function AdminCashManagement() {
     setEditingSummary(summary);
     setEditData({
       openingCash: summary.openingCash,
+      shift: 1,
       remark: 'Corrected by Admin',
       denominations: summary.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
     });
@@ -144,9 +143,10 @@ export default function AdminCashManagement() {
         date: editingSummary.date,
         openingCash: editData.openingCash,
         denominations: editData.denominations,
-        remark: editData.remark
+        remark: editData.remark,
+        shift: editData.shift,
       });
-      toast.success('Opening cash updated — expected & difference recalculated');
+      toast.success(`Shift ${editData.shift} opening cash updated`);
       setShowEditModal(false);
       fetchSummaries();
     } catch (error) {
@@ -170,6 +170,12 @@ export default function AdminCashManagement() {
       setIsDeleting(false);
     }
   };
+
+  const handleOpenView = (summary) => {
+    setViewingSummary(summary);
+    setShowViewModal(true);
+  };
+
   const filteredSummaries = summaries.filter(s => {
     const searchLower = searchTerm.toLowerCase();
     const agent = s.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
@@ -180,18 +186,95 @@ export default function AdminCashManagement() {
     );
   });
 
+  // Helper: shift status badge
+  const ShiftStatusBadge = ({ opening, closing }) => {
+    if (closing) {
+      const diff = closing.difference || 0;
+      if (diff === 0) return (
+        <div className="flex items-center gap-1">
+          <CheckCircle2 size={12} className="text-emerald-500" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Matched</span>
+        </div>
+      );
+      return (
+        <div className="flex items-center gap-1">
+          <AlertCircle size={12} className="text-rose-500" />
+          <span className="text-[9px] font-black uppercase tracking-widest text-rose-600">
+            {diff > 0 ? `+₹${diff}` : `-₹${Math.abs(diff)}`}
+          </span>
+        </div>
+      );
+    }
+    if (opening) return (
+      <div className="flex items-center gap-1">
+        <Clock size={12} className="text-orange-500" />
+        <span className="text-[9px] font-black uppercase tracking-widest text-orange-600">Open</span>
+      </div>
+    );
+    return <span className="text-[9px] font-bold text-gray-300">—</span>;
+  };
+
+  // Shift selector component
+  const ShiftSelector = ({ value, onChange }) => (
+    <div className="flex gap-2">
+      {[
+        { id: 1, label: 'Shift 1', sub: 'Morning', icon: Sun, color: 'amber' },
+        { id: 2, label: 'Shift 2', sub: 'Afternoon', icon: Moon, color: 'indigo' },
+      ].map(s => (
+        <button
+          key={s.id}
+          type="button"
+          onClick={() => onChange(s.id)}
+          className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs uppercase tracking-wider ${value === s.id
+            ? s.color === 'amber'
+              ? 'border-amber-400 bg-amber-50 text-amber-700'
+              : 'border-indigo-400 bg-indigo-50 text-indigo-700'
+            : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
+            }`}
+        >
+          <s.icon size={16} />
+          <div className="flex flex-col items-start">
+            <span className="text-[10px] font-black">{s.label}</span>
+            <span className="text-[8px] font-bold opacity-60">{s.sub}</span>
+          </div>
+        </button>
+      ))}
+    </div>
+  );
+
+  // Denomination display grid (for view modal)
+  const DenominationGrid = ({ denominations, label }) => {
+    if (!denominations || Object.keys(denominations).length === 0) return null;
+    const nonZero = denominationsList.filter(d => denominations[d] > 0);
+    if (nonZero.length === 0) return null;
+    return (
+      <div className="space-y-1.5">
+        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{label}</span>
+        <div className="grid grid-cols-3 gap-1.5">
+          {nonZero.map(d => (
+            <div key={d} className="bg-gray-50 rounded-lg p-2 text-center border border-gray-100">
+              <span className="text-[9px] font-black text-gray-400 block">₹{d}</span>
+              <span className="text-xs font-black text-gray-700">× {denominations[d]}</span>
+              <span className="text-[8px] text-gray-400 block">= ₹{(d * denominations[d]).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold text-gray-900">Cash Management</h2>
-          <p className="text-sm text-gray-500">Track and reconcile daily vehicle cash movement</p>
+          <p className="text-sm text-gray-500">Track and reconcile daily vehicle cash — Shift 1 &amp; Shift 2 (Independent)</p>
         </div>
 
         <div className="flex items-center gap-3">
           <div className="relative group hidden sm:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
-            <input 
+            <input
               type="text"
               placeholder="Search by vehicle or agent..."
               value={searchTerm}
@@ -218,31 +301,16 @@ export default function AdminCashManagement() {
         </div>
       </div>
 
-      {/* Mobile Search - Only visible on small screens */}
+      {/* Mobile Search */}
       <div className="sm:hidden relative group px-1">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-        <input 
+        <input
           type="text"
           placeholder="Search by vehicle or agent..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
           className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
         />
-      </div>
-
-      {/* Stats Overview */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {[
-          { label: 'Expected Total', value: `₹${stats.totalExpected.toLocaleString()}`, color: 'text-gray-900', bg: 'bg-white' },
-          { label: 'Total Expenses', value: `₹${stats.totalExpenses.toLocaleString()}`, color: 'text-rose-600', bg: 'bg-rose-50' },
-          { label: 'Actual Collected', value: `₹${stats.totalActual.toLocaleString()}`, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-          { label: 'Total Diff', value: `₹${stats.totalDifference.toLocaleString()}`, color: stats.totalDifference === 0 ? 'text-gray-400' : 'text-rose-600', bg: 'bg-white' },
-        ].map((stat, i) => (
-          <div key={i} className={`${stat.bg} p-4 rounded-2xl border border-gray-100 shadow-sm`}>
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">{stat.label}</span>
-            <span className={`text-lg font-black ${stat.color}`}>{stat.value}</span>
-          </div>
-        ))}
       </div>
 
       {/* Tabs */}
@@ -267,16 +335,15 @@ export default function AdminCashManagement() {
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50 border-b border-gray-100">
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Opening</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Sales</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-rose-400">Expenses</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Expected</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Actual</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-400">Chest</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Difference</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Status</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Open</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-400">S1 Close</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Open</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-400">S2 Close</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Status</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Status</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-rose-500">Expenses</th>
+                <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -294,81 +361,315 @@ export default function AdminCashManagement() {
                   </td>
                 </tr>
               ) : (
-                filteredSummaries.map((summary) => (
-                  <tr key={summary.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                          <Truck size={16} strokeWidth={2.5} />
+                filteredSummaries.map((summary) => {
+                  const s1 = summary.shiftDetails?.shift1;
+                  const s2 = summary.shiftDetails?.shift2;
+                  const s1Open = s1?.opening?.totalOpeningCash || 0;
+                  const s1Close = s1?.closing?.actualCash || 0;
+                  const s2Open = s2?.opening?.totalOpeningCash || 0;
+                  const s2Close = s2?.closing?.actualCash || 0;
+
+                  return (
+                    <tr key={summary.id} className="hover:bg-gray-50/50 transition-colors">
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                            <Truck size={16} strokeWidth={2.5} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-gray-900 leading-none">{summary.vehicle.vehicleNumber}</span>
+                            <span className="text-[10px] text-gray-400 font-bold uppercase">{summary.vehicle.vehicleName || 'Standard'}</span>
+                          </div>
                         </div>
-                        <div className="flex flex-col">
-                          <span className="text-sm font-black text-gray-900 leading-none">{summary.vehicle.vehicleNumber}</span>
-                          <span className="text-[10px] text-gray-400 font-bold uppercase">{summary.vehicle.vehicleName || 'Standard'}</span>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-600">₹{summary.openingCash.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-emerald-600">₹{summary.cashSales.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-bold text-rose-500">₹{(summary.expenses || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-black text-gray-900 underline decoration-emerald-200 decoration-2 underline-offset-4">₹{summary.expectedCash.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-black text-slate-800">₹{summary.actualCash.toLocaleString()}</td>
-                    <td className="px-6 py-4 text-sm font-black text-emerald-700">₹{(summary.submittedCash || 0).toLocaleString()}</td>
-                    <td className="px-6 py-4">
-                      {summary.difference === 0 ? (
-                        <span className="text-xs font-bold text-gray-400">-</span>
-                      ) : (
-                        <span className={`text-xs font-black px-2 py-1 rounded-lg ${summary.difference > 0 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                          {summary.difference > 0 ? `+₹${summary.difference}` : `-₹${Math.abs(summary.difference)}`}
+                      </td>
+                      {/* S1 Open */}
+                      <td className="px-4 py-4">
+                        <span className={`text-sm font-bold ${s1Open > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
+                          ₹{s1Open.toLocaleString()}
                         </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-1.5">
-                        {summary.status === 'MATCHED' ? (
-                          <CheckCircle2 size={14} className="text-emerald-500" />
-                        ) : summary.status === 'MISMATCHED' ? (
-                          <AlertCircle size={14} className="text-rose-500" />
+                      </td>
+                      {/* S1 Close */}
+                      <td className="px-4 py-4">
+                        {s1?.closing ? (
+                          <span className="text-sm font-bold text-amber-700">₹{s1Close.toLocaleString()}</span>
                         ) : (
-                          <Clock size={14} className="text-orange-500" />
+                          <span className="text-[9px] font-bold text-gray-300 uppercase">Pending</span>
                         )}
-                        <span className={`text-[10px] font-black uppercase tracking-widest ${summary.status === 'MATCHED' ? 'text-emerald-600' :
-                            summary.status === 'MISMATCHED' ? 'text-rose-600' : 'text-orange-600'
-                          }`}>
-                          {summary.status}
+                      </td>
+                      {/* S2 Open */}
+                      <td className="px-4 py-4">
+                        <span className={`text-sm font-bold ${s2Open > 0 ? 'text-indigo-600' : 'text-gray-300'}`}>
+                          ₹{s2Open.toLocaleString()}
                         </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <div className="flex items-center justify-end gap-2 text-gray-400">
-                        <button className="p-2 hover:bg-gray-100 rounded-xl hover:text-emerald-600 transition-all">
-                          <Eye size={18} />
-                        </button>
-                        <button
-                          onClick={() => handleOpenEdit(summary)}
-                          className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"
-                        >
-                          <Pencil size={18} />
-                        </button>
-                        <button
-                          onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }}
-                          className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"
-                        >
-                          <Trash2 size={18} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                      {/* S2 Close */}
+                      <td className="px-4 py-4">
+                        {s2?.closing ? (
+                          <span className="text-sm font-bold text-indigo-700">₹{s2Close.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-[9px] font-bold text-gray-300 uppercase">{s2?.opening ? 'Pending' : '—'}</span>
+                        )}
+                      </td>
+                      {/* S1 Status */}
+                      <td className="px-4 py-4">
+                        <ShiftStatusBadge opening={s1?.opening} closing={s1?.closing} />
+                      </td>
+                      {/* S2 Status */}
+                      <td className="px-4 py-4">
+                        <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
+                      </td>
+                      {/* Expenses */}
+                      <td className="px-4 py-4">
+                        <span className="text-sm font-bold text-rose-500">-₹{(summary.expenses || 0).toLocaleString()}</span>
+                      </td>
+                      {/* Actions */}
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5 text-gray-400">
+                          <button
+                            onClick={() => handleOpenView(summary)}
+                            className="p-2 hover:bg-emerald-50 rounded-xl hover:text-emerald-600 transition-all"
+                            title="View Details"
+                          >
+                            <Eye size={18} />
+                          </button>
+                          <button
+                            onClick={() => handleOpenEdit(summary)}
+                            className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"
+                            title="Edit"
+                          >
+                            <Pencil size={18} />
+                          </button>
+                          <button
+                            onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }}
+                            className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"
+                            title="Delete"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* Float Assignment Modal */}
+      {/* ========== VIEW DETAIL MODAL ========== */}
+      {showViewModal && viewingSummary && (() => {
+        const s1 = viewingSummary.shiftDetails?.shift1;
+        const s2 = viewingSummary.shiftDetails?.shift2;
+        const agent = viewingSummary.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+            <div className="bg-white w-full max-w-2xl rounded-[2rem] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
+                    <Eye size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 leading-tight">Cash Detail</h3>
+                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-tight">
+                      {viewingSummary.vehicle.vehicleNumber} • {viewingSummary.date}
+                      {agent ? ` • ${agent.name}` : ''}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => { setShowViewModal(false); setViewingSummary(null); }}
+                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Daily Sales Breakdown */}
+              {viewingSummary.dailySales && (
+                <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-100 rounded-xl p-3">
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
+                    <span className="text-sm font-black text-emerald-600">₹{viewingSummary.dailySales.totalCash.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col border-l border-gray-200 pl-3">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
+                    <span className="text-sm font-black text-blue-600">₹{viewingSummary.dailySales.totalUpi.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col border-l border-gray-200 pl-3">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
+                    <span className="text-sm font-black text-purple-600">₹{viewingSummary.dailySales.totalCard.toLocaleString()}</span>
+                  </div>
+                  <div className="flex flex-col border-l border-gray-200 pl-3">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Total Sales</span>
+                    <span className="text-sm font-black text-gray-900">₹{viewingSummary.dailySales.grandTotal.toLocaleString()}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* Two-column shift cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Shift 1 Card */}
+                <div className="rounded-2xl border-2 border-amber-200 overflow-hidden">
+                  <div className="bg-amber-50 px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Sun size={16} className="text-amber-600" />
+                      <span className="text-xs font-black text-amber-700 uppercase tracking-widest">Shift 1 — Morning</span>
+                    </div>
+                    <ShiftStatusBadge opening={s1?.opening} closing={s1?.closing} />
+                  </div>
+                  <div className="p-5 space-y-4 bg-white">
+                    {/* Opening */}
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-black text-gray-400 uppercase">Opening Cash</span>
+                      <span className={`text-sm font-black ${s1?.opening ? 'text-amber-700' : 'text-gray-300'}`}>
+                        ₹{(s1?.opening?.totalOpeningCash || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <DenominationGrid denominations={s1?.opening?.denominations} label="Opening Denominations" />
+
+                    {/* Closing */}
+                    {s1?.closing ? (
+                      <>
+                        <div className="border-t border-gray-100 pt-3 space-y-2">
+                          <div className="flex justify-between">
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Cash Sales</span>
+                            <span className="text-sm font-black text-emerald-600">₹{(s1.closing.cashSales || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Expenses</span>
+                            <span className="text-sm font-black text-rose-500">-₹{(s1.closing.expenses || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Expected</span>
+                            <span className="text-sm font-black text-gray-900">₹{(s1.closing.expectedCash || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between">
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Actual Submitted</span>
+                            <span className="text-sm font-black text-slate-800">₹{(s1.closing.actualCash || 0).toLocaleString()}</span>
+                          </div>
+                          <div className="flex justify-between items-center pt-1 border-t border-gray-50">
+                            <span className="text-[10px] font-black text-gray-400 uppercase">Difference</span>
+                            {s1.closing.difference === 0 ? (
+                              <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">₹0 ✓</span>
+                            ) : (
+                              <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${s1.closing.difference > 0 ? 'text-blue-600 bg-blue-50' : 'text-rose-600 bg-rose-50'}`}>
+                                {s1.closing.difference > 0 ? '+' : ''}₹{s1.closing.difference?.toLocaleString()}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                        <DenominationGrid denominations={s1.closing.denominations} label="Closing Denominations" />
+                        
+                        {s1.closing.remark && (
+                          <div className="mt-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
+                            <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-1">Agent Remark</span>
+                            <p className="text-xs text-amber-900 font-medium italic">"{s1.closing.remark}"</p>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="border-t border-gray-100 pt-3 text-center py-4">
+                        <Clock size={20} className="mx-auto text-gray-300 mb-1" />
+                        <span className="text-[10px] font-bold text-gray-400 uppercase">Closing not submitted</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Shift 2 Card */}
+                <div className="rounded-2xl border-2 border-indigo-200 overflow-hidden">
+                  <div className="bg-indigo-50 px-5 py-3 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Moon size={16} className="text-indigo-600" />
+                      <span className="text-xs font-black text-indigo-700 uppercase tracking-widest">Shift 2 — Afternoon</span>
+                    </div>
+                    <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
+                  </div>
+                  <div className="p-5 space-y-4 bg-white">
+                    {s2?.opening ? (
+                      <>
+                        <div className="flex items-center justify-between">
+                          <span className="text-[10px] font-black text-gray-400 uppercase">Opening Cash</span>
+                          <span className="text-sm font-black text-indigo-700">
+                            ₹{(s2.opening.totalOpeningCash || 0).toLocaleString()}
+                          </span>
+                        </div>
+                        <DenominationGrid denominations={s2.opening.denominations} label="Opening Denominations" />
+
+                        {s2?.closing ? (
+                          <>
+                            <div className="border-t border-gray-100 pt-3 space-y-2">
+                              <div className="flex justify-between">
+                                <span className="text-[10px] font-black text-gray-400 uppercase">Cash Sales</span>
+                                <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-[10px] font-black text-gray-400 uppercase">Expenses</span>
+                                <span className="text-sm font-black text-rose-500">-₹{(s2.closing.expenses || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-[10px] font-black text-gray-400 uppercase">Expected</span>
+                                <span className="text-sm font-black text-gray-900">₹{(s2.closing.expectedCash || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between">
+                                <span className="text-[10px] font-black text-gray-400 uppercase">Actual Submitted</span>
+                                <span className="text-sm font-black text-slate-800">₹{(s2.closing.actualCash || 0).toLocaleString()}</span>
+                              </div>
+                              <div className="flex justify-between items-center pt-1 border-t border-gray-50">
+                                <span className="text-[10px] font-black text-gray-400 uppercase">Difference</span>
+                                {s2.closing.difference === 0 ? (
+                                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">₹0 ✓</span>
+                                ) : (
+                                  <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${s2.closing.difference > 0 ? 'text-blue-600 bg-blue-50' : 'text-rose-600 bg-rose-50'}`}>
+                                    {s2.closing.difference > 0 ? '+' : ''}₹{s2.closing.difference?.toLocaleString()}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <DenominationGrid denominations={s2.closing.denominations} label="Closing Denominations" />
+                            
+                            {s2.closing.remark && (
+                              <div className="mt-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
+                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-1">Agent Remark</span>
+                                <p className="text-xs text-indigo-900 font-medium italic">"{s2.closing.remark}"</p>
+                              </div>
+                            )}
+                          </>
+                        ) : (
+                          <div className="border-t border-gray-100 pt-3 text-center py-4">
+                            <Clock size={20} className="mx-auto text-gray-300 mb-1" />
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">Closing not submitted</span>
+                          </div>
+                        )}
+                      </>
+                    ) : (
+                      <div className="text-center py-8 space-y-2">
+                        <Moon size={28} className="mx-auto text-gray-200" />
+                        <span className="text-xs font-bold text-gray-400 block">Shift 2 not assigned</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <button
+                onClick={() => { setShowViewModal(false); setViewingSummary(null); }}
+                className="w-full bg-gray-100 text-gray-600 font-black text-sm py-3 rounded-xl hover:bg-gray-200 transition-all"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* ========== FLOAT ASSIGNMENT MODAL ========== */}
       {showAssignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
@@ -388,6 +689,12 @@ export default function AdminCashManagement() {
             </div>
 
             <form onSubmit={handleAssignFloat} className="space-y-4">
+              {/* Shift Selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Select Shift</label>
+                <ShiftSelector value={assignmentData.shift} onChange={(s) => setAssignmentData({ ...assignmentData, shift: s })} />
+              </div>
+
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Target Vehicle / Agent</label>
                 <select
@@ -412,7 +719,7 @@ export default function AdminCashManagement() {
                 </select>
               </div>
 
-              {/* Denominations Section - Compact Grid */}
+              {/* Denominations Section */}
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Denominations</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
@@ -438,13 +745,13 @@ export default function AdminCashManagement() {
                 </div>
               </div>
 
-              <div className="flex items-center justify-between bg-emerald-600 px-5 py-4 rounded-2xl shadow-lg shadow-emerald-600/20 text-white group overflow-hidden">
+              <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white group overflow-hidden ${assignmentData.shift === 1 ? 'bg-amber-600 shadow-amber-600/20' : 'bg-indigo-600 shadow-indigo-600/20'}`}>
                 <div className="flex flex-col">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">Calculated Total</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">Shift {assignmentData.shift} Total</p>
                   <h4 className="text-2xl font-black tracking-tight">₹{assignmentData.amount.toLocaleString()}</h4>
                 </div>
                 <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-                  <Coins size={20} className="text-white opacity-40 group-hover:scale-110 transition-transform" />
+                  {assignmentData.shift === 1 ? <Sun size={20} className="text-white opacity-40" /> : <Moon size={20} className="text-white opacity-40" />}
                 </div>
               </div>
 
@@ -467,10 +774,10 @@ export default function AdminCashManagement() {
         </div>
       )}
 
-      {/* Edit Reconciliation Modal */}
+      {/* ========== EDIT RECONCILIATION MODAL ========== */}
       {showEditModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200">
+          <div className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-600">
@@ -490,20 +797,20 @@ export default function AdminCashManagement() {
             </div>
 
             <form onSubmit={handleUpdateReconciliation} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="bg-gray-50 p-3 rounded-xl border border-gray-100">
-                  <span className="text-[10px] font-black uppercase text-gray-400 block mb-1">Current Opening</span>
-                  <span className="text-sm font-black text-gray-900">₹{editingSummary.openingCash.toLocaleString()}</span>
-                </div>
-                <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
-                  <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">New Opening</span>
-                  <span className="text-sm font-black text-orange-700">₹{editData.openingCash.toLocaleString()}</span>
-                </div>
+              {/* Shift Selector */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Which Shift to Edit?</label>
+                <ShiftSelector value={editData.shift} onChange={(s) => setEditData({ ...editData, shift: s })} />
               </div>
 
-              {/* Denominations Section - Compact Grid */}
+              <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
+                <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">New S{editData.shift} Opening</span>
+                <span className="text-sm font-black text-orange-700">₹{editData.openingCash.toLocaleString()}</span>
+              </div>
+
+              {/* Denominations */}
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Opening Cash Denominations</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Shift {editData.shift} Denominations</label>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
                   {denominationsList.map((denom) => (
                     <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-orange-200 transition-all">
@@ -527,11 +834,10 @@ export default function AdminCashManagement() {
                 </div>
               </div>
 
-              {/* Info: what gets recalculated */}
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
-                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">What changes?</p>
+                <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Independent Shifts</p>
                 <p className="text-xs text-blue-500 font-bold">
-                  Expected = New Opening + Cash Sales &nbsp;|&nbsp; Difference = Actual − Expected
+                  Each shift is recalculated independently: Opening + Sales − Expenses
                 </p>
               </div>
 
@@ -565,7 +871,7 @@ export default function AdminCashManagement() {
         </div>
       )}
 
-      {/* Delete Confirmation Modal */}
+      {/* ========== DELETE CONFIRMATION MODAL ========== */}
       {showDeleteModal && deletingSummary && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
           <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 duration-200">
@@ -589,7 +895,7 @@ export default function AdminCashManagement() {
 
             <div className="bg-rose-50 border border-rose-100 rounded-2xl px-4 py-4 space-y-2">
               <p className="text-xs font-bold text-rose-700">
-                You are about to permanently delete all cash records for:
+                You are about to permanently delete all cash records (both shifts) for:
               </p>
               <div className="flex items-center gap-2 mt-1">
                 <div className="w-7 h-7 rounded-lg bg-rose-100 flex items-center justify-center text-rose-600">
@@ -601,7 +907,7 @@ export default function AdminCashManagement() {
                 </div>
               </div>
               <p className="text-[10px] text-rose-500 font-bold mt-2">
-                Opening cash, closing cash &amp; daily summary will all be removed.
+                Both shifts' opening cash, closing cash &amp; daily summary will all be removed.
               </p>
             </div>
 

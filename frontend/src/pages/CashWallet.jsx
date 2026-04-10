@@ -12,7 +12,9 @@ import {
     X,
     Loader2,
     AlertCircle,
-    Calculator
+    Calculator,
+    Sun,
+    Moon
 } from 'lucide-react';
 import { getCashStatus } from '../services/cashService';
 import { addExpense, getMyExpenses, submitToChest, getExpenseCategories } from '../services/expenseService';
@@ -118,7 +120,12 @@ export default function CashWallet() {
         );
     }
 
-    const availableCash = (status?.openingCash || 0) + (status?.cashSales || 0) - (status?.expenses || 0);
+    const shift1 = status?.shifts?.shift1;
+    const shift2 = status?.shifts?.shift2;
+    const s1Opening = shift1?.openingCash || 0;
+    const s2Opening = shift2?.openingCash || 0;
+    const totalOpening = s1Opening + s2Opening;
+    const availableCash = totalOpening + (status?.cashSales || 0) - (status?.expenses || 0);
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
@@ -142,18 +149,32 @@ export default function CashWallet() {
                         <h2 className="text-5xl font-black tracking-tighter">₹{availableCash.toLocaleString()}</h2>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-2 pt-4">
-                        <div className="bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-sm">
-                            <span className="text-[9px] font-black uppercase text-white/40 block mb-1">Opening</span>
-                            <span className="text-sm font-black italic">₹{status?.openingCash?.toLocaleString()}</span>
+                    {/* Two-shift breakdown */}
+                    <div className="grid grid-cols-2 gap-2 pt-2">
+                        <div className="bg-amber-500/20 p-3 rounded-2xl border border-amber-500/30">
+                            <div className="flex items-center gap-1.5 mb-1">
+                                <Sun size={10} className="text-amber-400" />
+                                <span className="text-[8px] font-black uppercase text-amber-400/80">S1 Opening</span>
+                            </div>
+                            <span className="text-sm font-black text-amber-200">₹{s1Opening.toLocaleString()}</span>
                         </div>
+                        <div className="bg-indigo-500/20 p-3 rounded-2xl border border-indigo-500/30">
+                            <div className="flex items-center gap-1.5 mb-1">
+                                <Moon size={10} className="text-indigo-400" />
+                                <span className="text-[8px] font-black uppercase text-indigo-400/80">S2 Opening</span>
+                            </div>
+                            <span className="text-sm font-black text-indigo-200">₹{s2Opening.toLocaleString()}</span>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2">
                         <div className="bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-sm">
                             <span className="text-[9px] font-black uppercase text-emerald-400/60 block mb-1">Sales</span>
-                            <span className="text-sm font-black italic text-emerald-400">+₹{status?.cashSales?.toLocaleString()}</span>
+                            <span className="text-sm font-black italic text-emerald-400">+₹{(status?.cashSales || 0).toLocaleString()}</span>
                         </div>
                         <div className="bg-white/5 p-3 rounded-2xl border border-white/10 backdrop-blur-sm">
                             <span className="text-[9px] font-black uppercase text-rose-400/60 block mb-1">Expenses</span>
-                            <span className="text-sm font-black italic text-rose-400">-₹{status?.expenses?.toLocaleString()}</span>
+                            <span className="text-sm font-black italic text-rose-400">-₹{(status?.expenses || 0).toLocaleString()}</span>
                         </div>
                     </div>
                 </div>
@@ -375,7 +396,7 @@ export default function CashWallet() {
                 </div>
             )}
 
-            {/* Chest Transfer Modal - Simplified for now */}
+            {/* Chest Transfer Modal */}
             {showChestTransfer && (
                <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-300">
                     <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] p-8 space-y-6 shadow-2xl animate-in slide-in-from-bottom duration-500">

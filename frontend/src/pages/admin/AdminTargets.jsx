@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Target, TrendingUp, Award, Zap, Trophy, Star, Crown, Users, Calendar, Settings, RefreshCw, Loader2, ChevronDown, ChevronRight, ArrowLeft, BarChart3, Package, Lock, Play, MapPin } from 'lucide-react';
+import { Target, TrendingUp, Award, Zap, Trophy, Star, Crown, Users, Calendar, Settings, RefreshCw, Loader2, ChevronDown, ChevronRight, ArrowLeft, BarChart3, Package, Lock, Play, MapPin, X } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
@@ -55,7 +55,15 @@ export default function AdminTargets() {
   const loadConfig = useCallback(async () => {
     try {
       const res = await adminAPI.vgeGetConfig();
-      setConfig(res.data);
+      const loadedConfig = res.data;
+      if (!Array.isArray(loadedConfig.rules)) {
+        if (typeof loadedConfig.rules === 'string') {
+          loadedConfig.rules = JSON.parse(loadedConfig.rules || '[]');
+        } else {
+          loadedConfig.rules = [];
+        }
+      }
+      setConfig(loadedConfig);
     } catch (err) {
       toast.error('Failed to load config');
     }
@@ -110,6 +118,8 @@ export default function AdminTargets() {
     try {
       setIsSubmitting(true);
       const { id, updatedAt, ...data } = config;
+      // Ensure rules are saved properly
+      if (!Array.isArray(data.rules)) data.rules = [];
       await adminAPI.vgeUpdateConfig(data);
       toast.success('Configuration saved');
     } catch (err) {
@@ -117,6 +127,39 @@ export default function AdminTargets() {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleAddRule = () => {
+    const newRule = {
+      id: Date.now().toString(),
+      name: '',
+      salesFrom: 0,
+      salesTo: 10000,
+      appsTarget: 0,
+      salesSlab: 5000,
+      appsSlab: 5,
+      salesType: 'PERCENTAGE',
+      salesValue: 0,
+      appsRate: 0,
+    };
+    setConfig(prev => ({
+      ...prev,
+      rules: Array.isArray(prev.rules) ? [...prev.rules, newRule] : [newRule]
+    }));
+  };
+
+  const updateRule = (id, field, val) => {
+    setConfig(prev => ({
+      ...prev,
+      rules: prev.rules.map(r => r.id === id ? { ...r, [field]: val } : r)
+    }));
+  };
+
+  const deleteRule = (id) => {
+    setConfig(prev => ({
+      ...prev,
+      rules: prev.rules.filter(r => r.id !== id)
+    }));
   };
 
   const viewAgentDetail = async (userId) => {
@@ -476,95 +519,128 @@ export default function AdminTargets() {
         <div className="space-y-5 animate-in fade-in duration-300">
           <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm space-y-6">
             <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider flex items-center gap-2">
-              <Settings size={16} className="text-emerald-500" /> Incentive Configuration
+              <Settings size={16} className="text-emerald-500" /> Earnings Configuration
             </h3>
 
-            {/* Thresholds */}
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Minimum Thresholds</p>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">Min Sales (₹)</label>
-                  <input type="number" value={config.minSalesThreshold} onChange={e => setConfig({...config, minSalesThreshold: parseFloat(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">Min Registrations</label>
-                  <input type="number" value={config.minRegThreshold} onChange={e => setConfig({...config, minRegThreshold: parseInt(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-              </div>
+            <div className="overflow-x-auto rounded-2xl border border-gray-100">
+              <table className="w-full text-left min-w-[1200px]">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Level</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales From</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales To</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Daily Apps</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales Slab</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Apps Slab</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Sales Type</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Sales Value</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Apps Rate(₹)</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-500 text-center">Incentive/Day</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center">Monthly Inc</th>
+                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 bg-white">
+                  {(!config.rules || config.rules.length === 0) ? (
+                    <tr>
+                      <td colSpan="10" className="p-8 text-center text-gray-400 font-bold text-sm">
+                        No earning levels defined. Click "Add One More Row" to start matching the excel sheet.
+                      </td>
+                    </tr>
+                  ) : (
+                    config.rules.map(rule => {
+                      const dailySalesInc = (rule.salesSlab * rule.salesPercent) / 100;
+                      const dailyAppInc = rule.appsSlab * rule.appsRate;
+                      const dailyTotal = dailySalesInc + dailyAppInc;
+                      const monthlyTotal = dailyTotal * 30;
+
+                      return (
+                        <tr key={rule.id} className="hover:bg-gray-50/50">
+                          <td className="p-2">
+                            <input type="text" placeholder="Level Name" value={rule.name} onChange={e => updateRule(rule.id, 'name', e.target.value)}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.salesFrom} onChange={e => updateRule(rule.id, 'salesFrom', parseFloat(e.target.value)||0)}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.salesTo} onChange={e => updateRule(rule.id, 'salesTo', parseFloat(e.target.value)||0)}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.appsTarget} onChange={e => updateRule(rule.id, 'appsTarget', parseFloat(e.target.value)||0)}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.salesSlab} onChange={e => updateRule(rule.id, 'salesSlab', parseFloat(e.target.value)||0)}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.appsSlab} onChange={e => updateRule(rule.id, 'appsSlab', parseFloat(e.target.value)||0)}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <select value={rule.salesType || 'PERCENTAGE'} onChange={e => updateRule(rule.id, 'salesType', e.target.value)}
+                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none">
+                              <option value="PERCENTAGE">%</option>
+                              <option value="FIXED">Flat ₹</option>
+                            </select>
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.salesValue} onChange={e => updateRule(rule.id, 'salesValue', parseFloat(e.target.value)||0)}
+                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2">
+                            <input type="number" value={rule.appsRate} onChange={e => updateRule(rule.id, 'appsRate', parseFloat(e.target.value)||0)}
+                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                          </td>
+                          <td className="p-2 text-center">
+                            {(() => {
+                              const sType = rule.salesType || 'PERCENTAGE';
+                              const sVal = rule.salesValue || 0;
+                              const sInc = sType === 'PERCENTAGE' ? (rule.salesSlab * sVal / 100) : sVal;
+                              const aInc = rule.appsSlab * rule.appsRate;
+                              const dailyTotal = sInc + aInc;
+                              
+                              return (
+                                <>
+                                  <span className="text-xs font-black text-emerald-700">₹{dailyTotal.toLocaleString()}</span>
+                                  <div className="text-[8px] text-gray-400">({sInc} + {aInc})</div>
+                                </>
+                              );
+                            })()}
+                          </td>
+                          <td className="p-2 text-center">
+                             {(() => {
+                               const sType = rule.salesType || 'PERCENTAGE';
+                               const sVal = rule.salesValue || 0;
+                               const sInc = sType === 'PERCENTAGE' ? (rule.salesSlab * sVal / 100) : sVal;
+                               const aInc = rule.appsSlab * rule.appsRate;
+                               const monthlyTotal = (sInc + aInc) * 30;
+                               return <span className="text-xs font-black text-emerald-600">₹{monthlyTotal.toLocaleString()}</span>;
+                             })()}
+                          </td>
+                          <td className="p-2 text-center">
+                            <button onClick={() => deleteRule(rule.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
+                              <X size={14} strokeWidth={3} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
             </div>
 
-            {/* Sales Slabs */}
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Sales Slab Configuration</p>
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">Slab Size (₹)</label>
-                  <input type="number" value={config.salesSlabSize} onChange={e => setConfig({...config, salesSlabSize: parseFloat(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">First N Slabs</label>
-                  <input type="number" value={config.firstSlabCount} onChange={e => setConfig({...config, firstSlabCount: parseInt(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">First Slab ₹</label>
-                  <input type="number" value={config.firstSlabIncentive} onChange={e => setConfig({...config, firstSlabIncentive: parseFloat(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">Remaining Slab ₹</label>
-                  <input type="number" value={config.remainingSlabIncentive} onChange={e => setConfig({...config, remainingSlabIncentive: parseFloat(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* Registration Incentive */}
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Registration Incentive</p>
-              <div className="grid grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">First N Regs</label>
-                  <input type="number" value={config.firstRegCount} onChange={e => setConfig({...config, firstRegCount: parseInt(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">First ₹/Reg</label>
-                  <input type="number" value={config.firstRegIncentive} onChange={e => setConfig({...config, firstRegIncentive: parseFloat(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-500">Remaining ₹/Reg</label>
-                  <input type="number" value={config.remainingRegIncentive} onChange={e => setConfig({...config, remainingRegIncentive: parseFloat(e.target.value)})}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                </div>
-              </div>
-            </div>
-
-            {/* Level Thresholds */}
-            <div>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3">Level Thresholds (₹ Sales)</p>
-              <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                {[
-                  { key: 'starterThreshold', label: 'Starter' },
-                  { key: 'performerThreshold', label: 'Performer' },
-                  { key: 'achieverThreshold', label: 'Achiever' },
-                  { key: 'championThreshold', label: 'Champion' },
-                  { key: 'starThreshold', label: 'Star' },
-                  { key: 'superStarThreshold', label: 'Super Star' },
-                ].map(({ key, label }) => (
-                  <div key={key} className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-500">{label}</label>
-                    <input type="number" value={config[key]} onChange={e => setConfig({...config, [key]: parseFloat(e.target.value)})}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 outline-none" />
-                  </div>
-                ))}
-              </div>
-            </div>
+            <button
+              onClick={handleAddRule}
+              disabled={isSubmitting}
+              className="w-full py-2 bg-gray-50 border border-dashed border-gray-300 text-gray-500 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-gray-100 hover:text-gray-700 transition-all flex items-center justify-center gap-2"
+            >
+              <Target size={14} /> Add One More Row
+            </button>
 
             <button
               onClick={handleSaveConfig}

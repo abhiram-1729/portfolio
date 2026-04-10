@@ -37,8 +37,8 @@ export const adminAPI = {
   getVehicleInventory: (id) => api.get(`/admin/inventory/vehicle/${id}`),
   auditVehicleStock: (id, data) => api.put(`/admin/inventory/vehicle/${id}/audit`, data),
   getRefillRequests: () => api.get('/admin/inventory/refills'),
-  approveRefillRequest: (id) => api.put(`/admin/inventory/refills/${id}/approve`),
-  rejectRefillRequest: (id) => api.put(`/admin/inventory/refills/${id}/reject`),
+  approveRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/approve`, data),
+  rejectRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/reject`, data),
 
   // Sales
   getSales: (params) => api.get('/admin/sales', { params }),

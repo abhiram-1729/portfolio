@@ -41,25 +41,36 @@ export const getMyPerformance = async (req, res) => {
       perf = await updateDailyPerformance(userId, date);
     }
 
-    // Load config for progress info
-    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { id: 'singleton' } });
+    // Get user's daily target fallback
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { dailyTarget: true, tenantId: true }
+    });
+
+    // Load config for progress info and base salary
+    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { tenantId: user?.tenantId || 'VK001' } });
     if (!config) config = undefined; // engine uses defaults
 
     const nextLevel = getNextLevelInfo(perf.totalSales, config);
     const nextSlab = getNextSlabInfo(perf.totalSales, config);
 
-    // Get user's daily target
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { dailyTarget: true }
-    });
+    // If config has rules, use the closest 'from' as the target for progress mapping
+    let dailyTarget = user?.dailyTarget || 10000;
+    if (nextLevel && nextLevel.nextLevel) {
+        // Find the rule for the next level to get the target
+        const rules = config?.rules || [];
+        const nextRule = rules.find(r => r.name === nextLevel.nextLevel);
+        if (nextRule) dailyTarget = Number(nextRule.salesFrom) || dailyTarget;
+    }
 
     res.json({
       ...perf,
       nextLevel,
       nextSlab,
-      dailyTarget: user?.dailyTarget || 10000,
-      targetProgress: user?.dailyTarget ? Math.min(100, (perf.totalSales / user.dailyTarget) * 100) : 0,
+      baseSalary: config?.baseSalary || 15000,
+      rules: config?.rules || [],
+      dailyTarget,
+      targetProgress: dailyTarget ? Math.min(100, (perf.totalSales / dailyTarget) * 100) : 0,
     });
   } catch (error) {
     console.error('[VGE] getMyPerformance error:', error);
@@ -223,9 +234,9 @@ export const getMonthlyReport = async (req, res) => {
  */
 export const getConfig = async (req, res) => {
   try {
-    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { id: 'singleton' } });
+    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { tenantId: 'VK001' } });
     if (!config) {
-      config = await prisma.vgeIncentiveConfig.create({ data: { id: 'singleton' } });
+      config = await prisma.vgeIncentiveConfig.create({ data: { tenantId: 'VK001' } });
     }
     res.json(config);
   } catch (error) {
@@ -245,9 +256,9 @@ export const updateConfig = async (req, res) => {
     delete data.updatedAt;
 
     const config = await prisma.vgeIncentiveConfig.upsert({
-      where: { id: 'singleton' },
+      where: { tenantId: 'VK001' },
       update: data,
-      create: { id: 'singleton', ...data }
+      create: { tenantId: 'VK001', ...data }
     });
 
     res.json({ message: 'Configuration updated', config });

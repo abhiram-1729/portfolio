@@ -418,6 +418,7 @@ model OpeningCash {
   vehicleId        String
   userId           String
   date             String
+  shift            Int      @default(1) // 1 = Morning, 2 = Afternoon
   denominations    Json
   totalOpeningCash Float
   status           String   @default("SUBMITTED")
@@ -425,7 +426,7 @@ model OpeningCash {
   vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
   user             User     @relation(fields: [userId], references: [id])
 
-  @@unique([vehicleId, date])
+  @@unique([vehicleId, date, shift])
   @@index([tenantId])
 }
 
@@ -435,8 +436,10 @@ model ClosingCash {
   vehicleId     String
   userId        String
   date          String
+  shift         Int      @default(1) // 1 = Morning, 2 = Afternoon
   openingCash   Float
   cashSales     Float
+  expenses      Float    @default(0)
   expectedCash  Float
   actualCash    Float
   difference    Float
@@ -447,7 +450,7 @@ model ClosingCash {
   vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
   user          User     @relation(fields: [userId], references: [id])
 
-  @@unique([vehicleId, date])
+  @@unique([vehicleId, date, shift])
   @@index([tenantId])
 }
 
@@ -618,13 +621,15 @@ model RefillRequest {
 }
 
 model RefillItem {
-  id              String        @id @default(cuid())
-  tenantId        String        @default("VK001")
-  refillRequestId String
-  productId       String
-  quantity        Int
-  refillRequest   RefillRequest @relation(fields: [refillRequestId], references: [id], onDelete: Cascade)
-  product         Product       @relation(fields: [productId], references: [id])
+  id                String        @id @default(cuid())
+  tenantId          String        @default("VK001")
+  refillRequestId   String
+  productId         String
+  quantity          Int
+  requestedQuantity Int?
+  adminRemark       String?
+  refillRequest     RefillRequest @relation(fields: [refillRequestId], references: [id], onDelete: Cascade)
+  product           Product       @relation(fields: [productId], references: [id])
 
   @@index([tenantId])
   @@index([refillRequestId])
@@ -649,6 +654,7 @@ enum ItemStatus {
 enum RefillStatus {
   PENDING
   APPROVED
+  PARTIAL
   REJECTED
 }
 
@@ -795,6 +801,10 @@ model VgeIncentiveConfig {
   championThreshold  Float @default(25000)
   starThreshold      Float @default(30000)
   superStarThreshold Float @default(35000)
+
+  // Custom tabular rules
+  rules      Json  @default("[]")
+  baseSalary Float @default(15000)
 
   updatedAt DateTime @updatedAt
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
