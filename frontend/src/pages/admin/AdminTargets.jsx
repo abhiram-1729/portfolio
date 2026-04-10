@@ -71,7 +71,7 @@ export default function AdminTargets() {
 
   useEffect(() => {
     if (activeTab === 'daily') loadDailyData();
-    if (activeTab === 'monthly') loadMonthlyData();
+    if (activeTab === 'monthly' || activeTab === 'payouts') loadMonthlyData();
     if (activeTab === 'config') loadConfig();
   }, [activeTab, loadDailyData, loadMonthlyData, loadConfig]);
 
@@ -269,6 +269,7 @@ export default function AdminTargets() {
         {[
           { id: 'daily', label: 'Daily View', icon: Target },
           { id: 'monthly', label: 'Monthly', icon: Calendar },
+          { id: 'payouts', label: 'Payouts', icon: Award },
           { id: 'routes', label: 'Routes', icon: MapPin },
           { id: 'config', label: 'Config', icon: Settings },
         ].map(tab => (
@@ -482,7 +483,90 @@ export default function AdminTargets() {
         </div>
       )}
 
-      {/* ─── ROUTES TAB ────────────────────────── */}
+      {/* ─── PAYOUTS TAB ───────────────────────── */}
+      {activeTab === 'payouts' && (
+        <div className="space-y-5 animate-in fade-in duration-300">
+          <div className="flex flex-wrap items-center gap-3">
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 outline-none"
+            />
+            <button onClick={handleGenerateMonthly} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50">
+              <RefreshCw size={14} className={isSubmitting ? 'animate-spin' : ''} /> Recalculate Summaries
+            </button>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Employee</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 text-center">Working Days</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 text-right">Base Salary</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 text-right">Incentives</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500 text-right">Bonuses</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-right">Total Payout</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {monthlySummaries.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="py-20 text-center">
+                        <Users size={40} className="mx-auto text-gray-200 mb-3" />
+                        <p className="text-sm font-black text-gray-300 uppercase tracking-widest">No payout data for this month</p>
+                      </td>
+                    </tr>
+                  ) : (
+                    monthlySummaries.map((s) => {
+                      const meta = s.metadata || {};
+                      const basePay = meta.baseSalary ?? (s.user?.vgeType === 'FREELANCER' ? 0 : 12000);
+                      const totalEarnings = meta.totalEarnings ?? (basePay + s.totalIncentive + (meta.bonus || 0));
+                      
+                      return (
+                        <tr key={s.id} className="hover:bg-indigo-50/20 transition-colors group">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center font-black text-xs">
+                                {s.user?.name?.[0]}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-black text-gray-900 leading-none">{s.user?.name}</span>
+                                <span className="text-[9px] font-bold text-gray-400 mt-1 uppercase tracking-tighter">
+                                  {s.user?.vgeType} • {s.user?.assignedVehicle?.vehicleNumber || 'No VH'}
+                                </span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 text-center font-black text-gray-600 text-sm">
+                            {s.workingDays}
+                          </td>
+                          <td className="px-6 py-4 text-right font-bold text-gray-600 text-sm">
+                            ₹{basePay.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right font-bold text-indigo-600 text-sm">
+                            ₹{s.totalIncentive.toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right font-bold text-amber-600 text-sm">
+                            ₹{(meta.bonus || 0).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                             <span className="px-4 py-2 rounded-2xl bg-emerald-50 text-emerald-700 font-black text-sm">
+                               ₹{totalEarnings.toLocaleString()}
+                             </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
       {activeTab === 'routes' && performances.length > 0 && (
         <div className="space-y-5 animate-in fade-in duration-300">
           <div className="bg-white rounded-[2.5rem] p-6 border border-gray-100 shadow-sm">

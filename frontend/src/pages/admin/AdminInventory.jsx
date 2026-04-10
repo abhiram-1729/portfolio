@@ -1850,11 +1850,11 @@ export default function AdminInventory() {
                 <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Refill Timeline</h4>
              </div>
 
-             <div className="space-y-8 relative before:absolute before:left-[31px] before:top-2 before:bottom-2 before:w-0.5 before:bg-gradient-to-b before:from-emerald-100 before:via-gray-100 before:to-gray-50">
+             <div className="space-y-12 md:space-y-8 relative md:before:absolute md:before:left-[31px] md:before:top-2 md:before:bottom-2 md:before:w-0.5 md:before:bg-gradient-to-b md:before:from-emerald-100 md:before:via-gray-100 md:before:to-gray-50">
                {group.requests.map((req) => (
-                  <div key={req.id} className="relative pl-16 group/session">
-                    {/* Time Indicator Circle */}
-                    <div className={`absolute left-[24px] top-1.5 w-4 h-4 rounded-full border-4 border-white ring-2 ring-offset-2 transition-all group-hover/session:scale-125 ${
+                  <div key={req.id} className="relative pl-0 md:pl-16 group/session">
+                    {/* Time Indicator Circle (Desktop Only) */}
+                    <div className={`hidden md:block absolute left-[24px] top-1.5 w-4 h-4 rounded-full border-4 border-white ring-2 ring-offset-2 transition-all group-hover/session:scale-125 ${
                       req.status === 'PENDING' ? 'ring-amber-400 bg-amber-400' : 
                       req.status === 'APPROVED' ? 'ring-emerald-400 bg-emerald-400' : 'ring-red-400 bg-red-400'
                     }`} />
@@ -1896,9 +1896,10 @@ export default function AdminInventory() {
 
                             if (excess > 0) {
                               excessBadge = (
-                                <span className="text-[9px] font-black text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded uppercase tracking-tighter whitespace-nowrap border border-amber-100 flex items-center gap-1 w-fit mt-1 shadow-sm">
-                                  <ArrowUpCircle size={10} strokeWidth={3} /> +{excess} ABOVE LIMIT
-                                </span>
+                                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-lg shadow-lg shadow-amber-500/30 ring-2 ring-white flex items-center gap-1 z-10 animate-in zoom-in duration-300">
+                                  <ArrowUpCircle size={10} strokeWidth={3} />
+                                  +{excess}
+                                </div>
                               );
                             }
                           }
@@ -1916,17 +1917,17 @@ export default function AdminInventory() {
                                        {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                                      </button>
                                    )}
-                                   <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center border shrink-0 ${isSelected || req.status !== 'PENDING' ? 'text-emerald-500 border-gray-100' : 'text-gray-400 border-gray-200'}`}>
+                                   <div className={`w-10 h-10 bg-white rounded-xl flex items-center justify-center border shrink-0 relative ${isSelected || req.status !== 'PENDING' ? 'text-emerald-500 border-gray-100' : 'text-gray-400 border-gray-200'}`}>
                                       <Package size={18} />
+                                      {excessBadge}
                                    </div>
-                                   <div className="flex flex-col min-w-0 flex-1 pt-1">
-                                      <span className="text-sm font-bold text-gray-700 truncate block">{item.product?.name}</span>
+                                   <div className="flex flex-col min-w-0 flex-1 pt-0.5">
+                                      <span className="text-sm font-black text-gray-800 break-words block leading-snug">{item.product?.name}</span>
                                       {item.adminRemark && req.status !== 'PENDING' && (
                                         <p className="text-[10px] text-gray-500 italic truncate before:content-['Note:'] before:mr-1 before:font-bold before:text-gray-400 mt-0.5">
                                           {item.adminRemark}
                                         </p>
                                       )}
-                                      {excessBadge}
                                    </div>
                                 </div>
                                 <div className="flex items-center gap-3 shrink-0 pl-1 pt-1">
@@ -1977,18 +1978,6 @@ export default function AdminInventory() {
                                   )}
                                 </div>
                               </div>
-                              {req.status === 'PENDING' && (
-                                <div className="w-full">
-                                  <input 
-                                    type="text" 
-                                    placeholder="Admin Note (Optional)" 
-                                    style={{ opacity: isSelected ? 1 : 0.5 }}
-                                    className="w-full text-xs bg-white border border-gray-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-all text-gray-700 placeholder:text-gray-300"
-                                    value={itemRemarks[item.id] || ''}
-                                    onChange={(e) => setItemRemarks(prev => ({...prev, [item.id]: e.target.value}))}
-                                  />
-                                </div>
-                              )}
                             </div>
                           );
                         })}
@@ -1996,11 +1985,11 @@ export default function AdminInventory() {
 
                       {/* Action Controls */}
                       {req.status === 'PENDING' && (
-                        <div className="flex flex-wrap gap-3 pt-2">
+                        <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 mt-2">
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }} 
                             disabled={isSubmitting} 
-                            className="px-6 py-2.5 rounded-2xl bg-white border border-red-100 text-red-500 font-black text-xs uppercase tracking-widest hover:bg-red-50 transition-colors disabled:opacity-50 flex items-center gap-2"
+                            className="w-full sm:w-auto px-6 py-4 sm:py-2.5 rounded-2xl bg-white border border-red-200 text-red-600 font-black text-[10px] uppercase tracking-widest hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
                           >
                             <X size={16} strokeWidth={3} />
                             Reject Session
@@ -2008,7 +1997,7 @@ export default function AdminInventory() {
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id, req.items); }} 
                             disabled={isSubmitting} 
-                            className="px-8 py-2.5 bg-emerald-600 text-white font-black text-xs uppercase tracking-widest rounded-2xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-500/20 disabled:opacity-50 flex items-center gap-2"
+                            className="w-full sm:w-auto px-10 py-4 sm:py-2.5 bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-emerald-700 active:scale-95 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
                           >
                             {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
                             Approve Refill
