@@ -1512,7 +1512,6 @@ export default function AdminInventory() {
                 </div>
               ) : (
                 <>
-                  {/* Mobile View */}
                   <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {activeStock.map(item => (
                       <div key={`track-item-${item.id}`} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-2xl border border-gray-100 group">
@@ -1527,39 +1526,53 @@ export default function AdminInventory() {
                         </div>
                         <div className="flex flex-col items-end shrink-0 pl-2">
                           {isAuditMode ? (
-                            <div className="flex flex-col items-end">
-                               <input 
-                                 type="number"
-                                 min="0"
-                                 onWheel={(e) => e.target.blur()}
-                                 className="w-16 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none text-right"
-                                 value={auditQuantities[item.productId] ?? item.quantity}
-                                 onChange={(e) => {
-                                   const val = Math.max(0, parseInt(e.target.value) || 0);
-                                   setAuditQuantities({...auditQuantities, [item.productId]: val});
-                                 }}
-                               />
-                               <span className="text-[8px] font-black text-emerald-600/50 uppercase mt-1">Auditing</span>
+                            <div className="flex items-center gap-2">
+                              <div className="flex flex-col items-center">
+                                <span className="text-[8px] font-black text-gray-400 uppercase mb-0.5">Audit</span>
+                                <input 
+                                  type="number"
+                                  min="0"
+                                  onWheel={(e) => e.target.blur()}
+                                  className="w-14 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-sm font-black text-emerald-700 outline-none text-right"
+                                  value={auditQuantities[item.productId] ?? item.quantity}
+                                  onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: Math.max(0, parseInt(e.target.value) || 0)})}
+                                />
+                              </div>
+                              <div className="flex flex-col items-center">
+                                <span className="text-[8px] font-black text-gray-400 uppercase mb-0.5">Diff</span>
+                                <div className={`w-12 py-1.5 rounded-lg text-center text-[10px] font-black border ${
+                                  (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                  (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) < 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                  'bg-gray-50 text-gray-400 border-gray-100'
+                                }`}>
+                                  {item.quantity - (auditQuantities[item.productId] ?? item.quantity)}
+                                </div>
+                              </div>
                             </div>
                           ) : (
-                            <>
+                            <div className="flex flex-col items-end">
                               <span className="text-sm font-black text-gray-900 leading-tight">{item.quantity} <span className="text-[9px] text-gray-400 uppercase">Qty</span></span>
                               <span className="text-[10px] font-black text-gray-500 mt-0.5">₹{(item.quantity * parseFloat(item.product?.price || 0)).toLocaleString()}</span>
-                            </>
+                            </div>
                           )}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Desktop Table View */}
                   <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-gray-50/50">
                           <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
                           <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Current Qty</th>
+                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">System Qty</th>
+                          {isAuditMode && (
+                            <>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/30">Audit Count</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-rose-600 text-center bg-rose-50/20">Difference</th>
+                            </>
+                          )}
                           <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
                         </tr>
                       </thead>
@@ -1577,36 +1590,40 @@ export default function AdminInventory() {
                                   </div>
                                   <div className="flex flex-col">
                                     <span className="text-sm font-black text-gray-800 line-clamp-1">{item.product?.name || 'Unknown'}</span>
-                                    {item.product?.isFree && <span className="text-[9px] font-black text-emerald-500 uppercase tracking-widest">Promotion</span>}
                                   </div>
                                 </div>
                               </td>
                               <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
                                 <span className="text-xs font-black text-gray-500">₹{price}</span>
                               </td>
-                              <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                                <div className="flex justify-center">
-                                  {isAuditMode ? (
+                              <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent text-center">
+                                <span className={`text-sm font-black ${isAuditMode ? 'text-indigo-300' : 'text-gray-900'}`}>{item.quantity}</span>
+                              </td>
+                              {isAuditMode && (
+                                <>
+                                  <td className="px-6 py-4 border-r border-emerald-50 bg-emerald-50/10 text-center">
                                     <input 
                                       type="number"
                                       min="0"
                                       onWheel={(e) => e.target.blur()}
-                                      className="w-20 bg-emerald-50 border border-emerald-200 rounded-xl px-2 py-2 text-sm text-center font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                                      className="w-16 bg-white border border-emerald-200 rounded-xl px-2 py-2 text-sm text-center font-black text-emerald-700 outline-none"
                                       value={auditQuantities[item.productId] ?? item.quantity}
-                                      onChange={(e) => {
-                                        const val = Math.max(0, parseInt(e.target.value) || 0);
-                                        setAuditQuantities({...auditQuantities, [item.productId]: val});
-                                      }}
+                                      onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: Math.max(0, parseInt(e.target.value) || 0)})}
                                     />
-                                  ) : (
-                                    <span className="text-sm font-black text-gray-900">{qty}</span>
-                                  )}
-                                </div>
-                              </td>
+                                  </td>
+                                  <td className="px-6 py-4 border-r border-rose-50 bg-rose-50/5 text-center">
+                                    <div className={`inline-flex items-center justify-center w-12 h-8 rounded-xl font-black text-xs border ${
+                                      (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                      (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) < 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                      'bg-indigo-50 text-indigo-400 border-indigo-100'
+                                    }`}>
+                                      {item.quantity - (auditQuantities[item.productId] ?? item.quantity)}
+                                    </div>
+                                  </td>
+                                </>
+                              )}
                               <td className="px-6 py-4 text-right">
-                                <span className="text-sm font-black text-emerald-700">
-                                  ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
-                                </span>
+                                <span className="text-sm font-black text-emerald-700">₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                               </td>
                             </tr>
                           );
@@ -1624,7 +1641,6 @@ export default function AdminInventory() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        {/* Vehicles Desktop Table View */}
         <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -1678,7 +1694,6 @@ export default function AdminInventory() {
           </table>
         </div>
 
-        {/* Vehicles Mobile Card View */}
         <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
           {vehicles.map(v => {
             const inventory = allVehiclesStock[v.id] || [];
