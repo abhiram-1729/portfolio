@@ -18,7 +18,8 @@ import {
   Box,
   Receipt,
   PieChart,
-  Briefcase
+  Briefcase,
+  Store
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -46,6 +47,7 @@ export default function TenantLayout() {
 
   const navItems = [
     { to: '/tenant', icon: LayoutDashboard, label: 'Organization', end: true },
+    { to: '/tenant/stores', icon: Store, label: 'Stores' },
     { to: '/tenant/admins', icon: Briefcase, label: 'Admin Management' },
     { to: '/tenant/users', icon: Users, label: 'All Staff' },
     { to: '/tenant/vehicles', icon: Truck, label: 'Fleet' },
@@ -99,13 +101,30 @@ export default function TenantLayout() {
 
       {/* Desktop Sidebar */}
       <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-emerald-50 flex-col shadow-xl z-40">
-        <div className="p-6 mb-4 flex items-center gap-3 border-b border-emerald-50">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-            <LayoutDashboard size={24} />
+        <div className="p-6 mb-4">
+          <div className="flex items-center gap-2 mb-6">
+            <Store size={14} className="text-emerald-500" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Global Hub</span>
           </div>
-          <div>
-            <h2 className="text-lg font-black text-emerald-600 leading-tight">Tenant</h2>
-            <p className="text-[10px] text-orange-500 uppercase tracking-widest font-black">Control Center</p>
+
+          <div className="bg-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-100 border border-emerald-500/20 relative overflow-hidden group">
+            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
+            
+            <div className="flex items-center justify-between mb-4 relative z-10">
+              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
+                <Store size={28} strokeWidth={2.5} />
+              </div>
+              <div className="px-3 py-1 rounded-full bg-emerald-500/50 backdrop-blur-sm text-[8px] font-black uppercase tracking-[0.2em] border border-white/20">
+                Master
+              </div>
+            </div>
+
+            <div className="relative z-10">
+              <h2 className="text-xl font-black tracking-tighter leading-none mb-1">
+                {user?.tenantName || 'Stores Management'}
+              </h2>
+              <p className="text-[10px] font-bold text-emerald-100/60 uppercase tracking-widest">Organization Portal</p>
+            </div>
           </div>
         </div>
 

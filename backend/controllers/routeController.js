@@ -344,7 +344,7 @@ export const getAllLocationCheckIns = async (req, res, next) => {
         const tenantId = req.user.tenantId || "VK001";
         const checkIns = await prisma.locationCheckIn.findMany({
             where: { tenantId },
-            include: { user: { select: { name: true, email: true } } },
+            include: { user: { select: { name: true, email: true, storeId: true } } },
             orderBy: { createdAt: 'desc' }
         });
         res.json(checkIns);

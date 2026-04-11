@@ -6,7 +6,9 @@ import { sendNotification } from '../../services/notificationService.js';
 // @access  Admin
 export const createRoute = async (req, res, next) => {
     try {
-        const { routeName, villages, cycles } = req.body;
+        const { routeName, villages, cycles, storeId: bodyStoreId } = req.body;
+        const tenantId = req.user.tenantId;
+        const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
 
         if (!routeName || !villages || !cycles) {
             res.status(400);
@@ -17,6 +19,8 @@ export const createRoute = async (req, res, next) => {
             data: {
                 routeName,
                 villages,
+                tenantId,
+                storeId,
                 cycles: {
                     create: cycles.map(cycle => ({
                         dayOfWeek: cycle.dayOfWeek,
@@ -144,7 +148,14 @@ export const updateRouteAssignment = async (req, res, next) => {
 // @access  Admin
 export const getAdminRoutes = async (req, res, next) => {
     try {
+        const { storeId: queryStoreId } = req.query;
+        const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
+
+        const where = { tenantId: req.user.tenantId };
+        if (storeId) where.storeId = storeId;
+
         const routes = await prisma.route.findMany({
+            where,
             include: {
                 cycles: true
             }
@@ -160,11 +171,21 @@ export const getAdminRoutes = async (req, res, next) => {
 // @access  Admin
 export const getRouteAssignments = async (req, res, next) => {
     try {
+        const { storeId } = req.query;
+        const where = { status: true };
+
+        // Filter assignments by vehicle's store
+        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+            where.vehicle = { storeId };
+        } else if (req.user.storeId) {
+            where.vehicle = { storeId: req.user.storeId };
+        }
+
         const assignments = await prisma.routeAssignment.findMany({
-            where: { status: true },
+            where,
             include: {
                 route: true,
-                vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+                vehicle: { select: { vehicleNumber: true, vehicleName: true, storeId: true } },
                 user: { select: { name: true } }
             }
         });

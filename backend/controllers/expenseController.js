@@ -31,6 +31,8 @@ export const addExpense = async (req, res, next) => {
 
         const expense = await prisma.expense.create({
             data: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 userId,
                 vehicleId: vehicleId || req.user.assignedVehicleId,
                 type,
@@ -76,6 +78,7 @@ export const getMyExpenses = async (req, res, next) => {
         
         const expenses = await prisma.expense.findMany({
             where: {
+                tenantId: req.user.tenantId,
                 userId,
                 ...(date && { date })
             },
@@ -93,14 +96,23 @@ export const getMyExpenses = async (req, res, next) => {
 // @access  Admin
 export const getAllExpenses = async (req, res, next) => {
     try {
-        const { date, userId, status } = req.query;
+        const { date, userId, status, storeId } = req.query;
+
+        const where = {
+            tenantId: req.user.tenantId,
+            ...(date && { date }),
+            ...(userId && { userId }),
+            ...(status && { status })
+        };
+
+        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+            where.storeId = storeId;
+        } else if (req.user.storeId) {
+            where.storeId = req.user.storeId;
+        }
 
         const expenses = await prisma.expense.findMany({
-            where: {
-                ...(date && { date }),
-                ...(userId && { userId }),
-                ...(status && { status })
-            },
+            where,
             include: {
                 user: { select: { name: true, role: true } },
                 vehicle: { select: { vehicleNumber: true } }
@@ -128,7 +140,7 @@ export const updateExpenseStatus = async (req, res, next) => {
         }
 
         const expense = await prisma.expense.update({
-            where: { id: id },
+            where: { id: id, tenantId: req.user.tenantId },
             data: { status },
             include: { user: true }
         });
@@ -162,7 +174,7 @@ export const claimExpense = async (req, res, next) => {
         const userId = req.user.id;
 
         const expense = await prisma.expense.findUnique({
-            where: { id: id }
+            where: { id: id, tenantId: req.user.tenantId }
         });
 
         if (!expense) {
@@ -203,7 +215,7 @@ export const claimExpense = async (req, res, next) => {
 export const getExpenseCategories = async (req, res, next) => {
     try {
         const categories = await prisma.expenseCategory.findMany({
-            where: { status: true }
+            where: { status: true, tenantId: req.user.tenantId }
         });
         res.json(categories);
     } catch (error) {
@@ -218,7 +230,11 @@ export const createExpenseCategory = async (req, res, next) => {
     try {
         const { name, limit } = req.body;
         const category = await prisma.expenseCategory.create({
-            data: { name, limit: limit ? parseFloat(limit) : null }
+            data: { 
+                tenantId: req.user.tenantId,
+                name, 
+                limit: limit ? parseFloat(limit) : null 
+            }
         });
         res.status(201).json(category);
     } catch (error) {
@@ -248,6 +264,8 @@ export const submitToChest = async (req, res, next) => {
                 userId
             },
             create: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 userId,
                 vehicleId: vehicleId || req.user.assignedVehicleId,
                 date: dateString,

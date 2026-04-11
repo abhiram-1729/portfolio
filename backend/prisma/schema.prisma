@@ -34,10 +34,11 @@ model Tenant {
   units             Unit[]
   assets            Asset[]
   businessSettings  BusinessSettings[]
-  incentiveConfig   VgeIncentiveConfig?
+  incentiveConfig   VgeIncentiveConfig[]
   orderItems        OrderItem[]
   payments          Payment[]
   assetCategories   AssetCategory[]
+  stores            Store[]
 }
 
 enum TenantStatus {
@@ -57,6 +58,7 @@ model User {
   createdAt         DateTime   @default(now())
   updatedAt         DateTime   @updatedAt
   assignedVehicleId String?
+  storeId           String?
   dailyTarget       Float?     @default(10000)
   baseSalary        Float?     @default(12000)
   status            UserStatus @default(ACTIVE)
@@ -65,6 +67,7 @@ model User {
 
   tenant           Tenant                @relation(fields: [tenantId], references: [id])
   assignedVehicle  Vehicle?              @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
+  store            Store?                @relation(fields: [storeId], references: [id])
   orders           Order[]
   carts            Cart[]
   openingCash      OpeningCash[]
@@ -82,7 +85,6 @@ model User {
   assetRequests    AssetRequest[]        @relation("UserAssetRequests")
   locationCheckIns LocationCheckIn[]
 
-
   @@index([tenantId])
   @@index([assignedVehicleId])
   @@index([role])
@@ -92,13 +94,17 @@ model User {
 model Category {
   id            String        @id @default(cuid())
   tenantId      String        @default("VK001")
+  storeId       String?
   name          String
   subCategories SubCategory[]
   products      Product[]
+  
   tenant        Tenant        @relation(fields: [tenantId], references: [id])
+  store         Store?        @relation(fields: [storeId], references: [id])
 
-  @@unique([tenantId, name])
+  @@unique([tenantId, storeId, name])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model SubCategory {
@@ -144,6 +150,8 @@ model Product {
   gst           Float?     @default(0)
   isFree        Boolean    @default(false)
   minShopAmount Float      @default(0)
+  storeId       String?
+  store         Store?     @relation(fields: [storeId], references: [id])
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id])
   category           Category             @relation(fields: [categoryId], references: [id])
@@ -163,6 +171,7 @@ model Product {
   @@index([subCategoryId])
   @@index([brandId])
   @@index([unitId])
+  @@index([storeId])
 }
 
 model ProductVariant {
@@ -240,10 +249,12 @@ model Order {
   coverageType CoverageType?
   routeId      String?
   villageName  String?
+  storeId      String?
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
   user         User?         @relation(fields: [userId], references: [id])
   vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   route        Route?        @relation(fields: [routeId], references: [id])
+  store        Store?        @relation(fields: [storeId], references: [id])
   items        OrderItem[]
   payment      Payment?
 
@@ -254,6 +265,7 @@ model Order {
   @@index([status])
   @@index([createdAt])
   @@index([routeId])
+  @@index([storeId])
 }
 
 model OrderItem {
@@ -270,8 +282,11 @@ model OrderItem {
   order        Order   @relation(fields: [orderId], references: [id])
   product      Product @relation(fields: [productId], references: [id])
   tenant       Tenant  @relation(fields: [tenantId], references: [id])
+  storeId      String?
+  store        Store?  @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
+  @@index([storeId])
   @@index([orderId])
   @@index([productId])
 }
@@ -286,8 +301,11 @@ model Payment {
   createdAt   DateTime    @default(now())
   order       Order       @relation(fields: [orderId], references: [id])
   tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  storeId     String?
+  store       Store?      @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model Vehicle {
@@ -299,7 +317,9 @@ model Vehicle {
   permitDocument    String?
   rcDocument        String?
   vehicleName       String?
+  storeId           String?
   tenant            Tenant             @relation(fields: [tenantId], references: [id])
+  store             Store?             @relation(fields: [storeId], references: [id])
   assignedUsers     User[]             @relation("UserVehicle")
   stocks            VehicleStock[]
   transactions      StockTransaction[]
@@ -320,20 +340,24 @@ model Vehicle {
 model VehicleStock {
   id              String  @id @default(cuid())
   tenantId        String  @default("VK001")
+  storeId         String?
   vehicleId       String
   productId       String
   quantity        Int     @default(0)
   openingQuantity Int     @default(0)
   vehicle         Vehicle @relation(fields: [vehicleId], references: [id])
   product         Product @relation(fields: [productId], references: [id])
+  store           Store?  @relation(fields: [storeId], references: [id])
 
   @@unique([vehicleId, productId])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model StockTransaction {
   id        String          @id @default(cuid())
   tenantId  String          @default("VK001")
+  storeId   String?
   date      DateTime        @default(now())
   type      TransactionType
   vehicleId String
@@ -341,8 +365,10 @@ model StockTransaction {
   quantity  Int
   vehicle   Vehicle         @relation(fields: [vehicleId], references: [id])
   product   Product         @relation(fields: [productId], references: [id])
+  store     Store?          @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
+  @@index([storeId])
   @@index([date])
   @@index([type])
   @@index([vehicleId])
@@ -357,14 +383,18 @@ model Route {
   status           Boolean             @default(true)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
+  storeId          String?
   tenant           Tenant              @relation(fields: [tenantId], references: [id])
+  store            Store?              @relation(fields: [storeId], references: [id])
   cycles           RouteCycle[]
   assignments      RouteAssignment[]
   orders           Order[]
   monthlySummaries VgeMonthlySummary[]
 
+  @@unique([tenantId, storeId, routeName])
   @@index([tenantId])
   @@index([status])
+  @@index([storeId])
 }
 
 model RouteCycle {
@@ -408,10 +438,13 @@ model Village {
   status    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  storeId   String?
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  store     Store?   @relation(fields: [storeId], references: [id])
 
-  @@unique([tenantId, name])
+  @@unique([tenantId, storeId, name])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model OpeningCash {
@@ -426,11 +459,14 @@ model OpeningCash {
   status           String   @default("SUBMITTED")
   isNoService      Boolean  @default(false)
   createdAt        DateTime @default(now())
+  storeId          String?
   vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
   user             User     @relation(fields: [userId], references: [id])
+  store            Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([vehicleId, date, shift])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model ClosingCash {
@@ -451,16 +487,20 @@ model ClosingCash {
   status        String   @default("SUBMITTED")
   isNoService   Boolean  @default(false)
   createdAt     DateTime @default(now())
+  storeId       String?
   vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
   user          User     @relation(fields: [userId], references: [id])
+  store         Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([vehicleId, date, shift])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model BusinessSettings {
   id           String   @id @default(cuid())
-  tenantId     String   @unique @default("VK001")
+  tenantId     String   @default("VK001")
+  storeId      String?  @unique
   businessName String   @default("VillagKart")
   gstNo        String?
   contactNo    String?
@@ -468,9 +508,13 @@ model BusinessSettings {
   address      String?
   taxRates     String   @default("0,5,12,18")
   updatedAt    DateTime @updatedAt
+  
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
+  store        Store?   @relation(fields: [storeId], references: [id])
 
+  @@unique([tenantId, storeId])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model DailyCashSummary {
@@ -488,13 +532,16 @@ model DailyCashSummary {
   status        String   @default("PENDING")
   submittedCash Float    @default(0)
   updatedAt     DateTime @updatedAt
+  storeId       String?
   vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
   user          User?    @relation("UserDailyCashSummary", fields: [userId], references: [id])
+  store         Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([vehicleId, date])
   @@index([tenantId])
   @@index([date])
   @@index([userId])
+  @@index([storeId])
 }
 
 model Expense {
@@ -511,14 +558,17 @@ model Expense {
   date        String // YYYY-MM-DD
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
+  storeId     String?
   user        User               @relation(fields: [userId], references: [id])
   vehicle     Vehicle?           @relation(fields: [vehicleId], references: [id])
+  store       Store?             @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
   @@index([vehicleId])
   @@index([date])
   @@index([status])
+  @@index([storeId])
 }
 
 model CashTransfer {
@@ -532,12 +582,15 @@ model CashTransfer {
   status        String   @default("SUBMITTED") // SUBMITTED, RECEIVED
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  storeId       String?
   user          User     @relation(fields: [userId], references: [id])
   vehicle       Vehicle  @relation(fields: [vehicleId], references: [id])
+  store         Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([vehicleId, date])
   @@index([tenantId])
   @@index([userId])
+  @@index([storeId])
 }
 
 model ExpenseCategory {
@@ -578,11 +631,14 @@ model DailyCoverage {
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+  storeId     String?
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
+  store       Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([vehicleId, date])
   @@index([tenantId])
   @@index([date])
+  @@index([storeId])
 }
 
 model Notification {
@@ -598,12 +654,15 @@ model Notification {
   priority  String    @default("low")
   role      UserRole?
   vehicleId String?
+  storeId   String?
   user      User?     @relation(fields: [userId], references: [id])
+  store     Store?    @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
   @@index([userId, isRead])
   @@index([createdAt])
   @@index([role])
+  @@index([storeId])
 }
 
 model RefillRequest {
@@ -614,14 +673,17 @@ model RefillRequest {
   status    RefillStatus @default(PENDING)
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
+  storeId   String?
   vehicle   Vehicle      @relation(fields: [vehicleId], references: [id])
   user      User         @relation(fields: [userId], references: [id])
+  store     Store?       @relation(fields: [storeId], references: [id])
   items     RefillItem[]
 
   @@index([tenantId])
   @@index([vehicleId])
   @@index([userId])
   @@index([status])
+  @@index([storeId])
 }
 
 model RefillItem {
@@ -740,14 +802,17 @@ model VgeDailyPerformance {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  storeId   String?
 
-  user User @relation("UserDailyPerformance", fields: [userId], references: [id])
+  user  User   @relation("UserDailyPerformance", fields: [userId], references: [id])
+  store Store? @relation(fields: [storeId], references: [id])
 
   @@unique([userId, date])
   @@index([tenantId])
   @@index([date])
   @@index([userId])
   @@index([level])
+  @@index([storeId])
 }
 
 model VgeMonthlySummary {
@@ -771,17 +836,21 @@ model VgeMonthlySummary {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  storeId   String?
 
-  user User @relation("UserMonthlySummary", fields: [userId], references: [id])
+  user  User   @relation("UserMonthlySummary", fields: [userId], references: [id])
+  store Store? @relation(fields: [storeId], references: [id])
 
   @@unique([userId, month])
   @@index([tenantId])
   @@index([month])
+  @@index([storeId])
 }
 
 model VgeIncentiveConfig {
   id       String @id @default(cuid())
-  tenantId String @unique @default("VK001")
+  tenantId String  @default("VK001")
+  storeId  String?
 
   // Minimum thresholds
   minSalesThreshold Float @default(10000)
@@ -812,22 +881,29 @@ model VgeIncentiveConfig {
 
   updatedAt DateTime @updatedAt
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  store     Store?   @relation(fields: [storeId], references: [id])
 
+  @@unique([tenantId, storeId])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model Unit {
   id        String    @id @default(cuid())
   tenantId  String    @default("VK001")
+  storeId   String?
   name      String
   type      String
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
+  
   tenant    Tenant    @relation(fields: [tenantId], references: [id])
+  store     Store?    @relation(fields: [storeId], references: [id])
   products  Product[]
 
-  @@unique([tenantId, name])
+  @@unique([tenantId, storeId, name])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 // ─── Asset Management ─────────────────────────────────────
@@ -866,26 +942,29 @@ enum AssetIssueStatus {
 }
 
 model Asset {
-  id              String         @id @default(cuid())
-  tenantId        String         @default("VK001")
-  name            String
-  categoryId      String?        // Link to dynamic categories
-  assetType       String?        // Legacy fallback/Direct name
-  model           String?
-  brand           String?
-  image           String?
-  description     String?
-  estimatedCost   Float          @default(0)
-  totalQuantity   Int            @default(0)
-  createdAt       DateTime       @default(now())
-  updatedAt       DateTime       @updatedAt
-  tenant          Tenant         @relation(fields: [tenantId], references: [id])
-  category        AssetCategory? @relation(fields: [categoryId], references: [id])
-  units           AssetUnit[]
-  requests        AssetRequest[]
+  id            String         @id @default(cuid())
+  tenantId      String         @default("VK001")
+  name          String
+  categoryId    String? // Link to dynamic categories
+  assetType     String? // Legacy fallback/Direct name
+  model         String?
+  brand         String?
+  image         String?
+  description   String?
+  estimatedCost Float          @default(0)
+  totalQuantity Int            @default(0)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  storeId       String?
+  tenant        Tenant         @relation(fields: [tenantId], references: [id])
+  category      AssetCategory? @relation(fields: [categoryId], references: [id])
+  store         Store?         @relation(fields: [storeId], references: [id])
+  units         AssetUnit[]
+  requests      AssetRequest[]
 
   @@index([tenantId])
   @@index([categoryId])
+  @@index([storeId])
 }
 
 model AssetCategory {
@@ -895,11 +974,14 @@ model AssetCategory {
   status    Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  storeId   String?
   tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  store     Store?   @relation(fields: [storeId], references: [id])
   assets    Asset[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
+  @@index([storeId])
 }
 
 model AssetUnit {
@@ -1002,21 +1084,69 @@ enum RequestStatus {
 }
 
 model LocationCheckIn {
-  id          String   @id @default(cuid())
-  tenantId    String   @default("VK001")
-  userId      String
-  date        String   // YYYY-MM-DD
-  time        DateTime @default(now())
-  latitude    Float
-  longitude   Float
-  villageName String?
-  status            String   // ON_TIME, LATE
+  id                String   @id @default(cuid())
+  tenantId          String   @default("VK001")
+  userId            String
+  date              String // YYYY-MM-DD
+  time              DateTime @default(now())
+  latitude          Float
+  longitude         Float
+  villageName       String?
+  status            String // ON_TIME, LATE
   isLocationMatched Boolean  @default(true)
   createdAt         DateTime @default(now())
-  user        User     @relation(fields: [userId], references: [id])
+  storeId           String?
+  user              User     @relation(fields: [userId], references: [id])
+  store             Store?   @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
   @@index([date])
+  @@index([storeId])
 }
 
+model Store {
+  id           String   @id @default(cuid())
+  tenantId     String   @default("VK001")
+  name         String
+  code         String   @unique
+  address      String?
+  contactEmail String?
+  contactPhone String?
+  status       String   @default("ACTIVE") // ACTIVE, INACTIVE
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  tenant   Tenant    @relation(fields: [tenantId], references: [id])
+  users    User[]
+  vehicles Vehicle[]
+
+  // Store-scoped relations
+  orders           Order[]
+  openingCash      OpeningCash[]
+  closingCash      ClosingCash[]
+  dailySummaries   DailyCashSummary[]
+  expenses         Expense[]
+  cashTransfers    CashTransfer[]
+  dailyCoverages   DailyCoverage[]
+  notifications    Notification[]
+  refillRequests   RefillRequest[]
+  dailyPerformance VgeDailyPerformance[]
+  monthlySummaries VgeMonthlySummary[]
+  assets             Asset[]
+  checkIns           LocationCheckIn[]
+  vehicleStocks      VehicleStock[]
+  stockTransactions  StockTransaction[]
+  products           Product[]
+  routes             Route[]
+  villages           Village[]
+  assetCategories    AssetCategory[]
+  incentiveConfigs   VgeIncentiveConfig[]
+  orderItems         OrderItem[]
+  payments           Payment[]
+  businessSettings   BusinessSettings?
+  categories         Category[]
+  units              Unit[]
+
+  @@index([tenantId])
+}

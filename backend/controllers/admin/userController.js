@@ -4,8 +4,18 @@ import bcrypt from 'bcryptjs';
 // Get all users
 export const getUsers = async (req, res) => {
   try {
+    const { storeId } = req.query;
+    const filter = { tenantId: req.user.tenantId };
+    
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      filter.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      filter.storeId = req.user.storeId;
+    }
+
     const users = await prisma.user.findMany({
-      include: { assignedVehicle: true }
+      where: filter,
+      include: { assignedVehicle: true, store: true }
     });
     res.json(users);
   } catch (error) {
@@ -17,7 +27,7 @@ export const getUsers = async (req, res) => {
 // Create a new user (Agent/helper/supervisor)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, role, assignedVehicleId, dailyTarget, vgeType, baseSalary } = req.body;
+    const { name, email, password, mobile, role, assignedVehicleId, storeId, dailyTarget, vgeType, baseSalary } = req.body;
 
     const userExists = await prisma.user.findFirst({
       where: {
@@ -40,7 +50,9 @@ export const createUser = async (req, res) => {
         password: hashedPassword,
         role: role || 'SALES_AGENT',
         vgeType: vgeType || 'EMPLOYEE',
+        tenantId: req.user.tenantId,
         assignedVehicle: assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined,
+        store: storeId ? { connect: { id: storeId } } : undefined,
         dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined,
         baseSalary: baseSalary ? parseFloat(baseSalary) : undefined
       }
@@ -57,7 +69,7 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, status, dailyTarget, vgeType, password, baseSalary } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, storeId, status, dailyTarget, vgeType, password, baseSalary } = req.body;
 
     const updateData = {
       name,
@@ -69,6 +81,9 @@ export const updateUser = async (req, res) => {
       assignedVehicle: assignedVehicleId === null 
         ? { disconnect: true } 
         : (assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined),
+      store: storeId === null 
+        ? { disconnect: true } 
+        : (storeId ? { connect: { id: storeId } } : undefined),
       dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined,
       baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined
     };
@@ -80,7 +95,7 @@ export const updateUser = async (req, res) => {
     }
 
     const updatedUser = await prisma.user.update({
-      where: { id },
+      where: { id, tenantId: req.user.tenantId },
       data: updateData
     });
 
@@ -100,6 +115,10 @@ export const deactivateUser = async (req, res) => {
     // Increased timeout for deep archival cleanup.
 
     await prisma.$transaction(async (tx) => {
+      // Verify user belongs to tenant
+      const user = await tx.user.findUnique({ where: { id, tenantId: req.user.tenantId } });
+      if (!user) throw new Error('User not found in your tenant');
+
       // 1. Inventory Cleanup
       const userCarts = await tx.cart.findMany({ where: { userId: id }, select: { id: true } });
       if (userCarts.length > 0) {

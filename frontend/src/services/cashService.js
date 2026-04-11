@@ -15,8 +15,11 @@ export const getCashStatus = async () => {
   return response.data;
 };
 
-export const getAdminReconciliation = async (date) => {
-  const response = await api.get(`/cash/admin/reconciliation${date ? `?date=${date}` : ''}`);
+export const getAdminReconciliation = async (date, storeId) => {
+  const params = {};
+  if (date) params.date = date;
+  if (storeId) params.storeId = storeId;
+  const response = await api.get('/cash/admin/reconciliation', { params });
   return response.data;
 };
 

@@ -19,7 +19,8 @@ import {
   Activity,
   Globe,
   Map,
-  MapPin
+  MapPin,
+  Store
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -36,6 +37,9 @@ import {
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
+import { useUserStore } from '../../store/userStore';
 
 export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('overview');
@@ -48,6 +52,7 @@ export default function AdminReports() {
   const [villageData, setVillageData] = useState(null);
   const [agentPerformance, setAgentPerformance] = useState(null);
   const [locationCheckIns, setLocationCheckIns] = useState(null);
+  const [stores, setStores] = useState([]);
 
 
   // Loading States
@@ -57,12 +62,18 @@ export default function AdminReports() {
   const [isAgentLoading, setIsAgentLoading] = useState(false);
   const [isTrackingLoading, setIsTrackingLoading] = useState(false);
 
+  // Routing & Context
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const location = useLocation();
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  const currentUser = useUserStore(s => s.user);
+
 
   const loadDailyData = async () => {
-    if (dailyReport) return; // Cache hit
     setIsDailyLoading(true);
     try {
-      const { data } = await adminAPI.getDailyReport();
+      const { data } = await adminAPI.getDailyReport({ storeId: storeFilterId });
       setDailyReport(data);
     } catch (error) {
       toast.error('Failed to fetch daily report');
@@ -72,17 +83,20 @@ export default function AdminReports() {
   };
 
   const loadOverviewData = async () => {
-    if (trendsData && topProducts && dailyReport) return; // Cache hit
     setIsOverviewLoading(true);
     try {
-      const [trendRes, topRes, dailyRes] = await Promise.all([
-        trendsData ? Promise.resolve({ data: trendsData }) : adminAPI.getTrendsReport({ days: 7 }),
-        topProducts ? Promise.resolve({ data: topProducts }) : adminAPI.getTopProducts(),
-        dailyReport ? Promise.resolve({ data: dailyReport }) : adminAPI.getDailyReport()
+      const [trendRes, topRes, dailyRes, storeRes] = await Promise.all([
+        adminAPI.getTrendsReport({ days: 7, storeId: storeFilterId }),
+        adminAPI.getTopProducts({ storeId: storeFilterId }),
+        adminAPI.getDailyReport({ storeId: storeFilterId }),
+        adminAPI.getStores()
       ]);
       setTrendsData(trendRes.data);
       setTopProducts(topRes.data);
       setDailyReport(dailyRes.data);
+      if (storeRes.data?.success) {
+        setStores(storeRes.data.data);
+      }
     } catch (error) {
       console.error('Overview data error:', error);
       toast.error('Failed to load overview data');
@@ -92,12 +106,11 @@ export default function AdminReports() {
   };
 
   const loadRouteData = async () => {
-    if (routeData && villageData) return;
     setIsRouteLoading(true);
     try {
         const [routeRes, villageRes] = await Promise.all([
-            adminAPI.getRouteWiseReport(),
-            adminAPI.getVillageWiseReport()
+            adminAPI.getRouteWiseReport({ storeId: storeFilterId }),
+            adminAPI.getVillageWiseReport({ storeId: storeFilterId })
         ]);
         setRouteData(routeRes.data);
         setVillageData(villageRes.data);
@@ -109,10 +122,9 @@ export default function AdminReports() {
   };
 
   const loadAgentData = async () => {
-    if (agentPerformance) return;
     setIsAgentLoading(true);
     try {
-        const { data } = await adminAPI.getAgentPerformance();
+        const { data } = await adminAPI.getAgentPerformance({ storeId: storeFilterId });
         setAgentPerformance(data);
     } catch (error) {
         toast.error('Failed to fetch agent performance');
@@ -138,16 +150,16 @@ export default function AdminReports() {
   useEffect(() => {
     // Initial load relies on the active tab
     if (activeTab === 'overview') loadOverviewData();
-  }, []);
+  }, [storeFilterId]);
 
   useEffect(() => {
-    // Only load if it's the active tab and data isn't already loaded
+    // Only load if it's the active tab 
     if (activeTab === 'daily') loadDailyData();
     if (activeTab === 'overview') loadOverviewData();
     if (activeTab === 'route') loadRouteData();
     if (activeTab === 'targets') loadAgentData();
     if (activeTab === 'tracking') loadTrackingData();
-  }, [activeTab]);
+  }, [activeTab, storeFilterId]);
 
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, bgColor }) => (
@@ -395,30 +407,70 @@ export default function AdminReports() {
                 <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Revenue Distribution by Assigned Route</p>
             </div>
             
-            <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={routeData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                        <XAxis type="number" hide />
-                        <YAxis 
-                            dataKey="routeName" 
-                            type="category" 
-                            axisLine={false} 
-                            tickLine={false}
-                            tick={{ fontSize: 10, fontWeight: 900, fill: '#374151' }}
-                            width={100}
-                        />
-                        <Tooltip 
-                            cursor={{ fill: '#f9fafb' }}
-                            contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                        />
-                        <Bar dataKey="totalSales" radius={[0, 10, 10, 0]} barSize={20}>
-                            {routeData?.map((entry, index) => (
-                                <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#f97316'} />
-                            ))}
-                        </Bar>
-                    </BarChart>
-                </ResponsiveContainer>
-            </div>
+            {isTenantRoute && !storeFilterId ? (
+              Object.entries(routeData?.reduce((acc, r) => {
+                const sName = stores.find(s => s.id === r.storeId)?.name || 'Unassigned Branch Level';
+                if (!acc[sName]) acc[sName] = [];
+                acc[sName].push(r);
+                return acc;
+              }, {}) || {}).map(([storeName, routes]) => (
+                <div key={storeName} className="mb-8 p-4 bg-gray-50/50 rounded-2xl border border-gray-100">
+                  <h3 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-4 flex items-center px-2">
+                    <Store size={14} className="mr-2 text-emerald-600" />
+                    {storeName}
+                  </h3>
+                  <div className="h-[250px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={routes} layout="vertical" margin={{ left: 10, right: 30 }}>
+                            <XAxis type="number" hide />
+                            <YAxis 
+                                dataKey="routeName" 
+                                type="category" 
+                                axisLine={false} 
+                                tickLine={false}
+                                tick={{ fontSize: 10, fontWeight: 900, fill: '#374151' }}
+                                width={100}
+                            />
+                            <Tooltip 
+                                cursor={{ fill: '#f9fafb' }}
+                                contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                            />
+                            <Bar dataKey="totalSales" radius={[0, 10, 10, 0]} barSize={20}>
+                                {routes?.map((entry, index) => (
+                                    <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#f97316'} />
+                                ))}
+                            </Bar>
+                        </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={routeData} layout="vertical" margin={{ left: 10, right: 30 }}>
+                          <XAxis type="number" hide />
+                          <YAxis 
+                              dataKey="routeName" 
+                              type="category" 
+                              axisLine={false} 
+                              tickLine={false}
+                              tick={{ fontSize: 10, fontWeight: 900, fill: '#374151' }}
+                              width={100}
+                          />
+                          <Tooltip 
+                              cursor={{ fill: '#f9fafb' }}
+                              contentStyle={{ borderRadius: '1rem', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
+                          />
+                          <Bar dataKey="totalSales" radius={[0, 10, 10, 0]} barSize={20}>
+                              {routeData?.map((entry, index) => (
+                                  <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#10b981' : '#f97316'} />
+                              ))}
+                          </Bar>
+                      </BarChart>
+                  </ResponsiveContainer>
+              </div>
+            )}
         </div>
 
         {/* Village Breakdown */}
@@ -432,27 +484,66 @@ export default function AdminReports() {
           </div>
 
           <div className="space-y-3">
-            {villageData?.map((v, idx) => (
-               <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
-                        <Globe size={18} />
-                    </div>
-                    <div>
-                        <p className="text-sm font-black text-gray-900">{v.villageName}</p>
-                        <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${v.coverageType === 'MORNING' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                {v.coverageType}
-                            </span>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{v.orderCount} Orders</span>
+            {isTenantRoute && !storeFilterId ? (
+              Object.entries(villageData?.reduce((acc, v) => {
+                const sName = stores.find(s => s.id === v.storeId)?.name || 'Unassigned Branch Level';
+                if (!acc[sName]) acc[sName] = [];
+                acc[sName].push(v);
+                return acc;
+              }, {}) || {}).map(([storeName, villages]) => (
+                <div key={storeName} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
+                  <h3 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-4 bg-white border border-emerald-100 flex items-center px-4 py-2.5 w-fit rounded-xl shadow-sm">
+                    <Store size={14} className="mr-2 text-emerald-600" />
+                    {storeName} <span className="ml-2 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md text-[9px]">{villages.length}</span>
+                  </h3>
+                  <div className="space-y-3">
+                    {villages.map((v, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
+                              <Globe size={18} />
+                          </div>
+                          <div>
+                              <p className="text-sm font-black text-gray-900">{v.villageName}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${v.coverageType === 'MORNING' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                      {v.coverageType}
+                                  </span>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{v.orderCount} Orders</span>
+                              </div>
+                          </div>
                         </div>
+                        <div className="text-right">
+                          <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              villageData?.map((v, idx) => (
+                 <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
+                          <Globe size={18} />
+                      </div>
+                      <div>
+                          <p className="text-sm font-black text-gray-900">{v.villageName}</p>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${v.coverageType === 'MORNING' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                  {v.coverageType}
+                              </span>
+                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{v.orderCount} Orders</span>
+                          </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
-                  </div>
-               </div>
-            ))}
+                    <div className="text-right">
+                      <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
+                    </div>
+                 </div>
+              ))
+            )}
             {(!villageData || villageData.length === 0) && (
               <div className="py-12 text-center text-gray-300">
                 <Map size={48} className="mx-auto mb-4 opacity-20" />
@@ -487,43 +578,98 @@ export default function AdminReports() {
           </div>
 
           <div className="space-y-8">
-            {agentPerformance?.map((agent, idx) => (
-              <div key={idx} className="space-y-3">
-                <div className="flex justify-between items-end px-1">
-                  <div>
-                    <h4 className="text-sm font-black text-gray-900">{agent.name}</h4>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
-                      Today: ₹{agent.totalSales.toLocaleString()} <span className="opacity-40">/ Goal: ₹{agent.dailyTarget.toLocaleString()}</span>
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <span className={`text-sm font-black tracking-tighter ${agent.percentage >= 100 ? 'text-emerald-600' : 'text-orange-500'}`}>
-                      {agent.percentage}%
-                    </span>
-                  </div>
-                </div>
-                
-                <div className="h-2.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-0.5 shadow-inner">
-                  <motion.div 
-                    initial={{ width: 0 }}
-                    animate={{ width: `${Math.min(agent.percentage, 100)}%` }}
-                    transition={{ duration: 1.5, ease: "easeOut" }}
-                    className={`h-full rounded-full ${
-                      agent.percentage >= 100 
-                      ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
-                      : 'bg-gradient-to-r from-orange-400 to-orange-500'
-                    }`}
-                  />
-                </div>
+            {isTenantRoute && !storeFilterId ? (
+              Object.entries(agentPerformance?.reduce((acc, agent) => {
+                const sName = stores.find(s => s.id === agent.storeId)?.name || 'Unassigned Branch Level';
+                if (!acc[sName]) acc[sName] = [];
+                acc[sName].push(agent);
+                return acc;
+              }, {}) || {}).map(([storeName, agents]) => (
+                <div key={storeName} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
+                  <h3 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-4 bg-white border border-emerald-100 flex items-center px-4 py-2.5 w-fit rounded-xl shadow-sm">
+                    <Store size={14} className="mr-2 text-emerald-600" />
+                    {storeName} <span className="ml-2 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md text-[9px]">{agents.length}</span>
+                  </h3>
+                  <div className="space-y-6">
+                    {agents.map((agent, idx) => (
+                      <div key={idx} className="space-y-3 bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
+                        <div className="flex justify-between items-end px-1">
+                          <div>
+                            <h4 className="text-sm font-black text-gray-900">{agent.name}</h4>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                              Today: ₹{agent.totalSales.toLocaleString()} <span className="opacity-40">/ Goal: ₹{agent.dailyTarget.toLocaleString()}</span>
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className={`text-sm font-black tracking-tighter ${agent.percentage >= 100 ? 'text-emerald-600' : 'text-orange-500'}`}>
+                              {agent.percentage}%
+                            </span>
+                          </div>
+                        </div>
+                        
+                        <div className="h-2.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-0.5 shadow-inner">
+                          <motion.div 
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(agent.percentage, 100)}%` }}
+                            transition={{ duration: 1.5, ease: "easeOut" }}
+                            className={`h-full rounded-full ${
+                              agent.percentage >= 100 
+                              ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
+                              : 'bg-gradient-to-r from-orange-400 to-orange-500'
+                            }`}
+                          />
+                        </div>
 
-                {agent.percentage >= 100 && (
-                  <div className="flex items-center gap-1.5 px-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Target Achieved</span>
+                        {agent.percentage >= 100 && (
+                          <div className="flex items-center gap-1.5 px-1">
+                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Target Achieved</span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
-            ))}
+                </div>
+              ))
+            ) : (
+              agentPerformance?.map((agent, idx) => (
+                <div key={idx} className="space-y-3">
+                  <div className="flex justify-between items-end px-1">
+                    <div>
+                      <h4 className="text-sm font-black text-gray-900">{agent.name}</h4>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
+                        Today: ₹{agent.totalSales.toLocaleString()} <span className="opacity-40">/ Goal: ₹{agent.dailyTarget.toLocaleString()}</span>
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`text-sm font-black tracking-tighter ${agent.percentage >= 100 ? 'text-emerald-600' : 'text-orange-500'}`}>
+                        {agent.percentage}%
+                      </span>
+                    </div>
+                  </div>
+                  
+                  <div className="h-2.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-0.5 shadow-inner">
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${Math.min(agent.percentage, 100)}%` }}
+                      transition={{ duration: 1.5, ease: "easeOut" }}
+                      className={`h-full rounded-full ${
+                        agent.percentage >= 100 
+                        ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
+                        : 'bg-gradient-to-r from-orange-400 to-orange-500'
+                      }`}
+                    />
+                  </div>
+
+                  {agent.percentage >= 100 && (
+                    <div className="flex items-center gap-1.5 px-1">
+                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Target Achieved</span>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
 
             {(!agentPerformance || agentPerformance.length === 0) && (
               <div className="py-12 text-center text-gray-300">
@@ -559,55 +705,122 @@ export default function AdminReports() {
           </div>
 
           <div className="space-y-4">
-            {locationCheckIns?.map((log, idx) => (
-              <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${log.status === 'ON_TIME' ? 'bg-emerald-500 shadow-emerald-200' : 'bg-amber-500 shadow-amber-200'} shadow-lg`}>
-                    <MapPin size={20} />
+            {isTenantRoute && !storeFilterId ? (
+              Object.entries(locationCheckIns?.reduce((acc, log) => {
+                const sName = stores.find(s => s.id === log.user?.storeId)?.name || 'Unassigned Branch Level';
+                if (!acc[sName]) acc[sName] = [];
+                acc[sName].push(log);
+                return acc;
+              }, {}) || {}).map(([storeName, logs]) => (
+                <div key={storeName} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
+                  <h3 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-4 bg-white border border-emerald-100 flex items-center px-4 py-2.5 w-fit rounded-xl shadow-sm">
+                    <Store size={14} className="mr-2 text-emerald-600" />
+                    {storeName} <span className="ml-2 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md text-[9px]">{logs.length}</span>
+                  </h3>
+                  <div className="space-y-4">
+                    {logs.map((log, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${log.status === 'ON_TIME' ? 'bg-emerald-500 shadow-emerald-200' : 'bg-amber-500 shadow-amber-200'} shadow-lg`}>
+                            <MapPin size={20} />
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-gray-900">{log.user?.name}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{log.villageName || 'Unknown Village'}</span>
+                              <span className="text-gray-300">•</span>
+                              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">
+                                {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </p>
+                            </div>
+                            {log.isLocationMatched ? (
+                              <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-1.5 opacity-60">
+                                <CheckCircle2 size={10} strokeWidth={3} />
+                                <span>Location Verified</span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1 text-[8px] font-black text-rose-500 uppercase tracking-widest mt-1.5">
+                                <AlertTriangle size={10} strokeWidth={3} />
+                                <span>Location Mismatch</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${log.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                            <span className="text-[10px] font-black uppercase tracking-widest">{log.status.replace('_', ' ')}</span>
+                          </div>
+                          <div className="flex items-center justify-end gap-2 mt-2">
+                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                              {new Date(log.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                            </p>
+                            <a 
+                              href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`} 
+                              target="_blank" 
+                              rel="noopener noreferrer"
+                              className="p-1.5 rounded-lg bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm"
+                              title="Open in Google Maps"
+                            >
+                              <Globe size={12} />
+                            </a>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div>
-                    <p className="text-sm font-black text-gray-900">{log.user?.name}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{log.villageName || 'Unknown Village'}</span>
-                      <span className="text-gray-300">•</span>
-                      <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">
-                        {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                      </p>
+                </div>
+              ))
+            ) : (
+              locationCheckIns?.map((log, idx) => (
+                <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-white ${log.status === 'ON_TIME' ? 'bg-emerald-500 shadow-emerald-200' : 'bg-amber-500 shadow-amber-200'} shadow-lg`}>
+                      <MapPin size={20} />
                     </div>
-                    {log.isLocationMatched ? (
-                      <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-1.5 opacity-60">
-                        <CheckCircle2 size={10} strokeWidth={3} />
-                        <span>Location Verified</span>
+                    <div>
+                      <p className="text-sm font-black text-gray-900">{log.user?.name}</p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{log.villageName || 'Unknown Village'}</span>
+                        <span className="text-gray-300">•</span>
+                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">
+                          {new Date(log.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
                       </div>
-                    ) : (
-                      <div className="flex items-center gap-1 text-[8px] font-black text-rose-500 uppercase tracking-widest mt-1.5">
-                        <AlertTriangle size={10} strokeWidth={3} />
-                        <span>Location Mismatch</span>
-                      </div>
-                    )}
+                      {log.isLocationMatched ? (
+                        <div className="flex items-center gap-1 text-[8px] font-black text-emerald-600 uppercase tracking-widest mt-1.5 opacity-60">
+                          <CheckCircle2 size={10} strokeWidth={3} />
+                          <span>Location Verified</span>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-1 text-[8px] font-black text-rose-500 uppercase tracking-widest mt-1.5">
+                          <AlertTriangle size={10} strokeWidth={3} />
+                          <span>Location Mismatch</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${log.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{log.status.replace('_', ' ')}</span>
+                    </div>
+                    <div className="flex items-center justify-end gap-2 mt-2">
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                        {new Date(log.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
+                      </p>
+                      <a 
+                        href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="p-1.5 rounded-lg bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm"
+                        title="Open in Google Maps"
+                      >
+                        <Globe size={12} />
+                      </a>
+                    </div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border ${log.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                    <span className="text-[10px] font-black uppercase tracking-widest">{log.status.replace('_', ' ')}</span>
-                  </div>
-                  <div className="flex items-center justify-end gap-2 mt-2">
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
-                      {new Date(log.date).toLocaleDateString('en-IN', { month: 'short', day: 'numeric' })}
-                    </p>
-                    <a 
-                      href={`https://www.google.com/maps?q=${log.latitude},${log.longitude}`} 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="p-1.5 rounded-lg bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:border-blue-100 transition-all shadow-sm"
-                      title="Open in Google Maps"
-                    >
-                      <Globe size={12} />
-                    </a>
-                  </div>
-                </div>
-              </div>
-            ))}
+              ))
+            )}
             {(!locationCheckIns || locationCheckIns.length === 0) && (
               <div className="py-12 text-center text-gray-300">
                 <Activity size={48} className="mx-auto mb-4 opacity-20" />
@@ -620,46 +833,114 @@ export default function AdminReports() {
     );
   };
 
+  // Gatekeeper removed for Tenant Owners to allow "All Stores" reports view
+
   return (
-    <div className="space-y-6 pb-20">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Reports Portal</h2>
-          <p className="text-sm text-gray-500">Track performance and reconcile data</p>
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Reports Portal</h2>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-500">Track performance and reconcile data</p>
+            {isTenantRoute && (
+              <>
+                <span className="text-gray-300">•</span>
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.25rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
         </div>
-        <button className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors">
-          <Download size={24} />
+        <button className="bg-emerald-600 text-white p-3 rounded-2xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 active:scale-95 transition-all w-fit">
+          <Download size={22} className="stroke-[2.5px]" />
         </button>
       </div>
 
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
-        {[
-          { key: 'overview', label: 'Overview' },
-          { key: 'daily', label: 'Summary' },
-          { key: 'route', label: 'Geographical' },
-          { key: 'targets', label: 'Targets' },
-          { key: 'tracking', label: 'Tracking' },
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={cn(
-              "flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200",
-              activeTab === tab.key ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400"
-            )}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {isTenantRoute && !storeFilterId ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
+          <div className="col-span-full mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Platform Branches</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to view analytical reports</p>
+          </div>
+          {stores.map(store => (
+            <button
+              key={store.id}
+              onClick={() => setSearchParams({ storeId: store.id })}
+              className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+            >
+              <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
+              
+              <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                <Store size={28} strokeWidth={2.5} />
+              </div>
+              <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
+              <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
+              
+              <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
+                <span>View Analytics</span>
+                <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
+              </div>
+            </button>
+          ))}
+          {stores.length === 0 && (
+            <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+               <Store size={48} className="mx-auto text-gray-300 mb-4" />
+               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <>
+          <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl">
+            {[
+              { key: 'overview', label: 'Overview' },
+              { key: 'daily', label: 'Summary' },
+              { key: 'route', label: 'Geographical' },
+              { key: 'targets', label: 'Targets' },
+              { key: 'tracking', label: 'Tracking' },
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setActiveTab(tab.key)}
+                className={cn(
+                  "flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200",
+                  activeTab === tab.key ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400"
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
+          </div>
 
-      <div className="transition-all duration-300">
-        {activeTab === 'overview' && renderOverview()}
-        {activeTab === 'daily' && renderDaily()}
-        {activeTab === 'route' && renderRouteReport()}
-        {activeTab === 'targets' && renderAgentPerformance()}
-        {activeTab === 'tracking' && renderTracking()}
-      </div>
+          <div className="transition-all duration-300">
+            {activeTab === 'overview' && renderOverview()}
+            {activeTab === 'daily' && renderDaily()}
+            {activeTab === 'route' && renderRouteReport()}
+            {activeTab === 'targets' && renderAgentPerformance()}
+            {activeTab === 'tracking' && renderTracking()}
+          </div>
+        </>
+      )}
     </div>
   );
 }

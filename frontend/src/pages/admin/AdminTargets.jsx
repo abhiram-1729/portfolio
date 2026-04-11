@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Target, TrendingUp, Award, Zap, Trophy, Star, Crown, Users, Calendar, Settings, RefreshCw, Loader2, ChevronDown, ChevronRight, ArrowLeft, BarChart3, Package, Lock, Play, MapPin, X } from 'lucide-react';
+import { Target, TrendingUp, Award, Zap, Trophy, Star, Crown, Users, Calendar, Settings, RefreshCw, Loader2, ChevronDown, ChevronRight, ArrowLeft, BarChart3, Package, Lock, Play, MapPin, X, Store } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import { useSearchParams } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
+import { useUserStore } from '../../store/userStore';
 
 const LEVEL_CONFIG = {
   NONE:       { label: 'Unranked',   gradient: 'from-gray-400 to-gray-500',    bg: 'bg-gray-50',    text: 'text-gray-600',    border: 'border-gray-100' },
@@ -14,6 +17,10 @@ const LEVEL_CONFIG = {
 };
 
 export default function AdminTargets() {
+  const currentUser = useUserStore(s => s.user);
+  const [searchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+
   const [performances, setPerformances] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('daily'); // daily | monthly | config
@@ -31,7 +38,10 @@ export default function AdminTargets() {
   const loadDailyData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await adminAPI.vgeAllPerformance({ date: selectedDate });
+      const res = await adminAPI.vgeAllPerformance({ 
+        date: selectedDate,
+        storeId: storeFilterId || currentUser?.storeId
+      });
       setPerformances(res.data);
     } catch (err) {
       toast.error('Failed to load performance data');
@@ -43,7 +53,10 @@ export default function AdminTargets() {
   const loadMonthlyData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await adminAPI.vgeMonthlyReport({ month: selectedMonth });
+      const res = await adminAPI.vgeMonthlyReport({ 
+        month: selectedMonth,
+        storeId: storeFilterId || currentUser?.storeId
+      });
       setMonthlySummaries(res.data);
     } catch (err) {
       toast.error('Failed to load monthly data');
@@ -54,7 +67,7 @@ export default function AdminTargets() {
 
   const loadConfig = useCallback(async () => {
     try {
-      const res = await adminAPI.vgeGetConfig();
+      const res = await adminAPI.vgeGetConfig({ storeId: storeFilterId || currentUser?.storeId });
       const loadedConfig = res.data;
       if (!Array.isArray(loadedConfig.rules)) {
         if (typeof loadedConfig.rules === 'string') {
@@ -78,7 +91,10 @@ export default function AdminTargets() {
   const handleRecalculate = async () => {
     try {
       setIsSubmitting(true);
-      await adminAPI.vgeRecalculate({ date: selectedDate });
+      await adminAPI.vgeRecalculate({ 
+        date: selectedDate,
+        storeId: storeFilterId || currentUser?.storeId
+      });
       toast.success('Recalculation triggered');
       loadDailyData();
     } catch (err) {
@@ -91,7 +107,10 @@ export default function AdminTargets() {
   const handleEndOfDay = async () => {
     try {
       setIsSubmitting(true);
-      const res = await adminAPI.vgeEndOfDay({ date: selectedDate });
+      const res = await adminAPI.vgeEndOfDay({ 
+        date: selectedDate,
+        storeId: storeFilterId || currentUser?.storeId
+      });
       toast.success(res.data.message);
       loadDailyData();
     } catch (err) {
@@ -104,7 +123,10 @@ export default function AdminTargets() {
   const handleGenerateMonthly = async () => {
     try {
       setIsSubmitting(true);
-      const res = await adminAPI.vgeGenerateMonthly({ month: selectedMonth });
+      const res = await adminAPI.vgeGenerateMonthly({ 
+        month: selectedMonth,
+        storeId: storeFilterId || currentUser?.storeId
+      });
       toast.success(res.data.message);
       loadMonthlyData();
     } catch (err) {
@@ -120,7 +142,10 @@ export default function AdminTargets() {
       const { id, updatedAt, ...data } = config;
       // Ensure rules are saved properly
       if (!Array.isArray(data.rules)) data.rules = [];
-      await adminAPI.vgeUpdateConfig(data);
+      await adminAPI.vgeUpdateConfig({ 
+        ...data,
+        storeId: storeFilterId || currentUser?.storeId
+      });
       toast.success('Configuration saved');
     } catch (err) {
       toast.error('Failed to save config');
@@ -256,11 +281,37 @@ export default function AdminTargets() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Targets & Incentives</h2>
-          <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">VGE Performance Module</p>
+      <div className="flex items-center justify-between pb-4">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+            <Target size={24} />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">VGE Performance</h2>
+              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                {performances.length} Agents
+              </span>
+            </div>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                <Store size={10} />
+                {currentUser?.storeId ? (performances[0]?.user?.store?.name || 'Assigned Branch') : (storeFilterId ? 'Selected Branch' : 'Cross-Branch View')}
+              </p>
+              {(currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN') && (
+                <button 
+                  onClick={() => window.location.href = '/admin'} 
+                  className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest underline underline-offset-2 ml-1"
+                >
+                  Change Store
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        <div className="text-right hidden sm:block">
+          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Tracking</p>
+          <p className="text-xs font-bold text-gray-500">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</p>
         </div>
       </div>
 

@@ -37,7 +37,7 @@ export const createOrderFromCart = async (req, res, next) => {
         // 2. Bulk fetch product details and calculate totals
         const productIds = cartItems.map((i) => i.productId);
         const products = await prisma.product.findMany({
-            where: { id: { in: productIds } },
+            where: { id: { in: productIds }, tenantId: req.user.tenantId },
         });
 
         const productMap = products.reduce((acc, p) => {
@@ -120,7 +120,9 @@ export const createOrderFromCart = async (req, res, next) => {
         if (vehicleId) {
             for (const item of orderItemsData) {
                 const stock = await prisma.vehicleStock.findUnique({
-                    where: { vehicleId_productId: { vehicleId, productId: item.productId } }
+                    where: { 
+                        vehicleId_productId: { vehicleId, productId: item.productId }
+                    }
                 });
                 
                 if (!stock || stock.quantity < item.quantity) {
@@ -145,6 +147,8 @@ export const createOrderFromCart = async (req, res, next) => {
         const order = await prisma.$transaction(async (tx) => {
             const newOrder = await tx.order.create({
                 data: {
+                    tenantId: req.user.tenantId,
+                    storeId: req.user.storeId,
                     customerName: customerName || null,
                     mobile: mobile || null,
                     totalAmount: totalAmount,
@@ -156,7 +160,11 @@ export const createOrderFromCart = async (req, res, next) => {
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
                     items: {
-                        create: orderItemsData,
+                        create: orderItemsData.map(item => ({ 
+                            ...item, 
+                            tenantId: req.user.tenantId,
+                            storeId: req.user.storeId
+                        })),
                     },
                 },
                 include: { items: true },
@@ -172,6 +180,7 @@ export const createOrderFromCart = async (req, res, next) => {
 
         res.status(201).json(order);
     } catch (error) {
+        console.error('[Order Create Error]:', error);
         next(error);
     }
 };
@@ -189,7 +198,7 @@ export const completePayment = async (req, res, next) => {
         }
 
         const order = await prisma.order.findUnique({
-            where: { id: orderId },
+            where: { id: orderId, tenantId: req.user.tenantId },
             include: { items: true },
         });
 
@@ -219,6 +228,8 @@ export const completePayment = async (req, res, next) => {
             // Create payment record
             await tx.payment.create({
                 data: {
+                    tenantId: req.user.tenantId,
+                    storeId: req.user.storeId,
                     orderId: orderId,
                     paymentMode: paymentMode,
                     amount: order.totalAmount,
@@ -319,7 +330,7 @@ export const completePayment = async (req, res, next) => {
 export const getOrderById = async (req, res, next) => {
     try {
         const order = await prisma.order.findUnique({
-            where: { id: req.params.id },
+            where: { id: req.params.id, tenantId: req.user.tenantId },
             include: {
                 items: {
                     include: {
@@ -355,6 +366,7 @@ export const getOrderById = async (req, res, next) => {
 
         res.json({ ...order, items: enrichedItems });
     } catch (error) {
+        console.error('[Payment Completion Error]:', error);
         next(error);
     }
 };

@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check } from 'lucide-react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
+import { useUserStore } from '../../store/userStore';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -13,6 +16,7 @@ export default function AdminInventory() {
   const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [items, setItems] = useState([]);
   const [vehicles, setVehicles] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
@@ -33,6 +37,12 @@ export default function AdminInventory() {
   const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const location = useLocation();
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  const currentUser = useUserStore(s => s.user);
 
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -72,12 +82,13 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
-      const [iRes, vRes, sRes, cRes, uRes] = await Promise.all([
-        adminAPI.getItems(),
-        adminAPI.getVehicles(),
+      const [iRes, vRes, sRes, cRes, uRes, storeRes] = await Promise.all([
+        adminAPI.getItems({ storeId: storeFilterId }),
+        adminAPI.getVehicles({ storeId: storeFilterId }),
         adminAPI.getSettings(),
         adminAPI.getCategories(),
-        adminAPI.getUnits()
+        adminAPI.getUnits(),
+        adminAPI.getStores()
       ]);
       setItems(iRes.data);
       setVehicles(vRes.data);
@@ -85,6 +96,9 @@ export default function AdminInventory() {
       setUnits(uRes.data || []);
       if (sRes.data?.success && sRes.data?.data?.taxRates) {
         setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
+      }
+      if (storeRes.data?.success) {
+        setStores(storeRes.data.data);
       }
     } catch (error) {
       toast.error('Failed to fetch inventory data');
@@ -95,7 +109,7 @@ export default function AdminInventory() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [storeFilterId]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -197,7 +211,7 @@ export default function AdminInventory() {
 
   const loadRefillRequests = async () => {
     try {
-      const { data } = await adminAPI.getRefillRequests();
+      const { data } = await adminAPI.getRefillRequests({ storeId: storeFilterId });
       setRefillRequests(data);
     } catch (error) {
       toast.error('Failed to load refill requests');
@@ -363,6 +377,12 @@ export default function AdminInventory() {
           formData.append(key, newItem[key]);
         }
       });
+      
+      // Enforce storeId isolation during creation
+      const currentStoreId = storeFilterId || currentUser.storeId;
+      if (currentStoreId) {
+        formData.append('storeId', currentStoreId);
+      }
 
       if (selectedFile) {
         formData.append('image', selectedFile);
@@ -435,6 +455,12 @@ export default function AdminInventory() {
           formData.append(key, editItem[key]);
         }
       });
+
+      // Enforce storeId isolation during update
+      const currentStoreId = storeFilterId || currentUser.storeId;
+      if (currentStoreId) {
+        formData.append('storeId', currentStoreId);
+      }
 
       if (selectedEditFile) {
         formData.append('image', selectedEditFile);
@@ -638,6 +664,11 @@ export default function AdminInventory() {
   }, [filteredItems, currentPage, itemsPerPage]);
 
   const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+
+  // Gatekeeper removed for Tenant Owners to allow "All Stores" inventory view
+
+  // Filter vehicles specifically for the selected store scope inside Inventory Tracking/Returns
+  const activeVehicles = vehicles.filter(v => (!storeFilterId || v.storeId === storeFilterId));
 
   const renderMaster = () => {
     const renderProductCard = (item) => {
@@ -2142,10 +2173,39 @@ export default function AdminInventory() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold text-gray-900">Inventory Management</h2>
-          <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
+            {isTenantRoute && (
+              <>
+                <span className="text-gray-300">•</span>
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.25rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
         </div>
         {activeTab === 'master' && (
           <div className="flex gap-2">

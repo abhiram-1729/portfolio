@@ -68,36 +68,68 @@ const prisma = basePrisma.$extends({
             
             // Injection for Write operations
             if (operation === 'create' || operation === 'upsert') {
-              const useRelationModels = ['Order', 'OrderItem', 'Product', 'User', 'Category', 'Brand', 'Tenant'];
-              const connectTenant = { tenant: { connect: { id: tenantId } } };
-              const scalarTenant = { tenantId };
+              const relationalMandatory = ['Order', 'Payment', 'User', 'Store', 'Tenant']; // Models where scalars are hidden in CreateInput (mostly Order)
+              
+              const h_clean = (modelName, obj) => {
+                if (!obj || typeof obj !== 'object') return obj;
+                const data = { ...obj };
+                const isRelationalMandatory = relationalMandatory.includes(modelName);
+
+                // Handle Tenant Isolation
+                const tId = data.tenantId || tenantId;
+                if (tId) {
+                  if (isRelationalMandatory && modelName !== 'Tenant') {
+                    delete data.tenantId;
+                    data.tenant = { connect: { id: tId } };
+                  } else {
+                    data.tenantId = tId;
+                  }
+                }
+                
+                // Handle Store Isolation
+                const sId = data.storeId || null;
+                if (sId && modelName !== 'Tenant') {
+                  if (isRelationalMandatory) {
+                    delete data.storeId;
+                    data.store = { connect: { id: sId } };
+                  } else {
+                    data.storeId = sId;
+                  }
+                }
+
+                // Recursive handling for nested creates
+                for (const key in data) {
+                  if (data[key] && typeof data[key] === 'object' && !['tenant', 'store', 'user', 'vehicle', 'route'].includes(key)) {
+                    const val = data[key];
+                    if (val.create) {
+                      let nestedModel = key.charAt(0).toUpperCase() + key.slice(1);
+                      if (nestedModel.endsWith('s')) nestedModel = nestedModel.slice(0, -1);
+                      if (key === 'items') nestedModel = 'OrderItem';
+                      if (key === 'orderItems') nestedModel = 'OrderItem';
+
+                      if (Array.isArray(val.create)) {
+                        val.create = val.create.map(d => h_clean(nestedModel, d));
+                      } else {
+                        val.create = h_clean(nestedModel, val.create);
+                      }
+                    }
+                  }
+                }
+                return data;
+              };
 
               if (operation === 'create') {
-                const hasTenant = args.data.tenantId || args.data.tenant;
-                if (!hasTenant) {
-                  if (useRelationModels.includes(model)) {
-                    args.data = { ...args.data, ...connectTenant };
-                  } else {
-                    args.data = { ...args.data, ...scalarTenant };
-                  }
-                }
+                args.data = h_clean(model, args.data);
               } else if (operation === 'upsert') {
-                const hasCreateTenant = args.create.tenantId || args.create.tenant;
-                if (!hasCreateTenant) {
-                  if (useRelationModels.includes(model)) {
-                    args.create = { ...args.create, ...connectTenant };
-                    if (model !== 'Tenant') args.update = { ...args.update, ...connectTenant };
-                  } else {
-                    args.create = { ...args.create, ...scalarTenant };
-                    args.update = { ...args.update, ...scalarTenant };
-                  }
-                }
+                args.create = h_clean(model, args.create);
+                args.update = h_clean(model, args.update);
               }
             } else if (operation === 'createMany') {
-              if (Array.isArray(args.data)) {
+              if (args.data && Array.isArray(args.data)) {
                 args.data = args.data.map(d => {
                   const hasTenant = d.tenantId || d.tenant;
-                  return hasTenant ? d : { ...d, tenantId };
+                  if (!hasTenant) return { ...d, tenantId };
+                  return d;
                 });
               }
             }

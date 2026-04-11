@@ -72,15 +72,11 @@ export async function updateDailyPerformance(userId, date = null) {
     // Get user and their current active route assignment to track route contribution
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      include: { 
-        routeAssignments: { 
-          where: { status: true },
-          take: 1
-        } 
-      }
+      select: { id: true, tenantId: true, storeId: true, vgeType: true, routeAssignments: { where: { status: true }, take: 1 } }
     });
 
     const routeId = user?.routeAssignments?.[0]?.routeId || null;
+    const storeId = user?.storeId || null;
 
     // Check if day is locked (finalized)
     const existing = await prisma.vgeDailyPerformance.findUnique({
@@ -141,11 +137,13 @@ export async function updateDailyPerformance(userId, date = null) {
         salesIncentive: result.salesIncentive,
         regIncentive: result.regIncentive,
         totalIncentive: result.totalIncentive,
-        routeId
+        routeId,
+        storeId
       },
       create: {
         userId,
         tenantId: user.tenantId,
+        storeId,
         date: dateStr,
         routeId,
         totalSales,
@@ -282,8 +280,9 @@ export async function generateMonthlySummary(monthStr = null) {
     let count = 0;
 
     for (const [userId, records] of Object.entries(groups)) {
-      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true, tenantId: true, storeId: true, vgeType: true, baseSalary: true } });
       const config = await getConfig(user?.tenantId);
+      const storeId = user?.storeId || null;
       const totalSales = records.reduce((sum, r) => sum + r.totalSales, 0);
       const totalRegistrations = records.reduce((sum, r) => sum + r.totalRegistrations, 0);
       const totalIncentive = records.reduce((sum, r) => sum + r.totalIncentive, 0);
@@ -318,6 +317,7 @@ export async function generateMonthlySummary(monthStr = null) {
           totalOrders,
           workingDays,
           bestLevel,
+          storeId,
           metadata: { 
             baseSalary, 
             bonus, 
@@ -328,6 +328,8 @@ export async function generateMonthlySummary(monthStr = null) {
         },
         create: {
           userId,
+          tenantId: user.tenantId,
+          storeId,
           month,
           totalSales,
           totalRegistrations,
@@ -358,14 +360,19 @@ export async function generateMonthlySummary(monthStr = null) {
 /**
  * Get leaderboard for a specific date
  */
-export async function getLeaderboard(dateStr = null, sortBy = 'totalSales') {
+export async function getLeaderboard(dateStr = null, sortBy = 'totalSales', tenantId = null, storeId = null) {
   const date = dateStr || toISTDateString();
 
   const validSortFields = ['totalSales', 'totalRegistrations', 'totalIncentive'];
   const orderField = validSortFields.includes(sortBy) ? sortBy : 'totalSales';
 
+  const where = { date, tenantId };
+  if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+    where.storeId = storeId;
+  }
+
   const leaderboard = await prisma.vgeDailyPerformance.findMany({
-    where: { date },
+    where,
     orderBy: { [orderField]: 'desc' },
     include: {
       user: {

@@ -18,6 +18,8 @@ import { getAdminReconciliation } from '../../services/cashService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
 
 export default function AdminDashboard() {
   const { user: currentUser } = useUserStore();
@@ -26,13 +28,17 @@ export default function AdminDashboard() {
   const [vgeStats, setVgeStats] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const location = useLocation();
+
   useEffect(() => {
     const fetchData = async () => {
       try {
         const [statsRes, cashRes, vgeRes] = await Promise.all([
-          adminAPI.getDashboardStats(),
-          getAdminReconciliation(format(new Date(), 'yyyy-MM-dd')),
-          adminAPI.vgeAllPerformance({ date: format(new Date(), 'yyyy-MM-dd') })
+          adminAPI.getDashboardStats({ storeId: storeFilterId }),
+          getAdminReconciliation(format(new Date(), 'yyyy-MM-dd'), storeFilterId),
+          adminAPI.vgeAllPerformance({ date: format(new Date(), 'yyyy-MM-dd'), storeId: storeFilterId })
         ]);
         setStats(statsRes.data);
         setCashStats(cashRes);
@@ -45,7 +51,7 @@ export default function AdminDashboard() {
       }
     };
     fetchData();
-  }, []);
+  }, [storeFilterId]);
 
   if (loading) {
     return (
@@ -71,13 +77,42 @@ export default function AdminDashboard() {
 
   const totalSales = stats?.totalSales || 1; // Avoid division by zero
 
+  // Gatekeeper integration
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  
+  if (isGlobalRole && isTenantRoute && !storeFilterId) {
+    return (
+       <StoreSelector 
+         title="Dashboard Overview"
+         description="Choose a specific store branch to visualize its live dashboard metrics."
+         onSelect={(id) => {
+           setSearchParams({ storeId: id });
+         }}
+       />
+    );
+  }
+
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-bold text-gray-900">Dashboard</h2>
-        <p className="text-sm text-gray-500">
-          Adminizing <span className="text-emerald-600 font-black">{currentUser?.tenantName || currentUser?.tenant?.name || 'Organization'}</span>
-        </p>
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard</h2>
+        <div className="flex items-center gap-2">
+          <p className="text-sm text-gray-500">
+            Adminizing <span className="text-emerald-600 font-bold">{currentUser?.tenantName || currentUser?.tenant?.name || 'Organization'}</span>
+          </p>
+          {isTenantRoute && storeFilterId && (
+            <>
+              <span className="text-gray-300">•</span>
+              <button 
+                onClick={() => setSearchParams({})} 
+                className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
+              >
+                Change Store
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

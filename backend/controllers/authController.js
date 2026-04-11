@@ -12,7 +12,7 @@ export const loginUser = async (req, res, next) => {
 
         const user = await prisma.user.findUnique({
             where: { mobile },
-            include: { assignedVehicle: true, tenant: true },
+            include: { assignedVehicle: true, tenant: true, store: true },
         });
         console.log(`[DEBUG] User found: ${!!user}, Status: ${user?.status}, Role: ${user?.role}`);
 
@@ -48,6 +48,8 @@ export const loginUser = async (req, res, next) => {
                 id: user.id,
                 tenantId: user.tenantId,
                 tenantName: user.tenant?.name,
+                storeId: user.storeId,
+                storeName: user.store?.name,
                 name: user.name,
                 email: user.email,
                 mobile: user.mobile,
@@ -83,6 +85,7 @@ export const getUserProfile = async (req, res, next) => {
             where: { id: req.user.id },
             include: {
                 tenant: { select: { name: true, logo: true } },
+                store: { select: { name: true, code: true } },
                 assignedVehicle: true
             }
         });

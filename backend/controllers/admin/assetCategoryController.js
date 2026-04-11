@@ -2,8 +2,13 @@ import prisma from '../../utils/prisma.js';
 
 export const getAssetCategories = async (req, res) => {
   try {
+    const { storeId: queryStoreId } = req.query;
+    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
+
+    const tenantId = req.user.tenantId;
+
     const categories = await prisma.assetCategory.findMany({
-      where: { status: true },
+      where: { storeId, status: true, tenantId },
       orderBy: { name: 'asc' }
     });
     res.json(categories);
@@ -15,11 +20,17 @@ export const getAssetCategories = async (req, res) => {
 
 export const createAssetCategory = async (req, res) => {
   try {
-    const { name } = req.body;
+    const { name, storeId: bodyStoreId } = req.body;
+    const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
+
     if (!name) return res.status(400).json({ message: 'Category name is required' });
 
     const category = await prisma.assetCategory.create({
-      data: { name }
+      data: { 
+        name,
+        tenantId: req.user.tenantId,
+        storeId
+      }
     });
     res.status(201).json(category);
   } catch (error) {

@@ -17,12 +17,13 @@ export const getTodayReport = async (req, res, next) => {
         tomorrow.setDate(tomorrow.getDate() + 1);
 
         const agent = await prisma.user.findUnique({
-            where: { id: agentId },
+            where: { id: agentId, tenantId: req.user.tenantId },
             select: { dailyTarget: true },
         });
 
         const orders = await prisma.order.findMany({
             where: {
+                tenantId: req.user.tenantId,
                 agentId: agentId,
                 status: 'COMPLETED',
                 createdAt: {
@@ -85,12 +86,13 @@ export const getDateReport = async (req, res, next) => {
         endDate.setDate(endDate.getDate() + 1);
 
         const agent = await prisma.user.findUnique({
-            where: { id: agentId },
+            where: { id: agentId, tenantId: req.user.tenantId },
             select: { dailyTarget: true },
         });
 
         const orders = await prisma.order.findMany({
             where: {
+                tenantId: req.user.tenantId,
                 agentId: agentId,
                 status: 'COMPLETED',
                 createdAt: {

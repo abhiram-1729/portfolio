@@ -44,7 +44,7 @@ export default function Header({ onMenuClick }) {
           <Link to="/" className="flex items-center gap-2 group ml-1">
             <img src={logo} alt="VillagKart" className="h-7 w-auto object-contain drop-shadow-sm group-active:scale-95 transition-transform" />
             <div className="hidden xs:flex flex-col">
-              <span className="text-[7px] font-black uppercase tracking-[0.2em] text-emerald-600 leading-none mb-0.5">VillagKart</span>
+              <span className="text-[7px] font-black uppercase tracking-[0.2em] text-emerald-600 leading-none mb-0.5">{user?.storeName || user?.tenantName || 'VillagKart'}</span>
               <span className="text-[10px] font-bold text-emerald-950 leading-none truncate max-w-[80px]">{user?.name}</span>
             </div>
           </Link>

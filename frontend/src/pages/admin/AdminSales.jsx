@@ -1,25 +1,41 @@
 import React, { useState, useEffect } from 'react';
 import { Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, Loader2 } from 'lucide-react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
+import { useUserStore } from '../../store/userStore';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
 export default function AdminSales() {
   const [sales, setSales] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDate, setFilterDate] = useState('Today');
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const location = useLocation();
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  const currentUser = useUserStore(s => s.user);
 
   const fetchSales = async () => {
     try {
       setLoading(true);
-      const params = {};
+      const params = { storeId: storeFilterId };
       if (filterDate === 'Today') {
         params.fromDate = new Date().toISOString().split('T')[0];
       }
       // Add more filter logic if needed
 
-      const { data } = await adminAPI.getSales(params);
-      setSales(data);
+      const [salesRes, storesRes] = await Promise.all([
+        adminAPI.getSales(params),
+        adminAPI.getStores()
+      ]);
+      setSales(salesRes.data);
+      if (storesRes.data?.success) {
+        setStores(storesRes.data.data);
+      }
     } catch (error) {
       toast.error('Failed to fetch sales history');
     } finally {
@@ -29,7 +45,7 @@ export default function AdminSales() {
 
   useEffect(() => {
     fetchSales();
-  }, [filterDate]);
+  }, [filterDate, storeFilterId]);
 
   if (loading) {
     return (
@@ -40,12 +56,52 @@ export default function AdminSales() {
     );
   }
 
+  // Gatekeeper removed for Tenant Owners to allow "All Stores" sales view
+
+  // Apply Store filter mathematically to sales
+  const listToRender = sales.filter(s => {
+      if (storeFilterId && s.storeId !== storeFilterId) return false;
+      const query = searchQuery.toLowerCase();
+      const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
+      const customerName = s.customerName ? s.customerName.toLowerCase() : '';
+      return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery)) || customerName.includes(query);
+  });
+
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Sales Management</h2>
-          <p className="text-sm text-gray-500">View and manage all transaction history</p>
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
+            {isTenantRoute && (
+              <>
+                <span className="text-gray-300">•</span>
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.25rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
         </div>
         <button className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors">
           <Download size={24} />
@@ -89,14 +145,7 @@ export default function AdminSales() {
           <>
             {/* Mobile View */}
             <div className="space-y-4 md:hidden">
-              {sales
-                .filter(s => {
-                  const query = searchQuery.toLowerCase();
-                  const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
-                  const customerName = s.customerName ? s.customerName.toLowerCase() : '';
-                  return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery)) || customerName.includes(query);
-                })
-                .map((sale) => (
+              {listToRender.map((sale) => (
                   <div key={sale.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
@@ -161,14 +210,7 @@ export default function AdminSales() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 text-sm">
-                  {sales
-                    .filter(s => {
-                      const query = searchQuery.toLowerCase();
-                      const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
-                      const customerName = s.customerName ? s.customerName.toLowerCase() : '';
-                      return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery)) || customerName.includes(query);
-                    })
-                    .map((sale) => (
+                  {listToRender.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50/30 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex flex-col">

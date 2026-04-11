@@ -3,17 +3,32 @@ import prisma from '../../utils/prisma.js';
 // Get current business settings
 export const getSettings = async (req, res) => {
   try {
-    // findFirst will be automatically scoped by extension
-    let settings = await prisma.businessSettings.findFirst();
-    
-    // If no settings exist yet, create default for this tenant
+    const storeId = req.query.storeId || req.user.storeId || null;
+    const tenantId = req.user.tenantId;
+
+    // 1. Try to fetch store-specific settings
+    let settings = null;
+    if (storeId) {
+      settings = await prisma.businessSettings.findUnique({
+        where: { tenantId_storeId: { tenantId, storeId } }
+      });
+    }
+
+    // 2. If no store settings, try to fetch global tenant settings
     if (!settings) {
-      settings = await prisma.businessSettings.create({
+      settings = await prisma.businessSettings.findUnique({
+        where: { tenantId_storeId: { tenantId, storeId: null } }
+      });
+    }
+    
+    // 3. If still no settings exist, return the defaults (don't create yet to avoid junk data)
+    if (!settings) {
+      return res.json({ 
+        success: true, 
         data: {
           businessName: 'VillagKart',
-          taxRates: '0,5,12,18',
-          // tenantId injected by extension
-        }
+          taxRates: '0,5,12,18'
+        } 
       });
     }
     
@@ -27,12 +42,12 @@ export const getSettings = async (req, res) => {
 // Update business settings
 export const updateSettings = async (req, res) => {
   try {
-    const { businessName, gstNo, contactNo, email, address, taxRates } = req.body;
+    const { businessName, gstNo, contactNo, email, address, taxRates, storeId: bodyStoreId } = req.body;
     const tenantId = req.user.tenantId;
+    const storeId = bodyStoreId || req.user.storeId || null;
 
-    // Use tenantId for uniqueness
     const settings = await prisma.businessSettings.upsert({
-      where: { tenantId }, 
+      where: { tenantId_storeId: { tenantId, storeId } },
       update: {
         businessName,
         gstNo,
@@ -48,7 +63,8 @@ export const updateSettings = async (req, res) => {
         email,
         address,
         taxRates,
-        tenantId
+        tenantId,
+        storeId: storeId || null
       }
     });
 

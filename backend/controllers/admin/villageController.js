@@ -3,7 +3,10 @@ import prisma from '../../utils/prisma.js';
 export const createVillage = async (req, res, next) => {
     try {
         console.log('[VillageControl] Create Body:', req.body);
-        const { name, latitude, longitude } = req.body;
+        const { name, latitude, longitude, storeId: bodyStoreId } = req.body;
+        const tenantId = req.user.tenantId || "VK001";
+        const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
+
         if (!name) {
             res.status(400);
             throw new Error('Village name is required');
@@ -16,6 +19,8 @@ export const createVillage = async (req, res, next) => {
         const village = await prisma.village.create({ 
             data: { 
                 name,
+                tenantId,
+                storeId,
                 latitude: !isNaN(lat) ? lat : null,
                 longitude: !isNaN(lng) ? lng : null
             } 
@@ -32,7 +37,16 @@ export const createVillage = async (req, res, next) => {
 
 export const getVillages = async (req, res, next) => {
     try {
-        const villages = await prisma.village.findMany({ orderBy: { name: 'asc' } });
+        const { storeId: queryStoreId } = req.query;
+        const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
+
+        const where = { tenantId: req.user.tenantId };
+        if (storeId) where.storeId = storeId;
+
+        const villages = await prisma.village.findMany({ 
+            where,
+            orderBy: { name: 'asc' } 
+        });
         res.json(villages);
     } catch (error) {
         next(error);

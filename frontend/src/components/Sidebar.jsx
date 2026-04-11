@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch, Target, Box } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch, Target, Box, Store } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 
@@ -37,21 +37,29 @@ export default function Sidebar({ isOpen, onClose }) {
       {/* Sidebar Drawer */}
       <div className={`fixed top-0 left-0 bottom-0 w-[80%] max-w-[320px] bg-white z-[70] transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl flex flex-col pt-[calc(var(--safe-top)+1rem)]`}>
         
-        {/* Header */}
-        <div className="px-6 mb-4 flex items-center justify-between">
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Merchant Portal</span>
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-            </div>
-            <h2 className="text-xl font-black text-slate-900 tracking-tight">Menu</h2>
+        {/* Store Context Layer */}
+        <div className="px-6 mb-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Store size={14} className="text-emerald-600" />
+            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Store Context</span>
           </div>
-          <button 
-            onClick={onClose}
-            className="p-2 rounded-xl bg-slate-50 text-slate-400 active:scale-95 transition-all"
-          >
-            <X size={18} strokeWidth={3} />
-          </button>
+          
+          <div className="group relative flex items-center gap-4 p-4 bg-emerald-50/50 rounded-[2rem] border border-emerald-100/50 shadow-sm transition-all hover:bg-emerald-50">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200/50">
+              <Store size={22} strokeWidth={2.5} />
+            </div>
+            <div className="flex-1 min-w-0">
+               <h3 className="text-base font-black text-slate-900 tracking-tight truncate leading-tight">
+                 {user?.storeName || user?.tenantName || 'VillagKart'}
+               </h3>
+               <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">Sales Outlet</p>
+            </div>
+          </div>
+          
+          <div className="mt-6 flex items-center justify-between px-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">Merchant Portal</span>
+            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+          </div>
         </div>
 
         {/* User Profile Summary */}

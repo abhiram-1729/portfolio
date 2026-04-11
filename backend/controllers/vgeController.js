@@ -141,8 +141,9 @@ export const getLeaderboardHandler = async (req, res) => {
   try {
     const date = req.query.date || toISTDateString();
     const sortBy = req.query.sortBy || 'totalSales';
+    const { storeId } = req.query;
 
-    const leaderboard = await getLeaderboard(date, sortBy);
+    const leaderboard = await getLeaderboard(date, sortBy, req.user.tenantId, storeId);
     res.json(leaderboard);
   } catch (error) {
     res.status(500).json({ message: 'Failed to load leaderboard', error: error.message });
@@ -158,10 +159,22 @@ export const getLeaderboardHandler = async (req, res) => {
  */
 export const getAllPerformance = async (req, res) => {
   try {
-    const date = req.query.date || toISTDateString();
+    const { date, storeId } = req.query;
+    const targetDate = date || toISTDateString();
+
+    const where = { 
+      date: targetDate, 
+      tenantId: req.user.tenantId 
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null' && storeId !== '') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
 
     const performances = await prisma.vgeDailyPerformance.findMany({
-      where: { date },
+      where,
       orderBy: { totalSales: 'desc' },
       include: {
         user: {
@@ -211,14 +224,23 @@ export const getAgentPerformance = async (req, res) => {
  */
 export const getMonthlyReport = async (req, res) => {
   try {
-    const month = req.query.month || toISTMonthString();
+    const { month, storeId: queryStoreId } = req.query;
+    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') ? queryStoreId : req.user.storeId;
+    const targetMonth = month || toISTMonthString();
+
+    const userWhere = {
+      tenantId: req.user.tenantId,
+      role: { in: ['SALES_AGENT', 'SUPERVISOR', 'HELPER'] },
+      status: 'ACTIVE'
+    };
+
+    if (storeId) {
+      userWhere.storeId = storeId;
+    }
 
     // 1. Get all relevant users (SALES_AGENT, SUPERVISOR, HELPER)
     const users = await prisma.user.findMany({
-      where: {
-        role: { in: ['SALES_AGENT', 'SUPERVISOR', 'HELPER'] },
-        status: 'ACTIVE'
-      },
+      where: userWhere,
       select: {
         id: true,
         name: true,
@@ -228,9 +250,18 @@ export const getMonthlyReport = async (req, res) => {
       }
     });
 
+    const summaryWhere = { 
+      month: targetMonth, 
+      tenantId: req.user.tenantId 
+    };
+
+    if (storeId) {
+      summaryWhere.storeId = storeId;
+    }
+
     // 2. Get existing summaries for this month
     const summaries = await prisma.vgeMonthlySummary.findMany({
-      where: { month },
+      where: summaryWhere,
       include: {
         user: {
           select: { id: true, name: true, vgeType: true, baseSalary: true, assignedVehicle: { select: { vehicleNumber: true } } }
@@ -249,7 +280,7 @@ export const getMonthlyReport = async (req, res) => {
         id: `uninitialized-${user.id}`,
         userId: user.id,
         user,
-        month,
+        month: targetMonth,
         totalSales: 0,
         totalRegistrations: 0,
         totalIncentive: 0,
@@ -281,9 +312,21 @@ export const getMonthlyReport = async (req, res) => {
  */
 export const getConfig = async (req, res) => {
   try {
-    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { tenantId: 'VK001' } });
+    const { storeId: queryStoreId } = req.query;
+    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') ? queryStoreId : req.user.storeId;
+
+    const where = { tenantId: req.user.tenantId };
+    if (storeId) where.storeId = storeId;
+    else where.storeId = null;
+
+    let config = await prisma.vgeIncentiveConfig.findFirst({ where });
     if (!config) {
-      config = await prisma.vgeIncentiveConfig.create({ data: { tenantId: 'VK001' } });
+      config = await prisma.vgeIncentiveConfig.create({ 
+        data: { 
+          tenantId: req.user.tenantId,
+          storeId: storeId || null
+        } 
+      });
     }
     res.json(config);
   } catch (error) {
@@ -297,15 +340,21 @@ export const getConfig = async (req, res) => {
  */
 export const updateConfig = async (req, res) => {
   try {
-    const data = req.body;
+    const { storeId: bodyStoreId, ...data } = req.body;
+    const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
+
     // Remove id and updatedAt from body to prevent overwrite
     delete data.id;
     delete data.updatedAt;
 
+    const where = { tenantId: req.user.tenantId, storeId: storeId || null };
+
     const config = await prisma.vgeIncentiveConfig.upsert({
-      where: { tenantId: 'VK001' },
+      where: { 
+        tenantId_storeId: where // This requires a new unique index in schema!
+      },
       update: data,
-      create: { tenantId: 'VK001', ...data }
+      create: { ...where, ...data }
     });
 
     res.json({ message: 'Configuration updated', config });

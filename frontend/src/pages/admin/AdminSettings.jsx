@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import { useUserStore } from '../../store/userStore';
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState({
@@ -34,17 +35,19 @@ export default function AdminSettings() {
   const [newAssetCategory, setNewAssetCategory] = useState({ name: '' });
   const [editingAssetCategoryId, setEditingAssetCategoryId] = useState(null);
 
+  const currentUser = useUserStore(s => s.user);
+
   useEffect(() => {
     fetchSettings();
     fetchUnits();
     fetchCategories();
     fetchAssetCategories();
-  }, []);
+  }, [currentUser?.storeId]);
 
   const fetchUnits = async () => {
     setUnitsLoading(true);
     try {
-      const { data } = await adminAPI.getUnits();
+      const { data } = await adminAPI.getUnits({ storeId: currentUser?.storeId });
       setUnits(data);
     } catch (error) {
       toast.error('Failed to load units');
@@ -56,7 +59,7 @@ export default function AdminSettings() {
   const fetchCategories = async () => {
     setCategoriesLoading(true);
     try {
-      const { data } = await adminAPI.getCategories();
+      const { data } = await adminAPI.getCategories({ storeId: currentUser?.storeId });
       setCategories(data);
     } catch (error) {
       toast.error('Failed to load categories');
@@ -68,7 +71,7 @@ export default function AdminSettings() {
   const fetchAssetCategories = async () => {
     setAssetCategoriesLoading(true);
     try {
-      const { data } = await adminAPI.getAssetCategories();
+      const { data } = await adminAPI.getAssetCategories({ storeId: currentUser?.storeId });
       setAssetCategories(data);
     } catch (error) {
       toast.error('Failed to load asset categories');
@@ -79,7 +82,7 @@ export default function AdminSettings() {
 
   const fetchSettings = async () => {
     try {
-      const { data } = await adminAPI.getSettings();
+      const { data } = await adminAPI.getSettings({ storeId: currentUser?.storeId });
       if (data.success) {
         setSettings(data.data);
       }
@@ -94,7 +97,7 @@ export default function AdminSettings() {
     e.preventDefault();
     setSaving(true);
     try {
-      const { data } = await adminAPI.updateSettings(settings);
+      const { data } = await adminAPI.updateSettings({ ...settings, storeId: currentUser?.storeId });
       if (data.success) {
         toast.success('Settings updated!');
         setActiveModal(null);
@@ -116,7 +119,7 @@ export default function AdminSettings() {
         setUnits(units.map(u => u.id === editingUnitId ? data : u));
         toast.success('Unit updated');
       } else {
-        const { data } = await adminAPI.createUnit(newUnit);
+        const { data } = await adminAPI.createUnit({ ...newUnit, storeId: currentUser?.storeId });
         setUnits([data, ...units]);
         toast.success('Unit created');
       }
@@ -150,7 +153,7 @@ export default function AdminSettings() {
         setCategories(categories.map(c => c.id === editingCategoryId ? data : c));
         toast.success('Category updated');
       } else {
-        const { data } = await adminAPI.createCategory(newCategory);
+        const { data } = await adminAPI.createCategory({ ...newCategory, storeId: currentUser?.storeId });
         setCategories([data, ...categories]);
         toast.success('Category created');
       }
@@ -184,7 +187,7 @@ export default function AdminSettings() {
         setAssetCategories(assetCategories.map(c => c.id === editingAssetCategoryId ? data : c));
         toast.success('Asset Category updated');
       } else {
-        const { data } = await adminAPI.createAssetCategory(newAssetCategory);
+        const { data } = await adminAPI.createAssetCategory({ ...newAssetCategory, storeId: currentUser?.storeId });
         setAssetCategories([data, ...assetCategories]);
         toast.success('Asset Category created');
       }

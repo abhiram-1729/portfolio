@@ -3,6 +3,9 @@ import { Package, Plus, Search, X, Loader2, Pencil, Trash2, Truck, Users, ArrowL
   CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import { useUserStore } from '../../store/userStore';
+import StoreSelector from './StoreSelector';
 
 export default function AdminAssets() {
   const [activeTab, setActiveTab] = useState('master');
@@ -43,9 +46,14 @@ export default function AdminAssets() {
   // Return form
   const [returnForm, setReturnForm] = useState({ assignmentId: '', returnCondition: 'GOOD', remarks: '' });
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeId = searchParams.get('storeId');
+  const location = useLocation();
+  const currentUser = useUserStore(s => s.user);
+
   useEffect(() => {
     fetchAll();
-  }, []);
+  }, [storeId]);
 
   useEffect(() => {
     if (activeTab === 'tracking') loadTracking();
@@ -57,8 +65,8 @@ export default function AdminAssets() {
   const fetchAll = async () => {
     try {
       const [aRes, uRes, cRes] = await Promise.all([
-        adminAPI.getAssets(),
-        adminAPI.getUsers(),
+        adminAPI.getAssets({ storeId }),
+        adminAPI.getUsers({ storeId }),
         adminAPI.getAssetCategories()
       ]);
       setAssets(aRes.data);
@@ -711,13 +719,42 @@ export default function AdminAssets() {
     </div>
   );
 
+  // Gatekeeper
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  
+  if (isGlobalRole && isTenantRoute && !storeId) {
+    return (
+       <StoreSelector 
+         title="Asset Management"
+         description="Please select a store branch to manage its inventory and equipment."
+         onSelect={(id) => {
+           setSearchParams({ storeId: id });
+         }}
+       />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold text-gray-900">Asset Management</h2>
-          <p className="text-sm text-gray-500">Track, assign and manage company assets</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500">Track, assign and manage company assets</p>
+            {isTenantRoute && storeId && (
+              <>
+                <span className="text-gray-300">•</span>
+                <button 
+                  onClick={() => setSearchParams({})} 
+                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
+                >
+                  Change Store
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 

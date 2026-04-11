@@ -15,20 +15,28 @@ import {
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import { useUserStore } from '../../store/userStore';
+import StoreSelector from './StoreSelector';
 
 export default function AdminFinanceReports() {
     const [loading, setLoading] = useState(true);
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [data, setData] = useState(null);
 
+    const [searchParams, setSearchParams] = useSearchParams();
+    const storeId = searchParams.get('storeId');
+    const location = useLocation();
+    const currentUser = useUserStore(s => s.user);
+
     useEffect(() => {
         loadData();
-    }, [date]);
+    }, [date, storeId]);
 
     const loadData = async () => {
         setLoading(true);
         try {
-            const res = await adminAPI.getFinancialReport({ date });
+            const res = await adminAPI.getFinancialReport({ date, storeId });
             setData(res);
         } catch (err) {
             toast.error('Failed to load financial data');
@@ -49,13 +57,42 @@ export default function AdminFinanceReports() {
     const totalExpenses = data?.profitability?.reduce((sum, item) => sum + item.totalExpenses, 0) || 0;
     const netProfit = totalSales - totalExpenses;
 
+    // Gatekeeper
+    const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+    const isTenantRoute = location.pathname.includes('/tenant/');
+    
+    if (isGlobalRole && isTenantRoute && !storeId) {
+      return (
+         <StoreSelector 
+           title="Financial Reports"
+           description="Please select a store branch to view its financial performance and cash reports."
+           onSelect={(id) => {
+             setSearchParams({ storeId: id });
+           }}
+         />
+      );
+    }
+
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-2xl font-bold text-gray-900">Financial Reports</h2>
-                    <p className="text-sm text-gray-500">Comprehensive overview of revenue, expenses and profitability</p>
+                    <div className="flex items-center gap-2">
+                        <p className="text-sm text-gray-500">Comprehensive overview of revenue, expenses and profitability</p>
+                        {isTenantRoute && storeId && (
+                        <>
+                            <span className="text-gray-300">•</span>
+                            <button 
+                            onClick={() => setSearchParams({})} 
+                            className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
+                            >
+                            Change Store
+                            </button>
+                        </>
+                        )}
+                    </div>
                 </div>
 
                 <div className="flex items-center gap-3">

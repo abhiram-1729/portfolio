@@ -69,7 +69,17 @@ export const getAssetCatalog = async (req, res) => {
 
 export const getAssets = async (req, res) => {
   try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
+
     const assets = await prisma.asset.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         units: {

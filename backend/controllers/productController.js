@@ -24,6 +24,7 @@ export const getProducts = async (req, res, next) => {
 
         const query = {
             where: {
+                tenantId: req.user.tenantId,
                 status: 'ACTIVE'
             },
 
@@ -97,7 +98,7 @@ export const getProducts = async (req, res, next) => {
 export const getProductById = async (req, res, next) => {
     try {
         const product = await prisma.product.findUnique({
-            where: { id: req.params.id },
+            where: { id: req.params.id, tenantId: req.user.tenantId },
             include: {
                 category: true,
                 subCategory: true,
@@ -128,10 +129,14 @@ export const requestRefill = async (req, res, next) => {
 
         const refillRequest = await prisma.refillRequest.create({
             data: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 vehicleId,
                 userId: req.user.id,
                 items: {
                     create: items.map(i => ({
+                        tenantId: req.user.tenantId,
+                        storeId: req.user.storeId,
                         productId: i.productId,
                         quantity: parseInt(i.quantity, 10)
                     }))

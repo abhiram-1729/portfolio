@@ -2,10 +2,12 @@ import prisma from '../../utils/prisma.js';
 
 export const getSalesHistory = async (req, res) => {
   try {
-    const { fromDate, toDate, vehicleId, userId } = req.query;
+    const { fromDate, toDate, vehicleId, userId, storeId } = req.query;
     
     // Build query
-    let whereClause = {};
+    let whereClause = {
+      tenantId: req.user.tenantId
+    };
 
     if (fromDate || toDate) {
       whereClause.createdAt = {};
@@ -15,6 +17,13 @@ export const getSalesHistory = async (req, res) => {
 
     if (vehicleId) whereClause.vehicleId = vehicleId;
     if (userId) whereClause.userId = userId;
+    
+    // Filter by store using the direct storeId column
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      whereClause.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      whereClause.storeId = req.user.storeId;
+    }
 
     const sales = await prisma.order.findMany({
       where: whereClause,

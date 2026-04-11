@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -17,7 +17,9 @@ import {
   Target,
   Box,
   Receipt,
-  PieChart
+  PieChart,
+  Store,
+  ChevronDown
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -37,6 +39,17 @@ export default function AdminLayout() {
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const [searchParams] = useSearchParams();
+  const activeStoreId = searchParams.get('storeId');
+  const activeStoreName = searchParams.get('storeName');
+  
+  const displayStoreName = activeStoreName || user?.storeName || user?.tenantName || 'VillagKart';
+
+  const appendParams = (path) => {
+    if (!activeStoreId) return path;
+    const separator = path.includes('?') ? '&' : '?';
+    return `${path}${separator}storeId=${activeStoreId}&storeName=${activeStoreName || ''}`;
+  };
 
   const handleLogout = () => {
     clearUser();
@@ -66,8 +79,11 @@ export default function AdminLayout() {
       {/* Header */}
       <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <img src={logo} alt="VillagKart" className="h-14 w-auto" />
-          <h1 className="text-xl font-bold text-emerald-600">Admin Portal</h1>
+          <img src={logo} alt="VillagKart" className="h-10 w-auto" />
+          <div className="flex flex-col">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
+            <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
+          </div>
         </div>
         <div className="flex items-center gap-4 relative">
           <button
@@ -101,33 +117,72 @@ export default function AdminLayout() {
 
 
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex-col py-6">
-        <div className="px-6 mb-8 flex items-center gap-3">
-          <img src={logo} alt="VillagKart" className="h-10 w-auto" />
-          <div>
-            <h2 className="text-2xl font-bold text-emerald-600 leading-tight">VillagKart</h2>
-            <p className="text-[10px] text-gray-400 uppercase tracking-widest font-bold">Admin Portal</p>
+      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex-col pt-8 pb-6">
+        {/* Global Layer: Stores */}
+        <div className="px-6 mb-8">
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 w-fit mb-6">
+            <Store size={14} className="text-gray-400" />
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Stores</span>
+          </div>
+
+          <div className="flex items-center gap-4 mb-2 group cursor-pointer">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200 transition-transform group-hover:scale-105">
+              <Store size={24} strokeWidth={2.5} />
+            </div>
+            <div>
+              <h2 className="text-xl font-black text-gray-900 leading-tight flex items-center gap-2">
+                {displayStoreName}
+                <ChevronDown size={14} className="text-gray-400 group-hover:text-emerald-500 transition-colors" />
+              </h2>
+              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Store Outlet</p>
+            </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200",
-                isActive
-                  ? "bg-emerald-50 text-emerald-600 shadow-sm"
-                  : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-              )}
-            >
-              <item.icon size={20} />
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
+        <div className="flex-1 overflow-y-auto px-4 space-y-6">
+          <div className="relative pl-4">
+            <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-100 ml-[2px]" />
+            
+            <div className="mb-4">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] px-4 py-2 border-l-2 border-emerald-500 -ml-[18px]">
+                Admin Portal
+              </p>
+            </div>
+
+            <nav className="space-y-1">
+              {navItems.map((item) => (
+                <NavLink
+                  key={item.to}
+                  to={appendParams(item.to)}
+                  end={item.end}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200",
+                    isActive
+                      ? "bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                  )}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon size={18} strokeWidth={isActive ? 2.5 : 2} />
+                      {item.label}
+                    </>
+                  )}
+                </NavLink>
+              ))}
+            </nav>
+          </div>
+        </div>
+
+        <div className="px-6 mt-6 pt-6 border-t border-gray-50">
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+          >
+            <LogOut size={18} />
+            <span>Logout</span>
+          </button>
+        </div>
       </aside>
 
       {/* Main Content */}
@@ -140,7 +195,7 @@ export default function AdminLayout() {
         {navItems.slice(0, 5).map((item) => (
           <NavLink
             key={item.to}
-            to={item.to}
+            to={appendParams(item.to)}
             end={item.end}
             className={({ isActive }) => cn(
               "flex flex-col items-center gap-1 transition-all duration-200 min-w-[64px]",
@@ -176,7 +231,10 @@ export default function AdminLayout() {
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4 pb-2 border-b">
-              <span className="font-bold text-gray-900">More Options</span>
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">VillagKart</span>
+                <span className="font-bold text-gray-900">Admin Portal</span>
+              </div>
               <button onClick={() => setIsMobileMenuOpen(false)} className="p-1 hover:bg-gray-100 rounded-full">
                 <X size={20} className="text-gray-500" />
               </button>
@@ -185,7 +243,7 @@ export default function AdminLayout() {
               {navItems.slice(5).map((item) => (
                 <NavLink
                   key={item.to}
-                  to={item.to}
+                  to={appendParams(item.to)}
                   onClick={() => setIsMobileMenuOpen(false)}
                   className={({ isActive }) => cn(
                     "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium border transition-all duration-200",
@@ -194,8 +252,12 @@ export default function AdminLayout() {
                       : "bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100"
                   )}
                 >
-                  <item.icon size={20} />
-                  {item.label}
+                  {({ isActive }) => (
+                    <>
+                      <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                      {item.label}
+                    </>
+                  )}
                 </NavLink>
               ))}
             </div>

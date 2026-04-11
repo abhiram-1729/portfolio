@@ -2,14 +2,24 @@ import prisma from '../../utils/prisma.js';
 
 export const getDailyReport = async (req, res) => {
   try {
+    const { storeId } = req.query;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const where = {
+      tenantId: req.user.tenantId,
+      createdAt: { gte: today },
+      status: { not: 'CANCELLED' }
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+
     const orders = await prisma.order.findMany({
-      where: {
-        createdAt: { gte: today },
-        status: { not: 'CANCELLED' }
-      },
+      where,
       include: { items: true },
     });
 
@@ -38,17 +48,27 @@ export const getTrendsReport = async (req, res) => {
   try {
     const days = parseInt(req.query.days) || 7;
 
+    const { storeId } = req.query;
     const endDate = new Date();
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - (days - 1));
     startDate.setHours(0, 0, 0, 0);
 
+    const where = {
+      tenantId: req.user.tenantId,
+      createdAt: { gte: startDate, lte: endDate },
+      status: { not: 'CANCELLED' },
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
+
     // Fetch all orders in the range with ONE query
     const orders = await prisma.order.findMany({
-      where: {
-        createdAt: { gte: startDate, lte: endDate },
-        status: { not: 'CANCELLED' },
-      },
+      where,
       include: { items: true },
     });
 
@@ -93,15 +113,26 @@ export const getTrendsReport = async (req, res) => {
 // Top selling products
 export const getTopProducts = async (req, res) => {
   try {
+    const { storeId } = req.query;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const orderFilter = {
+      tenantId: req.user.tenantId,
+      createdAt: { gte: today },
+      status: { not: 'CANCELLED' },
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      orderFilter.storeId = storeId;
+    } else if (req.user.storeId) {
+      orderFilter.storeId = req.user.storeId;
+    }
+
     const orderItems = await prisma.orderItem.findMany({
       where: {
-        order: {
-          createdAt: { gte: today },
-          status: { not: 'CANCELLED' },
-        },
+        tenantId: req.user.tenantId,
+        order: orderFilter,
       },
       include: { product: { select: { name: true, image: true } } },
     });
@@ -139,7 +170,11 @@ export const getVehicleWiseReport = async (req, res) => {
     const { id } = req.params; // vehicleId
 
     const orders = await prisma.order.findMany({
-      where: { vehicleId: id, status: { not: 'CANCELLED' } },
+      where: { 
+        vehicleId: id, 
+        tenantId: req.user.tenantId,
+        status: { not: 'CANCELLED' } 
+      },
       include: { items: true }
     });
 
@@ -163,8 +198,17 @@ export const getVehicleWiseReport = async (req, res) => {
 
 export const getItemWiseReport = async (req, res) => {
   try {
+    const { storeId: queryStoreId } = req.query;
+    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
+
+    const orderItemWhere = { tenantId: req.user.tenantId };
+    if (storeId) {
+      orderItemWhere.order = { storeId };
+    }
+
     const orderItems = await prisma.orderItem.groupBy({
       by: ['productId'],
+      where: orderItemWhere,
       _sum: {
         quantity: true,
         price: true 
@@ -172,8 +216,11 @@ export const getItemWiseReport = async (req, res) => {
     });
 
     const productIds = orderItems.map(item => item.productId);
+    const productWhere = { id: { in: productIds }, tenantId: req.user.tenantId };
+    if (storeId) productWhere.storeId = storeId;
+
     const products = await prisma.product.findMany({
-      where: { id: { in: productIds } },
+      where: productWhere,
       select: { id: true, name: true }
     });
 
@@ -200,13 +247,22 @@ export const getItemWiseReport = async (req, res) => {
 
 export const getDateRangeReport = async (req, res) => {
   try {
-    const { from, to } = req.query;
+    const { from, to, storeId } = req.query;
+
+    const where = {
+      tenantId: req.user.tenantId,
+      createdAt: { gte: new Date(from), lte: new Date(to) },
+      status: { not: 'CANCELLED' }
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
 
     const orders = await prisma.order.findMany({
-      where: {
-        createdAt: { gte: new Date(from), lte: new Date(to) },
-        status: { not: 'CANCELLED' }
-      }
+      where
     });
 
     const totalOrders = orders.length;
@@ -220,22 +276,26 @@ export const getDateRangeReport = async (req, res) => {
 
 export const getReconciliationReport = async (req, res) => {
   try {
-    const { vehicleId, date } = req.query; // pass 'today' or specific date
+    const { vehicleId, date, storeId: queryStoreId } = req.query; // pass 'today' or specific date
+    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
 
     let dateQuery = new Date();
     dateQuery.setHours(0, 0, 0, 0);
-    // If specific date passed, parse it.
+
+    const productWhere = { tenantId: req.user.tenantId };
+    if (storeId) productWhere.storeId = storeId;
 
     const [items, loads, returns, sales] = await Promise.all([
-      prisma.product.findMany({ select: { id: true, name: true } }),
+      prisma.product.findMany({ where: productWhere, select: { id: true, name: true } }),
       prisma.stockTransaction.findMany({
-        where: { vehicleId, type: 'LOAD', date: { gte: dateQuery } }
+        where: { vehicleId, type: 'LOAD', date: { gte: dateQuery }, tenantId: req.user.tenantId }
       }),
       prisma.stockTransaction.findMany({
-        where: { vehicleId, type: 'RETURN', date: { gte: dateQuery } }
+        where: { vehicleId, type: 'RETURN', date: { gte: dateQuery }, tenantId: req.user.tenantId }
       }),
       prisma.orderItem.findMany({
         where: {
+          tenantId: req.user.tenantId,
           order: {
             vehicleId,
             createdAt: { gte: dateQuery },
@@ -282,18 +342,26 @@ export const getReconciliationReport = async (req, res) => {
 
 export const getRouteWiseReport = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    const dateFilter = startDate && endDate ? {
-      createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
-    } : {};
+    const { startDate, endDate, storeId } = req.query;
+    const where = {
+      tenantId: req.user.tenantId,
+      status: 'COMPLETED',
+      routeId: { not: null }
+    };
+
+    if (startDate && endDate) {
+      where.createdAt = { gte: new Date(startDate), lte: new Date(endDate) };
+    }
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
 
     const routeData = await prisma.order.groupBy({
-      by: ['routeId'],
-      where: {
-        ...dateFilter,
-        status: 'COMPLETED',
-        routeId: { not: null }
-      },
+      by: ['routeId', 'storeId'],
+      where,
       _sum: {
         totalAmount: true
       },
@@ -316,7 +384,8 @@ export const getRouteWiseReport = async (req, res) => {
     const result = routeData.map(r => ({
       routeName: routeMap[r.routeId] || 'Unmapped Route',
       totalSales: Math.round(r._sum.totalAmount || 0),
-      orderCount: r._count.id
+      orderCount: r._count.id,
+      storeId: r.storeId
     }));
 
     res.json(result);
@@ -328,18 +397,26 @@ export const getRouteWiseReport = async (req, res) => {
 
 export const getVillageWiseReport = async (req, res) => {
   try {
-    const { startDate, endDate } = req.query;
-    const dateFilter = startDate && endDate ? {
-      createdAt: { gte: new Date(startDate), lte: new Date(endDate) }
-    } : {};
+    const { startDate, endDate, storeId } = req.query;
+    const where = {
+      tenantId: req.user.tenantId,
+      status: 'COMPLETED',
+      villageName: { not: null }
+    };
+
+    if (startDate && endDate) {
+      where.createdAt = { gte: new Date(startDate), lte: new Date(endDate) };
+    }
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
 
     const villageData = await prisma.order.groupBy({
-      by: ['villageName', 'coverageType'],
-      where: {
-        ...dateFilter,
-        status: 'COMPLETED',
-        villageName: { not: null }
-      },
+      by: ['villageName', 'coverageType', 'storeId'],
+      where,
       _sum: {
         totalAmount: true
       },
@@ -352,7 +429,8 @@ export const getVillageWiseReport = async (req, res) => {
       villageName: v.villageName,
       coverageType: v.coverageType,
       totalSales: Math.round(v._sum.totalAmount || 0),
-      orderCount: v._count.id
+      orderCount: v._count.id,
+      storeId: v.storeId
     }));
 
     res.json(formattedData);
@@ -364,12 +442,24 @@ export const getVillageWiseReport = async (req, res) => {
 
 export const getAgentPerformance = async (req, res) => {
   try {
+    const { storeId } = req.query;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
+    const agentFilter = { 
+      tenantId: req.user.tenantId,
+      role: 'SALES_AGENT' 
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      agentFilter.storeId = storeId;
+    } else if (req.user.storeId) {
+      agentFilter.storeId = req.user.storeId;
+    }
+
     const agents = await prisma.user.findMany({
-      where: { role: 'SALES_AGENT' },
-      select: { id: true, name: true, dailyTarget: true, status: true }
+      where: agentFilter,
+      select: { id: true, name: true, dailyTarget: true, status: true, storeId: true }
     });
 
     const performance = await Promise.all(agents.map(async (agent) => {
@@ -390,7 +480,8 @@ export const getAgentPerformance = async (req, res) => {
         dailyTarget: agent.dailyTarget,
         totalSales: totalSales,
         percentage: agent.dailyTarget > 0 ? Math.round((totalSales / agent.dailyTarget) * 100) : 0,
-        status: agent.status
+        status: agent.status,
+        storeId: agent.storeId
       };
     }));
 

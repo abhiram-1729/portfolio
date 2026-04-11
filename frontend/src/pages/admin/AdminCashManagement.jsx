@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon } from 'lucide-react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
+import { useUserStore } from '../../store/userStore';
 import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation } from '../../services/cashService';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
@@ -12,6 +15,11 @@ export default function AdminCashManagement() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const location = useLocation();
+  const currentUser = useUserStore(s => s.user);
 
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -186,6 +194,7 @@ export default function AdminCashManagement() {
   };
 
   const filteredSummaries = summaries.filter(s => {
+    if (storeFilterId && s.vehicle?.storeId !== storeFilterId) return false;
     const searchLower = searchTerm.toLowerCase();
     const agent = s.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
     return (
@@ -286,12 +295,41 @@ export default function AdminCashManagement() {
     );
   };
 
+  // Gatekeeper integration
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  
+  if (isGlobalRole && isTenantRoute && !storeFilterId) {
+    return (
+       <StoreSelector 
+         title="Cash Management"
+         description="Please select a store branch to manage its assigned daily shifts and cash reconciliations."
+         onSelect={(id) => {
+           setSearchParams({ storeId: id });
+         }}
+       />
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Cash Management</h2>
-          <p className="text-sm text-gray-500">Track and reconcile daily vehicle cash — Shift 1 &amp; Shift 2 (Independent)</p>
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Cash Management</h2>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-500">Track and reconcile daily vehicle cash — Shift 1 & Shift 2 (Independent)</p>
+            {isTenantRoute && storeFilterId && (
+              <>
+                <span className="text-gray-300">•</span>
+                <button 
+                  onClick={() => setSearchParams({})} 
+                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors mt-0.5"
+                >
+                  Change Store
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

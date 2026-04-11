@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search } from 'lucide-react';
+import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import { useSearchParams, useLocation } from 'react-router-dom';
 
 export default function AdminVehicles() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const location = useLocation();
+  const isTenantRoute = location.pathname.startsWith('/tenant');
+
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -22,8 +29,11 @@ export default function AdminVehicles() {
 
   const fetchData = async () => {
     try {
-      const [vRes, uRes] = await Promise.all([adminAPI.getVehicles(), adminAPI.getUsers()]);
+      const [vRes, uRes, sRes] = await Promise.all([adminAPI.getVehicles(), adminAPI.getUsers(), isTenantRoute ? adminAPI.getStores() : null]);
       setVehicles(vRes.data);
+      if (isTenantRoute && sRes) {
+        setStores(sRes.data?.success ? sRes.data.data : (sRes.data || []));
+      }
       // Filter out Consumers AND Admins - only show agents/staff for vehicles
       setUsers(uRes.data.filter(u => u.role !== 'CONSUMER' && u.role !== 'ADMIN'));
     } catch {
@@ -45,6 +55,7 @@ export default function AdminVehicles() {
       fd.append('vehicleNumber', newVehicle.vehicleNumber);
       if (newVehicle.vehicleName) fd.append('vehicleName', newVehicle.vehicleName);
       if (newVehicle.assignedUserId) fd.append('assignedUserId', newVehicle.assignedUserId);
+      if (newVehicle.storeId) fd.append('storeId', newVehicle.storeId);
       fd.append('status', newVehicle.status);
       if (documents.rcDocument) fd.append('rcDocument', documents.rcDocument);
       if (documents.insuranceDocument) fd.append('insuranceDocument', documents.insuranceDocument);
@@ -81,6 +92,7 @@ export default function AdminVehicles() {
       fd.append('vehicleNumber', editingVehicle.vehicleNumber);
       fd.append('vehicleName', editingVehicle.vehicleName || '');
       fd.append('status', editingVehicle.status);
+      if (editingVehicle.storeId) fd.append('storeId', editingVehicle.storeId);
       fd.append('assignedUserId', editingVehicle.assignedUserId || '');
       if (editDocuments.rcDocument) fd.append('rcDocument', editDocuments.rcDocument);
       if (editDocuments.insuranceDocument) fd.append('insuranceDocument', editDocuments.insuranceDocument);
@@ -127,6 +139,7 @@ export default function AdminVehicles() {
   };
 
   const filteredVehicles = vehicles.filter((v) => {
+    if (storeFilterId && v.storeId !== storeFilterId) return false;
     const searchLower = searchTerm.toLowerCase();
     const assignedUser = users.find(u => u.assignedVehicleId === v.id);
     return (
@@ -182,13 +195,252 @@ export default function AdminVehicles() {
     </div>
   );
 
+  const renderGroup = (groupVehicles) => (
+    <>
+      <div className="grid grid-cols-1 gap-4 md:hidden mb-6">
+        {groupVehicles.map((vehicle) => (
+          <div key={vehicle.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-4">
+                <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center',
+                  vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
+                  <Truck size={24} />
+                </div>
+                <div className="flex flex-col">
+                  <h3 className="font-bold text-gray-900">{vehicle.vehicleNumber}</h3>
+                  {vehicle.vehicleName && <span className="text-xs text-gray-500">{vehicle.vehicleName}</span>}
+                  <div className="flex items-center gap-2 mt-1">
+                    {vehicle.status ? (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase">
+                        <CheckCircle2 size={12} /> Active
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase">
+                        <XCircle size={12} /> Inactive
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                  className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                  {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                </button>
+                <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
+                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                  <Pencil size={16} />
+                </button>
+                <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete Vehicle"
+                  disabled={deletingId === vehicle.id}
+                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                  {deletingId === vehicle.id
+                    ? <Loader2 size={16} className="animate-spin text-rose-400" />
+                    : <Trash2 size={16} />}
+                </button>
+              </div>
+            </div>
+
+            {(vehicle.rcDocument || vehicle.insuranceDocument || vehicle.permitDocument) && (
+              <div className="flex gap-2">
+                {vehicle.rcDocument && <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">RC</a>}
+                {vehicle.insuranceDocument && <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Insurance</a>}
+                {vehicle.permitDocument && <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Permit</a>}
+              </div>
+            )}
+
+            <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between border border-gray-100">
+              <div className="flex flex-col gap-1">
+                <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">Assigned Driver</span>
+                <div className="flex items-center gap-2">
+                  <User size={14} className="text-emerald-500" />
+                  <span className="text-sm font-bold text-gray-800">{vehicle.assignedUsers?.[0]?.name || 'Not Assigned'}</span>
+                </div>
+              </div>
+              <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
+                <ArrowRight size={20} />
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle Info</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Driver Assignment</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Compliance</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {groupVehicles.map((vehicle) => (
+              <tr key={vehicle.id} className="hover:bg-gray-50/30 transition-colors group">
+                <td className="px-6 py-4">
+                  <div className="flex items-center gap-3">
+                    <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
+                      vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
+                      <Truck size={20} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-bold text-gray-900 tracking-tight">{vehicle.vehicleNumber}</span>
+                      {vehicle.vehicleName && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{vehicle.vehicleName}</span>}
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex justify-center">
+                    {vehicle.status ? (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest">
+                        <CheckCircle2 size={10} /> Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-full uppercase tracking-widest">
+                        <XCircle size={10} /> Inactive
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-between gap-4 bg-gray-50/50 p-2 rounded-xl border border-transparent hover:border-gray-100 transition-all group/driver">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-emerald-500 shadow-sm border border-gray-50">
+                        <User size={14} />
+                      </div>
+                      <span className="text-sm font-bold text-gray-700">{vehicle.assignedUsers?.[0]?.name || 'Unassigned'}</span>
+                    </div>
+                  <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                      className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
+                      <ArrowRight size={16} />
+                    </button>
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex gap-1.5">
+                    {vehicle.rcDocument ? (
+                      <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" title="RC Document"
+                        className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-emerald-600/10 text-emerald-700 rounded-lg hover:bg-emerald-600 hover:text-white transition-all">RC</a>
+                    ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
+                    {vehicle.insuranceDocument ? (
+                      <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" title="Insurance"
+                        className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-blue-600/10 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all">IN</a>
+                    ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
+                    {vehicle.permitDocument ? (
+                      <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" title="Permit"
+                        className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-orange-600/10 text-orange-700 rounded-lg hover:bg-orange-600 hover:text-white transition-all">PM</a>
+                    ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
+                  </div>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-end gap-1 transition-all">
+                    <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                      className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                      {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                    </button>
+                    <button onClick={() => openEditModal(vehicle)} title="Edit Details"
+                      className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                      <Pencil size={16} />
+                    </button>
+                    <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete"
+                      disabled={deletingId === vehicle.id}
+                      className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
+                      {deletingId === vehicle.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+
+  const renderClassifiedVehicles = () => {
+    if (isTenantRoute && !storeFilterId) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
+          <div className="col-span-full mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Platform Branches</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to manage its transport assets</p>
+          </div>
+          {stores.map(store => {
+            const groupVehicles = filteredVehicles.filter(v => v.storeId === store.id);
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+              >
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
+                
+                <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  <Store size={28} strokeWidth={2.5} />
+                </div>
+                <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
+                <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
+                
+                <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
+                  <span>{groupVehicles.length} Vehicles</span>
+                  <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+               <Store size={48} className="mx-auto text-gray-300 mb-4" />
+               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return renderGroup(filteredVehicles);
+  };
+
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Vehicle Management</h2>
-          <p className="text-sm text-gray-500">Manage your fleet and driver assignments</p>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
+            {isTenantRoute && (
+              <>
+                <span className="text-gray-300">•</span>
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.25rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative group hidden sm:block">
@@ -201,7 +453,7 @@ export default function AdminVehicles() {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          <button onClick={() => setShowAddModal(true)}
+          <button onClick={() => { setShowAddModal(true); setNewVehicle({ ...newVehicle, storeId: storeFilterId || '' }); }}
             className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
             <Plus size={24} />
           </button>
@@ -228,171 +480,7 @@ export default function AdminVehicles() {
             <p className="text-gray-500">No vehicles found</p>
           </div>
         ) : (
-          <>
-            {/* Mobile Card View */}
-            <div className="grid grid-cols-1 gap-4 md:hidden">
-              {filteredVehicles.map((vehicle) => (
-                <div key={vehicle.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                      <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center',
-                        vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
-                        <Truck size={24} />
-                      </div>
-                      <div className="flex flex-col">
-                        <h3 className="font-bold text-gray-900">{vehicle.vehicleNumber}</h3>
-                        {vehicle.vehicleName && <span className="text-xs text-gray-500">{vehicle.vehicleName}</span>}
-                        <div className="flex items-center gap-2 mt-1">
-                          {vehicle.status ? (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 uppercase">
-                              <CheckCircle2 size={12} /> Active
-                            </span>
-                          ) : (
-                            <span className="flex items-center gap-1 text-[10px] font-bold text-gray-400 uppercase">
-                              <XCircle size={12} /> Inactive
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                        className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                        {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
-                      </button>
-                      <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                        <Pencil size={16} />
-                      </button>
-                      <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete Vehicle"
-                        disabled={deletingId === vehicle.id}
-                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                        {deletingId === vehicle.id
-                          ? <Loader2 size={16} className="animate-spin text-rose-400" />
-                          : <Trash2 size={16} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  {(vehicle.rcDocument || vehicle.insuranceDocument || vehicle.permitDocument) && (
-                    <div className="flex gap-2">
-                      {vehicle.rcDocument && <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">RC</a>}
-                      {vehicle.insuranceDocument && <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Insurance</a>}
-                      {vehicle.permitDocument && <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" className="text-[10px] bg-emerald-100 text-emerald-700 px-2 py-1 rounded-md font-bold">Permit</a>}
-                    </div>
-                  )}
-
-                  <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between border border-gray-100">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[10px] uppercase tracking-wider font-semibold text-gray-400">Assigned Driver</span>
-                      <div className="flex items-center gap-2">
-                        <User size={14} className="text-emerald-500" />
-                        <span className="text-sm font-bold text-gray-800">{vehicle.assignedUsers?.[0]?.name || 'Not Assigned'}</span>
-                      </div>
-                    </div>
-                    <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                      className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
-                      <ArrowRight size={20} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/50">
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle Info</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Driver Assignment</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Compliance</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredVehicles.map((vehicle) => (
-                    <tr key={vehicle.id} className="hover:bg-gray-50/30 transition-colors group">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0',
-                            vehicle.status ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400')}>
-                            <Truck size={20} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className="font-bold text-gray-900 tracking-tight">{vehicle.vehicleNumber}</span>
-                            {vehicle.vehicleName && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{vehicle.vehicleName}</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex justify-center">
-                          {vehicle.status ? (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest">
-                              <CheckCircle2 size={10} /> Active
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-full uppercase tracking-widest">
-                              <XCircle size={10} /> Inactive
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-between gap-4 bg-gray-50/50 p-2 rounded-xl border border-transparent hover:border-gray-100 transition-all group/driver">
-                          <div className="flex items-center gap-2">
-                            <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center text-emerald-500 shadow-sm border border-gray-50">
-                              <User size={14} />
-                            </div>
-                            <span className="text-sm font-bold text-gray-700">{vehicle.assignedUsers?.[0]?.name || 'Unassigned'}</span>
-                          </div>
-                        <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                            className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
-                            <ArrowRight size={16} />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex gap-1.5">
-                          {vehicle.rcDocument ? (
-                            <a href={vehicle.rcDocument} target="_blank" rel="noreferrer" title="RC Document"
-                              className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-emerald-600/10 text-emerald-700 rounded-lg hover:bg-emerald-600 hover:text-white transition-all">RC</a>
-                          ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
-                          {vehicle.insuranceDocument ? (
-                            <a href={vehicle.insuranceDocument} target="_blank" rel="noreferrer" title="Insurance"
-                              className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-blue-600/10 text-blue-700 rounded-lg hover:bg-blue-600 hover:text-white transition-all">IN</a>
-                          ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
-                          {vehicle.permitDocument ? (
-                            <a href={vehicle.permitDocument} target="_blank" rel="noreferrer" title="Permit"
-                              className="w-8 h-8 flex items-center justify-center text-[10px] font-black bg-orange-600/10 text-orange-700 rounded-lg hover:bg-orange-600 hover:text-white transition-all">PM</a>
-                          ) : <div className="w-8 h-8 border border-dashed border-gray-200 rounded-lg" />}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1 transition-all">
-                          <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                            className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                            {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
-                          </button>
-                          <button onClick={() => openEditModal(vehicle)} title="Edit Details"
-                            className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                            <Pencil size={16} />
-                          </button>
-                          <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete"
-                            disabled={deletingId === vehicle.id}
-                            className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
-                            {deletingId === vehicle.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
+          renderClassifiedVehicles()
         )}
       </div>
 
@@ -430,6 +518,25 @@ export default function AdminVehicles() {
                   ))}
                 </select>
               </div>
+
+              {!storeFilterId && (
+                <div className="space-y-1 focus-within:text-emerald-600 relative">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1 transition-colors">Context Branch</label>
+                  <div className="relative">
+                    <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 z-10" />
+                    <select
+                      className="w-full bg-emerald-50 border border-emerald-100/50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none appearance-none text-emerald-900 font-bold focus:ring-2 focus:ring-emerald-500/50 transition-all cursor-pointer"
+                      value={newVehicle.storeId}
+                      onChange={(e) => setNewVehicle({ ...newVehicle, storeId: e.target.value })}
+                    >
+                      <option value="">-- Global (Unassigned) --</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 pt-1 border-t border-gray-50">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents</p>
@@ -497,6 +604,25 @@ export default function AdminVehicles() {
                   ))}
                 </select>
               </div>
+
+              {!storeFilterId && (
+                <div className="space-y-1 focus-within:text-indigo-600 relative">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1 transition-colors">Assigned Branch</label>
+                  <div className="relative">
+                    <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-600 z-10" />
+                    <select
+                      className="w-full bg-indigo-50 border border-indigo-100/50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none appearance-none text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer"
+                      value={editingVehicle.storeId || ''}
+                      onChange={(e) => setEditingVehicle({ ...editingVehicle, storeId: e.target.value })}
+                    >
+                      <option value="">-- Global (Unassigned) --</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-3 pt-1 border-t border-gray-50">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents (upload to replace)</p>

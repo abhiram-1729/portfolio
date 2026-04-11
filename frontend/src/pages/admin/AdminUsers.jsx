@@ -1,19 +1,30 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store } from 'lucide-react';
+import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
+import StoreSelector from './StoreSelector';
+import { useUserStore } from '../../store/userStore';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
-
 export default function AdminUsers({ type }) {
   const [users, setUsers] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const navigate = useNavigate();
+  const location = useLocation();
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  const currentUser = useUserStore(s => s.user);
+
   const [newUser, setNewUser] = useState({
     name: '',
     email: '',
     password: '',
     mobile: '',
-    role: 'SALES_AGENT',
+    role: type === 'admin' ? 'ADMIN' : 'SALES_AGENT',
     vgeType: 'EMPLOYEE',
+    storeId: storeFilterId || currentUser?.storeId || '',
     dailyTarget: 10000,
     baseSalary: 12000,
   });
@@ -25,18 +36,27 @@ export default function AdminUsers({ type }) {
 
   const fetchUsers = async () => {
     try {
-      const { data } = await adminAPI.getUsers();
+      const { data } = await adminAPI.getUsers({ storeId: storeFilterId });
       setUsers(data);
     } catch (error) {
       toast.error('Failed to fetch users');
-    } finally {
-      setLoading(false);
+    }
+  };
+
+  const fetchStores = async () => {
+    try {
+      const res = await adminAPI.getStores();
+      if (res.data?.success) {
+        setStores(res.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch stores:', error);
     }
   };
 
   useEffect(() => {
-    fetchUsers();
-  }, []);
+    Promise.all([fetchUsers(), fetchStores()]).finally(() => setLoading(false));
+  }, [storeFilterId]);
 
   const handleCreateUser = async (e) => {
     e.preventDefault();
@@ -45,7 +65,7 @@ export default function AdminUsers({ type }) {
       await adminAPI.createUser(newUser);
       toast.success('User created successfully');
       setShowAddModal(false);
-      setNewUser({ name: '', email: '', password: '', mobile: '', role: 'SALES_AGENT' });
+      setNewUser({ name: '', email: '', password: '', mobile: '', role: type === 'admin' ? 'ADMIN' : 'SALES_AGENT', vgeType: 'EMPLOYEE', storeId: storeFilterId || currentUser?.storeId || '', dailyTarget: 10000, baseSalary: 12000 });
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create user');
@@ -161,11 +181,20 @@ export default function AdminUsers({ type }) {
 
     // 2. Search Filter
     const searchLower = searchTerm.toLowerCase();
-    return (
-      u.name?.toLowerCase().includes(searchLower) ||
-      u.mobile?.includes(searchTerm) ||
-      u.role?.toLowerCase().includes(searchLower)
-    );
+    if (
+      !u.name?.toLowerCase().includes(searchLower) &&
+      !u.mobile?.includes(searchTerm) &&
+      !u.role?.toLowerCase().includes(searchLower)
+    ) {
+      return false;
+    }
+
+    // 3. Store Filter
+    if (storeFilterId && u.storeId !== storeFilterId) {
+      return false;
+    }
+
+    return true;
   });
 
   if (loading) {
@@ -176,16 +205,261 @@ export default function AdminUsers({ type }) {
       </div>
     );
   }
+  const renderGroup = (groupUsers) => (
+    <>
+      {/* Mobile Card View */}
+      <div className="md:hidden space-y-4 mb-8">
+        {groupUsers.map((user) => (
+          <div 
+            key={user.id} 
+            className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 grayscale opacity-80' : ''}`}
+          >
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border shadow-inner ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                  {getInitials(user.name)}
+                </div>
+                <div className="flex flex-col">
+                  <div className="flex items-center gap-2">
+                    <h3 className={`font-black text-gray-900 tracking-tight leading-none ${user.status === 'SUSPENDED' ? 'line-through' : ''}`}>{user.name}</h3>
+                    {getStatusBadge(user.status)}
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-1 items-center">
+                    {getRoleBadge(user.role)}
+                    {getVgeTypeBadge(user.vgeType)}
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-1">
+                <button onClick={() => { 
+                  const { password, ...userWithoutPass } = user;
+                  setEditingUser({ ...userWithoutPass, password: '' }); 
+                  setShowEditModal(true); 
+                }}
+                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                  <Pencil size={15} />
+                </button>
+                <button onClick={() => handleToggleStatus(user)}
+                  className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
+                  {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                </button>
+                <button onClick={() => handleDeleteUser(user.id)}
+                  disabled={deletingId === user.id}
+                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
+                  {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                </button>
+              </div>
+            </div>
 
-  const listToRender = filteredUsers;
+            <div className="grid grid-cols-2 gap-3 pb-1">
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Mobile</span>
+                <span className="text-xs font-black text-gray-700 flex items-center gap-1.5"><Phone size={10} className="text-emerald-500" /> {user.mobile || '---'}</span>
+              </div>
+              <div className="flex flex-col gap-1">
+                <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Assigned Vehicle</span>
+                <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'Unassigned'}</span>
+              </div>
+            </div>
+            <div className="flex flex-col gap-1 mb-2 px-1">
+              <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Base Store / Outlet</span>
+              <span className={`text-xs font-black flex items-center gap-1.5 w-fit px-2 py-1 rounded-md border ${user.store ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}><Store size={10} /> {user.store?.name || 'Unassigned'}</span>
+            </div>
+            <div className="mt-1">
+              <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col items-center">
+                 <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
+                 <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop Table View */}
+      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-8">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50">
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Context</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {groupUsers.map((user) => (
+              <tr 
+                key={user.id} 
+                className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
+              >
+                <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs border shadow-inner transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-50 text-gray-400 border-gray-100 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-500 transition-all'}`}>
+                      {getInitials(user.name)}
+                    </div>
+                    <div className="flex flex-col">
+                      <span className={`text-sm font-black text-gray-900 tracking-tight leading-none mb-1 ${user.status === 'SUSPENDED' ? 'line-through text-gray-400' : ''}`}>
+                        {user.name}
+                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-gray-400 font-bold tracking-tight">{user.email}</span>
+                        {getStatusBadge(user.status)}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex flex-col items-center">
+                    <span className={`text-xs font-black flex items-center gap-1.5 px-2 py-1 rounded-md border ${user.store ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
+                      <Store size={11} className={user.store ? "text-emerald-500" : "text-orange-500"} /> {user.store?.name || 'Unassigned'}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                      <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
+                    </span>
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex flex-col items-center gap-1.5">
+                    {getRoleBadge(user.role)}
+                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                      <Truck size={10} />
+                      {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                    </div>
+                    {getVgeTypeBadge(user.vgeType)}
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <span className="text-sm font-black text-indigo-600">
+                     ₹{(user.baseSalary || 0).toLocaleString()}
+                  </span>
+                </td>
+                <td className="px-6 py-4">
+                  <div className="flex items-center justify-end gap-1.5">
+                    <button 
+                      onClick={() => { 
+                        const { password, ...userWithoutPass } = user;
+                        setEditingUser({ ...userWithoutPass, password: '' }); 
+                        setShowEditModal(true); 
+                      }}
+                      title="Edit Profile"
+                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button 
+                      onClick={() => handleToggleStatus(user)}
+                      title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
+                      className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                    >
+                      {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteUser(user.id)}
+                      title="Permanent Removal"
+                      disabled={deletingId === user.id}
+                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                    >
+                      {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+
+  const renderClassifiedUsers = () => {
+    if (isTenantRoute && !storeFilterId) {
+      return (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
+          <div className="col-span-full mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Groups</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to manage its {type === 'admin' ? 'administrators' : 'operational staff'}</p>
+          </div>
+          {stores.map(store => {
+            const groupUsers = filteredUsers.filter(u => u.storeId === store.id);
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+              >
+                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
+                
+                <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                  <Store size={28} strokeWidth={2.5} />
+                </div>
+                <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
+                <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
+                
+                <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
+                  <span>{groupUsers.length} {type === 'admin' ? 'Admins' : 'Staff'}</span>
+                  <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+               <Store size={48} className="mx-auto text-gray-300 mb-4" />
+               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    
+    return renderGroup(filteredUsers);
+  };
+
+  // Only keep it for cases where we explicitly want a selector (if any)
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Sub-Header */}
       <div className="flex items-center justify-between pb-2">
         <div>
           <h2 className="text-xl font-bold text-gray-900">{type === 'admin' ? 'Organization Admins' : 'Operational Staff'}</h2>
-          <p className="text-xs text-gray-500">{listToRender.length} members found</p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-xs text-gray-500">{filteredUsers.length} members found</p>
+            {isTenantRoute && (
+              <>
+                <span className="text-gray-300">•</span>
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.25rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative group hidden sm:block">
@@ -217,179 +491,19 @@ export default function AdminUsers({ type }) {
           placeholder="Search staff members..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
         />
       </div>
 
-      {/* Main List Container */}
-      <div className="space-y-4">
-        {listToRender.length === 0 ? (
-          <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
-            <User size={48} className="mx-auto text-gray-200 mb-4" />
-            <h3 className="text-lg font-black text-gray-900 tracking-tight">Access Control Empty</h3>
-            <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">No members match this category yet.</p>
+      {filteredUsers.length === 0 ? (
+        <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200">
+          <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+             <AlertCircle size={28} className="text-gray-400" />
           </div>
-        ) : (
-          <>
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-4">
-              {listToRender.map((user) => (
-                <div 
-                  key={user.id} 
-                  className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 grayscale opacity-80' : ''}`}
-                >
-                  <div className="flex justify-between items-start">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-sm border shadow-inner ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                        {getInitials(user.name)}
-                      </div>
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <h3 className={`font-black text-gray-900 tracking-tight leading-none ${user.status === 'SUSPENDED' ? 'line-through' : ''}`}>{user.name}</h3>
-                          {getStatusBadge(user.status)}
-                        </div>
-                        <div className="mt-1 flex flex-wrap gap-1 items-center">
-                          {getRoleBadge(user.role)}
-                          {getVgeTypeBadge(user.vgeType)}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-1">
-                      <button onClick={() => { 
-                        const { password, ...userWithoutPass } = user;
-                        setEditingUser({ ...userWithoutPass, password: '' }); 
-                        setShowEditModal(true); 
-                      }}
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                        <Pencil size={15} />
-                      </button>
-                      <button onClick={() => handleToggleStatus(user)}
-                        className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
-                        {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
-                      </button>
-                      <button onClick={() => handleDeleteUser(user.id)}
-                        disabled={deletingId === user.id}
-                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
-                        {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
-                      </button>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 pb-1">
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Mobile</span>
-                      <span className="text-xs font-black text-gray-700 flex items-center gap-1.5"><Phone size={10} className="text-emerald-500" /> {user.mobile || '---'}</span>
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Assigned Vehicle</span>
-                      <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'Unassigned'}</span>
-                    </div>
-                  </div>
-                  <div className="mt-1">
-                    <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col items-center">
-                       <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
-                       <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Desktop Table View */}
-            <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50/50">
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>
-                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {listToRender.map((user) => (
-                    <tr 
-                      key={user.id} 
-                      className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
-                    >
-                      <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs border shadow-inner transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-50 text-gray-400 border-gray-100 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-500 transition-all'}`}>
-                            {getInitials(user.name)}
-                          </div>
-                          <div className="flex flex-col">
-                            <span className={`text-sm font-black text-gray-900 tracking-tight leading-none mb-1 ${user.status === 'SUSPENDED' ? 'line-through text-gray-400' : ''}`}>
-                              {user.name}
-                            </span>
-                            <div className="flex items-center gap-2">
-                              <span className="text-[10px] text-gray-400 font-bold tracking-tight">{user.email}</span>
-                              {getStatusBadge(user.status)}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                        <div className="flex flex-col items-center">
-                          <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                            <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                        <div className="flex flex-col items-center gap-1.5">
-                          {getRoleBadge(user.role)}
-                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                            <Truck size={10} />
-                            {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
-                          </div>
-                          {getVgeTypeBadge(user.vgeType)}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                        <span className="text-sm font-black text-indigo-600">
-                           ₹{(user.baseSalary || 0).toLocaleString()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center justify-end gap-1.5">
-                          <button 
-                            onClick={() => { 
-                              const { password, ...userWithoutPass } = user;
-                              setEditingUser({ ...userWithoutPass, password: '' }); 
-                              setShowEditModal(true); 
-                            }}
-                            title="Edit Profile"
-                            className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                          >
-                            <Pencil size={15} />
-                          </button>
-                          <button 
-                            onClick={() => handleToggleStatus(user)}
-                            title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
-                            className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
-                          >
-                            {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
-                          </button>
-                          <button 
-                            onClick={() => handleDeleteUser(user.id)}
-                            title="Permanent Removal"
-                            disabled={deletingId === user.id}
-                            className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
-                          >
-                            {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </div>
+          <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">No {type === 'admin' ? 'organization admins' : 'operational staff'} found</p>
+        </div>
+      ) : (
+        renderClassifiedUsers()
+      )}
 
       {/* Add User Modal */}
       {showAddModal && (
@@ -470,16 +584,36 @@ export default function AdminUsers({ type }) {
                 />
               </div>
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CTC Monthly Pay (₹)</label>
-                <input 
-                  type="number"
-                  required
-                  placeholder="e.g. 15000"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
-                  value={newUser.baseSalary}
-                  onChange={(e) => setNewUser({...newUser, baseSalary: e.target.value})}
-                />
+              <div className="grid grid-cols-2 gap-3">
+                {isTenantRoute && (
+                  <div className="space-y-1 focus-within:text-emerald-600 relative">
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 transition-colors">Context Branch</label>
+                    <div className="relative">
+                      <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 z-10" />
+                      <select
+                        className="w-full bg-emerald-50 border border-emerald-100/50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none appearance-none text-emerald-900 font-bold focus:ring-2 focus:ring-emerald-500/50 transition-all cursor-pointer"
+                        value={newUser.storeId || ''}
+                        onChange={(e) => setNewUser({...newUser, storeId: e.target.value})}
+                        disabled={!!storeFilterId}
+                      >
+                        {stores.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                )}
+                <div className={`space-y-1 ${!isTenantRoute ? 'col-span-2' : ''}`}>
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CTC Monthly Pay (₹)</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="e.g. 15000"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
+                    value={newUser.baseSalary}
+                    onChange={(e) => setNewUser({...newUser, baseSalary: e.target.value})}
+                  />
+                </div>
               </div>
 
               <button 
@@ -581,6 +715,25 @@ export default function AdminUsers({ type }) {
                   <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
               </div>
+
+              {isTenantRoute && (
+                <div className="space-y-1 focus-within:text-indigo-600 relative">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 transition-colors">Assigned Branch</label>
+                  <div className="relative">
+                    <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-600 z-10" />
+                    <select
+                      className="w-full bg-indigo-50 border border-indigo-100/50 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none appearance-none text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer"
+                      value={editingUser.storeId || ''}
+                      onChange={(e) => setEditingUser({...editingUser, storeId: e.target.value})}
+                      disabled={!!storeFilterId}
+                    >
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monthly CTC (₹)</label>

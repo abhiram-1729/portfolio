@@ -3,8 +3,17 @@ import { uploadToSupabase } from '../../utils/supabaseService.js';
 
 export const getVehicles = async (req, res) => {
   try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+
     const vehicles = await prisma.vehicle.findMany({
-      where: { tenantId: req.user.tenantId },
+      where,
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
       }
@@ -34,9 +43,9 @@ export const getVehicleById = async (req, res) => {
 
 export const createVehicle = async (req, res) => {
   try {
-    const { vehicleNumber, vehicleName, status, assignedUserId } = req.body;
+    const { vehicleNumber, vehicleName, status, assignedUserId, storeId } = req.body;
 
-    console.log('📝 Creating vehicle order:', { vehicleNumber, vehicleName, status, assignedUserId });
+    console.log('📝 Creating vehicle order:', { vehicleNumber, vehicleName, status, assignedUserId, storeId });
 
     // Convert string status from FormData to boolean
     const isStatusActive = status === 'true' || status === true;
@@ -80,7 +89,8 @@ export const createVehicle = async (req, res) => {
         rcDocument,
         insuranceDocument,
         permitDocument,
-        tenantId: req.user.tenantId
+        tenantId: req.user.tenantId,
+        storeId: (storeId && storeId !== 'null' && storeId !== '') ? storeId : req.user.storeId
       }
     });
 
@@ -101,7 +111,7 @@ export const createVehicle = async (req, res) => {
 export const updateVehicle = async (req, res) => {
   try {
     const { id } = req.params;
-    const { vehicleNumber, vehicleName, status, assignedUserId } = req.body;
+    const { vehicleNumber, vehicleName, status, assignedUserId, storeId } = req.body;
 
     const vehicle = await prisma.vehicle.findUnique({ where: { id } });
     if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
@@ -141,6 +151,7 @@ export const updateVehicle = async (req, res) => {
         ...(vehicleNumber !== undefined && { vehicleNumber }),
         ...(vehicleName !== undefined && { vehicleName }),
         ...(status !== undefined && { status: status === true || status === 'true' }),
+        ...(storeId !== undefined && { storeId: (storeId && storeId !== 'null' && storeId !== '') ? storeId : null }),
         rcDocument,
         insuranceDocument,
         permitDocument,

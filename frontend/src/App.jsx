@@ -37,6 +37,7 @@ import AdminExpenses from './pages/admin/AdminExpenses';
 import AdminFinanceReports from './pages/admin/AdminFinanceReports';
 import TenantLayout from './components/tenant/TenantLayout';
 import TenantDashboard from './pages/tenant/TenantDashboard';
+import TenantStores from './pages/tenant/TenantStores';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -139,6 +140,7 @@ export default function App() {
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
           <Route index element={<TenantDashboard />} />
+          <Route path="stores" element={<TenantStores />} />
           <Route path="users" element={<AdminUsers type="staff" />} />
           <Route path="vehicles" element={<AdminVehicles />} />
           <Route path="reports" element={<AdminReports />} />

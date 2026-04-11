@@ -31,6 +31,8 @@ export const submitOpeningCash = async (req, res, next) => {
                 userId,
             },
             create: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 vehicleId,
                 userId,
                 date: dateString,
@@ -40,8 +42,8 @@ export const submitOpeningCash = async (req, res, next) => {
             },
         });
 
-        // Recalculate daily summary (aggregates both shifts)
-        await recalculateDailySummary(vehicleId, dateString);
+        // Recalculate daily summary
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
 
         res.status(201).json(openingCash);
 
@@ -74,7 +76,10 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
         // Validation: Prevent Shift 2 assignment if Shift 1 is not closed
         if (shift === 2) {
             const shift1Closing = await prisma.closingCash.findUnique({
-                where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } }
+                where: { 
+                    vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
+                    tenantId: req.user.tenantId
+                }
             });
             if (!shift1Closing) {
                 res.status(400);
@@ -84,7 +89,10 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
 
         // UNBREAKABLE VALIDATION: Prevent re-assignment of an already assigned shift
         const existingAssignment = await prisma.openingCash.findUnique({
-            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift } }
+            where: { 
+                vehicleId_date_shift: { vehicleId, date: dateString, shift },
+                tenantId: req.user.tenantId
+            }
         });
         if (existingAssignment) {
             res.status(400);
@@ -100,6 +108,8 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
                 isNoService
             },
             create: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 vehicleId,
                 userId,
                 date: dateString,
@@ -128,6 +138,8 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
                     remark: 'Marked as No Service by Admin'
                 },
                 create: {
+                    tenantId: req.user.tenantId,
+                    storeId: req.user.storeId,
                     vehicleId,
                     userId,
                     date: dateString,
@@ -147,7 +159,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
         }
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
 
         res.status(201).json(openingCash);
 
@@ -173,9 +185,9 @@ export const deleteReconciliation = async (req, res, next) => {
         const { vehicleId, date } = req.params;
 
         await prisma.$transaction([
-            prisma.openingCash.deleteMany({ where: { vehicleId, date } }),
-            prisma.closingCash.deleteMany({ where: { vehicleId, date } }),
-            prisma.dailyCashSummary.deleteMany({ where: { vehicleId, date } }),
+            prisma.openingCash.deleteMany({ where: { vehicleId, date, tenantId: req.user.tenantId } }),
+            prisma.closingCash.deleteMany({ where: { vehicleId, date, tenantId: req.user.tenantId } }),
+            prisma.dailyCashSummary.deleteMany({ where: { vehicleId, date, tenantId: req.user.tenantId } }),
         ]);
 
         res.json({ message: 'Reconciliation data removed' });
@@ -210,7 +222,10 @@ export const submitClosingCash = async (req, res, next) => {
 
         // Get the opening cash for THIS shift only
         const shiftOpening = await prisma.openingCash.findUnique({
-            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift } }
+            where: { 
+                vehicleId_date_shift: { vehicleId, date: dateString, shift },
+                tenantId: req.user.tenantId
+            }
         });
 
         if (!shiftOpening && !isNoService) {
@@ -227,6 +242,7 @@ export const submitClosingCash = async (req, res, next) => {
         const cashSalesResult = await prisma.order.aggregate({
             _sum: { totalAmount: true },
             where: {
+                tenantId: req.user.tenantId,
                 vehicleId,
                 paymentMode: 'CASH',
                 status: 'COMPLETED',
@@ -239,6 +255,7 @@ export const submitClosingCash = async (req, res, next) => {
         const expensesResult = await prisma.expense.aggregate({
             _sum: { amount: true },
             where: {
+                tenantId: req.user.tenantId,
                 vehicleId,
                 date: dateString,
                 paymentMode: 'CASH',
@@ -253,7 +270,10 @@ export const submitClosingCash = async (req, res, next) => {
 
         if (shift === 2) {
             const shift1Record = await prisma.closingCash.findUnique({
-                where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } }
+                where: { 
+                    vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
+                    tenantId: req.user.tenantId
+                }
             });
             shiftCashSales = totalDaySales - (shift1Record?.cashSales || 0);
             shiftExpenses = totalDayExpenses - (shift1Record?.expenses || 0);
@@ -286,6 +306,8 @@ export const submitClosingCash = async (req, res, next) => {
                 isNoService
             },
             create: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 vehicleId,
                 userId,
                 date: dateString,
@@ -303,7 +325,7 @@ export const submitClosingCash = async (req, res, next) => {
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
 
         res.status(201).json(closingCash);
 
@@ -349,16 +371,28 @@ export const getCashStatus = async (req, res, next) => {
 
         // Fetch both shifts
         const opening1 = await prisma.openingCash.findUnique({
-            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } },
+            where: { 
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
+                tenantId: req.user.tenantId
+            },
         });
         const opening2 = await prisma.openingCash.findUnique({
-            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 } },
+            where: { 
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 },
+                tenantId: req.user.tenantId
+            },
         });
         const closing1 = await prisma.closingCash.findUnique({
-            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 } },
+            where: { 
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
+                tenantId: req.user.tenantId
+            },
         });
         const closing2 = await prisma.closingCash.findUnique({
-            where: { vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 } },
+            where: { 
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 },
+                tenantId: req.user.tenantId
+            },
         });
 
         const startOfDay = new Date();
@@ -369,6 +403,7 @@ export const getCashStatus = async (req, res, next) => {
         const cashSalesResult = await prisma.order.aggregate({
             _sum: { totalAmount: true },
             where: {
+                tenantId: req.user.tenantId,
                 vehicleId,
                 paymentMode: 'CASH',
                 status: 'COMPLETED',
@@ -380,6 +415,7 @@ export const getCashStatus = async (req, res, next) => {
         const expensesResult = await prisma.expense.aggregate({
             _sum: { amount: true },
             where: {
+                tenantId: req.user.tenantId,
                 vehicleId,
                 date: dateString,
                 paymentMode: 'CASH',
@@ -440,11 +476,22 @@ export const getCashStatus = async (req, res, next) => {
 // @access  Admin
 export const getAdminCashSummary = async (req, res, next) => {
     try {
-        const { date } = req.query;
+        const { date, storeId } = req.query;
         const dateString = date || format(new Date(), 'yyyy-MM-dd');
 
+        const summaryFilter = { 
+            date: dateString,
+            tenantId: req.user.tenantId
+        };
+
+        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+            summaryFilter.storeId = storeId;
+        } else if (req.user.storeId) {
+            summaryFilter.storeId = req.user.storeId;
+        }
+
         const summaries = await prisma.dailyCashSummary.findMany({
-            where: { date: dateString },
+            where: summaryFilter,
             include: {
                 vehicle: {
                     select: {
@@ -463,12 +510,12 @@ export const getAdminCashSummary = async (req, res, next) => {
         const enriched = await Promise.all(
             summaries.map(async (s) => {
                 const openings = await prisma.openingCash.findMany({
-                    where: { vehicleId: s.vehicleId, date: s.date },
+                    where: { vehicleId: s.vehicleId, date: s.date, tenantId: req.user.tenantId },
                     select: { shift: true, totalOpeningCash: true, denominations: true },
                     orderBy: { shift: 'asc' }
                 });
                 const closings = await prisma.closingCash.findMany({
-                    where: { vehicleId: s.vehicleId, date: s.date },
+                    where: { vehicleId: s.vehicleId, date: s.date, tenantId: req.user.tenantId },
                     select: { shift: true, actualCash: true, difference: true, denominations: true, cashSales: true, expenses: true, expectedCash: true, openingCash: true, remark: true },
                     orderBy: { shift: 'asc' }
                 });
@@ -483,6 +530,7 @@ export const getAdminCashSummary = async (req, res, next) => {
                     by: ['paymentMode'],
                     _sum: { totalAmount: true },
                     where: {
+                        tenantId: req.user.tenantId,
                         vehicleId: s.vehicleId,
                         status: 'COMPLETED',
                         createdAt: { gte: startOfDay, lte: endOfDay }
@@ -500,6 +548,7 @@ export const getAdminCashSummary = async (req, res, next) => {
                 const expensesResult = await prisma.expense.aggregate({
                     _sum: { amount: true },
                     where: {
+                        tenantId: req.user.tenantId,
                         vehicleId: s.vehicleId,
                         date: s.date,
                         paymentMode: 'CASH',
@@ -588,12 +637,17 @@ export const adminUpdateReconciliation = async (req, res, next) => {
 
         // Update the specific shift's OpeningCash record
         await prisma.openingCash.upsert({
-            where: { vehicleId_date_shift: { vehicleId, date, shift } },
+            where: { 
+                vehicleId_date_shift: { vehicleId, date, shift },
+                tenantId: req.user.tenantId
+            },
             update: {
                 totalOpeningCash: openingCash,
                 denominations: denominations || {},
             },
             create: {
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId,
                 vehicleId,
                 date,
                 shift,
@@ -603,11 +657,14 @@ export const adminUpdateReconciliation = async (req, res, next) => {
             },
         });
 
-        // Recalculate daily summary (aggregates both shifts)
-        const updatedSummary = await recalculateDailySummary(vehicleId, date);
+        // Recalculate daily summary
+        const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
 
         const finalSummary = await prisma.dailyCashSummary.findUnique({
-            where: { vehicleId_date: { vehicleId, date } },
+            where: { 
+                vehicleId_date: { vehicleId, date },
+                tenantId: req.user.tenantId 
+            },
             include: {
                 vehicle: {
                     select: { vehicleNumber: true, vehicleName: true }
@@ -632,15 +689,25 @@ export const adminUpdateReconciliation = async (req, res, next) => {
 };
 
 // Shared utility to recalculate daily summary (aggregates BOTH shifts)
-export async function recalculateDailySummary(vehicleId, date) {
-    if (!vehicleId || !date) return;
+export async function recalculateDailySummary(vehicleId, date, tenantId, storeId) {
+    if (!vehicleId || !date || !tenantId) return;
 
     // 1. Get Opening Cash from BOTH shifts
     const openings = await prisma.openingCash.findMany({
-        where: { vehicleId, date }
+        where: { vehicleId, date, tenantId }
     });
     const totalOpeningCash = openings.reduce((sum, o) => sum + o.totalOpeningCash, 0);
     const primaryUserId = openings[0]?.userId || 'SYSTEM';
+
+    // Fallback storeId from vehicle if not provided
+    let effectiveStoreId = storeId;
+    if (!effectiveStoreId) {
+        const vehicle = await prisma.vehicle.findUnique({
+            where: { id: vehicleId, tenantId },
+            select: { storeId: true }
+        });
+        effectiveStoreId = vehicle?.storeId;
+    }
 
     // 2. Calculate Cash Sales from Orders
     const startOfDay = new Date(date);
@@ -651,6 +718,7 @@ export async function recalculateDailySummary(vehicleId, date) {
     const cashSalesRes = await prisma.order.aggregate({
         _sum: { totalAmount: true },
         where: {
+            tenantId,
             vehicleId,
             paymentMode: 'CASH',
             status: 'COMPLETED',
@@ -663,6 +731,7 @@ export async function recalculateDailySummary(vehicleId, date) {
     const expensesRes = await prisma.expense.aggregate({
         _sum: { amount: true },
         where: {
+            tenantId,
             vehicleId,
             date,
             paymentMode: 'CASH',
@@ -673,10 +742,16 @@ export async function recalculateDailySummary(vehicleId, date) {
 
     // 4. Get Actual Cash from the LATEST closing (Shift 2 takes priority, fallback to Shift 1)
     const closing2 = await prisma.closingCash.findUnique({
-        where: { vehicleId_date_shift: { vehicleId, date, shift: 2 } }
+        where: { 
+            vehicleId_date_shift: { vehicleId, date, shift: 2 },
+            tenantId
+        }
     });
     const closing1 = await prisma.closingCash.findUnique({
-        where: { vehicleId_date_shift: { vehicleId, date, shift: 1 } }
+        where: { 
+            vehicleId_date_shift: { vehicleId, date, shift: 1 },
+            tenantId
+        }
     });
     const latestClosing = closing2 || closing1;
     const actualCash = latestClosing?.actualCash || 0;
@@ -687,7 +762,10 @@ export async function recalculateDailySummary(vehicleId, date) {
 
     // 6. Upsert Daily Summary
     return await prisma.dailyCashSummary.upsert({
-        where: { vehicleId_date: { vehicleId, date } },
+        where: { 
+            vehicleId_date: { vehicleId, date },
+            tenantId
+        },
         update: {
             openingCash: totalOpeningCash,
             cashSales,
@@ -698,6 +776,8 @@ export async function recalculateDailySummary(vehicleId, date) {
             status: actualCash > 0 ? (difference === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
         },
         create: {
+            tenantId,
+            storeId: effectiveStoreId,
             vehicleId,
             userId: primaryUserId,
             date,
@@ -717,19 +797,29 @@ export async function recalculateDailySummary(vehicleId, date) {
 // @access  Admin
 export const getFinanceReports = async (req, res, next) => {
     try {
-        const { date, startDate, endDate } = req.query;
+        const { date, startDate, endDate, storeId } = req.query;
         const targetDate = date || format(new Date(), 'yyyy-MM-dd');
+        const tenantId = req.user.tenantId;
+
+        const baseFilter = { 
+            tenantId,
+            ...(date ? { date: targetDate } : {
+                date: {
+                    gte: startDate,
+                    lte: endDate || targetDate
+                }
+            })
+        };
+
+        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+            baseFilter.storeId = storeId;
+        } else if (req.user.storeId) {
+            baseFilter.storeId = req.user.storeId;
+        }
 
         // 1. Daily Summary (Daily Cash Sheet)
         const dailySummaries = await prisma.dailyCashSummary.findMany({
-            where: {
-                ...(date ? { date: targetDate } : {
-                    date: {
-                        gte: startDate,
-                        lte: endDate || targetDate
-                    }
-                })
-            },
+            where: baseFilter,
             include: {
                 vehicle: {
                     select: { vehicleNumber: true }
@@ -738,38 +828,39 @@ export const getFinanceReports = async (req, res, next) => {
         });
 
         // 2. Expense Category Breakdown
+        const expenseFilter = {
+            tenantId,
+            status: 'APPROVED',
+            ...(date ? { date: targetDate } : {
+                date: {
+                    gte: startDate,
+                    lte: endDate || targetDate
+                }
+            })
+        };
+        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+            expenseFilter.storeId = storeId;
+        } else if (req.user.storeId) {
+            expenseFilter.storeId = req.user.storeId;
+        }
+
         const expenses = await prisma.expense.groupBy({
             by: ['type'],
             _sum: { amount: true },
-            where: {
-                status: 'APPROVED',
-                ...(date ? { date: targetDate } : {
-                    date: {
-                        gte: startDate,
-                        lte: endDate || targetDate
-                    }
-                })
-            }
+            where: expenseFilter
         });
 
         // 3. Profitability (Simplified: Sales - approved expenses)
         const salesByVehicle = await prisma.dailyCashSummary.groupBy({
             by: ['vehicleId'],
             _sum: { cashSales: true, expenses: true },
-            where: {
-                ...(date ? { date: targetDate } : {
-                    date: {
-                        gte: startDate,
-                        lte: endDate || targetDate
-                    }
-                })
-            }
+            where: baseFilter
         });
 
         // Enforce vehicle names for profitability
         const profitability = await Promise.all(salesByVehicle.map(async (v) => {
             const vehicle = await prisma.vehicle.findUnique({
-                where: { id: v.vehicleId },
+                where: { id: v.vehicleId, tenantId },
                 select: { vehicleNumber: true }
             });
             return {

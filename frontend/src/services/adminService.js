@@ -2,17 +2,17 @@ import api from './api';
 
 export const adminAPI = {
   // Dashboard
-  getDashboardStats: () => api.get('/admin/dashboard'),
+  getDashboardStats: (params) => api.get('/admin/dashboard', { params }),
   getLocationCheckIns: () => api.get('/routes/all-location-check-ins'),
 
   // Users
-  getUsers: () => api.get('/admin/users'),
+  getUsers: (params) => api.get('/admin/users', { params }),
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   deactivateUser: (id) => api.delete(`/admin/users/${id}`),
 
   // Vehicles
-  getVehicles: () => api.get('/admin/vehicles'),
+  getVehicles: (params) => api.get('/admin/vehicles', { params }),
   createVehicle: (data) => api.post('/admin/vehicles', data),
   updateVehicle: (id, data) => api.put(`/admin/vehicles/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -22,7 +22,7 @@ export const adminAPI = {
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
 
   // Inventory
-  getItems: () => api.get('/admin/inventory/items'),
+  getItems: (params) => api.get('/admin/inventory/items', { params }),
   createItem: (data) => api.post('/admin/inventory/items', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -36,7 +36,7 @@ export const adminAPI = {
   returnStock: (data) => api.post('/admin/inventory/return', data),
   getVehicleInventory: (id) => api.get(`/admin/inventory/vehicle/${id}`),
   auditVehicleStock: (id, data) => api.put(`/admin/inventory/vehicle/${id}/audit`, data),
-  getRefillRequests: () => api.get('/admin/inventory/refills'),
+  getRefillRequests: (params) => api.get('/admin/inventory/refills', { params }),
   approveRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/approve`, data),
   rejectRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/reject`, data),
 
@@ -44,19 +44,19 @@ export const adminAPI = {
   getSales: (params) => api.get('/admin/sales', { params }),
 
   // Reports
-  getDailyReport: () => api.get('/admin/reports/daily'),
+  getDailyReport: (params) => api.get('/admin/reports/daily', { params }),
   getTrendsReport: (params) => api.get('/admin/reports/trends', { params }),
-  getTopProducts: () => api.get('/admin/reports/top-products'),
+  getTopProducts: (params) => api.get('/admin/reports/top-products', { params }),
   getVehicleReport: (id) => api.get(`/admin/reports/vehicle/${id}`),
-  getItemReport: () => api.get('/admin/reports/item'),
+  getItemReport: (params) => api.get('/admin/reports/item', { params }),
   getDateRangeReport: (params) => api.get('/admin/reports/date-range', { params }),
   getReconciliationReport: (params) => api.get('/admin/reports/reconciliation', { params }),
   getRouteWiseReport: (params) => api.get('/admin/reports/route-wise', { params }),
   getVillageWiseReport: (params) => api.get('/admin/reports/village-wise', { params }),
-  getAgentPerformance: () => api.get('/admin/reports/agent-performance'),
+  getAgentPerformance: (params) => api.get('/admin/reports/agent-performance', { params }),
   
   // Settings
-  getSettings: () => api.get('/admin/settings').catch(err => {
+  getSettings: (params) => api.get('/admin/settings', { params }).catch(err => {
     if (err.response?.status === 404) {
       console.warn('[System] Admin settings route not found on server yet. Using defaults.');
       return { data: { success: true, data: { businessName: 'VillagKart', taxRates: '0,5,12,18' } } };
@@ -66,13 +66,13 @@ export const adminAPI = {
   updateSettings: (data) => api.put('/admin/settings', data),
 
   // Units
-  getUnits: () => api.get('/admin/units'),
+  getUnits: (params) => api.get('/admin/units', { params }),
   createUnit: (data) => api.post('/admin/units', data),
   updateUnit: (id, data) => api.put(`/admin/units/${id}`, data),
   deleteUnit: (id) => api.delete(`/admin/units/${id}`),
 
   // Categories
-  getCategories: () => api.get('/admin/categories'),
+  getCategories: (params) => api.get('/admin/categories', { params }),
   createCategory: (data) => api.post('/admin/categories', data),
   updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
@@ -81,7 +81,7 @@ export const adminAPI = {
   vgeAllPerformance: (params) => api.get('/vge/admin/all-performance', { params }),
   vgeAgentPerformance: (userId, params) => api.get(`/vge/admin/agent/${userId}`, { params }),
   vgeMonthlyReport: (params) => api.get('/vge/admin/monthly-report', { params }),
-  vgeGetConfig: () => api.get('/vge/admin/config'),
+  vgeGetConfig: (params) => api.get('/vge/admin/config', { params }),
   vgeUpdateConfig: (data) => api.put('/vge/admin/config', data),
   vgeRecalculate: (data) => api.post('/vge/admin/recalculate', data),
   vgeEndOfDay: (data) => api.post('/vge/admin/end-of-day', data || {}),
@@ -107,7 +107,7 @@ export const adminAPI = {
   getAssetReports: () => api.get('/admin/assets/reports'),
 
   // Asset Categories
-  getAssetCategories: () => api.get('/admin/asset-categories'),
+  getAssetCategories: (params) => api.get('/admin/asset-categories', { params }),
   createAssetCategory: (data) => api.post('/admin/asset-categories', data),
   updateAssetCategory: (id, data) => api.put(`/admin/asset-categories/${id}`, data),
   deleteAssetCategory: (id) => api.delete(`/admin/asset-categories/${id}`),
@@ -118,6 +118,13 @@ export const adminAPI = {
     return response.data;
   },
   resolveVillageLink: (url) => api.post('/admin/villages/resolve-link', { url }),
+
+  // Tenant Stores Management
+  getStores: () => api.get('/tenant/stores'),
+  createStore: (data) => api.post('/tenant/stores', data),
+  updateStore: (id, data) => api.put(`/tenant/stores/${id}`, data),
+  deleteStore: (id) => api.delete(`/tenant/stores/${id}`),
 };
+
 
 export default adminAPI;

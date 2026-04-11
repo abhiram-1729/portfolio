@@ -13,6 +13,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import vgeRoutes from './routes/vgeRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
+import storeRoutes from './routes/storeRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -46,6 +47,7 @@ app.use('/api/notifications', notificationRoutes);
 app.use('/api/vge', vgeRoutes);
 app.use('/api/assets', assetRoutes);
 app.use('/api/expenses', expenseRoutes);
+app.use('/api/tenant/stores', storeRoutes);
 
 
 app.get('/', (req, res) => {

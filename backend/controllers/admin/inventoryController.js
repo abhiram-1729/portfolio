@@ -7,7 +7,17 @@ import fs from 'fs';
 // Item Master
 export const getItems = async (req, res) => {
   try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+    
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+
     const items = await prisma.product.findMany({
+      where,
       include: {
         category: { select: { name: true } },
         unit: { select: { name: true, type: true } },
@@ -119,6 +129,7 @@ export const createItem = async (req, res) => {
       gst: parseNumber(gst) || 0,
       isFree: isFree === 'true' || isFree === true,
       minShopAmount: parseNumber(minShopAmount) || 0,
+      storeId: (req.body.storeId && req.body.storeId !== 'null' && req.body.storeId !== '') ? req.body.storeId : req.user.storeId
     };
 
     const item = await prisma.product.create({
@@ -272,6 +283,11 @@ export const deleteItem = async (req, res) => {
 export const loadStock = async (req, res) => {
   try {
     const { vehicleId, items } = req.body; // items = [{ productId, quantity }]
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: { storeId: true }
+    });
+    const storeId = vehicle?.storeId;
 
     for (const item of items) {
       const q = parseInt(item.quantity);
@@ -279,6 +295,8 @@ export const loadStock = async (req, res) => {
       // Create transaction
       await prisma.stockTransaction.create({
         data: {
+          tenantId: req.user.tenantId,
+          storeId,
           type: 'LOAD',
           vehicleId,
           productId: item.productId,
@@ -296,6 +314,8 @@ export const loadStock = async (req, res) => {
           openingQuantity: { increment: q }
         },
         create: {
+          tenantId: req.user.tenantId,
+          storeId,
           vehicleId,
           productId: item.productId,
           quantity: q,
@@ -325,6 +345,11 @@ export const loadStock = async (req, res) => {
 export const returnStock = async (req, res) => {
   try {
     const { vehicleId, items } = req.body;
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: vehicleId },
+      select: { storeId: true }
+    });
+    const storeId = vehicle?.storeId;
 
     for (const item of items) {
       const q = parseInt(item.quantity);
@@ -332,6 +357,8 @@ export const returnStock = async (req, res) => {
       // Create transaction
       await prisma.stockTransaction.create({
         data: {
+          tenantId: req.user.tenantId,
+          storeId,
           type: 'RETURN',
           vehicleId,
           productId: item.productId,
@@ -476,7 +503,11 @@ export const getVehicleInventory = async (req, res) => {
   try {
     const { id } = req.params; // vehicleId
     const inventory = await prisma.vehicleStock.findMany({
-      where: { vehicleId: id },
+      where: { 
+        vehicleId: id,
+        tenantId: req.user.tenantId,
+        // Optional: filter by storeId if needed, but vehicle is usually unique anyway
+      },
       include: {
         product: { 
           include: { 
@@ -499,6 +530,11 @@ export const auditVehicleStock = async (req, res) => {
   try {
     const { id } = req.params; // vehicleId
     const { items } = req.body; // items = [{ productId, quantity }]
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id },
+      select: { storeId: true }
+    });
+    const storeId = vehicle?.storeId;
 
     if (!items || !Array.isArray(items)) {
       return res.status(400).json({ message: 'Invalid items data' });
@@ -511,6 +547,8 @@ export const auditVehicleStock = async (req, res) => {
         // Log the audit as a special transaction
         await tx.stockTransaction.create({
           data: {
+            tenantId: req.user.tenantId,
+            storeId,
             type: 'AUDIT',
             vehicleId: id,
             productId: item.productId,
@@ -529,6 +567,8 @@ export const auditVehicleStock = async (req, res) => {
             openingQuantity: q 
           },
           create: { 
+            tenantId: req.user.tenantId,
+            storeId,
             vehicleId: id, 
             productId: item.productId, 
             quantity: q,
@@ -550,7 +590,17 @@ export const auditVehicleStock = async (req, res) => {
 
 export const getRefillRequests = async (req, res) => {
   try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+
     const requests = await prisma.refillRequest.findMany({
+      where,
       orderBy: { createdAt: 'desc' },
       include: {
         vehicle: { select: { vehicleNumber: true, vehicleName: true } },
@@ -641,6 +691,8 @@ export const approveRefillRequest = async (req, res) => {
         // Log transaction
         await tx.stockTransaction.create({
           data: {
+            tenantId: request.tenantId,
+            storeId: request.storeId,
             date: new Date(),
             type: 'LOAD',
             vehicleId: request.vehicleId,
@@ -656,6 +708,8 @@ export const approveRefillRequest = async (req, res) => {
             quantity: { increment: item.quantity }
           },
           create: { 
+            tenantId: request.tenantId,
+            storeId: request.storeId,
             vehicleId: request.vehicleId, 
             productId: item.productId, 
             quantity: item.quantity,

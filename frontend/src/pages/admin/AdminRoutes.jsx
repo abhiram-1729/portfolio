@@ -20,6 +20,9 @@ import {
 import * as routeService from '../../services/routeService';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import { useUserStore } from '../../store/userStore';
+import StoreSelector from './StoreSelector';
 
 export default function AdminRoutes() {
   const [villages, setVillages] = useState([]);
@@ -46,6 +49,11 @@ export default function AdminRoutes() {
   const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
   const [routeForm, setRouteForm] = useState({ id: '', routeName: '', selectedVillages: [] });
   const [assignmentForm, setAssignmentForm] = useState({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' });
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeId = searchParams.get('storeId');
+  const location = useLocation();
+  const currentUser = useUserStore(s => s.user);
 
   const fetchData = async () => {
     setIsVillagesLoading(true);
@@ -53,11 +61,11 @@ export default function AdminRoutes() {
     setIsAssignmentsLoading(true);
     try {
       const [vRes, rRes, aRes, vehRes, uRes] = await Promise.all([
-        routeService.getVillages(),
-        routeService.getAdminRoutes(),
-        routeService.getRouteAssignments(),
-        adminAPI.getVehicles(),
-        adminAPI.getUsers()
+        routeService.getVillages({ storeId }),
+        routeService.getAdminRoutes({ storeId }),
+        routeService.getRouteAssignments({ storeId }),
+        adminAPI.getVehicles({ storeId }),
+        adminAPI.getUsers({ storeId })
       ]);
       setVillages(vRes);
       setRoutes(rRes);
@@ -77,7 +85,7 @@ export default function AdminRoutes() {
 
   useEffect(() => {
     fetchData();
-  }, []);
+  }, [storeId]);
 
   // --- Village Handlers ---
   const handleSaveVillage = async (e) => {
@@ -187,13 +195,42 @@ export default function AdminRoutes() {
     }
   };
 
+  // Gatekeeper
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+  const isTenantRoute = location.pathname.includes('/tenant/');
+  
+  if (isGlobalRole && isTenantRoute && !storeId) {
+    return (
+       <StoreSelector 
+         title="Route & Coverage"
+         description="Please select a store branch to manage its routes and agent assignments."
+         onSelect={(id) => {
+           setSearchParams({ storeId: id });
+         }}
+       />
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header & Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
-          <p className="text-sm text-gray-500">Manage villages, routes, and agent schedules</p>
+          <div className="flex items-center gap-2">
+            <p className="text-sm text-gray-500">Manage villages, routes, and agent schedules</p>
+            {isTenantRoute && storeId && (
+              <>
+                <span className="text-gray-300">•</span>
+                <button 
+                  onClick={() => setSearchParams({})} 
+                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
+                >
+                  Change Store
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
