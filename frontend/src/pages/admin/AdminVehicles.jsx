@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store } from 'lucide-react';
+import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
@@ -409,8 +409,19 @@ export default function AdminVehicles() {
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+             {isTenantRoute && storeFilterId && (
+               <button 
+                 onClick={() => setSearchParams({})}
+                 className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                 title="Back to All Branches"
+               >
+                 <ArrowLeft size={18} />
+               </button>
+             )}
+             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
+          </div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
             {isTenantRoute && (
@@ -453,7 +464,17 @@ export default function AdminVehicles() {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          <button onClick={() => { setShowAddModal(true); setNewVehicle({ ...newVehicle, storeId: storeFilterId || '' }); }}
+          <button onClick={() => { 
+            setNewVehicle({ 
+              vehicleNumber: '', 
+              vehicleName: '', 
+              assignedUserId: '', 
+              status: true,
+              storeId: storeFilterId || '' 
+            });
+            setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
+            setShowAddModal(true); 
+          }}
             className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
             <Plus size={24} />
           </button>

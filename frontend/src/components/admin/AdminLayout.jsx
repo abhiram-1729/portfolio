@@ -86,6 +86,10 @@ export default function AdminLayout() {
           </div>
         </div>
         <div className="flex items-center gap-4 relative">
+          <NotificationPopover 
+            isOpen={isNotifOpen} 
+            onClose={() => setIsNotifOpen(false)} 
+          />
           <button
             onClick={() => setIsNotifOpen(!isNotifOpen)}
             className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
@@ -98,17 +102,9 @@ export default function AdminLayout() {
             )}
           </button>
           
-          <NotificationPopover 
-            isOpen={isNotifOpen} 
-            onClose={() => setIsNotifOpen(false)} 
-          />
-
-          <span className="hidden md:block text-sm text-gray-600 font-medium">
-            {user?.name} ({user?.role})
-          </span>
           <button
             onClick={handleLogout}
-            className="p-2 text-gray-500 hover:text-red-600 transition-colors"
+            className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
           >
             <LogOut size={20} />
           </button>
@@ -116,71 +112,69 @@ export default function AdminLayout() {
       </header>
 
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-200 flex-col pt-8 pb-6">
-        {/* Global Layer: Stores */}
-        <div className="px-6 mb-8">
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-50 border border-gray-100 w-fit mb-6">
-            <Store size={14} className="text-gray-400" />
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Stores</span>
-          </div>
-
-          <div className="flex items-center gap-4 mb-2 group cursor-pointer">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200 transition-transform group-hover:scale-105">
-              <Store size={24} strokeWidth={2.5} />
-            </div>
-            <div>
-              <h2 className="text-xl font-black text-gray-900 leading-tight flex items-center gap-2">
-                {displayStoreName}
-                <ChevronDown size={14} className="text-gray-400 group-hover:text-emerald-500 transition-colors" />
-              </h2>
-              <p className="text-[10px] font-bold text-emerald-600 uppercase tracking-widest">Store Outlet</p>
+      {/* Desktop Sidebar - Non-scrollable Single Screen */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-40">
+        {/* Sidebar Header: Store Info */}
+        <div className="p-6">
+          <div className="flex flex-col gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+                <Store size={20} strokeWidth={2.5} />
+              </div>
+              <div className="min-w-0">
+                <h2 className="text-base font-black text-gray-900 leading-tight truncate">
+                  {displayStoreName}
+                </h2>
+                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Admin Portal</p>
+              </div>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-4 space-y-6">
-          <div className="relative pl-4">
-            <div className="absolute left-0 top-0 bottom-0 w-px bg-gray-100 ml-[2px]" />
-            
-            <div className="mb-4">
-              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] px-4 py-2 border-l-2 border-emerald-500 -ml-[18px]">
-                Admin Portal
-              </p>
-            </div>
-
-            <nav className="space-y-1">
-              {navItems.map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={appendParams(item.to)}
-                  end={item.end}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold transition-all duration-200",
-                    isActive
-                      ? "bg-emerald-50 text-emerald-600 shadow-sm border border-emerald-100"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                  )}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon size={18} strokeWidth={isActive ? 2.5 : 2} />
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </nav>
-          </div>
+        {/* Navigation - Flex Grow but hide scrollbar */}
+        <div className="flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+          <nav className="space-y-0.5 pb-6">
+            <p className="px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Management</p>
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={appendParams(item.to)}
+                end={item.end}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
+                  isActive
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
+                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
+                )}
+              >
+                {({ isActive }) => (
+                  <>
+                    <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
+                    {item.label}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
         </div>
 
-        <div className="px-6 mt-6 pt-6 border-t border-gray-50">
+        {/* Sidebar Footer: Admin Profile Data */}
+        <div className="p-4 border-t border-gray-50 bg-gray-50/30">
+          <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 shadow-sm mb-3">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
+              {user?.name?.charAt(0) || 'A'}
+            </div>
+            <div className="flex flex-col min-w-0">
+              <span className="text-[11px] font-black text-gray-900 truncate tracking-tight">{user?.name}</span>
+              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
+            </div>
+          </div>
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-3 rounded-xl text-sm font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+            className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100"
           >
-            <LogOut size={18} />
-            <span>Logout</span>
+            <LogOut size={14} />
+            <span>Sign Out</span>
           </button>
         </div>
       </aside>

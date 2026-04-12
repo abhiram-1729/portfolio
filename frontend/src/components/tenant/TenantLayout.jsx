@@ -99,68 +99,80 @@ export default function TenantLayout() {
         </div>
       </header>
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-full w-64 bg-white border-r border-emerald-50 flex-col shadow-xl z-40">
-        <div className="p-6 mb-4">
-          <div className="flex items-center gap-2 mb-6">
-            <Store size={14} className="text-emerald-500" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Global Hub</span>
-          </div>
-
-          <div className="bg-emerald-600 rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-100 border border-emerald-500/20 relative overflow-hidden group">
-            <div className="absolute -right-4 -top-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
-            
-            <div className="flex items-center justify-between mb-4 relative z-10">
-              <div className="w-12 h-12 rounded-2xl bg-white/20 backdrop-blur-md flex items-center justify-center">
-                <Store size={28} strokeWidth={2.5} />
-              </div>
-              <div className="px-3 py-1 rounded-full bg-emerald-500/50 backdrop-blur-sm text-[8px] font-black uppercase tracking-[0.2em] border border-white/20">
-                Master
-              </div>
+      {/* Desktop Sidebar - Fixed & Non-scrollable */}
+      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-emerald-50 flex-col z-40">
+        {/* Compact Header */}
+        <div className="p-6 pb-2">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-100">
+              <Store size={20} strokeWidth={2.5} />
             </div>
-
-            <div className="relative z-10">
-              <h2 className="text-xl font-black tracking-tighter leading-none mb-1">
-                {user?.tenantName || 'Stores Management'}
-              </h2>
-              <p className="text-[10px] font-bold text-emerald-100/60 uppercase tracking-widest">Organization Portal</p>
+            <div className="min-w-0">
+              <h2 className="text-[11px] font-black text-slate-900 leading-tight tracking-tight uppercase">Master Control</h2>
+              <p className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest leading-none">Global Network</p>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 px-4 py-4 space-y-1">
-          {navItems.map((item) => (
-            <NavLink
-              key={item.to}
-              to={item.to}
-              end={item.end}
-              className={({ isActive }) => cn(
-                "flex items-center gap-3 px-4 py-3.5 rounded-2xl text-sm font-black transition-all duration-300",
-                isActive
-                  ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/30"
-                  : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
-              )}
-            >
-              {({ isActive }) => (
-                <>
-                  <item.icon size={18} strokeWidth={isActive ? 3 : 2} />
-                  {item.label}
-                </>
-              )}
-            </NavLink>
-          ))}
-        </nav>
+        {/* Navigation - Single Screen & Hidden Scrollbar */}
+        <div className="flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-6">
+          <p className="px-4 py-3 text-[9px] font-black text-slate-400 border-t border-emerald-50/50 uppercase tracking-[0.2em] mb-1">Infrastructure</p>
+          <nav className="space-y-0.5">
+            {navItems.map((item) => (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) => cn(
+                  "flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-300",
+                  isActive
+                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-600/20"
+                    : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+                )}
+              >
+                {({ isActive }) => (
+                  <>
+                    <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
+                    {item.label}
+                  </>
+                )}
+              </NavLink>
+            ))}
+          </nav>
+        </div>
 
-        <div className="p-6 mt-auto border-t border-emerald-50">
-           <div className="bg-orange-50 rounded-2xl p-4 border border-orange-100 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg bg-orange-500 flex items-center justify-center text-white">
-                 <Target size={18} />
-              </div>
-              <div>
-                 <p className="text-[9px] font-black text-orange-600 uppercase tracking-widest">Growth Plan</p>
-                 <p className="text-xs font-black text-orange-950 uppercase tracking-tighter">Strategic</p>
-              </div>
-           </div>
+        {/* Profile Footer - Organization Data */}
+        <div className="p-4 border-t border-emerald-50 bg-emerald-50/10">
+          <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm mb-3">
+             <div className="flex items-center gap-3 mb-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100">
+                   {user?.tenantName?.charAt(0) || 'O'}
+                </div>
+                <div className="min-w-0 flex-1">
+                   <p className="text-[11px] font-black text-slate-900 truncate leading-none mb-1 uppercase tracking-tight">{user?.tenantName}</p>
+                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{user?.name}</p>
+                </div>
+             </div>
+             
+             <div className="flex items-center justify-between pt-3 border-t border-emerald-50/50">
+                <div className="flex flex-col">
+                   <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Access Level</span>
+                   <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">Super Admin</span>
+                </div>
+                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md text-[8px] font-black border border-emerald-100">
+                   <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                   LIVE
+                </div>
+             </div>
+          </div>
+
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-orange-50 hover:text-orange-600 transition-all border border-transparent hover:border-orange-100"
+          >
+            <LogOut size={14} />
+            <span>Sign Out Control</span>
+          </button>
         </div>
       </aside>
 

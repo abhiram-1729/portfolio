@@ -55,9 +55,9 @@ export default function ProductCard({ product }) {
         )}
 
         {/* Stock Info - More subtle */}
-        {!isFreeProduct && product.stock !== undefined && product.stock !== null && (
-          <div className="absolute top-2 right-2 z-10 bg-emerald-600/90 backdrop-blur-sm text-white text-[0.55rem] font-black px-1.5 py-0.5 rounded-md border border-white/20 shadow-sm select-none">
-            {product.stock} IN STOCK
+        {product.stock !== undefined && product.stock !== null && (
+          <div className={`absolute top-2 right-2 z-10 backdrop-blur-sm text-white text-[0.55rem] font-black px-1.5 py-0.5 rounded-md border shadow-sm select-none ${product.stock === 0 ? 'bg-red-500/90 border-red-400' : 'bg-emerald-600/90 border-white/20'}`}>
+            {product.stock === 0 ? 'OUT OF STOCK' : `${product.stock} IN STOCK`}
           </div>
         )}
 
@@ -133,7 +133,11 @@ export default function ProductCard({ product }) {
 
       {/* Action Area */}
       <div className="mt-1">
-        {qty === 0 ? (
+        {product.stock === 0 ? (
+          <div className="w-full font-black py-4 rounded-2xl bg-slate-100/80 text-slate-400 flex items-center justify-center gap-2 text-[0.7rem] uppercase tracking-widest border border-slate-200/50 select-none">
+            Unavailable
+          </div>
+        ) : qty === 0 ? (
           <button
             onClick={handleAdd}
             className={`w-full font-black py-3 rounded-2xl active:scale-[0.97] transition-all flex items-center justify-center gap-2 text-[0.7rem] uppercase tracking-widest shadow-lg ${isCurrentlyFree

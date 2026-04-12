@@ -33,14 +33,30 @@ export const createStore = async (req, res) => {
   try {
     const { name, code, address, contactEmail, contactPhone, status } = req.body;
 
-    const existingStore = await prisma.store.findUnique({
+    // Check for existing stores with same critical attributes
+    const existingStore = await prisma.store.findFirst({
       where: {
-        code
+        tenantId: req.user.tenantId,
+        OR: [
+          { code: code },
+          { name: name },
+          { contactEmail: contactEmail },
+          { contactPhone: contactPhone }
+        ]
       }
     });
 
     if (existingStore) {
-      return res.status(400).json({ success: false, message: 'Store with this code already exists' });
+      let conflictField = 'attribute';
+      if (existingStore.code === code) conflictField = 'Code';
+      else if (existingStore.name === name) conflictField = 'Name';
+      else if (existingStore.contactEmail === contactEmail) conflictField = 'Contact Email';
+      else if (existingStore.contactPhone === contactPhone) conflictField = 'Contact Phone';
+
+      return res.status(400).json({ 
+        success: false, 
+        message: `A store with this ${conflictField} already exists in your organization` 
+      });
     }
 
     const store = await prisma.store.create({
@@ -82,6 +98,33 @@ export const updateStore = async (req, res) => {
     // Ensure they belong to the same tenant
     if (store.tenantId !== req.user.tenantId) {
       return res.status(403).json({ success: false, message: 'Unauthorized access to store' });
+    }
+
+    // Check for conflicts with other stores
+    const conflictStore = await prisma.store.findFirst({
+      where: {
+        tenantId: req.user.tenantId,
+        id: { not: id },
+        OR: [
+          { code: code },
+          { name: name },
+          { contactEmail: contactEmail },
+          { contactPhone: contactPhone }
+        ]
+      }
+    });
+
+    if (conflictStore) {
+      let conflictField = 'attribute';
+      if (conflictStore.code === code) conflictField = 'Code';
+      else if (conflictStore.name === name) conflictField = 'Name';
+      else if (conflictStore.contactEmail === contactEmail) conflictField = 'Contact Email';
+      else if (conflictStore.contactPhone === contactPhone) conflictField = 'Contact Phone';
+
+      return res.status(400).json({ 
+        success: false, 
+        message: `Another store already uses this ${conflictField}` 
+      });
     }
 
     const updatedStore = await prisma.store.update({

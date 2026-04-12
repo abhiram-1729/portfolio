@@ -285,6 +285,9 @@ export default function AgentInventory() {
                           <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100">
                             Current: {currentStock}
                           </span>
+                          <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded cursor-default border border-orange-100">
+                            ₹{p.price} / Unit
+                          </span>
                           {p.unit && (
                             <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded cursor-default border border-blue-100">
                               {p.unitValue || ''} {p.unit.type}

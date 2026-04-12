@@ -15,7 +15,7 @@ export default function Header({ onMenuClick }) {
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 pt-[calc(var(--safe-top)+0.5rem)] pb-2 transition-all duration-300 shadow-sm">
-      <div className="max-w-lg mx-auto px-4 flex items-center justify-between">
+      <div className="max-w-lg md:max-w-none mx-auto px-4 md:px-8 flex items-center justify-between">
         
         <div className="flex items-center gap-2">
           {/* Main Action Hub - Left */}
@@ -34,7 +34,7 @@ export default function Header({ onMenuClick }) {
              {user?.role === 'SALES_AGENT' && (
                <button 
                  onClick={onMenuClick}
-                 className="p-2.5 rounded-xl text-slate-600 active:scale-90 transition-all hover:bg-white flex items-center justify-center"
+                 className="p-2.5 rounded-xl text-slate-600 active:scale-90 transition-all hover:bg-white flex items-center justify-center md:hidden"
                >
                  <Menu size={22} strokeWidth={2.5} />
                </button>

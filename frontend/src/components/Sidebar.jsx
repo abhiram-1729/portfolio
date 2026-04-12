@@ -34,55 +34,32 @@ export default function Sidebar({ isOpen, onClose }) {
         />
       )}
 
-      {/* Sidebar Drawer */}
-      <div className={`fixed top-0 left-0 bottom-0 w-[80%] max-w-[320px] bg-white z-[70] transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) ${isOpen ? 'translate-x-0' : '-translate-x-full'} shadow-2xl flex flex-col pt-[calc(var(--safe-top)+1rem)]`}>
+      {/* Sidebar - Desktop (Fixed) & Mobile (Drawer) */}
+      <aside className={`fixed left-0 top-0 bottom-0 w-64 bg-white border-r border-slate-200 flex flex-col z-[70] transition-transform duration-500 cubic-bezier(0.16, 1, 0.3, 1) md:translate-x-0 ${isOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'} h-screen overflow-hidden`}>
         
         {/* Store Context Layer */}
-        <div className="px-6 mb-6">
+        <div className="p-6">
           <div className="flex items-center gap-2 mb-3">
             <Store size={14} className="text-emerald-600" />
             <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Store Context</span>
           </div>
           
-          <div className="group relative flex items-center gap-4 p-4 bg-emerald-50/50 rounded-[2rem] border border-emerald-100/50 shadow-sm transition-all hover:bg-emerald-50">
-            <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200/50">
-              <Store size={22} strokeWidth={2.5} />
+          <div className="group relative flex items-center gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50 shadow-sm transition-all hover:bg-emerald-50">
+            <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200/50">
+              <Store size={20} strokeWidth={2.5} />
             </div>
             <div className="flex-1 min-w-0">
-               <h3 className="text-base font-black text-slate-900 tracking-tight truncate leading-tight">
+               <h3 className="text-sm font-black text-slate-900 tracking-tight truncate leading-tight">
                  {user?.storeName || user?.tenantName || 'VillagKart'}
                </h3>
                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest mt-0.5">Sales Outlet</p>
             </div>
           </div>
-          
-          <div className="mt-6 flex items-center justify-between px-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.3em] text-slate-300">Merchant Portal</span>
-            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-          </div>
         </div>
 
-        {/* User Profile Summary */}
-        <div className="mx-6 p-3 rounded-2xl bg-slate-50 border border-slate-100 mb-4 flex items-center gap-3 group">
-          <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-            <User size={20} strokeWidth={2.5} />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-xs font-black text-slate-900 truncate tracking-tight font-sans uppercase">{user?.name}</p>
-            <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">{user?.role?.replace('_', ' ')}</p>
-          </div>
-          <button 
-            onClick={handleLogout}
-            className="p-2.5 rounded-xl bg-rose-50 text-rose-500 hover:bg-rose-500 hover:text-white transition-all active:scale-90"
-            title="Logout"
-          >
-            <LogOut size={16} strokeWidth={3} />
-          </button>
-        </div>
-
-        {/* Navigation Content */}
-        <div className="flex-1 px-4 pb-4">
-          <div className="space-y-1">
+        {/* Navigation Content - Flex Grow with hidden scrollbar */}
+        <div className="flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden pb-8">
+          <div className="space-y-0.5">
             <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Operations</p>
             {menuItems.map((item) => {
               const isActive = location.pathname === item.path;
@@ -91,37 +68,48 @@ export default function Sidebar({ isOpen, onClose }) {
                   key={item.path}
                   to={item.path}
                   onClick={onClose}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all active:scale-[0.98] ${isActive 
-                    ? `${item.bg} ${item.color} shadow-sm border border-${item.color.split('-')[1]}-100` 
-                    : 'text-slate-600 hover:bg-slate-50'}`}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${isActive 
+                    ? `bg-emerald-600 text-white shadow-lg shadow-emerald-200` 
+                    : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
                 >
-                  <div className={`p-1.5 rounded-lg ${isActive ? 'bg-white shadow-sm' : 'bg-transparent'}`}>
-                    <item.icon size={18} strokeWidth={isActive ? 3 : 2.5} />
-                  </div>
-                  <span className="flex-1 font-black text-[0.85rem] tracking-tight">{item.name}</span>
-                  {isActive && <ChevronRight size={14} strokeWidth={3} />}
+                  <item.icon size={16} strokeWidth={isActive ? 3 : 2.5} className={isActive ? 'text-white' : item.color} />
+                  <span className="flex-1 font-black text-xs uppercase tracking-wide">{item.name}</span>
+                  {isActive && <ChevronRight size={14} strokeWidth={3} className="text-white/50" />}
                 </Link>
               );
             })}
           </div>
 
           <div className="mt-4 pt-4 border-t border-slate-100">
-            <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">System</p>
-            <div className="px-4 py-2 text-[10px] font-black text-slate-300 uppercase tracking-widest italic">
-              Synchronized Access
+            <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">System Status</p>
+            <div className="px-4 py-2 flex items-center gap-2">
+              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">Synchronized</span>
             </div>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="p-8 border-t border-slate-50">
-           <div className="flex items-center justify-between opacity-30 font-black text-[8px] uppercase tracking-[0.3em] text-slate-500">
-             <span>VillagKart</span>
-             <span>v1.0.4</span>
-           </div>
+        {/* User Profile Footer */}
+        <div className="p-4 border-t border-slate-100 bg-slate-50/50">
+          <div className="mx-2 p-3 rounded-2xl bg-white border border-slate-100 shadow-sm flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-sm border border-emerald-100/50 shrink-0">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-black text-slate-900 truncate tracking-tight uppercase leading-none">{user?.name}</p>
+              <p className="text-[9px] font-bold text-slate-400 uppercase tracking-wider truncate mt-1">{user?.role?.replace('_', ' ')}</p>
+            </div>
+          </div>
+          <button 
+            onClick={handleLogout}
+            className="flex items-center gap-3 w-full px-5 py-2.5 mt-3 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all border border-transparent hover:border-rose-100"
+          >
+            <LogOut size={14} strokeWidth={3} />
+            <span>Sign Out</span>
+          </button>
         </div>
 
-      </div>
+      </aside>
     </>
   );
 }

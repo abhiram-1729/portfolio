@@ -14,13 +14,10 @@ import {
   Target,
   ArrowUpRight,
   ShoppingCart,
-  DollarSign,
-  Users,
-  Activity,
-  Globe,
   Map,
   MapPin,
-  Store
+  Store,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -839,7 +836,18 @@ export default function AdminReports() {
     <div className="space-y-6 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Reports Portal</h2>
+          <div className="flex items-center gap-3">
+             {isTenantRoute && storeFilterId && (
+               <button 
+                 onClick={() => setSearchParams({})}
+                 className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                 title="Back to All Branches"
+               >
+                 <ArrowLeft size={18} />
+               </button>
+             )}
+             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Reports Portal</h2>
+          </div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-500">Track performance and reconcile data</p>
             {isTenantRoute && (

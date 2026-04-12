@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -33,6 +33,11 @@ export default function AdminUsers({ type }) {
   const [editingUser, setEditingUser] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [activeTab, setActiveTab] = useState(type || 'staff');
+
+  useEffect(() => {
+    if (type) setActiveTab(type);
+  }, [type]);
 
   const fetchUsers = async () => {
     try {
@@ -171,15 +176,16 @@ export default function AdminUsers({ type }) {
 
   const filteredUsers = users.filter(u => {
     // 1. Role Filter
-    const roleMatches = type === 'admin' 
-      ? ['ADMIN', 'TENANT_OWNER', 'SUPER_ADMIN'].includes(u.role)
-      : type === 'staff' 
-        ? ['SALES_AGENT', 'SUPERVISOR', 'HELPER'].includes(u.role)
-        : true;
+    const roleMatches = activeTab === 'admin' 
+      ? u.role === 'ADMIN' 
+      : u.role === 'SALES_AGENT';
 
     if (!roleMatches) return false;
 
-    // 2. Search Filter
+    // 2. Hide Current User (Self)
+    if (u.id === currentUser?.id) return false;
+
+    // 3. Search Filter
     const searchLower = searchTerm.toLowerCase();
     if (
       !u.name?.toLowerCase().includes(searchLower) &&
@@ -201,7 +207,7 @@ export default function AdminUsers({ type }) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="animate-spin text-emerald-600" size={40} />
-        <p className="text-gray-500 font-medium tracking-wide">Loading {type === 'admin' ? 'Admins' : 'Staff'}...</p>
+        <p className="text-gray-500 font-medium tracking-wide">Loading {activeTab === 'admin' ? 'Admins' : 'Staff'}...</p>
       </div>
     );
   }
@@ -258,20 +264,31 @@ export default function AdminUsers({ type }) {
                 <span className="text-xs font-black text-gray-700 flex items-center gap-1.5"><Phone size={10} className="text-emerald-500" /> {user.mobile || '---'}</span>
               </div>
               <div className="flex flex-col gap-1">
-                <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Assigned Vehicle</span>
-                <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'Unassigned'}</span>
+                <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Base Store</span>
+                <span className="text-xs font-black text-emerald-700 flex items-center gap-1.5 truncate"><Store size={10} /> {user.store?.name || 'Unassigned'}</span>
               </div>
             </div>
-            <div className="flex flex-col gap-1 mb-2 px-1">
-              <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Base Store / Outlet</span>
-              <span className={`text-xs font-black flex items-center gap-1.5 w-fit px-2 py-1 rounded-md border ${user.store ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}><Store size={10} /> {user.store?.name || 'Unassigned'}</span>
-            </div>
-            <div className="mt-1">
-              <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col items-center">
-                 <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
-                 <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
-              </div>
-            </div>
+
+            {user.role !== 'ADMIN' && (
+              <>
+                <div className="grid grid-cols-2 gap-3 pb-1 pt-1 border-t border-gray-50">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Role Type</span>
+                    {getRoleBadge(user.role)}
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Vehicle</span>
+                    <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'No Truck'}</span>
+                  </div>
+                </div>
+                <div className="mt-1">
+                  <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col items-center">
+                     <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
+                     <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
+                  </div>
+                </div>
+              </>
+            )}
           </div>
         ))}
       </div>
@@ -284,8 +301,8 @@ export default function AdminUsers({ type }) {
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Context</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>
+              {activeTab !== 'admin' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>}
+              {activeTab !== 'admin' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>}
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
             </tr>
           </thead>
@@ -318,28 +335,32 @@ export default function AdminUsers({ type }) {
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                  <div className="flex flex-col items-center">
-                    <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                      <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
-                    </span>
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                  <div className="flex flex-col items-center gap-1.5">
-                    {getRoleBadge(user.role)}
-                    <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                      <Truck size={10} />
-                      {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                    <div className="flex flex-col items-center">
+                      <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                        <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
+                      </span>
                     </div>
-                    {getVgeTypeBadge(user.vgeType)}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                  <span className="text-sm font-black text-indigo-600">
-                     ₹{(user.baseSalary || 0).toLocaleString()}
-                  </span>
-                </td>
+                  </td>
+                  {activeTab !== 'admin' && (
+                    <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                      <div className="flex flex-col items-center gap-1.5">
+                        {getRoleBadge(user.role)}
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                          <Truck size={10} />
+                          {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                        </div>
+                        {getVgeTypeBadge(user.vgeType)}
+                      </div>
+                    </td>
+                  )}
+                  {activeTab !== 'admin' && (
+                    <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                      <span className="text-sm font-black text-indigo-600">
+                         ₹{(user.baseSalary || 0).toLocaleString()}
+                      </span>
+                    </td>
+                  )}
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1.5">
                     <button 
@@ -403,7 +424,7 @@ export default function AdminUsers({ type }) {
                 <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
                 
                 <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
-                  <span>{groupUsers.length} {type === 'admin' ? 'Admins' : 'Staff'}</span>
+                  <span>{groupUsers.length} {activeTab === 'admin' ? 'Admins' : 'Staff'}</span>
                   <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
                 </div>
               </button>
@@ -427,11 +448,36 @@ export default function AdminUsers({ type }) {
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
       {/* Sub-Header */}
-      <div className="flex items-center justify-between pb-2">
-        <div>
-          <h2 className="text-xl font-bold text-gray-900">{type === 'admin' ? 'Organization Admins' : 'Operational Staff'}</h2>
-          <div className="flex items-center gap-2 mt-1">
-            <p className="text-xs text-gray-500">{filteredUsers.length} members found</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between pb-2 gap-4">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-3">
+            {isTenantRoute && storeFilterId && (
+              <button 
+                onClick={() => setSearchParams({})}
+                className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                title="Back to All Branches"
+              >
+                <ArrowLeft size={18} />
+              </button>
+            )}
+            <h2 className="text-xl font-bold text-gray-900">User Management</h2>
+          </div>
+          <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit mt-1">
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'admin' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Admins
+            </button>
+            <button
+              onClick={() => setActiveTab('staff')}
+              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'staff' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+            >
+              Sales Exec
+            </button>
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{filteredUsers.length} members found</p>
             {isTenantRoute && (
               <>
                 <span className="text-gray-300">•</span>
@@ -473,7 +519,20 @@ export default function AdminUsers({ type }) {
             />
           </div>
           <button 
-            onClick={() => setShowAddModal(true)}
+            onClick={() => {
+              setNewUser({
+                name: '',
+                email: '',
+                password: '',
+                mobile: '',
+                role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
+                vgeType: 'EMPLOYEE',
+                storeId: storeFilterId || currentUser?.storeId || '',
+                dailyTarget: 10000,
+                baseSalary: 12000,
+              });
+              setShowAddModal(true);
+            }}
             className="bg-emerald-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-medium text-sm active:scale-95"
           >
             <Plus size={18} />
@@ -560,11 +619,7 @@ export default function AdminUsers({ type }) {
                   onChange={(e) => setNewUser({...newUser, role: e.target.value})}
                 >
                   <option value="SALES_AGENT">Sales</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="HELPER">Helper</option>
                   <option value="ADMIN">Admin</option>
-                  <option value="TENANT_OWNER">Tenant Owner</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
                 <select 
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none"
@@ -603,17 +658,19 @@ export default function AdminUsers({ type }) {
                     </div>
                   </div>
                 )}
-                <div className={`space-y-1 ${!isTenantRoute ? 'col-span-2' : ''}`}>
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CTC Monthly Pay (₹)</label>
-                  <input 
-                    type="number"
-                    required
-                    placeholder="e.g. 15000"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
-                    value={newUser.baseSalary}
-                    onChange={(e) => setNewUser({...newUser, baseSalary: e.target.value})}
-                  />
-                </div>
+                {newUser.role !== 'ADMIN' && (
+                  <div className={`space-y-1 ${!isTenantRoute ? 'col-span-2' : ''}`}>
+                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CTC Monthly Pay (₹)</label>
+                    <input 
+                      type="number"
+                      required
+                      placeholder="e.g. 15000"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
+                      value={newUser.baseSalary}
+                      onChange={(e) => setNewUser({...newUser, baseSalary: e.target.value})}
+                    />
+                  </div>
+                )}
               </div>
 
               <button 
@@ -708,11 +765,7 @@ export default function AdminUsers({ type }) {
                   onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
                 >
                   <option value="SALES_AGENT">Sales Agent</option>
-                  <option value="SUPERVISOR">Supervisor</option>
-                  <option value="HELPER">Helper</option>
                   <option value="ADMIN">Admin</option>
-                  <option value="TENANT_OWNER">Tenant Owner</option>
-                  <option value="SUPER_ADMIN">Super Admin</option>
                 </select>
               </div>
 
@@ -735,17 +788,19 @@ export default function AdminUsers({ type }) {
                 </div>
               )}
 
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monthly CTC (₹)</label>
-                <input 
-                  type="number"
-                  required
-                  placeholder="Monthly Base"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none font-bold text-indigo-600"
-                  value={editingUser.baseSalary || ''}
-                  onChange={(e) => setEditingUser({...editingUser, baseSalary: e.target.value})}
-                />
-              </div>
+              {editingUser.role !== 'ADMIN' && (
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monthly CTC (₹)</label>
+                  <input 
+                    type="number"
+                    required
+                    placeholder="Monthly Base"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none font-bold text-indigo-600"
+                    value={editingUser.baseSalary || ''}
+                    onChange={(e) => setEditingUser({...editingUser, baseSalary: e.target.value})}
+                  />
+                </div>
+              )}
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Update Password</label>
