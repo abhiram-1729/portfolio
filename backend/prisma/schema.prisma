@@ -41,6 +41,10 @@ model Tenant {
   stores            Store[]
   stockAudits       StockAudit[]
   stockAuditItems   StockAuditItem[]
+  refillItems       RefillItem[]
+  dailyPerformance  VgeDailyPerformance[]
+  monthlySummaries  VgeMonthlySummary[]
+  assetRequests     AssetRequest[]
 }
 
 enum TenantStatus {
@@ -699,12 +703,16 @@ model RefillItem {
   quantity          Int
   requestedQuantity Int?
   adminRemark       String?
+  storeId           String?
   refillRequest     RefillRequest @relation(fields: [refillRequestId], references: [id], onDelete: Cascade)
   product           Product       @relation(fields: [productId], references: [id])
+  store             Store?        @relation(fields: [storeId], references: [id])
+  tenant            Tenant        @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([refillRequestId])
   @@index([productId])
+  @@index([storeId])
 }
 
 enum UserRole {
@@ -811,6 +819,7 @@ model VgeDailyPerformance {
 
   user  User   @relation("UserDailyPerformance", fields: [userId], references: [id])
   store Store? @relation(fields: [storeId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([userId, date])
   @@index([tenantId])
@@ -845,6 +854,7 @@ model VgeMonthlySummary {
 
   user  User   @relation("UserMonthlySummary", fields: [userId], references: [id])
   store Store? @relation(fields: [storeId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([userId, month])
   @@index([tenantId])
@@ -1069,6 +1079,7 @@ model AssetRequest {
   user      User       @relation("UserAssetRequests", fields: [userId], references: [id])
   asset     Asset?     @relation(fields: [assetId], references: [id])
   assetUnit AssetUnit? @relation(fields: [assetUnitId], references: [id])
+  tenant    Tenant     @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
@@ -1143,12 +1154,13 @@ model Store {
   vehicleStocks      VehicleStock[]
   stockTransactions  StockTransaction[]
   products           Product[]
+  refillItems        RefillItem[]
+  orderItems         OrderItem[]
+  payments           Payment[]
   routes             Route[]
   villages           Village[]
   assetCategories    AssetCategory[]
   incentiveConfigs   VgeIncentiveConfig[]
-  orderItems         OrderItem[]
-  payments           Payment[]
   businessSettings   BusinessSettings?
   categories         Category[]
   units              Unit[]

@@ -26,6 +26,11 @@ export const initCronJobs = () => {
             let notifiedCount = 0;
 
             for (const assignment of activeAssignments) {
+                if (!assignment.user || !assignment.vehicle) {
+                    console.warn(`[CRON] Skipping assignment ${assignment.id}: Missing user or vehicle.`);
+                    continue;
+                }
+
                 // 2. Generate tomorrow plan
                 const tomorrow = addDays(new Date(), 1);
                 const plan = await fetchPlanForVehicle(assignment.vehicleId, tomorrow);
