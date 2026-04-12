@@ -19,7 +19,11 @@ export default function AgentInventory() {
   const { vehicleId } = useParams();
 
   useEffect(() => {
-    fetchInventory();
+    if (vehicleId && vehicleId !== 'undefined' && vehicleId !== 'null') {
+      fetchInventory();
+    } else {
+      setLoading(false);
+    }
   }, [vehicleId]);
 
   const fetchInventory = async () => {
@@ -158,6 +162,12 @@ export default function AgentInventory() {
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="animate-spin text-emerald-600" size={40} />
             <p className="text-sm font-black text-emerald-900/40 uppercase tracking-widest">Loading Stock...</p>
+          </div>
+        ) : (!vehicleId || vehicleId === 'undefined' || vehicleId === 'null' || vehicleId === 'none') ? (
+          <div className="glass rounded-[2rem] p-10 flex flex-col items-center text-center border border-rose-50 bg-white/70 shadow-sm">
+            <X size={48} className="text-rose-300 mb-4" />
+            <p className="text-sm font-black text-rose-900 uppercase tracking-widest">No Vehicle Assigned</p>
+            <p className="text-[10px] font-bold text-rose-600 mt-2 uppercase tracking-tighter">Please contact your administrator to assign a vehicle to your profile.</p>
           </div>
         ) : filteredInventory.length === 0 ? (
           <div className="glass rounded-[2rem] p-10 flex flex-col items-center text-center border border-emerald-50 bg-white/70 shadow-sm opacity-60">
