@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft } from 'lucide-react';
+import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
@@ -23,6 +23,8 @@ export default function AdminVehicles() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   const [newVehicle, setNewVehicle] = useState({ vehicleNumber: '', vehicleName: '', assignedUserId: '', status: true });
   const [documents, setDocuments] = useState({ rcDocument: null, insuranceDocument: null, permitDocument: null });
@@ -44,6 +46,10 @@ export default function AdminVehicles() {
   };
 
   useEffect(() => { fetchData(); }, []);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, storeFilterId]);
 
   // ── Create ──────────────────────────────────────────────
   const handleCreateVehicle = async (e) => {
@@ -148,6 +154,10 @@ export default function AdminVehicles() {
       assignedUser?.name?.toLowerCase().includes(searchLower)
     );
   });
+
+  const totalPages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedVehicles = filteredVehicles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   // ── Assign driver ─────────────────────────────────────────
   const handleAssignDriver = async (userId) => {
@@ -402,7 +412,70 @@ export default function AdminVehicles() {
       );
     }
     
-    return renderGroup(filteredVehicles);
+    return (
+      <div className="flex flex-col gap-6">
+        {renderGroup(paginatedVehicles)}
+        
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white px-6 py-4 rounded-3xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredVehicles.length)} of {filteredVehicles.length}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {[...Array(totalPages)].map((_, i) => {
+                  const pageNum = i + 1;
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
+                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   return (

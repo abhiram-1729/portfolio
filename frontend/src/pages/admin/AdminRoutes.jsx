@@ -15,7 +15,9 @@ import {
   Settings2,
   Home,
   CheckCircle2,
-  Search
+  Search,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import * as routeService from '../../services/routeService';
 import adminAPI from '../../services/adminService';
@@ -32,6 +34,10 @@ export default function AdminRoutes() {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('villages'); // 'villages', 'routes', 'assignments'
+  const [villagePage, setVillagePage] = useState(1);
+  const [routePage, setRoutePage] = useState(1);
+  const [assignmentPage, setAssignmentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   // Modals
   const [showVillageModal, setShowVillageModal] = useState(false);
@@ -86,6 +92,27 @@ export default function AdminRoutes() {
   useEffect(() => {
     fetchData();
   }, [storeId]);
+
+  useEffect(() => { setVillagePage(1); }, [villageSearchQuery, storeId]);
+  useEffect(() => { setRoutePage(1); }, [routeSearchQuery, storeId]);
+  useEffect(() => { setAssignmentPage(1); }, [assignmentSearchQuery, storeId]);
+
+  const filteredVillages = villages.filter(v => v.name.toLowerCase().includes(villageSearchQuery.toLowerCase()));
+  const totalVillagePages = Math.ceil(filteredVillages.length / ITEMS_PER_PAGE);
+  const paginatedVillages = filteredVillages.slice((villagePage - 1) * ITEMS_PER_PAGE, villagePage * ITEMS_PER_PAGE);
+
+  const filteredRoutes = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
+  const totalRoutePages = Math.ceil(filteredRoutes.length / ITEMS_PER_PAGE);
+  const paginatedRoutes = filteredRoutes.slice((routePage - 1) * ITEMS_PER_PAGE, routePage * ITEMS_PER_PAGE);
+
+  const q = assignmentSearchQuery.toLowerCase();
+  const filteredAssignments = assignments.filter(a => 
+    a.route?.routeName?.toLowerCase().includes(q) || 
+    a.user?.name?.toLowerCase().includes(q) || 
+    a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
+  );
+  const totalAssignmentPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
+  const paginatedAssignments = filteredAssignments.slice((assignmentPage - 1) * ITEMS_PER_PAGE, assignmentPage * ITEMS_PER_PAGE);
 
   // --- Village Handlers ---
   const handleSaveVillage = async (e) => {
@@ -295,8 +322,7 @@ export default function AdminRoutes() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {(() => {
-                      const filtered = villages.filter(v => v.name.toLowerCase().includes(villageSearchQuery.toLowerCase()));
-                      if (filtered.length === 0) {
+                      if (paginatedVillages.length === 0) {
                         return (
                           <tr>
                             <td colSpan="3" className="px-8 py-20 text-center">
@@ -308,7 +334,7 @@ export default function AdminRoutes() {
                           </tr>
                         );
                       }
-                      return filtered.map(v => (
+                      return paginatedVillages.map(v => (
                         <tr key={v.id} className="hover:bg-gray-50/30 transition-colors group">
                           <td className="px-8 py-4">
                             <div className="flex items-center gap-4">
@@ -359,6 +385,54 @@ export default function AdminRoutes() {
               </div>
             )}
           </div>
+
+          {totalVillagePages > 1 && (
+            <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm mt-4">
+               <div className="flex items-center gap-2">
+                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                   Showing {(villagePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(villagePage * ITEMS_PER_PAGE, filteredVillages.length)} of {filteredVillages.length}
+                 </p>
+               </div>
+               
+               <div className="flex items-center gap-1.5">
+                 <button
+                   onClick={() => setVillagePage(prev => Math.max(1, prev - 1))}
+                   disabled={villagePage === 1}
+                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                 >
+                   <ChevronLeft size={16} />
+                 </button>
+                 
+                 <div className="flex items-center gap-1">
+                   {[...Array(totalVillagePages)].map((_, i) => {
+                     const pageNum = i + 1;
+                     if (pageNum === 1 || pageNum === totalVillagePages || (pageNum >= villagePage - 1 && pageNum <= villagePage + 1)) {
+                       return (
+                         <button
+                           key={pageNum}
+                           onClick={() => setVillagePage(pageNum)}
+                           className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${villagePage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                         >
+                           {pageNum}
+                         </button>
+                       );
+                     } else if (pageNum === villagePage - 2 || pageNum === villagePage + 2) {
+                       return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                     }
+                     return null;
+                   })}
+                 </div>
+
+                 <button
+                   onClick={() => setVillagePage(prev => Math.min(totalVillagePages, prev + 1))}
+                   disabled={villagePage === totalVillagePages}
+                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                 >
+                   <ChevronRight size={16} />
+                 </button>
+               </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -393,9 +467,8 @@ export default function AdminRoutes() {
             <>
               <div className="grid grid-cols-1 md:hidden gap-4">
                 {(() => {
-                  const filtered = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
-                  if (filtered.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching routes</div>;
-                  return filtered.map(route => (
+                  if (paginatedRoutes.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching routes</div>;
+                  return paginatedRoutes.map(route => (
                     <div key={route.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
                       <div className="flex justify-between items-center">
                         <h3 className="font-black text-gray-900 flex items-center gap-2 uppercase tracking-tight"><MapPin size={18} className="text-emerald-500 fill-emerald-500/10"/> {route.routeName}</h3>
@@ -425,15 +498,14 @@ export default function AdminRoutes() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {(() => {
-                      const filtered = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
-                      if (filtered.length === 0) {
+                      if (paginatedRoutes.length === 0) {
                         return (
                           <tr>
                             <td colSpan="3" className="px-8 py-20 text-center text-gray-400 font-bold text-xs uppercase italic">No matching routes found</td>
                           </tr>
                         );
                       }
-                      return filtered.map(route => (
+                      return paginatedRoutes.map(route => (
                         <tr key={route.id} className="hover:bg-gray-50/30 transition-colors group">
                           <td className="px-8 py-6 flex items-center gap-4">
                             <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100 transition-all">
@@ -467,6 +539,54 @@ export default function AdminRoutes() {
                 </table>
               </div>
             </>
+          )}
+
+          {totalRoutePages > 1 && (
+            <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm mt-4">
+               <div className="flex items-center gap-2">
+                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                   Showing {(routePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(routePage * ITEMS_PER_PAGE, filteredRoutes.length)} of {filteredRoutes.length}
+                 </p>
+               </div>
+               
+               <div className="flex items-center gap-1.5">
+                 <button
+                   onClick={() => setRoutePage(prev => Math.max(1, prev - 1))}
+                   disabled={routePage === 1}
+                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                 >
+                   <ChevronLeft size={16} />
+                 </button>
+                 
+                 <div className="flex items-center gap-1">
+                   {[...Array(totalRoutePages)].map((_, i) => {
+                     const pageNum = i + 1;
+                     if (pageNum === 1 || pageNum === totalRoutePages || (pageNum >= routePage - 1 && pageNum <= routePage + 1)) {
+                       return (
+                         <button
+                           key={pageNum}
+                           onClick={() => setRoutePage(pageNum)}
+                           className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${routePage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                         >
+                           {pageNum}
+                         </button>
+                       );
+                     } else if (pageNum === routePage - 2 || pageNum === routePage + 2) {
+                       return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                     }
+                     return null;
+                   })}
+                 </div>
+
+                 <button
+                   onClick={() => setRoutePage(prev => Math.min(totalRoutePages, prev + 1))}
+                   disabled={routePage === totalRoutePages}
+                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                 >
+                   <ChevronRight size={16} />
+                 </button>
+               </div>
+            </div>
           )}
         </div>
       )}
@@ -502,15 +622,9 @@ export default function AdminRoutes() {
             <>
               <div className="grid grid-cols-1 md:hidden gap-4">
                 {(() => {
-                  const q = assignmentSearchQuery.toLowerCase();
-                  const filtered = assignments.filter(a => 
-                    a.route?.routeName?.toLowerCase().includes(q) || 
-                    a.user?.name?.toLowerCase().includes(q) || 
-                    a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
-                  );
-                  if (filtered.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching assignments</div>;
+                  if (paginatedAssignments.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching assignments</div>;
                   
-                  return filtered.map(a => (
+                  return paginatedAssignments.map(a => (
                     <div key={a.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
                       <div className="flex justify-between items-center pb-3 border-b border-gray-50">
                         <h4 className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</h4>
@@ -576,13 +690,7 @@ export default function AdminRoutes() {
                   </thead>
                   <tbody className="divide-y divide-gray-50">
                     {(() => {
-                      const q = assignmentSearchQuery.toLowerCase();
-                      const filtered = assignments.filter(a => 
-                        a.route?.routeName?.toLowerCase().includes(q) || 
-                        a.user?.name?.toLowerCase().includes(q) || 
-                        a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
-                      );
-                      if (filtered.length === 0) {
+                      if (paginatedAssignments.length === 0) {
                         return (
                           <tr>
                             <td colSpan="4" className="px-8 py-20 text-center text-gray-400 font-bold text-xs uppercase italic">
@@ -591,7 +699,7 @@ export default function AdminRoutes() {
                           </tr>
                         );
                       }
-                      return filtered.map(a => (
+                      return paginatedAssignments.map(a => (
                         <tr key={a.id} className="hover:bg-gray-50/30 transition-colors group">
                           <td className="px-8 py-6">
                             <div className="flex flex-col gap-3">
@@ -666,6 +774,54 @@ export default function AdminRoutes() {
                 </table>
               </div>
             </>
+          )}
+
+          {totalAssignmentPages > 1 && (
+            <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm mt-4">
+               <div className="flex items-center gap-2">
+                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                   Showing {(assignmentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(assignmentPage * ITEMS_PER_PAGE, filteredAssignments.length)} of {filteredAssignments.length}
+                 </p>
+               </div>
+               
+               <div className="flex items-center gap-1.5">
+                 <button
+                   onClick={() => setAssignmentPage(prev => Math.max(1, prev - 1))}
+                   disabled={assignmentPage === 1}
+                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                 >
+                   <ChevronLeft size={16} />
+                 </button>
+                 
+                 <div className="flex items-center gap-1">
+                   {[...Array(totalAssignmentPages)].map((_, i) => {
+                     const pageNum = i + 1;
+                     if (pageNum === 1 || pageNum === totalAssignmentPages || (pageNum >= assignmentPage - 1 && pageNum <= assignmentPage + 1)) {
+                       return (
+                         <button
+                           key={pageNum}
+                           onClick={() => setAssignmentPage(pageNum)}
+                           className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                         >
+                           {pageNum}
+                         </button>
+                       );
+                     } else if (pageNum === assignmentPage - 2 || pageNum === assignmentPage + 2) {
+                       return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                     }
+                     return null;
+                   })}
+                 </div>
+
+                 <button
+                   onClick={() => setAssignmentPage(prev => Math.min(totalAssignmentPages, prev + 1))}
+                   disabled={assignmentPage === totalAssignmentPages}
+                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                 >
+                   <ChevronRight size={16} />
+                 </button>
+               </div>
+            </div>
           )}
         </div>
       )}

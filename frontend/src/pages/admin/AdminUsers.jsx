@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -34,10 +34,16 @@ export default function AdminUsers({ type }) {
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [activeTab, setActiveTab] = useState(type || 'staff');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (type) setActiveTab(type);
   }, [type]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, activeTab, storeFilterId]);
 
   const fetchUsers = async () => {
     try {
@@ -202,6 +208,10 @@ export default function AdminUsers({ type }) {
 
     return true;
   });
+
+  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+  const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
   if (loading) {
     return (
@@ -440,7 +450,71 @@ export default function AdminUsers({ type }) {
       );
     }
     
-    return renderGroup(filteredUsers);
+    return (
+      <div className="flex flex-col gap-6">
+        {renderGroup(paginatedUsers)}
+        
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between bg-white px-6 py-4 rounded-3xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
+              </p>
+            </div>
+            
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                disabled={currentPage === 1}
+                className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+              >
+                <ChevronLeft size={16} />
+              </button>
+              
+              <div className="flex items-center gap-1">
+                {[...Array(totalPages)].map((_, i) => {
+                  const pageNum = i + 1;
+                  // Show current page, first, last, and pages around current
+                  if (
+                    pageNum === 1 ||
+                    pageNum === totalPages ||
+                    (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)
+                  ) {
+                    return (
+                      <button
+                        key={pageNum}
+                        onClick={() => setCurrentPage(pageNum)}
+                        className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${
+                          currentPage === pageNum
+                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
+                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                        }`}
+                      >
+                        {pageNum}
+                      </button>
+                    );
+                  } else if (
+                    pageNum === currentPage - 2 ||
+                    pageNum === currentPage + 2
+                  ) {
+                    return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                  }
+                  return null;
+                })}
+              </div>
+
+              <button
+                onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                disabled={currentPage === totalPages}
+                className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+              >
+                <ChevronRight size={16} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
   };
 
   // Only keep it for cases where we explicitly want a selector (if any)

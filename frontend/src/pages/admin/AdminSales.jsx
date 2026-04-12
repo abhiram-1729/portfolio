@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, Loader2 } from 'lucide-react';
+import { Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, ChevronLeft, Loader2 } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -12,6 +12,8 @@ export default function AdminSales() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDate, setFilterDate] = useState('Today');
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
   
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
@@ -47,6 +49,10 @@ export default function AdminSales() {
     fetchSales();
   }, [filterDate, storeFilterId]);
 
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, filterDate, storeFilterId]);
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -66,6 +72,9 @@ export default function AdminSales() {
       const customerName = s.customerName ? s.customerName.toLowerCase() : '';
       return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery)) || customerName.includes(query);
   });
+
+  const totalPages = Math.ceil(listToRender.length / ITEMS_PER_PAGE);
+  const paginatedSales = listToRender.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -145,7 +154,7 @@ export default function AdminSales() {
           <>
             {/* Mobile View */}
             <div className="space-y-4 md:hidden">
-              {listToRender.map((sale) => (
+              {paginatedSales.map((sale) => (
                   <div key={sale.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
                     <div className="flex justify-between items-start">
                       <div className="flex items-center gap-3">
@@ -210,7 +219,7 @@ export default function AdminSales() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 text-sm">
-                  {listToRender.map((sale) => (
+                  {paginatedSales.map((sale) => (
                       <tr key={sale.id} className="hover:bg-gray-50/30 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
@@ -260,6 +269,55 @@ export default function AdminSales() {
                 </tbody>
               </table>
             </div>
+
+            {/* Pagination Controls */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                    Showing {(currentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(currentPage * ITEMS_PER_PAGE, listToRender.length)} of {listToRender.length}
+                  </p>
+                </div>
+                
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                  
+                  <div className="flex items-center gap-1">
+                    {[...Array(totalPages)].map((_, i) => {
+                      const pageNum = i + 1;
+                      if (pageNum === 1 || pageNum === totalPages || (pageNum >= currentPage - 1 && pageNum <= currentPage + 1)) {
+                        return (
+                          <button
+                            key={pageNum}
+                            onClick={() => setCurrentPage(pageNum)}
+                            className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${currentPage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                          >
+                            {pageNum}
+                          </button>
+                        );
+                      } else if (pageNum === currentPage - 2 || pageNum === currentPage + 2) {
+                        return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                      }
+                      return null;
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
           </>
         )}
       </div>

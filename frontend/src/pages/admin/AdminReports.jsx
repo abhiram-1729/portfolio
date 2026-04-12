@@ -17,7 +17,13 @@ import {
   Map,
   MapPin,
   Store,
-  ArrowLeft
+  ArrowLeft,
+  DollarSign,
+  Activity,
+  Globe,
+  Users,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 import { 
   AreaChart, 
@@ -50,6 +56,8 @@ export default function AdminReports() {
   const [agentPerformance, setAgentPerformance] = useState(null);
   const [locationCheckIns, setLocationCheckIns] = useState(null);
   const [stores, setStores] = useState([]);
+  const [villagePage, setVillagePage] = useState(1);
+  const ITEMS_PER_PAGE = 10;
 
 
   // Loading States
@@ -157,6 +165,10 @@ export default function AdminReports() {
     if (activeTab === 'targets') loadAgentData();
     if (activeTab === 'tracking') loadTrackingData();
   }, [activeTab, storeFilterId]);
+
+  useEffect(() => {
+    setVillagePage(1);
+  }, [storeFilterId]);
 
 
   const StatCard = ({ icon: Icon, label, value, subValue, color, bgColor }) => (
@@ -480,22 +492,63 @@ export default function AdminReports() {
             <Activity className="text-gray-300" size={24} />
           </div>
 
-          <div className="space-y-3">
-            {isTenantRoute && !storeFilterId ? (
-              Object.entries(villageData?.reduce((acc, v) => {
-                const sName = stores.find(s => s.id === v.storeId)?.name || 'Unassigned Branch Level';
-                if (!acc[sName]) acc[sName] = [];
-                acc[sName].push(v);
-                return acc;
-              }, {}) || {}).map(([storeName, villages]) => (
-                <div key={storeName} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm">
-                  <h3 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-4 bg-white border border-emerald-100 flex items-center px-4 py-2.5 w-fit rounded-xl shadow-sm">
-                    <Store size={14} className="mr-2 text-emerald-600" />
-                    {storeName} <span className="ml-2 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md text-[9px]">{villages.length}</span>
-                  </h3>
-                  <div className="space-y-3">
-                    {villages.map((v, idx) => (
-                      <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+          </div>
+
+          <div className="space-y-4">
+            {(() => {
+              const totalVillagePages = Math.ceil((villageData?.length || 0) / ITEMS_PER_PAGE);
+              const paginatedVillages = villageData?.slice((villagePage - 1) * ITEMS_PER_PAGE, villagePage * ITEMS_PER_PAGE);
+
+              if (!paginatedVillages || paginatedVillages.length === 0) {
+                return (
+                  <div className="py-12 text-center text-gray-300">
+                    <Map size={48} className="mx-auto mb-4 opacity-20" />
+                    <p className="text-xs font-bold uppercase tracking-widest">No Geographical Data Logged</p>
+                  </div>
+                );
+              }
+
+              const content = isTenantRoute && !storeFilterId ? (
+                Object.entries(paginatedVillages.reduce((acc, v) => {
+                  const sName = stores.find(s => s.id === v.storeId)?.name || 'Unassigned Branch Level';
+                  if (!acc[sName]) acc[sName] = [];
+                  acc[sName].push(v);
+                  return acc;
+                }, {}) || {}).map(([storeName, villages]) => (
+                  <div key={storeName} className="p-4 bg-gray-50 rounded-2xl border border-gray-100 shadow-sm mb-4">
+                    <h3 className="text-xs font-black text-emerald-900 uppercase tracking-widest mb-4 bg-white border border-emerald-100 flex items-center px-4 py-2.5 w-fit rounded-xl shadow-sm">
+                      <Store size={14} className="mr-2 text-emerald-600" />
+                      {storeName} <span className="ml-2 bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md text-[9px]">{villages.length}</span>
+                    </h3>
+                    <div className="space-y-3">
+                      {villages.map((v, idx) => (
+                        <div key={idx} className="flex items-center justify-between p-4 bg-white rounded-xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
+                                <Globe size={18} />
+                            </div>
+                            <div>
+                                <p className="text-sm font-black text-gray-900">{v.villageName}</p>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                    <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${v.coverageType === 'MORNING' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
+                                        {v.coverageType}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{v.orderCount} Orders</span>
+                                </div>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ))
+              ) : (
+                <div className="space-y-3">
+                  {paginatedVillages.map((v, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
                         <div className="flex items-center gap-4">
                           <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
                               <Globe size={18} />
@@ -513,41 +566,65 @@ export default function AdminReports() {
                         <div className="text-right">
                           <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
                         </div>
-                      </div>
-                    ))}
-                  </div>
+                    </div>
+                  ))}
                 </div>
-              ))
-            ) : (
-              villageData?.map((v, idx) => (
-                 <div key={idx} className="flex items-center justify-between p-4 bg-gray-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${v.coverageType === 'MORNING' ? 'bg-orange-400' : 'bg-indigo-500'}`}>
-                          <Globe size={18} />
+              );
+
+              return (
+                <>
+                  {content}
+                  
+                  {totalVillagePages > 1 && (
+                    <div className="flex items-center justify-between bg-gray-50/50 px-6 py-4 rounded-2xl border border-gray-100 mt-6">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[9px] font-black uppercase text-gray-400 tracking-widest">
+                          Showing {(villagePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(villagePage * ITEMS_PER_PAGE, villageData.length)} of {villageData.length}
+                        </p>
                       </div>
-                      <div>
-                          <p className="text-sm font-black text-gray-900">{v.villageName}</p>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded ${v.coverageType === 'MORNING' ? 'bg-orange-100 text-orange-600' : 'bg-indigo-100 text-indigo-600'}`}>
-                                  {v.coverageType}
-                              </span>
-                              <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{v.orderCount} Orders</span>
-                          </div>
+                      
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          onClick={() => setVillagePage(prev => Math.max(1, prev - 1))}
+                          disabled={villagePage === 1}
+                          className="p-1.5 rounded-lg border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 transition-all"
+                        >
+                          <ChevronLeft size={14} />
+                        </button>
+                        
+                        <div className="flex items-center gap-1">
+                          {[...Array(totalVillagePages)].map((_, i) => {
+                            const pageNum = i + 1;
+                            if (pageNum === 1 || pageNum === totalVillagePages || (pageNum >= villagePage - 1 && pageNum <= villagePage + 1)) {
+                              return (
+                                <button
+                                  key={pageNum}
+                                  onClick={() => setVillagePage(pageNum)}
+                                  className={`w-7 h-7 rounded-lg text-[9px] font-black transition-all ${villagePage === pageNum ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100'}`}
+                                >
+                                  {pageNum}
+                                </button>
+                              );
+                            } else if (pageNum === villagePage - 2 || pageNum === villagePage + 2) {
+                              return <span key={pageNum} className="text-gray-300 px-0.5 text-[10px]">...</span>;
+                            }
+                            return null;
+                          })}
+                        </div>
+
+                        <button
+                          onClick={() => setVillagePage(prev => Math.min(totalVillagePages, prev + 1))}
+                          disabled={villagePage === totalVillagePages}
+                          className="p-1.5 rounded-lg border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 transition-all"
+                        >
+                          <ChevronRight size={14} />
+                        </button>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-md font-black text-gray-900 tracking-tighter italic">₹{v.totalSales.toLocaleString()}</p>
-                    </div>
-                 </div>
-              ))
-            )}
-            {(!villageData || villageData.length === 0) && (
-              <div className="py-12 text-center text-gray-300">
-                <Map size={48} className="mx-auto mb-4 opacity-20" />
-                <p className="text-xs font-bold uppercase tracking-widest">No Geographical Data Logged</p>
-              </div>
-            )}
-          </div>
+                  )}
+                </>
+              );
+            })()}
         </div>
       </div>
     );
