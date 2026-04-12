@@ -116,7 +116,8 @@ export default function AdminCashManagement() {
         totalOpeningCash: assignmentData.isNoService ? 0 : assignmentData.amount,
         denominations: assignmentData.isNoService ? {} : assignmentData.denominations,
         shift: assignmentData.shift,
-        isNoService: assignmentData.isNoService || false
+        isNoService: assignmentData.isNoService || false,
+        date: date
       });
       
       const msg = assignmentData.isNoService 
@@ -235,7 +236,7 @@ export default function AdminCashManagement() {
         <span className="text-[9px] font-black uppercase tracking-widest text-orange-600">Open</span>
       </div>
     );
-    return <span className="text-[9px] font-bold text-gray-300">—</span>;
+    return <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Not Assigned</span>;
   };
 
   // Shift selector component
@@ -480,8 +481,10 @@ export default function AdminCashManagement() {
                         <td className="px-4 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5 text-gray-400">
                             <button onClick={() => handleOpenView(summary)} className="p-2 hover:bg-emerald-50 rounded-xl hover:text-emerald-600 transition-all"><Eye size={18} /></button>
-                            <button onClick={() => handleOpenEdit(summary)} className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"><Pencil size={18} /></button>
-                            <button onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }} className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
+                            <>
+                              <button onClick={() => handleOpenEdit(summary)} className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"><Pencil size={18} /></button>
+                              <button onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }} className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
+                            </>
                           </div>
                         </td>
                       </tr>

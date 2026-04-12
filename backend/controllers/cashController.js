@@ -65,8 +65,8 @@ export const submitOpeningCash = async (req, res, next) => {
 // @access  Admin
 export const adminSubmitOpeningCash = async (req, res, next) => {
     try {
-        const { vehicleId, denominations, totalOpeningCash, userId, shift = 1, isNoService = false } = req.body;
-        const dateString = format(new Date(), 'yyyy-MM-dd');
+        const { vehicleId, denominations, totalOpeningCash, userId, shift = 1, isNoService = false, date } = req.body;
+        const dateString = date || format(new Date(), 'yyyy-MM-dd');
 
         if (!vehicleId || !userId || (totalOpeningCash === undefined && !isNoService)) {
             res.status(400);
@@ -87,17 +87,8 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
             }
         }
 
-        // UNBREAKABLE VALIDATION: Prevent re-assignment of an already assigned shift
-        const existingAssignment = await prisma.openingCash.findUnique({
-            where: { 
-                vehicleId_date_shift: { vehicleId, date: dateString, shift },
-                tenantId: req.user.tenantId
-            }
-        });
-        if (existingAssignment) {
-            res.status(400);
-            throw new Error(`Shift ${shift} has already been assigned for this vehicle today. Duplicate assignment is not permitted.`);
-        }
+        // Admin: Allow upserting (updating) an assignment if it already exists, 
+        // which prevents "Duplicate assignment" errors on retries or corrections.
 
         const openingCash = await prisma.openingCash.upsert({
             where: { vehicleId_date_shift: { vehicleId, date: dateString, shift } },
@@ -479,145 +470,143 @@ export const getAdminCashSummary = async (req, res, next) => {
         const { date, storeId } = req.query;
         const dateString = date || format(new Date(), 'yyyy-MM-dd');
 
-        const summaryFilter = { 
-            date: dateString,
-            tenantId: req.user.tenantId
-        };
-
+        const vehicleFilter = { tenantId: req.user.tenantId, status: true };
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
-            summaryFilter.storeId = storeId;
-        } else if (req.user.storeId) {
-            summaryFilter.storeId = req.user.storeId;
+            vehicleFilter.storeId = storeId;
+        } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+            vehicleFilter.storeId = req.user.storeId;
         }
 
-        const summaries = await prisma.dailyCashSummary.findMany({
-            where: summaryFilter,
+        const vehicles = await prisma.vehicle.findMany({
+            where: vehicleFilter,
             include: {
-                vehicle: {
-                    select: {
-                        vehicleNumber: true,
-                        vehicleName: true,
-                        assignedUsers: {
-                            select: { id: true, name: true, role: true }
-                        }
-                    },
-                },
-            },
+                assignedUsers: {
+                    select: { id: true, name: true, role: true }
+                }
+            }
         });
 
-        // Enrich with per-shift opening data
-        // Enrich with per-shift data (including live calculation for non-closed shifts)
-        const enriched = await Promise.all(
-            summaries.map(async (s) => {
-                const openings = await prisma.openingCash.findMany({
-                    where: { vehicleId: s.vehicleId, date: s.date, tenantId: req.user.tenantId },
-                    select: { shift: true, totalOpeningCash: true, denominations: true },
-                    orderBy: { shift: 'asc' }
-                });
-                const closings = await prisma.closingCash.findMany({
-                    where: { vehicleId: s.vehicleId, date: s.date, tenantId: req.user.tenantId },
-                    select: { shift: true, actualCash: true, difference: true, denominations: true, cashSales: true, expenses: true, expectedCash: true, openingCash: true, remark: true },
-                    orderBy: { shift: 'asc' }
-                });
+        const summaries = await prisma.dailyCashSummary.findMany({
+            where: {
+                date: dateString,
+                tenantId: req.user.tenantId,
+                vehicleId: { in: vehicles.map(v => v.id) }
+            }
+        });
 
-                // Fetch real-time sales for the day
-                const startOfDay = new Date(s.date);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(s.date);
-                endOfDay.setHours(23, 59, 59, 999);
+        // BULK FETCH: Get all related data in one go to prevent connection pool exhaustion
+        const openingCashRecords = await prisma.openingCash.findMany({
+            where: { date: dateString, tenantId: req.user.tenantId, vehicleId: { in: vehicles.map(v => v.id) } }
+        });
+        const closingCashRecords = await prisma.closingCash.findMany({
+            where: { date: dateString, tenantId: req.user.tenantId, vehicleId: { in: vehicles.map(v => v.id) } }
+        });
 
-                const salesByMode = await prisma.order.groupBy({
-                    by: ['paymentMode'],
-                    _sum: { totalAmount: true },
-                    where: {
-                        tenantId: req.user.tenantId,
-                        vehicleId: s.vehicleId,
-                        status: 'COMPLETED',
-                        createdAt: { gte: startOfDay, lte: endOfDay }
-                    }
-                });
+        const startOfDayDate = new Date(dateString);
+        startOfDayDate.setHours(0, 0, 0, 0);
+        const endOfDayDate = new Date(dateString);
+        endOfDayDate.setHours(23, 59, 59, 999);
 
-                let totalRealtimeCashSales = 0, totalRealtimeUpiSales = 0, totalRealtimeCardSales = 0;
-                salesByMode.forEach(item => {
-                    if (item.paymentMode === 'CASH') totalRealtimeCashSales += item._sum.totalAmount || 0;
-                    if (item.paymentMode === 'UPI') totalRealtimeUpiSales += item._sum.totalAmount || 0;
-                    if (item.paymentMode === 'CARD') totalRealtimeCardSales += item._sum.totalAmount || 0;
-                });
+        const orderAggregates = await prisma.order.groupBy({
+            by: ['vehicleId', 'paymentMode'],
+            _sum: { totalAmount: true },
+            where: {
+                tenantId: req.user.tenantId,
+                vehicleId: { in: vehicles.map(v => v.id) },
+                status: 'COMPLETED',
+                createdAt: { gte: startOfDayDate, lte: endOfDayDate }
+            }
+        });
 
-                // Fetch real-time expenses for the day
-                const expensesResult = await prisma.expense.aggregate({
-                    _sum: { amount: true },
-                    where: {
-                        tenantId: req.user.tenantId,
-                        vehicleId: s.vehicleId,
-                        date: s.date,
-                        paymentMode: 'CASH',
-                        NOT: { status: 'REJECTED' }
-                    }
-                });
-                const totalRealtimeExpenses = expensesResult._sum.amount || 0;
+        const expenseAggregates = await prisma.expense.groupBy({
+            by: ['vehicleId'],
+            _sum: { amount: true },
+            where: {
+                tenantId: req.user.tenantId,
+                vehicleId: { in: vehicles.map(v => v.id) },
+                date: dateString,
+                paymentMode: 'CASH',
+                NOT: { status: 'REJECTED' }
+            }
+        });
 
-                const o1 = openings.find(o => o.shift === 1);
-                const o2 = openings.find(o => o.shift === 2);
-                const c1 = closings.find(c => c.shift === 1);
-                const c2 = closings.find(c => c.shift === 2);
+        const results = vehicles.map((v) => {
+            const s = summaries.find(sum => sum.vehicleId === v.id);
+            const openings = openingCashRecords.filter(o => o.vehicleId === v.id);
+            const closings = closingCashRecords.filter(c => c.vehicleId === v.id);
+            const orders = orderAggregates.filter(o => o.vehicleId === v.id);
+            const expenses = expenseAggregates.filter(e => e.vehicleId === v.id);
 
-                // Calculate Live Metrics
-                let s1Live = { cashSales: 0, expenses: 0, expected: 0 };
-                let s2Live = { cashSales: 0, expenses: 0, expected: 0 };
+            const totalRealtimeCashSales = orders.filter(o => o.paymentMode === 'CASH').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
+            const totalRealtimeUpiSales = orders.filter(o => o.paymentMode === 'UPI').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
+            const totalRealtimeCardSales = orders.filter(o => o.paymentMode === 'CARD').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
+            const totalRealtimeExpenses = expenses.reduce((sum, e) => sum + (e._sum.amount || 0), 0);
 
-                if (o1 && !c1) {
-                    // Shift 1 is live: All sales today up to now belong to S1
-                    s1Live.cashSales = totalRealtimeCashSales;
-                    s1Live.expenses = totalRealtimeExpenses;
-                    s1Live.expected = o1.totalOpeningCash + s1Live.cashSales - s1Live.expenses;
-                } else if (c1) {
-                    // Shift 1 is closed: Use stored values
-                    s1Live.cashSales = c1.cashSales;
-                    s1Live.expenses = c1.expenses;
-                    s1Live.expected = c1.expectedCash;
+            const o1 = openings.find(o => o.shift === 1);
+            const o2 = openings.find(o => o.shift === 2);
+            const c1 = closings.find(c => c.shift === 1);
+            const c2 = closings.find(c => c.shift === 2);
+
+            let s1Live = { cashSales: 0, expenses: 0, expected: 0 };
+            let s2Live = { cashSales: 0, expenses: 0, expected: 0 };
+
+            if (o1 && !c1) {
+                s1Live.cashSales = totalRealtimeCashSales;
+                s1Live.expenses = totalRealtimeExpenses;
+                s1Live.expected = o1.totalOpeningCash + s1Live.cashSales - s1Live.expenses;
+            } else if (c1) {
+                s1Live.cashSales = c1.cashSales;
+                s1Live.expenses = c1.expenses;
+                s1Live.expected = c1.expectedCash;
+            }
+
+            if (o2 && !c2) {
+                const s1AccountedSales = c1?.cashSales || 0;
+                const s1AccountedExpenses = c1?.expenses || 0;
+                s2Live.cashSales = totalRealtimeCashSales - s1AccountedSales;
+                s2Live.expenses = totalRealtimeExpenses - s1AccountedExpenses;
+                s2Live.expected = o2.totalOpeningCash + s2Live.cashSales - s2Live.expenses;
+            } else if (c2) {
+                s2Live.cashSales = c2.cashSales;
+                s2Live.expenses = c2.expenses;
+                s2Live.expected = c2.expectedCash;
+            }
+
+            return {
+                id: s ? s.id : `temp-${v.id}`,
+                vehicleId: v.id,
+                date: dateString,
+                tenantId: req.user.tenantId,
+                storeId: v.storeId,
+                openingCash: s ? s.openingCash : 0,
+                cashSales: s ? s.cashSales : 0,
+                expenses: s ? s.expenses : 0,
+                expectedCash: s ? s.expectedCash : 0,
+                actualCash: s ? s.actualCash : 0,
+                difference: s ? s.difference : 0,
+                status: s ? s.status : 'PENDING',
+                vehicle: v,
+                dailySales: {
+                    totalCash: totalRealtimeCashSales,
+                    totalUpi: totalRealtimeUpiSales,
+                    totalCard: totalRealtimeCardSales,
+                    grandTotal: totalRealtimeCashSales + totalRealtimeUpiSales + totalRealtimeCardSales
+                },
+                openingDenominations: o1?.denominations || {},
+                shiftDetails: {
+                    shift1: { opening: o1 || null, closing: c1 || null, live: s1Live },
+                    shift2: { opening: o2 || null, closing: c2 || null, live: s2Live }
                 }
+            };
+        });
 
-                if (o2 && !c2) {
-                    // Shift 2 is live: All sales today MINUS what S1 took belong to S2
-                    const s1AccountedSales = c1?.cashSales || 0;
-                    const s1AccountedExpenses = c1?.expenses || 0;
-                    s2Live.cashSales = totalRealtimeCashSales - s1AccountedSales;
-                    s2Live.expenses = totalRealtimeExpenses - s1AccountedExpenses;
-                    s2Live.expected = o2.totalOpeningCash + s2Live.cashSales - s2Live.expenses;
-                } else if (c2) {
-                    // Shift 2 is closed: Use stored values
-                    s2Live.cashSales = c2.cashSales;
-                    s2Live.expenses = c2.expenses;
-                    s2Live.expected = c2.expectedCash;
-                }
-
-                return {
-                    ...s,
-                    dailySales: {
-                        totalCash: totalRealtimeCashSales,
-                        totalUpi: totalRealtimeUpiSales,
-                        totalCard: totalRealtimeCardSales,
-                        grandTotal: totalRealtimeCashSales + totalRealtimeUpiSales + totalRealtimeCardSales
-                    },
-                    openingDenominations: openings[0]?.denominations || {},
-                    shiftDetails: {
-                        shift1: {
-                            opening: o1 || null,
-                            closing: c1 || null,
-                            live: s1Live
-                        },
-                        shift2: {
-                            opening: o2 || null,
-                            closing: c2 || null,
-                            live: s2Live
-                        }
-                    }
-                };
-            })
+        // Filter: ONLY show vehicles that have been assigned a float today
+        const assignedResults = results.filter(r => 
+            r.shiftDetails.shift1.opening !== null || 
+            r.shiftDetails.shift2.opening !== null
         );
 
-        res.json(enriched);
+        res.json(assignedResults);
     } catch (error) {
         next(error);
     }
