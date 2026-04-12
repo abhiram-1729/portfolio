@@ -136,7 +136,6 @@ export const requestRefill = async (req, res, next) => {
                 items: {
                     create: items.map(i => ({
                         tenantId: req.user.tenantId,
-                        storeId: req.user.storeId,
                         productId: i.productId,
                         quantity: parseInt(i.quantity, 10)
                     }))
