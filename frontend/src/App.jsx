@@ -99,10 +99,10 @@ export default function App() {
         }}
       />
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
         
-        {/* Agent Routes wrapped in Layout */}
-        <Route path="/" element={<PrivateRoute><AgentLayout /></PrivateRoute>}>
+        {/* Root Route: If not logged in, show Login. If logged in, wrap in Layout */}
+        <Route path="/" element={!token ? <Login /> : <PrivateRoute><AgentLayout /></PrivateRoute>}>
           <Route index element={<SalesEntry />} />
           <Route path="reports" element={<Reports />} />
           <Route path="profile" element={<Profile />} />
