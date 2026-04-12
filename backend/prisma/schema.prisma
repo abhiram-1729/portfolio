@@ -39,6 +39,8 @@ model Tenant {
   payments          Payment[]
   assetCategories   AssetCategory[]
   stores            Store[]
+  stockAudits       StockAudit[]
+  stockAuditItems   StockAuditItem[]
 }
 
 enum TenantStatus {
@@ -84,6 +86,7 @@ model User {
   dailySummaries   DailyCashSummary[]    @relation("UserDailyCashSummary")
   assetRequests    AssetRequest[]        @relation("UserAssetRequests")
   locationCheckIns LocationCheckIn[]
+  stockAudits      StockAudit[]
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -164,6 +167,7 @@ model Product {
   stockTransactions  StockTransaction[]
   orderItems         OrderItem[]
   refillItems        RefillItem[]
+  auditItems         StockAuditItem[]
 
   @@index([tenantId])
   @@index([status])
@@ -332,6 +336,7 @@ model Vehicle {
   refillRequests    RefillRequest[]
   expenses          Expense[]
   cashTransfers     CashTransfer[]
+  stockAudits       StockAudit[]
 
   @@unique([tenantId, vehicleNumber])
   @@index([tenantId])
@@ -1147,6 +1152,45 @@ model Store {
   businessSettings   BusinessSettings?
   categories         Category[]
   units              Unit[]
+  stockAudits        StockAudit[]
 
+  @@index([tenantId])
+}
+
+model StockAudit {
+  id        String           @id @default(cuid())
+  tenantId  String           @default("VK001")
+  storeId   String?
+  vehicleId String
+  userId    String           
+  createdAt DateTime         @default(now())
+  remark    String?
+
+  tenant    Tenant           @relation(fields: [tenantId], references: [id])
+  store     Store?           @relation(fields: [storeId], references: [id])
+  vehicle   Vehicle          @relation(fields: [vehicleId], references: [id])
+  user      User             @relation(fields: [userId], references: [id])
+  items     StockAuditItem[]
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vehicleId])
+  @@index([userId])
+}
+
+model StockAuditItem {
+  id           String     @id @default(cuid())
+  auditId      String
+  productId    String
+  oldQuantity  Int        
+  newQuantity  Int        
+  tenantId     String     @default("VK001")
+  
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  audit        StockAudit @relation(fields: [auditId], references: [id], onDelete: Cascade)
+  product      Product    @relation(fields: [productId], references: [id])
+
+  @@index([auditId])
+  @@index([productId])
   @@index([tenantId])
 }

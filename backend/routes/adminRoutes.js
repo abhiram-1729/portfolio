@@ -80,6 +80,7 @@ router.post('/inventory/load', inventoryCtr.loadStock);
 router.post('/inventory/return', inventoryCtr.returnStock);
 router.get('/inventory/vehicle/:id', inventoryCtr.getVehicleInventory);
 router.put('/inventory/vehicle/:id/audit', inventoryCtr.auditVehicleStock);
+router.get('/inventory/audit-history', inventoryCtr.getAuditHistory);
 router.get('/inventory/refills', inventoryCtr.getRefillRequests);
 router.put('/inventory/refills/:id/approve', inventoryCtr.approveRefillRequest);
 router.put('/inventory/refills/:id/reject', inventoryCtr.rejectRefillRequest);

@@ -60,6 +60,8 @@ export default function AdminInventory() {
   const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false);
   const [pendingLoadItems, setPendingLoadItems] = useState([]);
   const [modalTab, setModalTab] = useState('info'); // info or price
+  const [auditHistory, setAuditHistory] = useState([]);
+  const [auditRemark, setAuditRemark] = useState('');
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -82,16 +84,18 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
-      const [iRes, vRes, sRes, cRes, uRes, storeRes] = await Promise.all([
+      const [iRes, vRes, sRes, cRes, uRes, storeRes, aRes] = await Promise.all([
         adminAPI.getItems({ storeId: storeFilterId }),
         adminAPI.getVehicles({ storeId: storeFilterId }),
         adminAPI.getSettings(),
         adminAPI.getCategories(),
         adminAPI.getUnits(),
-        adminAPI.getStores()
+        adminAPI.getStores(),
+        adminAPI.getAuditHistory({ storeId: storeFilterId })
       ]);
       setItems(iRes.data);
       setVehicles(vRes.data);
+      setAuditHistory(aRes.data || []);
       setCategories(cRes.data || []);
       setUnits(uRes.data || []);
       if (sRes.data?.success && sRes.data?.data?.taxRates) {
@@ -635,11 +639,14 @@ export default function AdminInventory() {
 
     setIsSubmitting(true);
     try {
-      await adminAPI.auditVehicleStock(viewingVehicleId, { items: auditItems });
+      await adminAPI.auditVehicleStock(viewingVehicleId, { items: auditItems, remark: auditRemark });
       toast.success('Inventory audited successfully');
       setIsAuditMode(false);
       setAuditQuantities({});
+      setAuditRemark('');
       await loadAllVehiclesStock(); // Refresh tracking data
+      const aRes = await adminAPI.getAuditHistory({ storeId: storeFilterId });
+      setAuditHistory(aRes.data || []);
     } catch (error) {
        console.error('Audit Save Error:', error);
        toast.error('Failed to audit inventory');
@@ -1496,6 +1503,29 @@ export default function AdminInventory() {
               </div>
             </div>
 
+            {/* Audit Quick Info */}
+            {auditHistory.filter(a => a.vehicleId === viewingVehicleId).length > 0 && (
+              <div className="flex items-center justify-between bg-indigo-50/50 p-4 rounded-[2rem] border border-indigo-100 shadow-inner">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm">
+                    <CheckSquare size={20} />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest">Last Audit Performed</span>
+                    <span className="text-xs font-black text-indigo-900">
+                      {new Date(auditHistory.find(a => a.vehicleId === viewingVehicleId).createdAt).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => { setSubTab('audits'); setViewingVehicleId(null); }}
+                  className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                >
+                  View Full History →
+                </button>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm uppercase tracking-widest">
@@ -1535,6 +1565,25 @@ export default function AdminInventory() {
                   )}
                 </div>
               </div>
+              
+              {isAuditMode && (
+                <div className="flex items-center gap-3 bg-emerald-50/50 p-4 rounded-[1.5rem] border border-emerald-100 animate-in slide-in-from-top-2 mb-2">
+                  <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
+                    <FileText size={20} />
+                  </div>
+                  <div className="flex flex-col flex-1">
+                    <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Audit Note / Remark</span>
+                    <input 
+                      type="text"
+                      placeholder="e.g. Stock mismatch correction, Route end audit..."
+                      className="bg-transparent border-none outline-none text-sm font-black text-emerald-900 placeholder:text-emerald-300 w-full"
+                      value={auditRemark}
+                      onChange={(e) => setAuditRemark(e.target.value)}
+                      autoFocus
+                    />
+                  </div>
+                </div>
+              )}
               
               {activeStock.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
@@ -1677,8 +1726,8 @@ export default function AdminInventory() {
             <thead>
               <tr className="bg-gray-50/50">
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Unique Items</th>
-                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Total Stock Value</th>
+                <th className="px-6 py-4 text-[10px) font-black uppercase tracking-widest text-gray-400 text-center">Inventory Status</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Last Audit</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
               </tr>
             </thead>
@@ -1688,10 +1737,11 @@ export default function AdminInventory() {
                 const activeStock = inventory.filter(i => i.quantity > 0);
                 const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
                 const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
+                const lastAudit = auditHistory.find(a => a.vehicleId === v.id);
 
                 return (
                   <tr 
-                    key={`track-row-${v.id}`}
+                    key={`track-row-list-${v.id}`}
                     onClick={() => setViewingVehicleId(v.id)}
                     className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
                   >
@@ -1707,10 +1757,20 @@ export default function AdminInventory() {
                       </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="text-sm font-black text-gray-700">{activeStock.length} Items</span>
+                      <div className="flex flex-col items-center">
+                        <span className="text-sm font-black text-gray-700">{activeStock.length} SKUs</span>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">₹{totalValue.toLocaleString('en-IN')}</span>
+                      </div>
                     </td>
                     <td className="px-6 py-4 text-center">
-                      <span className="text-sm font-black text-emerald-700">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                      {lastAudit ? (
+                        <div className="flex flex-col items-center">
+                          <span className="text-[11px] font-black text-indigo-600 leading-none mb-0.5">{new Date(lastAudit.createdAt).toLocaleDateString()}</span>
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest mt-0.5">Verified</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">Never Audited</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex items-center justify-end gap-2 text-[10px] font-black text-gray-300 uppercase tracking-widest group-hover:text-emerald-600 transition-colors">
@@ -1731,6 +1791,7 @@ export default function AdminInventory() {
             const activeStock = inventory.filter(i => i.quantity > 0);
             const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
             const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
+            const lastAudit = auditHistory.find(a => a.vehicleId === v.id);
 
             return (
               <div
@@ -1747,14 +1808,16 @@ export default function AdminInventory() {
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{v.vehicleNumber}</span>
                   </div>
                 </div>
-                <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-3 rounded-2xl flex justify-between items-center border border-transparent group-hover:border-emerald-100">
+                <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-3 rounded-2xl flex justify-between items-center border border-transparent group-hover:border-emerald-100 italic">
                   <div className="flex flex-col">
-                    <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Unique Items</span>
-                    <span className="text-sm font-black text-gray-700 leading-none mt-1">{activeStock.length}</span>
+                    <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Stock Items</span>
+                    <span className="text-sm font-black text-gray-700 leading-none mt-1">{activeStock.length} SKUs</span>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-black uppercase text-emerald-600/70 tracking-widest">Stock Value</span>
-                    <span className="text-sm font-black text-emerald-700 leading-none mt-1">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                    <span className="text-[9px] font-black uppercase text-indigo-600/70 tracking-widest">Last Audit</span>
+                    <span className="text-sm font-black text-indigo-700 leading-none mt-1">
+                       {lastAudit ? new Date(lastAudit.createdAt).toLocaleDateString() : 'Never'}
+                    </span>
                   </div>
                 </div>
                 <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest text-gray-400 group-hover:text-emerald-600 mt-1 transition-colors">
@@ -1764,6 +1827,138 @@ export default function AdminInventory() {
               </div>
             );
           })}
+        </div>
+      </div>
+    );
+  };
+
+  const renderAuditHistory = () => {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
+        <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600"></div>
+          <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 bg-indigo-50 rounded-3xl flex items-center justify-center text-indigo-600 shadow-inner">
+                <CheckSquare size={32} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none mb-2 uppercase">Audit Logs</h3>
+                <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                  <Package size={14} className="text-indigo-400" />
+                  Historical inventory adjustments tracking
+                </p>
+              </div>
+            </div>
+            <button 
+              onClick={fetchData} 
+              disabled={loading}
+              className="p-3 bg-gray-50 hover:bg-indigo-50 rounded-2xl text-gray-400 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 shadow-sm"
+            >
+              <Loader2 size={24} className={loading ? 'animate-spin' : ''} />
+            </button>
+          </div>
+
+          {auditHistory.length === 0 ? (
+            <div className="text-center py-24 bg-gray-50/50 rounded-[3rem] border-2 border-dashed border-gray-100">
+              <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-gray-200/50">
+                <CheckSquare size={40} className="text-gray-200" />
+              </div>
+              <p className="text-lg font-black text-gray-400 uppercase tracking-[0.2em]">No audit records found</p>
+              <p className="text-sm text-gray-300 mt-2">Audit history will appear here once inventory adjustments are made.</p>
+            </div>
+          ) : (
+            <div className="space-y-8">
+              {auditHistory.map((audit) => (
+                <div key={audit.id} className="border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-indigo-500/5 transition-all border-l-[6px] border-l-indigo-600">
+                  <div className="bg-gray-50/50 p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-6">
+                    <div className="flex items-center gap-5">
+                      <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
+                        <Truck size={28} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-lg font-black text-gray-900 leading-none mb-1">{audit.vehicle?.vehicleNumber}</span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
+                            {audit.vehicle?.vehicleName || 'Vehicle'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
+                          Admin User
+                        </span>
+                        <span className="text-sm font-black text-gray-800">{audit.user?.name}</span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
+                          Timestamp
+                        </span>
+                        <span className="text-sm font-black text-gray-800">
+                          {new Date(audit.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
+                          <span className="text-gray-400 font-bold ml-2">@ {new Date(audit.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
+                        </span>
+                      </div>
+                      {audit.remark && (
+                        <div className="hidden md:flex flex-col">
+                          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">Remark</span>
+                          <span className="text-sm font-black text-gray-600 italic">"{audit.remark}"</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div className="p-4">
+                    <div className="bg-white rounded-3xl border border-gray-50 overflow-hidden">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="bg-gray-50/30">
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Adjustment</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">System Qty</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-indigo-500 uppercase tracking-widest text-center">Audited Qty</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Variance</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {audit.items.map((item) => {
+                            const diff = item.newQuantity - item.oldQuantity;
+                            return (
+                              <tr key={item.id} className="hover:bg-indigo-50/10 transition-colors group">
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col">
+                                    <span className="text-sm font-black text-gray-800 group-hover:text-indigo-600 transition-colors">{item.product?.name}</span>
+                                    {item.product?.unit && (
+                                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">
+                                        Packing: {item.product.unitValue} {item.product.unit.type}
+                                      </span>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-sm font-black text-gray-400 text-center">{item.oldQuantity}</td>
+                                <td className="px-6 py-4 text-sm font-black text-indigo-600 text-center bg-indigo-50/5">{item.newQuantity}</td>
+                                <td className="px-6 py-4 text-right">
+                                  <span className={`inline-flex items-center justify-center min-w-[50px] px-3 py-1 rounded-xl text-[10px] font-black shadow-sm border ${
+                                    diff > 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                    diff < 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                    'bg-gray-50 text-gray-400 border-gray-100'
+                                  }`}>
+                                    {diff > 0 ? `+${diff}` : diff === 0 ? 'NO CHANGE' : diff}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     );
@@ -2263,7 +2458,8 @@ export default function AdminInventory() {
             { key: 'loading', label: 'Loading', icon: <ArrowUpCircle size={14}/> },
             { key: 'return', label: 'Return', icon: <ArrowDownCircle size={14}/> },
             { key: 'tracking', label: 'Tracking', icon: <Truck size={14}/> },
-            { key: 'refills', label: 'Refills', icon: <Package size={14}/> }
+            { key: 'refills', label: 'Refills', icon: <Package size={14}/> },
+            { key: 'audits', label: 'Audits History', icon: <CheckSquare size={14}/> }
           ].map((tab) => (
             <button
               key={`sub-${tab.key}`}
@@ -2291,6 +2487,7 @@ export default function AdminInventory() {
           {subTab === 'return' && renderReturn()}
           {subTab === 'tracking' && renderTracking()}
           {subTab === 'refills' && renderRefills()}
+          {subTab === 'audits' && renderAuditHistory()}
         </>
       )}
 

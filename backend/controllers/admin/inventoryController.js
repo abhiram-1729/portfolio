@@ -541,10 +541,36 @@ export const auditVehicleStock = async (req, res) => {
     }
 
     await prisma.$transaction(async (tx) => {
+      // 1. Create a parent Audit record
+      const audit = await tx.stockAudit.create({
+        data: {
+          tenantId: req.user.tenantId,
+          storeId,
+          vehicleId: id,
+          userId: req.user.id,
+          remark: req.body.remark || 'Manual Audit'
+        }
+      });
+
       for (const item of items) {
         const q = parseInt(item.quantity);
         
-        // Log the audit as a special transaction
+        // Get current stock for historical record
+        const currentStock = await tx.vehicleStock.findUnique({
+          where: { vehicleId_productId: { vehicleId: id, productId: item.productId } }
+        });
+
+        // 2. Create Audit Item
+        await tx.stockAuditItem.create({
+          data: {
+            auditId: audit.id,
+            productId: item.productId,
+            oldQuantity: currentStock?.quantity || 0,
+            newQuantity: q
+          }
+        });
+
+        // 3. Log the audit as a special transaction
         await tx.stockTransaction.create({
           data: {
             tenantId: req.user.tenantId,
@@ -557,7 +583,7 @@ export const auditVehicleStock = async (req, res) => {
           }
         });
 
-        // Hard update the stock to the new audited value
+        // 4. Hard update the stock to the new audited value
         await tx.vehicleStock.upsert({
           where: {
             vehicleId_productId: { vehicleId: id, productId: item.productId }
@@ -872,5 +898,41 @@ export const rejectRefillRequest = async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({ message: 'Error rejecting refill request', error: error.message });
+  }
+};
+
+export const getAuditHistory = async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+
+    const audits = await prisma.stockAudit.findMany({
+      where,
+      orderBy: { createdAt: 'desc' },
+      include: {
+        vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+        user: { select: { name: true } },
+        items: {
+          include: {
+            product: { 
+              include: { 
+                unit: true
+              } 
+            }
+          }
+        }
+      }
+    });
+
+    res.json(audits);
+  } catch (error) {
+    console.error('getAuditHistory error:', error);
+    res.status(500).json({ message: 'Error fetching audit history', error: error.message });
   }
 };
