@@ -16,6 +16,7 @@ import vgeRoutes from './routes/vgeRoutes.js';
 import assetRoutes from './routes/assetRoutes.js';
 import expenseRoutes from './routes/expenseRoutes.js';
 import storeRoutes from './routes/storeRoutes.js';
+import procurementRoutes from './routes/procurementRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -59,6 +60,7 @@ apiRouter.use('/vge', vgeRoutes);
 apiRouter.use('/assets', assetRoutes);
 apiRouter.use('/expenses', expenseRoutes);
 apiRouter.use('/tenant/stores', storeRoutes);
+apiRouter.use('/procurement', procurementRoutes);
 
 // Mount the apiRouter both WITH and WITHOUT /api prefix
 // This ensures compatibility with proxies that might or might not strip the prefix

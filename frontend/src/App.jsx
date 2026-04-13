@@ -35,6 +35,7 @@ import AgentAssets from './pages/AgentAssets';
 import CashWallet from './pages/CashWallet';
 import AdminExpenses from './pages/admin/AdminExpenses';
 import AdminFinanceReports from './pages/admin/AdminFinanceReports';
+import AdminProcurement from './pages/admin/AdminProcurement';
 import TenantLayout from './components/tenant/TenantLayout';
 import TenantDashboard from './pages/tenant/TenantDashboard';
 import TenantStores from './pages/tenant/TenantStores';
@@ -140,6 +141,7 @@ export default function App() {
           <Route path="targets" element={<AdminTargets />} />
           <Route path="assets" element={<AdminAssets />} />
           <Route path="expenses" element={<AdminExpenses />} />
+          <Route path="procurement" element={<AdminProcurement />} />
           <Route path="finance-reports" element={<AdminFinanceReports />} />
         </Route>
         {/* Tenant Routes */}

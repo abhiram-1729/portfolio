@@ -45,6 +45,19 @@ model Tenant {
   dailyPerformance  VgeDailyPerformance[]
   monthlySummaries  VgeMonthlySummary[]
   assetRequests     AssetRequest[]
+  // Procurement Relations
+  vendors                Vendor[]
+  vendorItemMappings     VendorItemMapping[]
+  purchaseOrders         PurchaseOrder[]
+  purchaseOrderItems     PurchaseOrderItem[]
+  goodsReceipts          GoodsReceipt[]
+  goodsReceiptItems      GoodsReceiptItem[]
+  purchaseInvoices       PurchaseInvoice[]
+  purchaseInvoiceItems   PurchaseInvoiceItem[]
+  procurementStockLedger ProcurementStockLedger[]
+  vendorLedger           VendorLedger[]
+  vendorPayments         VendorPayment[]
+  vendorPaymentAllocations VendorPaymentAllocation[]
 }
 
 enum TenantStatus {
@@ -158,6 +171,10 @@ model Product {
   isFree        Boolean    @default(false)
   minShopAmount Float      @default(0)
   storeId       String?
+  purchasePrice Float?     @default(0)
+  minStockAlert Int?       @default(0)
+  skuCode       String?
+  barcode       String?
   store         Store?     @relation(fields: [storeId], references: [id])
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id])
@@ -172,6 +189,11 @@ model Product {
   orderItems         OrderItem[]
   refillItems        RefillItem[]
   auditItems         StockAuditItem[]
+  vendorMappings     VendorItemMapping[]
+  poItems            PurchaseOrderItem[]
+  grnItems           GoodsReceiptItem[]
+  purchaseItems      PurchaseInvoiceItem[]
+  procurementLedger  ProcurementStockLedger[]
 
   @@index([tenantId])
   @@index([status])
@@ -1165,6 +1187,15 @@ model Store {
   categories         Category[]
   units              Unit[]
   stockAudits        StockAudit[]
+  // Procurement store-scoped relations
+  vendors                Vendor[]
+  vendorItemMappings     VendorItemMapping[]
+  purchaseOrders         PurchaseOrder[]
+  goodsReceipts          GoodsReceipt[]
+  purchaseInvoices       PurchaseInvoice[]
+  vendorLedger           VendorLedger[]
+  vendorPayments         VendorPayment[]
+  procurementStockLedger ProcurementStockLedger[]
 
   @@index([tenantId])
 }
@@ -1205,4 +1236,341 @@ model StockAuditItem {
   @@index([auditId])
   @@index([productId])
   @@index([tenantId])
+}
+
+// ─── PROCUREMENT, INVENTORY & ACCOUNTS PAYABLE ─────────────
+
+enum VendorStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum POStatus {
+  CREATED
+  APPROVED
+  ORDERED
+  DELIVERED
+  CLOSED
+  CANCELLED
+}
+
+enum GRNStatus {
+  PARTIAL
+  COMPLETE
+}
+
+enum PurchaseInvoiceStatus {
+  DRAFT
+  CONFIRMED
+  PAID
+  PARTIAL_PAID
+}
+
+enum VendorPaymentMode {
+  CASH
+  BANK
+  UPI
+}
+
+enum StockMovementType {
+  PURCHASE
+  SALE
+  TRANSFER_IN
+  TRANSFER_OUT
+  ADJUSTMENT
+}
+
+enum VendorLedgerType {
+  PURCHASE
+  PAYMENT
+  OPENING_BALANCE
+}
+
+// ─── VENDOR ─────────────────────────────────────
+
+model Vendor {
+  id            String       @id @default(cuid())
+  tenantId      String       @default("VK001")
+  storeId       String?
+  vendorName    String
+  mobile        String
+  email         String?
+  address       String?
+  gstNumber     String?
+  contactPerson String?
+  creditDays    Int          @default(30)
+  openingBalance Float       @default(0)
+  currentBalance Float       @default(0)
+  status        VendorStatus @default(ACTIVE)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  store         Store?       @relation(fields: [storeId], references: [id])
+  itemMappings  VendorItemMapping[]
+  purchaseOrders PurchaseOrder[]
+  purchaseInvoices PurchaseInvoice[]
+  ledgerEntries VendorLedger[]
+  payments      VendorPayment[]
+
+  @@unique([tenantId, mobile])
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([status])
+}
+
+// ─── VENDOR-ITEM MAPPING ─────────────────────────────────────
+
+model VendorItemMapping {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("VK001")
+  storeId   String?
+  vendorId  String
+  productId String
+  createdAt DateTime @default(now())
+
+  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  store     Store?   @relation(fields: [storeId], references: [id])
+  vendor    Vendor   @relation(fields: [vendorId], references: [id])
+  product   Product  @relation(fields: [productId], references: [id])
+
+  @@unique([vendorId, productId])
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vendorId])
+  @@index([productId])
+}
+
+// ─── PURCHASE ORDER ─────────────────────────────────────
+
+model PurchaseOrder {
+  id                String    @id @default(cuid())
+  tenantId          String    @default("VK001")
+  storeId           String?
+  poNumber          Int       @unique @default(autoincrement())
+  vendorId          String
+  poDate            DateTime  @default(now())
+  expectedDelivery  DateTime?
+  remarks           String?
+  status            POStatus  @default(CREATED)
+  totalAmount       Float     @default(0)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  store             Store?    @relation(fields: [storeId], references: [id])
+  vendor            Vendor    @relation(fields: [vendorId], references: [id])
+  items             PurchaseOrderItem[]
+  goodsReceipts     GoodsReceipt[]
+  purchaseInvoices  PurchaseInvoice[]
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vendorId])
+  @@index([status])
+}
+
+model PurchaseOrderItem {
+  id          String        @id @default(cuid())
+  tenantId    String        @default("VK001")
+  poId        String
+  productId   String
+  quantity    Int
+  rate        Float
+  total       Float         @default(0)
+  receivedQty Int           @default(0)
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  po          PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+  product     Product       @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
+  @@index([poId])
+  @@index([productId])
+}
+
+// ─── GOODS RECEIPT NOTE (GRN) ─────────────────────────────────────
+
+model GoodsReceipt {
+  id          String    @id @default(cuid())
+  tenantId    String    @default("VK001")
+  storeId     String?
+  poId        String
+  grnDate     DateTime  @default(now())
+  status      GRNStatus @default(PARTIAL)
+  remarks     String?
+  createdAt   DateTime  @default(now())
+
+  tenant      Tenant        @relation(fields: [tenantId], references: [id])
+  store       Store?        @relation(fields: [storeId], references: [id])
+  po          PurchaseOrder @relation(fields: [poId], references: [id])
+  items       GoodsReceiptItem[]
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([poId])
+}
+
+model GoodsReceiptItem {
+  id            String       @id @default(cuid())
+  tenantId      String       @default("VK001")
+  grnId         String
+  productId     String
+  orderedQty    Int
+  receivedQty   Int
+
+  tenant        Tenant       @relation(fields: [tenantId], references: [id])
+  grn           GoodsReceipt @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  product       Product      @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
+  @@index([grnId])
+  @@index([productId])
+}
+
+// ─── PURCHASE INVOICE ─────────────────────────────────────
+
+model PurchaseInvoice {
+  id               String                @id @default(cuid())
+  tenantId         String                @default("VK001")
+  storeId          String?
+  vendorId         String
+  poId             String?
+  invoiceNumber    String
+  invoiceDate      DateTime              @default(now())
+  transportCharges Float                 @default(0)
+  otherCharges     Float                 @default(0)
+  totalAmount      Float                 @default(0)
+  status           PurchaseInvoiceStatus @default(DRAFT)
+  paidAmount       Float                 @default(0)
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+
+  tenant           Tenant                @relation(fields: [tenantId], references: [id])
+  store            Store?                @relation(fields: [storeId], references: [id])
+  vendor           Vendor                @relation(fields: [vendorId], references: [id])
+  po               PurchaseOrder?        @relation(fields: [poId], references: [id])
+  items            PurchaseInvoiceItem[]
+  paymentAllocations VendorPaymentAllocation[]
+
+  @@unique([tenantId, invoiceNumber])
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vendorId])
+  @@index([poId])
+  @@index([status])
+}
+
+model PurchaseInvoiceItem {
+  id         String          @id @default(cuid())
+  tenantId   String          @default("VK001")
+  invoiceId  String
+  productId  String
+  quantity   Int
+  price      Float
+  total      Float           @default(0)
+
+  tenant     Tenant          @relation(fields: [tenantId], references: [id])
+  invoice    PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product    Product         @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
+  @@index([invoiceId])
+  @@index([productId])
+}
+
+// ─── PROCUREMENT STOCK LEDGER ─────────────────────────────────────
+
+model ProcurementStockLedger {
+  id          String            @id @default(cuid())
+  tenantId    String            @default("VK001")
+  storeId     String?
+  productId   String
+  type        StockMovementType
+  quantity    Int
+  reference   String?           // Invoice/Order/Transfer ID
+  refType     String?           // INVOICE, ORDER, TRANSFER
+  balanceAfter Int              @default(0)
+  createdAt   DateTime          @default(now())
+
+  tenant      Tenant            @relation(fields: [tenantId], references: [id])
+  store       Store?            @relation(fields: [storeId], references: [id])
+  product     Product           @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([productId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ─── VENDOR LEDGER ─────────────────────────────────────
+
+model VendorLedger {
+  id          String           @id @default(cuid())
+  tenantId    String           @default("VK001")
+  storeId     String?
+  vendorId    String
+  date        DateTime         @default(now())
+  type        VendorLedgerType
+  debit       Float            @default(0)
+  credit      Float            @default(0)
+  balance     Float            @default(0)
+  reference   String?          // Invoice or Payment ID
+  description String?
+  createdAt   DateTime         @default(now())
+
+  tenant      Tenant           @relation(fields: [tenantId], references: [id])
+  store       Store?           @relation(fields: [storeId], references: [id])
+  vendor      Vendor           @relation(fields: [vendorId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vendorId])
+  @@index([date])
+  @@index([type])
+}
+
+// ─── VENDOR PAYMENT ─────────────────────────────────────
+
+model VendorPayment {
+  id            String            @id @default(cuid())
+  tenantId      String            @default("VK001")
+  storeId       String?
+  vendorId      String
+  paymentDate   DateTime          @default(now())
+  amount        Float
+  mode          VendorPaymentMode
+  referenceNo   String?
+  isAdvance     Boolean           @default(false)
+  remarks       String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+
+  tenant        Tenant            @relation(fields: [tenantId], references: [id])
+  store         Store?            @relation(fields: [storeId], references: [id])
+  vendor        Vendor            @relation(fields: [vendorId], references: [id])
+  allocations   VendorPaymentAllocation[]
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vendorId])
+  @@index([paymentDate])
+}
+
+model VendorPaymentAllocation {
+  id          String          @id @default(cuid())
+  tenantId    String          @default("VK001")
+  paymentId   String
+  invoiceId   String
+  amount      Float
+  createdAt   DateTime        @default(now())
+
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  payment     VendorPayment   @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+  invoice     PurchaseInvoice @relation(fields: [invoiceId], references: [id])
+
+  @@index([tenantId])
+  @@index([paymentId])
+  @@index([invoiceId])
 }

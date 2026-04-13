@@ -19,7 +19,8 @@ import {
   Receipt,
   PieChart,
   Store,
-  ChevronDown
+  ChevronDown,
+  ClipboardList
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -68,6 +69,7 @@ export default function AdminLayout() {
     { to: '/admin/targets', icon: Target, label: 'Targets' },
     { to: '/admin/assets', icon: Box, label: 'Assets' },
     { to: '/admin/expenses', icon: Receipt, label: 'Expenses' },
+    { to: '/admin/procurement', icon: ClipboardList, label: 'Procurement' },
     { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports' },
     { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
     { to: '/admin/settings', icon: Settings, label: 'Settings' },
