@@ -3,7 +3,7 @@ import { initCronJobs } from './utils/cronJobs.js';
 import { createServer } from 'http';
 import { initSocket } from './services/socketService.js';
 
-const PORT = process.env.PORT || 5001; // Match .env
+const PORT = process.env.PORT || 5000; // Match .env
 
 const server = createServer(app);
 const io = initSocket(server);
