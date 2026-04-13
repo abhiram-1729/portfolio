@@ -702,6 +702,7 @@ export default function AdminInventory() {
             <div className="flex flex-col">
               <div className="flex items-center gap-2">
                 <h3 className={`text-[11px] font-black uppercase tracking-tight ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
+                {item.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{item.displayId}</span>}
                 {item.unit && (
                   <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
                     {item.unitValue || ''} {item.unit.type}
@@ -818,6 +819,7 @@ export default function AdminInventory() {
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-bold text-gray-900 leading-tight">{item.name}</span>
+                        {item.displayId && <span className="text-[9px] font-black w-fit text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider mt-0.5">{item.displayId}</span>}
                         {item.unit && (
                           <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
                             {item.unitValue || ''} {item.unit.type}

@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
+import { generateId } from '../../utils/idGenerator.js';
 
 // ─── CREATE PURCHASE INVOICE ─────────────────────────────────────
 export const createPurchase = async (req, res) => {
@@ -35,11 +36,18 @@ export const createPurchase = async (req, res) => {
     const totalAmount = itemsTotal + transport + other;
 
     const invoice = await prisma.$transaction(async (tx) => {
+      const displayId = await generateId({
+        entity: 'PINV',
+        tenantId,
+        storeId
+      });
+
       // Create purchase invoice
       const inv = await tx.purchaseInvoice.create({
         data: {
           tenantId,
           storeId,
+          displayId,
           vendorId,
           poId: poId || null,
           invoiceNumber,

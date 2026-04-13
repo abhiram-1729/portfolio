@@ -16,11 +16,21 @@ import { getIO } from './socketService.js';
 /**
  * Load incentive config from DB (with fallback to defaults)
  */
-async function getConfig(tenantId) {
+export async function getConfig(tenantId, storeId = null) {
   try {
     if (!tenantId) return null;
     
-    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { tenantId } });
+    let config = undefined;
+    if (storeId) {
+      config = await prisma.vgeIncentiveConfig.findFirst({ 
+        where: { tenantId, storeId: storeId }
+      });
+    }
+    if (!config) {
+      config = await prisma.vgeIncentiveConfig.findFirst({ 
+        where: { tenantId, storeId: null }
+      });
+    }
     if (!config) {
       // Create default config for this tenant if requested
       config = await prisma.vgeIncentiveConfig.create({ 
@@ -119,7 +129,7 @@ export async function updateDailyPerformance(userId, date = null) {
     const totalRegistrations = uniqueCustomers.length;
 
     // 3. Calculate incentives
-    const config = await getConfig(user.tenantId);
+    const config = await getConfig(user.tenantId, storeId);
     const result = calculateIncentive(totalSales, totalRegistrations, config, user.vgeType);
 
     // 4. Upsert into VgeDailyPerformance

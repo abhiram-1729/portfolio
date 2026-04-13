@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
+import { generateId } from '../../utils/idGenerator.js';
 
 // ─── CREATE GRN (Receive Goods) ─────────────────────────────────────
 export const createGRN = async (req, res) => {
@@ -24,11 +25,18 @@ export const createGRN = async (req, res) => {
     const storeId = po.storeId || req.user.storeId || null;
 
     await prisma.$transaction(async (tx) => {
+      const displayId = await generateId({
+        entity: 'GRN',
+        tenantId,
+        storeId
+      });
+
       // Create GRN
       const grn = await tx.goodsReceipt.create({
         data: {
           tenantId,
           storeId,
+          displayId,
           poId,
           remarks: remarks || null,
           items: {

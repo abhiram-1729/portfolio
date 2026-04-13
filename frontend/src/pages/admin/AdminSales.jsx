@@ -164,7 +164,7 @@ export default function AdminSales() {
                         <div>
                           <div className="flex items-center gap-2">
                             <h3 className="text-sm font-bold text-gray-900 uppercase">
-                              {sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6) || Math.floor(Math.random() * 100000)}`}
+                              {sale.displayId || (sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6) || Math.floor(Math.random() * 100000)}`)}
                             </h3>
                             {sale.customerName && (
                               <span className="text-[10px] bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full font-black uppercase tracking-tight">
@@ -224,7 +224,7 @@ export default function AdminSales() {
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
                             <span className="font-black text-gray-900 uppercase">
-                              {sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6)}`}
+                              {sale.displayId || (sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6)}`)}
                             </span>
                             <span className="text-[10px] text-gray-400 font-bold uppercase tracking-tighter">
                               {new Date(sale.createdAt).toLocaleString()}

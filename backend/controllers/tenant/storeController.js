@@ -1,4 +1,5 @@
 import prisma from '../../utils/prisma.js';
+import { generateStoreId } from '../../utils/idGenerator.js';
 
 // @desc    Get all stores for the tenant
 // @route   GET /api/tenant/stores
@@ -31,7 +32,7 @@ export const getStores = async (req, res) => {
 // @access  Private (Tenant Owner)
 export const createStore = async (req, res) => {
   try {
-    const { name, code, address, contactEmail, contactPhone, status } = req.body;
+    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode } = req.body;
 
     // Check for existing stores with same critical attributes
     const existingStore = await prisma.store.findFirst({
@@ -63,6 +64,8 @@ export const createStore = async (req, res) => {
       data: {
         name,
         code,
+        stateCode: stateCode || 'AP',
+        hubCode: hubCode || code?.substring(0, 3)?.toUpperCase() || 'HUB',
         address,
         contactEmail,
         contactPhone,
@@ -84,7 +87,7 @@ export const createStore = async (req, res) => {
 export const updateStore = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, address, contactEmail, contactPhone, status } = req.body;
+    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode } = req.body;
 
     // Check if store exists
     const store = await prisma.store.findUnique({
@@ -132,6 +135,8 @@ export const updateStore = async (req, res) => {
       data: {
         name,
         code,
+        ...(stateCode && { stateCode }),
+        ...(hubCode && { hubCode }),
         address,
         contactEmail,
         contactPhone,

@@ -266,6 +266,12 @@ export default function CashWallet() {
                                         value={expenseForm.type}
                                         onChange={(e) => setExpenseForm({...expenseForm, type: e.target.value})}
                                         className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none"
+                                        style={{
+                                            backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%230f172a' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                                            backgroundPosition: 'right 1rem center',
+                                            backgroundRepeat: 'no-repeat',
+                                            backgroundSize: '1.25rem'
+                                        }}
                                     >
                                         <option value="" disabled>Select category</option>
                                         {categories.map(c => (

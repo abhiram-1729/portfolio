@@ -200,6 +200,7 @@ function VendorsTab() {
                     <td className="px-5 py-3">
                       <div>
                         <span className="text-sm font-black text-gray-900">{v.vendorName}</span>
+                        {v.displayId && <span className="ml-2 text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{v.displayId}</span>}
                         {v.contactPerson && <p className="text-[10px] text-gray-400 font-bold">{v.contactPerson}</p>}
                       </div>
                     </td>
@@ -239,6 +240,7 @@ function VendorsTab() {
                 <div className="flex items-start justify-between">
                   <div>
                     <h4 className="text-sm font-black text-gray-900">{v.vendorName}</h4>
+                    {v.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{v.displayId}</span>}
                     <p className="text-[10px] text-gray-400 font-bold">{v.mobile} {v.contactPerson && `• ${v.contactPerson}`}</p>
                   </div>
                   <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-lg ${v.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-gray-100 text-gray-400'}`}>{v.status}</span>
@@ -615,6 +617,7 @@ function PurchaseOrdersTab() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-black text-gray-900">PO #{po.poNumber}</span>
+                    {po.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{po.displayId}</span>}
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${statusColors[po.status] || ''}`}>{po.status}</span>
                   </div>
                   <p className="text-[10px] text-gray-400 font-bold mt-0.5">{po.vendor?.vendorName} • {format(new Date(po.poDate), 'dd MMM yyyy')}</p>
@@ -981,6 +984,7 @@ function PurchasesTab() {
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-black text-gray-900">#{p.invoiceNumber}</span>
+                    {p.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{p.displayId}</span>}
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${invoiceStatusColors[p.status] || ''}`}>{p.status}</span>
                   </div>
                   <p className="text-[10px] text-gray-400 font-bold">{p.vendor?.vendorName} • {format(new Date(p.invoiceDate), 'dd MMM yyyy')}</p>
@@ -1246,6 +1250,7 @@ function PaymentsTab() {
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black text-gray-900">₹{p.amount.toLocaleString()}</span>
+                  {p.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{p.displayId}</span>}
                   <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${
                     p.mode === 'CASH' ? 'bg-emerald-50 text-emerald-600' : p.mode === 'UPI' ? 'bg-purple-50 text-purple-600' : 'bg-blue-50 text-blue-600'
                   }`}>{p.mode}</span>

@@ -265,6 +265,7 @@ export default function AdminExpenses() {
                                               </div>
                                               <div className="flex flex-col min-w-0">
                                                 <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{exp.type}</span>
+                                                {exp.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded w-fit tracking-wider mb-1">{exp.displayId}</span>}
                                                 <div className="flex items-center gap-2">
                                                   <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-lg border ${exp.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                                                     {exp.paymentMode}

@@ -218,6 +218,7 @@ export default function AdminVehicles() {
                 </div>
                 <div className="flex flex-col">
                   <h3 className="font-bold text-gray-900">{vehicle.vehicleNumber}</h3>
+                  {vehicle.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded w-fit tracking-wider">{vehicle.displayId}</span>}
                   {vehicle.vehicleName && <span className="text-xs text-gray-500">{vehicle.vehicleName}</span>}
                   <div className="flex items-center gap-2 mt-1">
                     {vehicle.status ? (
@@ -299,6 +300,7 @@ export default function AdminVehicles() {
                     </div>
                     <div className="flex flex-col">
                       <span className="font-bold text-gray-900 tracking-tight">{vehicle.vehicleNumber}</span>
+                      {vehicle.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded w-fit tracking-wider mt-0.5">{vehicle.displayId}</span>}
                       {vehicle.vehicleName && <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter">{vehicle.vehicleName}</span>}
                     </div>
                   </div>

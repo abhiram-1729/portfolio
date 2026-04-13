@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
+import { generateId } from '../../utils/idGenerator.js';
 
 // ─── CREATE VENDOR ─────────────────────────────────────
 export const createVendor = async (req, res) => {
@@ -20,10 +21,17 @@ export const createVendor = async (req, res) => {
     const storeId = req.body.storeId || req.user.storeId || null;
     const openBal = parseFloat(openingBalance) || 0;
 
+    const displayId = await generateId({
+      entity: 'VND',
+      tenantId,
+      storeId
+    });
+
     const vendor = await prisma.vendor.create({
       data: {
         tenantId,
         storeId,
+        displayId,
         vendorName,
         mobile,
         email: email || null,

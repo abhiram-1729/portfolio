@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
+import { generateId } from '../../utils/idGenerator.js';
 
 export const getVehicles = async (req, res) => {
   try {
@@ -81,16 +82,25 @@ export const createVehicle = async (req, res) => {
 
     console.log('✅ Uploaded to Supabase:', { rcDocument, insuranceDocument, permitDocument });
 
+    const resolvedStoreId = (storeId && storeId !== 'null' && storeId !== '') ? storeId : req.user.storeId;
+
+    const displayId = await generateId({
+      entity: 'VH',
+      tenantId: req.user.tenantId,
+      storeId: resolvedStoreId
+    });
+
     const vehicle = await prisma.vehicle.create({
       data: {
         vehicleNumber,
         vehicleName,
+        displayId,
         status: isStatusActive,
         rcDocument,
         insuranceDocument,
         permitDocument,
         tenantId: req.user.tenantId,
-        storeId: (storeId && storeId !== 'null' && storeId !== '') ? storeId : req.user.storeId
+        storeId: resolvedStoreId
       }
     });
 

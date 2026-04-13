@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
+import { generateId } from '../../utils/idGenerator.js';
 
 // ─── CREATE PO ─────────────────────────────────────
 export const createPO = async (req, res) => {
@@ -38,10 +39,17 @@ export const createPO = async (req, res) => {
     // Calculate totals
     const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
 
+    const displayId = await generateId({
+      entity: 'PO',
+      tenantId,
+      storeId
+    });
+
     const po = await prisma.purchaseOrder.create({
       data: {
         tenantId,
         storeId,
+        displayId,
         vendorId,
         poDate: poDate ? new Date(poDate) : new Date(),
         expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,

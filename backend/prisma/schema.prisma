@@ -58,6 +58,8 @@ model Tenant {
   vendorLedger           VendorLedger[]
   vendorPayments         VendorPayment[]
   vendorPaymentAllocations VendorPaymentAllocation[]
+  // ID Generation
+  idSequences            IdSequence[]
 }
 
 enum TenantStatus {
@@ -68,6 +70,7 @@ enum TenantStatus {
 
 model User {
   id                String     @id @default(cuid())
+  displayId         String?    @unique
   tenantId          String     @default("VK001") // Temp default for migration
   name              String?
   email             String     @unique
@@ -171,6 +174,7 @@ model Product {
   isFree        Boolean    @default(false)
   minShopAmount Float      @default(0)
   storeId       String?
+  displayId     String?    @unique
   purchasePrice Float?     @default(0)
   minStockAlert Int?       @default(0)
   skuCode       String?
@@ -264,6 +268,7 @@ model CartItem {
 
 model Order {
   id           String        @id @default(cuid())
+  displayId    String?       @unique
   tenantId     String        @default("VK001")
   userId       String?
   agentId      String?
@@ -340,6 +345,7 @@ model Payment {
 
 model Vehicle {
   id                String             @id @default(cuid())
+  displayId         String?            @unique
   tenantId          String             @default("VK001")
   vehicleNumber     String
   status            Boolean            @default(true)
@@ -577,6 +583,7 @@ model DailyCashSummary {
 
 model Expense {
   id          String             @id @default(cuid())
+  displayId   String?            @unique
   tenantId    String             @default("VK001")
   userId      String
   vehicleId   String?
@@ -827,7 +834,7 @@ model VgeDailyPerformance {
   slabsCount    Int   @default(0)
 
   // Calculated output
-  level          VgeLevel @default(NONE)
+  level          String   @default("NONE")
   salesIncentive Float    @default(0)
   regIncentive   Float    @default(0)
   totalIncentive Float    @default(0)
@@ -1148,6 +1155,8 @@ model Store {
   tenantId     String   @default("VK001")
   name         String
   code         String   @unique
+  stateCode    String   @default("AP")
+  hubCode      String   @default("HUB")
   address      String?
   contactEmail String?
   contactPhone String?
@@ -1290,6 +1299,7 @@ enum VendorLedgerType {
 
 model Vendor {
   id            String       @id @default(cuid())
+  displayId     String?      @unique
   tenantId      String       @default("VK001")
   storeId       String?
   vendorName    String
@@ -1345,6 +1355,7 @@ model VendorItemMapping {
 
 model PurchaseOrder {
   id                String    @id @default(cuid())
+  displayId         String?   @unique
   tenantId          String    @default("VK001")
   storeId           String?
   poNumber          Int       @unique @default(autoincrement())
@@ -1393,6 +1404,7 @@ model PurchaseOrderItem {
 
 model GoodsReceipt {
   id          String    @id @default(cuid())
+  displayId   String?   @unique
   tenantId    String    @default("VK001")
   storeId     String?
   poId        String
@@ -1432,6 +1444,7 @@ model GoodsReceiptItem {
 
 model PurchaseInvoice {
   id               String                @id @default(cuid())
+  displayId        String?               @unique
   tenantId         String                @default("VK001")
   storeId          String?
   vendorId         String
@@ -1535,6 +1548,7 @@ model VendorLedger {
 
 model VendorPayment {
   id            String            @id @default(cuid())
+  displayId     String?           @unique
   tenantId      String            @default("VK001")
   storeId       String?
   vendorId      String
@@ -1573,4 +1587,22 @@ model VendorPaymentAllocation {
   @@index([tenantId])
   @@index([paymentId])
   @@index([invoiceId])
+}
+
+// ─── ID GENERATION SEQUENCE TRACKER ─────────────────────────────────────
+
+model IdSequence {
+  id         String   @id @default(cuid())
+  tenantId   String   @default("VK001")
+  entity     String   // VH, INV, ORD, PO, PINV, GRN, PAY, EMP, VA, ITM, VND, SES, EXP
+  hub        String   // Hub code (e.g., PPM, GNT)
+  period     String   @default("ALL") // "ALL" for continuous, "2026" for yearly, "20260413" for daily
+  lastNumber Int      @default(0)
+  updatedAt  DateTime @updatedAt
+
+  tenant     Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, entity, hub, period])
+  @@index([tenantId])
+  @@index([entity, hub])
 }

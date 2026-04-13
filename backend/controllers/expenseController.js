@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
 import { uploadToSupabase } from '../utils/supabaseService.js';
 import { recalculateDailySummary } from './cashController.js';
+import { generateId } from '../utils/idGenerator.js';
 
 // @desc    Add expense entry
 // @route   POST /api/expenses
@@ -29,10 +30,17 @@ export const addExpense = async (req, res, next) => {
             );
         }
 
+        const displayId = await generateId({
+          entity: 'EXP',
+          tenantId: req.user.tenantId,
+          storeId: req.user.storeId
+        });
+
         const expense = await prisma.expense.create({
             data: {
                 tenantId: req.user.tenantId,
                 storeId: req.user.storeId,
+                displayId,
                 userId,
                 vehicleId: vehicleId || req.user.assignedVehicleId,
                 type,

@@ -240,6 +240,7 @@ export default function AdminUsers({ type }) {
                     <h3 className={`font-black text-gray-900 tracking-tight leading-none ${user.status === 'SUSPENDED' ? 'line-through' : ''}`}>{user.name}</h3>
                     {getStatusBadge(user.status)}
                   </div>
+                  {user.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded w-fit tracking-wider mt-0.5">{user.displayId}</span>}
                   <div className="mt-1 flex flex-wrap gap-1 items-center">
                     {getRoleBadge(user.role)}
                     {getVgeTypeBadge(user.vgeType)}
@@ -332,6 +333,7 @@ export default function AdminUsers({ type }) {
                         {user.name}
                       </span>
                       <div className="flex items-center gap-2">
+                        {user.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{user.displayId}</span>}
                         <span className="text-[10px] text-gray-400 font-bold tracking-tight">{user.email}</span>
                         {getStatusBadge(user.status)}
                       </div>

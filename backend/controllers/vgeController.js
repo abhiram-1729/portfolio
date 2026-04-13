@@ -11,7 +11,8 @@ import {
   endOfDayProcess,
   generateMonthlySummary,
   toISTDateString,
-  toISTMonthString 
+  toISTMonthString,
+  getConfig as fetchIncentiveConfig
 } from '../services/vgeAggregationService.js';
 import { 
   calculateIncentive, 
@@ -44,22 +45,26 @@ export const getMyPerformance = async (req, res) => {
     // Get user's daily target fallback
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { dailyTarget: true, baseSalary: true, tenantId: true, vgeType: true }
+      select: { dailyTarget: true, baseSalary: true, tenantId: true, vgeType: true, storeId: true }
     });
 
-    // Load config for progress info and base salary
-    let config = await prisma.vgeIncentiveConfig.findUnique({ where: { tenantId: user?.tenantId || 'VK001' } });
-    if (!config) config = undefined; // engine uses defaults
-
+    // Load config for progress info and base salary, matching user's store
+    const config = await fetchIncentiveConfig(user?.tenantId || 'VK001', user?.storeId);
+    
     const nextLevel = getNextLevelInfo(perf.totalSales, config);
     const nextSlab = getNextSlabInfo(perf.totalSales, config);
 
     // If config has rules, use the closest 'from' as the target for progress mapping
     let dailyTarget = user?.dailyTarget || 10000;
+    
+    let rulesArr = [];
+    if (Array.isArray(config?.rules)) rulesArr = config.rules;
+    else if (typeof config?.rules === 'string') {
+      try { rulesArr = JSON.parse(config.rules); } catch(e){}
+    }
+        
     if (nextLevel && nextLevel.nextLevel) {
-        // Find the rule for the next level to get the target
-        const rules = config?.rules || [];
-        const nextRule = rules.find(r => r.name === nextLevel.nextLevel);
+        const nextRule = rulesArr.find(r => r.name === nextLevel.nextLevel);
         if (nextRule) dailyTarget = Number(nextRule.salesFrom) || dailyTarget;
     }
 
@@ -67,9 +72,9 @@ export const getMyPerformance = async (req, res) => {
       ...perf,
       nextLevel,
       nextSlab,
-      baseSalary: user.baseSalary || config?.baseSalary || 12000,
-      vgeType: user.vgeType,
-      rules: config?.rules || [],
+      baseSalary: user?.baseSalary || config?.baseSalary || 12000,
+      vgeType: user?.vgeType || 'EMPLOYEE',
+      rules: rulesArr || config?.rules || [],
       dailyTarget,
       targetProgress: dailyTarget ? Math.min(100, (perf.totalSales / dailyTarget) * 100) : 0,
     });
@@ -315,19 +320,7 @@ export const getConfig = async (req, res) => {
     const { storeId: queryStoreId } = req.query;
     const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') ? queryStoreId : req.user.storeId;
 
-    const where = { tenantId: req.user.tenantId };
-    if (storeId) where.storeId = storeId;
-    else where.storeId = null;
-
-    let config = await prisma.vgeIncentiveConfig.findFirst({ where });
-    if (!config) {
-      config = await prisma.vgeIncentiveConfig.create({ 
-        data: { 
-          tenantId: req.user.tenantId,
-          storeId: storeId || null
-        } 
-      });
-    }
+    const config = await fetchIncentiveConfig(req.user.tenantId, storeId);
     res.json(config);
   } catch (error) {
     res.status(500).json({ message: 'Error loading config', error: error.message });

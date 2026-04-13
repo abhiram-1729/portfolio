@@ -14,6 +14,21 @@ const LEVEL_CONFIG = {
   SUPER_STAR: { label: 'Super Star', color: 'rose',    icon: Crown,      gradient: 'from-rose-400 to-rose-600' },
 };
 
+const DYNAMIC_GRADIENTS = [
+  'from-blue-400 to-blue-600',
+  'from-indigo-400 to-indigo-600',
+  'from-violet-400 to-violet-600',
+  'from-purple-400 to-purple-600',
+  'from-fuchsia-400 to-fuchsia-600',
+  'from-pink-400 to-pink-600',
+  'from-rose-400 to-rose-600',
+  'from-orange-400 to-orange-600',
+  'from-amber-400 to-amber-600',
+  'from-yellow-400 to-yellow-600',
+];
+
+const ICONS = [Target, Zap, TrendingUp, Award, Trophy, Star, Crown, Flame, Gift];
+
 const LEVEL_ORDER = ['NONE', 'STARTER', 'PERFORMER', 'ACHIEVER', 'CHAMPION', 'STAR', 'SUPER_STAR'];
 
 export default function VgeTargets() {
@@ -80,7 +95,20 @@ export default function VgeTargets() {
 
   const getLevelInfo = (levelName) => {
     const key = levelName?.toUpperCase().replace(/\s+/g, '_') || 'NONE';
-    return LEVEL_CONFIG[key] || { ...LEVEL_CONFIG.NONE, label: levelName || 'None' };
+    if (LEVEL_CONFIG[key]) return LEVEL_CONFIG[key];
+    
+    // Fallback for custom dynamically named levels
+    const nameStr = levelName || 'None';
+    const hash = nameStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const gradIndex = hash % DYNAMIC_GRADIENTS.length;
+    const iconIndex = hash % ICONS.length;
+    
+    return {
+       label: nameStr,
+       color: 'custom',
+       gradient: DYNAMIC_GRADIENTS[gradIndex],
+       icon: ICONS[iconIndex]
+    };
   };
 
   const levelInfo = getLevelInfo(perf?.level);
@@ -231,8 +259,7 @@ export default function VgeTargets() {
             {/* Dynamic Level Ladder */}
             <div className="space-y-2">
               {(perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).map((rule, idx) => {
-                const ruleKey = rule.name?.toUpperCase().replace(/\s+/g, '_');
-                const config = LEVEL_CONFIG[ruleKey] || LEVEL_CONFIG.NONE;
+                const config = getLevelInfo(rule.name);
                 const isActive = perf.level === rule.name;
                 
                 // Logic to check if this level is already surpassed (using simple index for sorted rules)
@@ -242,23 +269,41 @@ export default function VgeTargets() {
                 const Icon = config.icon || Target;
 
                 return (
-                  <div key={rule.id || idx} className={`flex items-center gap-3 p-2.5 rounded-2xl transition-all ${
+                  <div key={rule.id || idx} className={`flex flex-col gap-2 p-3 rounded-2xl transition-all ${
                     isActive ? `bg-gradient-to-r ${config.gradient} text-white shadow-md` :
-                    isReached ? 'bg-gray-50 text-gray-600' : 'text-gray-300'
+                    isReached ? 'bg-gray-50 text-gray-600 border border-gray-100' : 'bg-white border border-gray-100 text-gray-400 opacity-60'
                   }`}>
-                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${
-                      isActive ? 'bg-white/20' : isReached ? 'bg-gray-200' : 'bg-gray-100'
-                    }`}>
-                      <Icon size={16} />
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                        isActive ? 'bg-white/20' : isReached ? 'bg-gray-200' : 'bg-gray-50 text-gray-300'
+                      }`}>
+                        <Icon size={18} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                         <div className="flex items-center justify-between">
+                            <span className="text-sm font-black tracking-tight">{rule.name}</span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
+                              ₹{Number(rule.salesFrom || 0).toLocaleString()} +
+                            </span>
+                         </div>
+                         
+                         {/* Config Details */}
+                         <div className="flex items-center gap-2 mt-1 flex-wrap">
+                           {rule.salesValue > 0 && (
+                             <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-emerald-600'}`}>
+                               • {rule.salesType === 'PERCENTAGE' ? `${rule.salesValue}%` : `₹${rule.salesValue}`} per ₹{rule.salesSlab || 0} sales
+                             </span>
+                           )}
+                           {rule.appsRate > 0 && (
+                             <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-blue-500'}`}>
+                               • ₹{rule.appsRate} per {rule.appsSlab || 0} apps
+                             </span>
+                           )}
+                         </div>
+                      </div>
+                      {isReached && !isActive && <span className="text-[12px] font-black uppercase tracking-widest opacity-50 shrink-0">✓</span>}
+                      {isActive && <Flame size={16} className="animate-pulse shrink-0" />}
                     </div>
-                    <div className="flex-1">
-                       <span className="text-xs font-black block">{rule.name}</span>
-                       {!isActive && !isReached && (
-                          <span className="text-[8px] font-bold opacity-60">From ₹{rule.salesFrom?.toLocaleString()}</span>
-                       )}
-                    </div>
-                    {isReached && !isActive && <span className="text-[9px] font-black uppercase tracking-widest opacity-50">✓</span>}
-                    {isActive && <Flame size={14} className="animate-pulse" />}
                   </div>
                 );
               })}

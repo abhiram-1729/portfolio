@@ -2,6 +2,7 @@ import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
 import { sendNotification } from '../../services/notificationService.js';
 import { getTenantId } from '../../utils/tenantContext.js';
+import { generateId } from '../../utils/idGenerator.js';
 import fs from 'fs';
 
 // Item Master
@@ -131,6 +132,17 @@ export const createItem = async (req, res) => {
       minShopAmount: parseNumber(minShopAmount) || 0,
       storeId: (req.body.storeId && req.body.storeId !== 'null' && req.body.storeId !== '') ? req.body.storeId : req.user.storeId
     };
+
+    // Generate display ID for item (VK-ITM-[CATEGORY]-[NUMBER])
+    const categoryForId = await prisma.category.findUnique({ where: { id: finalCategoryId }, select: { name: true } });
+    const catCode = (categoryForId?.name || 'GEN').substring(0, 4).toUpperCase();
+    const displayId = await generateId({
+      entity: 'ITM',
+      tenantId: finalTenantId,
+      storeId: itemData.storeId,
+      categoryCode: catCode
+    });
+    itemData.displayId = displayId;
 
     const item = await prisma.product.create({
       data: itemData

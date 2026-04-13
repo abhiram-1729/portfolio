@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import bcrypt from 'bcryptjs';
+import { generateId } from '../../utils/idGenerator.js';
 
 // Get all users
 export const getUsers = async (req, res) => {
@@ -42,6 +43,13 @@ export const createUser = async (req, res) => {
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
 
+    const resolvedStoreId = storeId || req.user.storeId || null;
+    const displayId = await generateId({
+      entity: 'EMP',
+      tenantId: req.user.tenantId,
+      storeId: resolvedStoreId
+    });
+
     const user = await prisma.user.create({
       data: {
         name,
@@ -51,6 +59,7 @@ export const createUser = async (req, res) => {
         role: role || 'SALES_AGENT',
         vgeType: vgeType || 'EMPLOYEE',
         tenantId: req.user.tenantId,
+        displayId,
         assignedVehicle: assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined,
         store: storeId ? { connect: { id: storeId } } : undefined,
         dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined,

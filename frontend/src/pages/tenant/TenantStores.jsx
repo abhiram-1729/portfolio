@@ -9,7 +9,7 @@ export default function TenantStores() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [formData, setFormData] = useState({ id: '', name: '', code: '', address: '', contactEmail: '', contactPhone: '', status: 'ACTIVE' });
+  const [formData, setFormData] = useState({ id: '', name: '', code: '', stateCode: '', hubCode: '', address: '', contactEmail: '', contactPhone: '', status: 'ACTIVE' });
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
 
@@ -37,7 +37,7 @@ export default function TenantStores() {
       setFormData(store);
       setIsEditing(true);
     } else {
-      setFormData({ id: '', name: '', code: '', address: '', contactEmail: '', contactPhone: '', status: 'ACTIVE' });
+      setFormData({ id: '', name: '', code: '', stateCode: '', hubCode: '', address: '', contactEmail: '', contactPhone: '', status: 'ACTIVE' });
       setIsEditing(false);
     }
     setIsModalOpen(true);
@@ -145,6 +145,11 @@ export default function TenantStores() {
                       <h3 className="text-lg font-black text-slate-900 tracking-tight leading-tight">{store.name}</h3>
                       <div className="flex items-center gap-2 mt-1">
                          <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 uppercase tracking-widest">{store.code}</span>
+                         {(store.stateCode || store.hubCode) && (
+                           <span className="text-[9px] font-black px-2 py-0.5 rounded-full bg-teal-50 text-teal-600 uppercase tracking-widest">
+                             VK-{store.stateCode || '??'}-{store.hubCode || '???'}
+                           </span>
+                         )}
                          <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${store.status === 'ACTIVE' ? 'bg-emerald-100 text-emerald-700' : 'bg-red-100 text-red-700'}`}>
                            {store.status}
                          </span>
@@ -274,6 +279,40 @@ export default function TenantStores() {
                   />
                 </div>
               </div>
+
+              {/* VillagKart Hub Configuration */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5 focus-within:text-teal-600">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 pl-4 transition-colors">State Code *</label>
+                  <input
+                    required
+                    type="text"
+                    maxLength={2}
+                    value={formData.stateCode || ''}
+                    onChange={(e) => setFormData({ ...formData, stateCode: e.target.value.toUpperCase() })}
+                    className="w-full bg-teal-50/50 border-none rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:bg-teal-50 focus:ring-2 focus:ring-teal-500 outline-none transition-all placeholder-slate-400 shadow-inner uppercase"
+                    placeholder="e.g. AP"
+                  />
+                </div>
+                <div className="space-y-1.5 focus-within:text-teal-600">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 pl-4 transition-colors">Hub Code *</label>
+                  <input
+                    required
+                    type="text"
+                    maxLength={3}
+                    value={formData.hubCode || ''}
+                    onChange={(e) => setFormData({ ...formData, hubCode: e.target.value.toUpperCase() })}
+                    className="w-full bg-teal-50/50 border-none rounded-2xl px-4 py-3 text-sm font-bold text-slate-900 focus:bg-teal-50 focus:ring-2 focus:ring-teal-500 outline-none transition-all placeholder-slate-400 shadow-inner uppercase"
+                    placeholder="e.g. PPM"
+                  />
+                </div>
+              </div>
+              {(formData.stateCode || formData.hubCode) && (
+                <div className="bg-teal-50 rounded-2xl p-3 flex items-center gap-3">
+                  <span className="text-[10px] font-black text-teal-400 uppercase tracking-widest">Hub ID Preview:</span>
+                  <span className="text-sm font-black text-teal-700 tracking-wide">VK-{formData.stateCode || '??'}-{formData.hubCode || '???'}</span>
+                </div>
+              )}
 
               <div className="space-y-1.5 focus-within:text-emerald-600">
                 <label className="text-[10px] font-black uppercase tracking-widest text-slate-500 pl-4 transition-colors">Address</label>

@@ -16,6 +16,51 @@ const LEVEL_CONFIG = {
   SUPER_STAR: { label: 'Super Star', gradient: 'from-rose-400 to-rose-600',    bg: 'bg-rose-50',    text: 'text-rose-600',    border: 'border-rose-100' },
 };
 
+const DYNAMIC_GRADIENTS = [
+  'from-blue-400 to-blue-600',
+  'from-indigo-400 to-indigo-600',
+  'from-violet-400 to-violet-600',
+  'from-purple-400 to-purple-600',
+  'from-fuchsia-400 to-fuchsia-600',
+  'from-pink-400 to-pink-600',
+  'from-rose-400 to-rose-600',
+  'from-orange-400 to-orange-600',
+  'from-amber-400 to-amber-600',
+  'from-yellow-400 to-yellow-600',
+];
+
+const getLevelInfo = (levelName) => {
+  const key = levelName?.toUpperCase().replace(/\s+/g, '_') || 'NONE';
+  if (LEVEL_CONFIG[key]) return LEVEL_CONFIG[key];
+  
+  const nameStr = levelName || 'None';
+  const hash = nameStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const gradIndex = hash % DYNAMIC_GRADIENTS.length;
+  
+  // Create deterministic fallback classes based on the index to preserve aesthetic consistency
+  const fallbackStyles = [
+    { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-100' },
+    { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-100' },
+    { bg: 'bg-violet-50', text: 'text-violet-600', border: 'border-violet-100' },
+    { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100' },
+    { bg: 'bg-fuchsia-50', text: 'text-fuchsia-600', border: 'border-fuchsia-100' },
+    { bg: 'bg-pink-50', text: 'text-pink-600', border: 'border-pink-100' },
+    { bg: 'bg-rose-50', text: 'text-rose-600', border: 'border-rose-100' },
+    { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-100' },
+    { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100' },
+    { bg: 'bg-yellow-50', text: 'text-yellow-600', border: 'border-yellow-100' }
+  ];
+  const styles = fallbackStyles[gradIndex];
+
+  return {
+     label: nameStr,
+     gradient: DYNAMIC_GRADIENTS[gradIndex],
+     bg: styles.bg,
+     text: styles.text,
+     border: styles.border
+  };
+};
+
 export default function AdminTargets() {
   const currentUser = useUserStore(s => s.user);
   const [searchParams] = useSearchParams();
@@ -237,7 +282,7 @@ export default function AdminTargets() {
             </div>
           ) : (
             agentHistory.map(day => {
-              const lev = LEVEL_CONFIG[day.level || 'NONE'];
+              const lev = getLevelInfo(day.level);
               return (
                 <div key={day.id} className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm">
                   <div className="flex items-center justify-between mb-2">
@@ -392,7 +437,7 @@ export default function AdminTargets() {
             ) : (
               <div className="divide-y divide-gray-50">
                 {performances.map((p, idx) => {
-                  const lev = LEVEL_CONFIG[p.level || 'NONE'];
+                  const lev = getLevelInfo(p.level);
                   return (
                     <div
                       key={p.id}
@@ -463,7 +508,7 @@ export default function AdminTargets() {
               </div>
               <div className="divide-y divide-gray-50">
                 {monthlySummaries.map((s, idx) => {
-                  const lev = LEVEL_CONFIG[s.bestLevel || 'NONE'];
+                  const lev = getLevelInfo(s.bestLevel);
                   const meta = s.metadata || {};
                   return (
                     <div key={s.id} className="p-5 space-y-4">

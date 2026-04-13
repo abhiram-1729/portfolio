@@ -17,13 +17,14 @@ const DEFAULT_CONFIG = {
  * Calculate the cumulative incentive based on passed levels
  */
 export function calculateIncentive(totalSales, totalRegistrations = 0, config = DEFAULT_CONFIG, userType = 'EMPLOYEE') {
+  config = config || DEFAULT_CONFIG;
   let rules = Array.isArray(config.rules) ? config.rules : [];
   if (typeof config.rules === 'string') {
     try { rules = JSON.parse(config.rules); } catch(e){}
   }
 
   let totalDailyIncentive = 0;
-  let currentLevel = 'Base';
+  let currentLevel = 'NONE';
 
   // Sort by sales target to determine final level name
   const sortedLevels = [...rules].sort((a, b) => (Number(a.salesFrom)||0) - (Number(b.salesFrom)||0));
@@ -67,6 +68,7 @@ export function calculateIncentive(totalSales, totalRegistrations = 0, config = 
  * Progress to next level
  */
 export function getNextLevelInfo(totalSales, config = DEFAULT_CONFIG) {
+  config = config || DEFAULT_CONFIG;
   let rules = Array.isArray(config.rules) ? config.rules : [];
   if (typeof config.rules === 'string') {
     try { rules = JSON.parse(config.rules); } catch(e){}

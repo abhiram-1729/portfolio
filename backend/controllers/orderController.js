@@ -4,6 +4,7 @@ import { sendNotification } from '../services/notificationService.js';
 import { updateDailyPerformance } from '../services/vgeAggregationService.js';
 import { recalculateDailySummary } from './cashController.js';
 import { format } from 'date-fns';
+import { generateId } from '../utils/idGenerator.js';
 
 
 // @desc    Create order from cart
@@ -145,10 +146,17 @@ export const createOrderFromCart = async (req, res, next) => {
 
         // 3. Create Order + OrderItems in a transaction
         const order = await prisma.$transaction(async (tx) => {
+            const orderDisplayId = await generateId({
+              entity: 'ORD',
+              tenantId: req.user.tenantId,
+              storeId: req.user.storeId
+            });
+
             const newOrder = await tx.order.create({
                 data: {
                     tenantId: req.user.tenantId,
                     storeId: req.user.storeId,
+                    displayId: orderDisplayId,
                     customerName: customerName || null,
                     mobile: mobile || null,
                     totalAmount: totalAmount,
