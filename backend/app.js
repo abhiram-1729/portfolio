@@ -1,5 +1,7 @@
 import express from 'express';
 import cors from 'cors';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
 import productRoutes from './routes/productRoutes.js';
@@ -18,6 +20,9 @@ import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 const app = express();
 
 const corsOptions = {
@@ -34,25 +39,48 @@ const corsOptions = {
 app.use(cors(corsOptions));
 app.use(express.json());
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/products', productRoutes);
-app.use('/api/cart', cartRoutes);
-app.use('/api/orders', orderRoutes);
-app.use('/api/reports', reportRoutes);
-app.use('/api/admin', adminRoutes);
-app.use('/api/cash', cashRoutes);
-app.use('/api/routes', routeRoutes);
-app.use('/api/notifications', notificationRoutes);
-app.use('/api/vge', vgeRoutes);
-app.use('/api/assets', assetRoutes);
-app.use('/api/expenses', expenseRoutes);
-app.use('/api/tenant/stores', storeRoutes);
+// Static Files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// API Router definition for robustness
+const apiRouter = express.Router();
 
+// Mount all routes to the apiRouter WITHOUT /api prefix here
+apiRouter.use('/auth', authRoutes);
+apiRouter.use('/products', productRoutes);
+apiRouter.use('/cart', cartRoutes);
+apiRouter.use('/orders', orderRoutes);
+apiRouter.use('/reports', reportRoutes);
+apiRouter.use('/admin', adminRoutes);
+apiRouter.use('/cash', cashRoutes);
+apiRouter.use('/routes', routeRoutes);
+apiRouter.use('/notifications', notificationRoutes);
+apiRouter.use('/vge', vgeRoutes);
+apiRouter.use('/assets', assetRoutes);
+apiRouter.use('/expenses', expenseRoutes);
+apiRouter.use('/tenant/stores', storeRoutes);
+
+// Mount the apiRouter both WITH and WITHOUT /api prefix
+// This ensures compatibility with proxies that might or might not strip the prefix
+app.use('/api', apiRouter);
+app.use(apiRouter); 
+
+// Root path health check (accessible at both / and /api)
 app.get('/', (req, res) => {
-  res.send('Vehicle Sales Tracking API is running...');
+  res.json({
+    message: 'Vehicle Sales Tracking API is running...',
+    status: 'healthy',
+    timestamp: new Date().toISOString()
+  });
 });
+
+apiRouter.get('/', (req, res) => {
+    res.json({
+      message: 'Vehicle Sales Tracking API is running...',
+      status: 'healthy',
+      timestamp: new Date().toISOString()
+    });
+  });
 
 // Error Middleware
 app.use(errorHandler);
