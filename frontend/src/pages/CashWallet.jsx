@@ -109,9 +109,9 @@ export default function CashWallet() {
         );
     }
 
-    const pendingAmount = expenses.filter(e => e.status === 'PENDING').reduce((acc, curr) => acc + curr.amount, 0);
-    const approvedAmount = expenses.filter(e => e.status === 'APPROVED').reduce((acc, curr) => acc + curr.amount, 0);
-    const claimedToday = expenses.filter(e => e.status === 'PAID').reduce((acc, curr) => acc + curr.amount, 0);
+    const pendingAmount = expenses.filter(e => e.status === 'PENDING').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+    const approvedAmount = expenses.filter(e => e.status === 'APPROVED').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+    const claimedToday = expenses.filter(e => e.status === 'PAID').reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
     return (
         <div className="min-h-screen bg-slate-50 pb-20">
