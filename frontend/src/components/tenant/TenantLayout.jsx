@@ -78,8 +78,8 @@ export default function TenantLayout() {
           >
             <Bell size={20} strokeWidth={2.5} />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-orange-500 text-[9px] font-black text-white ring-2 ring-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
+              <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-orange-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-orange-500/10 z-10 transition-all">
+                {unreadCount}
               </span>
             )}
           </button>

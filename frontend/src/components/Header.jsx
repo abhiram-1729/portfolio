@@ -62,8 +62,8 @@ export default function Header({ onMenuClick }) {
             <Link to="/notifications" className="relative p-2 rounded-xl hover:bg-white active:scale-90 transition-all text-slate-500 flex items-center justify-center">
               <Bell size={20} strokeWidth={2.5} />
               {unreadCount > 0 && (
-                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[8px] font-black text-white border-2 border-white shadow-sm animate-bounce-subtle">
-                  {unreadCount > 9 ? '9+' : unreadCount}
+                <span className="absolute -top-1 -right-1 flex min-w-[18px] h-[18px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[9px] font-black text-white border-2 border-white shadow-lg shadow-red-500/20 z-10 animate-bounce-subtle">
+                  {unreadCount}
                 </span>
               )}
             </Link>
