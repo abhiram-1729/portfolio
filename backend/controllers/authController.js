@@ -91,7 +91,11 @@ export const getUserProfile = async (req, res, next) => {
         });
 
         if (user) {
-            res.json(user);
+            res.json({
+                ...user,
+                tenantName: user.tenant?.name,
+                storeName: user.store?.name,
+            });
         } else {
             res.status(404);
             throw new Error('User not found');

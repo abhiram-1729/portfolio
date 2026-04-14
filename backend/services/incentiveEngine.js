@@ -34,7 +34,12 @@ export function calculateIncentive(totalSales, totalRegistrations = 0, config = 
     const sTo = Number(level.salesTo) || 0;
     const aTarget = Number(level.appsTarget) || 0;
 
-    // Range-base mapping
+    // Determine if sales alone have passed this level's threshold (for visual ranking)
+    if (totalSales >= sFrom) {
+      currentLevel = level.name;
+    }
+
+    // Determine if fully qualified for the financial incentive
     const inRange = sTo > 0 ? (totalSales >= sFrom && totalSales <= sTo) : (totalSales >= sFrom);
 
     if (inRange && totalRegistrations >= aTarget) {
@@ -50,7 +55,6 @@ export function calculateIncentive(totalSales, totalRegistrations = 0, config = 
 
       const levelReward = salesIncentive + appIncentive;
       totalDailyIncentive += levelReward;
-      currentLevel = level.name;
     }
   });
 

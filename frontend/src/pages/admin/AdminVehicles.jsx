@@ -3,12 +3,14 @@ import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Penci
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
+import { useUserStore } from '../../store/userStore';
 
 export default function AdminVehicles() {
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
   const location = useLocation();
   const isTenantRoute = location.pathname.startsWith('/tenant');
+  const currentUser = useUserStore(s => s.user);
 
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
@@ -26,7 +28,13 @@ export default function AdminVehicles() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const [newVehicle, setNewVehicle] = useState({ vehicleNumber: '', vehicleName: '', assignedUserId: '', status: true });
+  const [newVehicle, setNewVehicle] = useState({ 
+    vehicleNumber: '', 
+    vehicleName: '', 
+    assignedUserId: '', 
+    status: true,
+    storeId: storeFilterId || currentUser?.storeId || ''
+  });
   const [documents, setDocuments] = useState({ rcDocument: null, insuranceDocument: null, permitDocument: null });
 
   const fetchData = async () => {
@@ -545,7 +553,7 @@ export default function AdminVehicles() {
               vehicleName: '', 
               assignedUserId: '', 
               status: true,
-              storeId: storeFilterId || '' 
+              storeId: storeFilterId || currentUser?.storeId || '' 
             });
             setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
             setShowAddModal(true); 
@@ -615,24 +623,6 @@ export default function AdminVehicles() {
                 </select>
               </div>
 
-              {!storeFilterId && (
-                <div className="space-y-1 focus-within:text-emerald-600 relative">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1 transition-colors">Context Branch</label>
-                  <div className="relative">
-                    <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 z-10" />
-                    <select
-                      className="w-full bg-emerald-50 border border-emerald-100/50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none appearance-none text-emerald-900 font-bold focus:ring-2 focus:ring-emerald-500/50 transition-all cursor-pointer"
-                      value={newVehicle.storeId}
-                      onChange={(e) => setNewVehicle({ ...newVehicle, storeId: e.target.value })}
-                    >
-                      <option value="">-- Global (Unassigned) --</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
 
               <div className="space-y-3 pt-1 border-t border-gray-50">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents</p>
@@ -701,24 +691,6 @@ export default function AdminVehicles() {
                 </select>
               </div>
 
-              {!storeFilterId && (
-                <div className="space-y-1 focus-within:text-indigo-600 relative">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1 transition-colors">Assigned Branch</label>
-                  <div className="relative">
-                    <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-600 z-10" />
-                    <select
-                      className="w-full bg-indigo-50 border border-indigo-100/50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none appearance-none text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer"
-                      value={editingVehicle.storeId || ''}
-                      onChange={(e) => setEditingVehicle({ ...editingVehicle, storeId: e.target.value })}
-                    >
-                      <option value="">-- Global (Unassigned) --</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
 
               <div className="space-y-3 pt-1 border-t border-gray-50">
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents (upload to replace)</p>

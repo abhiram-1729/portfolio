@@ -491,11 +491,11 @@ export default function VgeTargets() {
 
           <div className="space-y-4">
             <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider px-2">Digital Awards & Badges</h3>
-            {(perf.rules || []).filter(r => (r.salesFrom || 0) >= 20000).map(rule => {
+            {(perf.rules || []).map(rule => {
               const info = getLevelInfo(rule.name);
               const currentIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
               const ruleIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === rule.name);
-              const isUnlocked = currentIdx >= ruleIdx;
+              const isUnlocked = currentIdx >= ruleIdx && ruleIdx !== -1;
 
               return (
                 <div key={rule.id} className={`bg-white p-5 rounded-[2rem] border transition-all flex items-center gap-4 ${isUnlocked ? 'border-amber-100 shadow-sm' : 'border-gray-50 opacity-40 grayscale'}`}>

@@ -354,20 +354,20 @@ export default function AdminAssets() {
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Executive (VGE)</label>
             <select value={assignForm.userId} onChange={e => setAssignForm({ ...assignForm, userId: e.target.value })} required
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
               <option value="">Select Executive</option>
-              {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+              {users.map(u => <option key={u.id} value={u.id} className="truncate">{u.name} ({u.role})</option>)}
             </select>
           </div>
 
           <div className="space-y-1">
             <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Asset</label>
             <select value={assignForm.assetId} onChange={e => setAssignForm({ ...assignForm, assetId: e.target.value, serialNumber: '' })} required
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
               <option value="">Select Asset</option>
               {assets.map(a => {
                 const avail = (a.units || []).filter(u => u.status === 'AVAILABLE').length;
-                return <option key={a.id} value={a.id}>{a.name} {a.model ? `(${a.model})` : ''} — {avail} available</option>;
+                return <option key={a.id} value={a.id} className="truncate">{a.name} {a.model ? `(${a.model})` : ''} — {avail} available</option>;
               })}
             </select>
           </div>
@@ -376,10 +376,10 @@ export default function AdminAssets() {
             <div className="space-y-1">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Serial Number</label>
               <select value={assignForm.serialNumber} onChange={e => setAssignForm({ ...assignForm, serialNumber: e.target.value })} required
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
                 <option value="">Select Serial Number</option>
                 {(selectedAssetForAssign.units || []).filter(u => u.status === 'AVAILABLE' && u.serialNumber).map(u =>
-                  <option key={u.id} value={u.serialNumber}>{u.serialNumber}</option>
+                  <option key={u.id} value={u.serialNumber} className="truncate">{u.serialNumber}</option>
                 )}
               </select>
             </div>
@@ -958,10 +958,10 @@ export default function AdminAssets() {
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Active Assignment</label>
                 <select value={returnForm.assignmentId} onChange={e => setReturnForm({ ...returnForm, assignmentId: e.target.value })} required
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
                   <option value="">Select Assignment</option>
                   {tracking.map(t => (
-                    <option key={t.id} value={t.id}>
+                    <option key={t.id} value={t.id} className="truncate">
                       {t.assetUnit?.asset?.name} {t.assetUnit?.serialNumber ? `(${t.assetUnit.serialNumber})` : ''} → {t.user?.name}
                     </option>
                   ))}

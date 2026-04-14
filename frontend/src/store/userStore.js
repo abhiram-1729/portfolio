@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { useCartStore } from './cartStore';
+import { authAPI } from '../services/api';
 
 export const useUserStore = create(
   persist(
@@ -18,6 +19,16 @@ export const useUserStore = create(
         }
 
         set({ user, token });
+      },
+
+      refreshUserProfile: async () => {
+        try {
+          const { data } = await authAPI.me();
+          set({ user: data });
+        } catch (error) {
+          console.error('Failed to refresh user profile:', error);
+          // If 401, the interceptor handles it, but we should be careful here
+        }
       },
 
       clearUser: () => {

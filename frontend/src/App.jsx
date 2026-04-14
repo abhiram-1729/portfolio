@@ -62,7 +62,7 @@ function TenantRoute({ children }) {
 }
 
 export default function App() {
-  const { token, user } = useUserStore();
+  const { token, user, refreshUserProfile } = useUserStore();
   const { cartOwnerId, clearCart, setCartOwner } = useCartStore();
   const { initSocket, disconnectSocket, fetchNotifications } = useNotificationStore();
 
@@ -70,10 +70,11 @@ export default function App() {
     if (token) {
       initSocket(token);
       fetchNotifications();
+      refreshUserProfile();
     } else {
       disconnectSocket();
     }
-  }, [token, initSocket, disconnectSocket, fetchNotifications]);
+  }, [token, initSocket, disconnectSocket, fetchNotifications, refreshUserProfile]);
 
   useEffect(() => {
     // 🛡️ Anti-leak protection: If the logged-in user doesn't own this cart storage (e.g. they switched accounts in the same browser), wipe it immediately.

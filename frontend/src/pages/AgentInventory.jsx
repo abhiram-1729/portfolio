@@ -276,11 +276,7 @@ export default function AgentInventory() {
                 const matchesSearch = p.name?.toLowerCase().includes(refillSearchQuery.toLowerCase());
                 const matchesFree = !filterFreeOnly || p.isFree;
                 return matchesSearch && matchesFree;
-              }).sort((a, b) => {
-                const reqA = refillItems[a.id] || 0;
-                const reqB = refillItems[b.id] || 0;
-                return reqB - reqA; // Higher requested quantities first
-              }).map(p => {
+              }).sort((a, b) => a.name.localeCompare(b.name)).map(p => {
                 const currentStock = inventory.find(i => i.productId === p.id)?.quantity || 0;
                 const reqQty = refillItems[p.id] || 0;
                 return (

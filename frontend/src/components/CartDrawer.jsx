@@ -10,6 +10,7 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
   const handleUpdate = (item, newQty) => {
     if (newQty > item.quantity && newQty > (item.stock || 0)) {
         toast.error(`Only ${item.stock || 0} units available in vehicle`, {
+            id: `stock-limit-${item.productId}`,
             icon: '🚛',
             style: { borderRadius: '15px', fontWeight: 'bold' }
         });

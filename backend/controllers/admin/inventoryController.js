@@ -772,12 +772,13 @@ export const approveRefillRequest = async (req, res) => {
             vehicleId: request.vehicleId,
             userId: request.userId,
             status: 'APPROVED',
+            parentId: request.parentId || request.id,
             items: {
-              create: itemsToProcess.map(item => ({
+              create: finalItemsToProcess.map(item => ({
                 tenantId: item.tenantId || request.tenantId,
                 productId: item.productId,
                 quantity: item.quantity,
-                requestedQuantity: item.originalQuantity !== item.quantity ? item.originalQuantity : null,
+                requestedQuantity: item.originalQuantity || item.quantity,
                 adminRemark: item.adminRemark
               }))
             }
@@ -790,18 +791,16 @@ export const approveRefillRequest = async (req, res) => {
           data: { status: 'APPROVED' }
         });
 
-        // Update items to reflect overrides
-        for (const item of itemsToProcess) {
-          if (item.quantity !== item.originalQuantity || item.adminRemark) {
-            await tx.refillItem.update({
-              where: { id: item.id },
-              data: {
-                quantity: item.quantity,
-                requestedQuantity: item.originalQuantity,
-                adminRemark: item.adminRemark
-              }
-            });
-          }
+        // Update items to store the requested quantity if not already set
+        for (const item of finalItemsToProcess) {
+          await tx.refillItem.updateMany({
+            where: { refillRequestId: id, productId: item.productId },
+            data: { 
+              quantity: item.quantity,
+              requestedQuantity: item.originalQuantity || item.quantity,
+              adminRemark: item.adminRemark
+            }
+          });
         }
       }
     }, {
@@ -809,41 +808,94 @@ export const approveRefillRequest = async (req, res) => {
       timeout: 120000  // Allow up to 120 seconds to process the transaction
     });
 
-
+    // Send immediate response to the client so UI updates instantly
     res.json({ message: 'Refill request approved and stock loaded successfully' });
 
-    // Notify via looping the changed items
-    for (const item of itemsToProcess) {
-       if (item.quantity !== item.originalQuantity || item.adminRemark) {
-          let msg = `You asked for ${item.originalQuantity} but sent ${item.quantity}.`;
-          if (item.adminRemark) msg += ` Note: ${item.adminRemark}`;
-          const pName = finalItemsToProcess.find(f => f.productId === item.productId)?.name || 'Product';
-          
-          sendNotification({
-            userIds: [request.userId],
-            title: `Refill Update: ${pName}`,
-            message: msg,
-            type: 'inventory',
-            priority: 'high',
-            metadata: { requestId: request.id, vehicleId: request.vehicleId }
-          });
-       }
-    }
+    // Consolidated notification logic: aggregate from all related requests (Run in background)
+    Promise.resolve().then(async () => {
+      try {
+        const rootId = request.parentId || request.id;
+        const allRelatedRequests = await prisma.refillRequest.findMany({
+          where: {
+            OR: [{ id: rootId }, { parentId: rootId }]
+          },
+          select: {
+            status: true,
+            items: {
+              select: {
+                productId: true,
+                quantity: true,
+                requestedQuantity: true,
+                adminRemark: true,
+                product: { select: { name: true } }
+              }
+            }
+          }
+        });
 
-    sendNotification({
-      userIds: [request.userId],
-      title: 'Refill Request Reviewed',
-      message: `Your refill request review is complete.`,
-      type: 'inventory',
-      priority: 'medium',
-      metadata: { requestId: request.id, vehicleId: request.vehicleId }
+    // Flatten all items from this flow
+    const itemMap = new Map();
+    allRelatedRequests.forEach(req => {
+      req.items.forEach(item => {
+        const key = item.productId;
+        const requested = item.requestedQuantity || item.quantity;
+        const approved = req.status === 'APPROVED' ? item.quantity : 0;
+        
+        let status = req.status; // PENDING, APPROVED, REJECTED
+        if (req.status === 'APPROVED' && item.quantity < requested) {
+          status = 'PARTIAL';
+        }
+
+        // Priority logic for statuses: APPROVED/REJECTED/PARTIAL override PENDING
+        if (!itemMap.has(key) || status !== 'PENDING') {
+          itemMap.set(key, {
+            name: item.product?.name || 'Product',
+            requested,
+            approved,
+            status,
+            adminRemark: item.adminRemark
+          });
+        }
+      });
     });
+
+    const refillItemsSummary = Array.from(itemMap.values());
+
+    await prisma.notification.deleteMany({
+      where: {
+        userId: request.userId,
+        type: 'inventory',
+        isRead: false,
+        metadata: { path: ['rootId'], equals: rootId }
+      }
+    });
+
+        sendNotification({
+          userIds: [request.userId],
+          title: 'Refill Request Reviewed',
+          message: `Your refill request review is in progress.`,
+          type: 'inventory',
+          priority: 'high',
+          metadata: { 
+            requestId: request.id, 
+            rootId: rootId,
+            vehicleId: request.vehicleId,
+            refillItems: refillItemsSummary 
+          }
+        });
+      } catch (notifError) {
+        console.error('Error in background notification logic for approve:', notifError);
+      }
+    });
+
   } catch (error) {
     console.error('❌ Error approving refill request:', error);
     import('fs').then(fs => {
       fs.writeFileSync('approve_refill_error.log', new Date().toISOString() + '\\n' + String(error.stack || error) + '\\n\\n', { flag: 'a' });
     });
-    res.status(500).json({ message: 'Error approving refill request', error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error approving refill request', error: error.message });
+    }
   }
 };
 
@@ -880,11 +932,13 @@ export const rejectRefillRequest = async (req, res) => {
             vehicleId: request.vehicleId,
             userId: request.userId,
             status: 'REJECTED',
+            parentId: request.parentId || request.id,
             items: {
               create: itemsToProcess.map(item => ({
                 tenantId: item.tenantId || request.tenantId,
                 productId: item.productId,
-                quantity: item.quantity
+                quantity: 0,
+                requestedQuantity: item.requestedQuantity || item.quantity
               }))
             }
           }
@@ -900,16 +954,84 @@ export const rejectRefillRequest = async (req, res) => {
 
     res.json({ message: 'Refill request rejected' });
 
-    sendNotification({
-      userIds: [request.userId],
-      title: 'Refill Request Rejected',
-      message: `Your refill request for vehicle has been rejected. Contact Admin for details.`,
-      type: 'inventory',
-      priority: 'high',
-      metadata: { requestId: request.id, vehicleId: request.vehicleId }
+    // Consolidated notification logic: aggregate from all related requests (Run in background)
+    Promise.resolve().then(async () => {
+      try {
+        const rootId = request.parentId || request.id;
+        const allRelatedRequests = await prisma.refillRequest.findMany({
+          where: {
+            OR: [{ id: rootId }, { parentId: rootId }]
+          },
+          select: {
+            status: true,
+            items: {
+              select: {
+                productId: true,
+                quantity: true,
+                requestedQuantity: true,
+                adminRemark: true,
+                product: { select: { name: true } }
+              }
+            }
+          }
+        });
+
+        const itemMap = new Map();
+    allRelatedRequests.forEach(req => {
+      req.items.forEach(item => {
+        const key = item.productId;
+        const requested = item.requestedQuantity || item.quantity;
+        const approved = req.status === 'APPROVED' ? item.quantity : 0;
+        
+        let status = req.status;
+        if (req.status === 'APPROVED' && item.quantity < requested) {
+          status = 'PARTIAL';
+        }
+
+        if (!itemMap.has(key) || status !== 'PENDING') {
+          itemMap.set(key, {
+            name: item.product?.name || 'Product',
+            requested,
+            approved,
+            status,
+            adminRemark: item.adminRemark
+          });
+        }
+      });
+    });
+
+    const refillItemsSummary = Array.from(itemMap.values());
+
+    await prisma.notification.deleteMany({
+      where: {
+        userId: request.userId,
+        type: 'inventory',
+        isRead: false,
+        metadata: { path: ['rootId'], equals: rootId }
+      }
+    });
+
+        sendNotification({
+          userIds: [request.userId],
+          title: 'Refill Request Updated',
+          message: `Your refill request review is in progress.`,
+          type: 'inventory',
+          priority: 'high',
+          metadata: { 
+            requestId: request.id, 
+            rootId: rootId,
+            vehicleId: request.vehicleId,
+            refillItems: refillItemsSummary 
+          }
+        });
+      } catch (notifError) {
+        console.error('Error in background notification logic for reject:', notifError);
+      }
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error rejecting refill request', error: error.message });
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Error rejecting refill request', error: error.message });
+    }
   }
 };
 

@@ -109,6 +109,41 @@ export default function Notifications() {
                           </span>
                         )}
                       </div>
+
+                      {/* Refill Items Grid */}
+                      {notification.metadata?.refillItems && (
+                        <div className="mt-4 border border-indigo-100 rounded-xl overflow-hidden bg-slate-50/50">
+                          <div className="grid grid-cols-4 bg-indigo-50/50 p-2 text-[8px] md:text-[9px] font-black text-indigo-950 uppercase tracking-widest border-b border-indigo-100">
+                            <span className="col-span-1">Item</span>
+                            <span className="text-center">Req</span>
+                            <span className="text-center">Appr</span>
+                            <span className="text-right">Status</span>
+                          </div>
+                          <div className="max-h-48 overflow-y-auto no-scrollbar">
+                            {notification.metadata.refillItems.map((item, idx) => (
+                              <div key={idx} className="grid grid-cols-4 p-2 border-b border-indigo-50 last:border-0 items-center">
+                                <span className="text-[10px] font-bold text-gray-700 truncate pr-1">{item.name}</span>
+                                <span className="text-[10px] font-black text-slate-400 text-center">{item.requested}</span>
+                                <span className="text-[10px] font-black text-emerald-600 text-center">{item.approved}</span>
+                                <div className="text-right">
+                                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${
+                                    item.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                                    item.status === 'PARTIAL' ? 'bg-amber-100 text-amber-700' :
+                                    'bg-red-100 text-red-700'
+                                  }`}>
+                                    {item.status}
+                                  </span>
+                                </div>
+                                {item.adminRemark && (
+                                  <div className="col-span-4 mt-1 pl-1 border-l-2 border-indigo-200">
+                                    <p className="text-[8px] text-indigo-400 italic font-medium">Remark: {item.adminRemark}</p>
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.div>

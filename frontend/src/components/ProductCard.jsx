@@ -10,6 +10,7 @@ export default function ProductCard({ product }) {
   const handleAdd = () => {
     if (qty + 1 > (product.stock || 0)) {
        toast.error(`Only ${product.stock || 0} units available in vehicle`, {
+          id: `stock-limit-${product.id}`,
           icon: '🚛',
           style: { borderRadius: '15px', fontWeight: 'bold' }
        });

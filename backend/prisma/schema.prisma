@@ -712,6 +712,7 @@ model RefillRequest {
   createdAt DateTime     @default(now())
   updatedAt DateTime     @updatedAt
   storeId   String?
+  parentId  String?
   vehicle   Vehicle      @relation(fields: [vehicleId], references: [id])
   user      User         @relation(fields: [userId], references: [id])
   store     Store?       @relation(fields: [storeId], references: [id])
@@ -722,6 +723,7 @@ model RefillRequest {
   @@index([userId])
   @@index([status])
   @@index([storeId])
+  @@index([parentId])
 }
 
 model RefillItem {

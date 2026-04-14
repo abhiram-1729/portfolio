@@ -313,11 +313,18 @@ export default function AgentAssets() {
                     value={requestForm.assetId} 
                     onChange={e => setRequestForm({ ...requestForm, assetId: e.target.value })}
                     required
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 truncate"
                   >
                     <option value="">Select an Item</option>
-                    {catalog.map(item => (
-                      <option key={item.id} value={item.id}>{item.name} {item.model ? `(${item.model})` : ''}</option>
+                    {/* Only show assets currently present in user's account */}
+                    {assets.reduce((acc, curr) => {
+                      const asset = curr.assetUnit?.asset;
+                      if (asset && !acc.find(a => a.id === asset.id)) {
+                        acc.push(asset);
+                      }
+                      return acc;
+                    }, []).map(item => (
+                      <option key={item.id} value={item.id} className="truncate">{item.name} {item.model ? `(${item.model})` : ''}</option>
                     ))}
                   </select>
                 </div>
@@ -397,10 +404,10 @@ export default function AgentAssets() {
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Issue Type</label>
                 <select value={issueForm.issueType} onChange={e => setIssueForm({ ...issueForm, issueType: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold appearance-none focus:ring-2 focus:ring-red-500/20">
-                  <option value="NOT_WORKING">Not Working</option>
-                  <option value="DAMAGED">Damaged</option>
-                  <option value="OTHER">Other</option>
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold appearance-none focus:ring-2 focus:ring-red-500/20 truncate">
+                  <option value="NOT_WORKING" className="truncate">Not Working</option>
+                  <option value="DAMAGED" className="truncate">Damaged</option>
+                  <option value="OTHER" className="truncate">Other</option>
                 </select>
               </div>
 

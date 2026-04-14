@@ -62,6 +62,7 @@ export default function AdminInventory() {
   const [modalTab, setModalTab] = useState('info'); // info or price
   const [auditHistory, setAuditHistory] = useState([]);
   const [auditRemark, setAuditRemark] = useState('');
+  const [processingItems, setProcessingItems] = useState(new Set());
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -2002,31 +2003,39 @@ export default function AdminInventory() {
 
   const handleApproveSingleItem = async (reqId, itemId) => {
     try {
-      setIsSubmitting(true);
+      setProcessingItems(prev => new Set(prev).add(itemId));
       await adminAPI.approveRefillRequest(reqId, { 
         approvedItemIds: [itemId],
         quantities: editedQuantities,
         remarks: itemRemarks
       });
-      toast.success('Product approved and stock loaded successfully');
+      toast.success('Product approved successfully');
       loadRefillRequests();
     } catch (error) {
       toast.error('Failed to approve product');
     } finally {
-      setIsSubmitting(false);
+      setProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
     }
   };
 
   const handleRejectSingleItem = async (reqId, itemId) => {
     try {
-      setIsSubmitting(true);
+      setProcessingItems(prev => new Set(prev).add(itemId));
       await adminAPI.rejectRefillRequest(reqId, { rejectedItemIds: [itemId] });
       toast.success('Product request rejected');
       loadRefillRequests();
     } catch (error) {
       toast.error('Failed to reject product');
     } finally {
-      setIsSubmitting(false);
+      setProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
     }
   };
 
@@ -2188,15 +2197,17 @@ export default function AdminInventory() {
                                   <div className="flex gap-1.5 shrink-0">
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
-                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 border border-rose-100"
+                                      disabled={processingItems.has(item.id)}
+                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 border border-rose-100 disabled:opacity-50"
                                     >
-                                      <X size={16} strokeWidth={3} />
+                                      {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <X size={16} strokeWidth={3} />}
                                     </button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
-                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-500/20"
+                                      disabled={processingItems.has(item.id)}
+                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 disabled:opacity-50"
                                     >
-                                      <Check size={16} strokeWidth={3} />
+                                      {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
                                     </button>
                                   </div>
                                 </div>

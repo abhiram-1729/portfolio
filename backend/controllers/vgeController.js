@@ -63,6 +63,15 @@ export const getMyPerformance = async (req, res) => {
       try { rulesArr = JSON.parse(config.rules); } catch(e){}
     }
         
+    // Compute current level live to prevent stale cached database records
+    let dynamicLevel = 'NONE';
+    const sortedLevels = [...rulesArr].sort((a, b) => (Number(a.salesFrom)||0) - (Number(b.salesFrom)||0));
+    sortedLevels.forEach(level => {
+      if (perf.totalSales >= (Number(level.salesFrom)||0)) {
+        dynamicLevel = level.name;
+      }
+    });
+    perf.level = dynamicLevel;        
     if (nextLevel && nextLevel.nextLevel) {
         const nextRule = rulesArr.find(r => r.name === nextLevel.nextLevel);
         if (nextRule) dailyTarget = Number(nextRule.salesFrom) || dailyTarget;
