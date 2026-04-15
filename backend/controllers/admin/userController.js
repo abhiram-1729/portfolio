@@ -1,17 +1,22 @@
 import prisma from '../../utils/prisma.js';
 import bcrypt from 'bcryptjs';
 import { generateId } from '../../utils/idGenerator.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // Get all users
 export const getUsers = async (req, res) => {
   try {
-    const { storeId } = req.query;
+    const { storeId, role } = req.query;
     const filter = { tenantId: req.user.tenantId };
     
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       filter.storeId = storeId;
     } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
       filter.storeId = req.user.storeId;
+    }
+
+    if (role) {
+      filter.role = role;
     }
 
     const users = await prisma.user.findMany({
@@ -68,6 +73,16 @@ export const createUser = async (req, res) => {
       }
     });
 
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: storeId || req.user.storeId,
+      action: 'USER_CREATED',
+      details: `Created new user: ${user.name} (${user.role})`,
+      targetUserId: user.id,
+      metadata: { role: user.role }
+    });
+
     res.status(201).json({ message: 'User created', user: { id: user.id, name: user.name, role: user.role } });
   } catch (error) {
     console.error('[AdminUsers] Create error:', error);
@@ -110,6 +125,16 @@ export const updateUser = async (req, res) => {
     const updatedUser = await prisma.user.update({
       where: { id, tenantId: req.user.tenantId },
       data: updateData
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: updatedUser.storeId || req.user.storeId,
+      action: 'USER_UPDATED',
+      details: `Updated details for user: ${updatedUser.name}`,
+      targetUserId: updatedUser.id,
+      metadata: { status: updatedUser.status }
     });
 
     res.json({ message: 'User updated', user: updatedUser });
@@ -178,6 +203,14 @@ export const deactivateUser = async (req, res) => {
       });
 
       await tx.user.delete({ where: { id } });
+
+      logActivity({
+        userId: req.user.id,
+        tenantId: req.user.tenantId,
+        action: 'USER_DELETED',
+        details: `Permanently deleted user: ${user.name} and all associated history`,
+        metadata: { deletedUserId: id }
+      });
     }, {
       timeout: 20000 // Increase timeout to 20s for deep cleanup
     });

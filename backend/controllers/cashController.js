@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma.js';
 import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 
 // @desc    Submit opening cash for a vehicle (agent — kept for backward compat but agents are blocked on frontend)
@@ -40,6 +41,15 @@ export const submitOpeningCash = async (req, res, next) => {
                 denominations,
                 totalOpeningCash,
             },
+        });
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: 'OPENING_CASH_SUBMITTED',
+            details: `Submitted opening cash of ₹${totalOpeningCash} for Shift ${shift}`,
+            metadata: { vehicleId, amount: totalOpeningCash, shift, date: dateString }
         });
 
         // Recalculate daily summary
@@ -313,6 +323,22 @@ export const submitClosingCash = async (req, res, next) => {
                 remark: isNoService ? `No Service: ${remark}` : remark,
                 isNoService
             },
+        });
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: 'CLOSING_CASH_SUBMITTED',
+            details: isNoService ? `Reported No Service for Shift ${shift}` : `Submitted closing cash for Shift ${shift}. Difference: ₹${difference}`,
+            metadata: { 
+                vehicleId, 
+                shift, 
+                actualCash: finalActual, 
+                expectedCash: finalExpected, 
+                difference,
+                isNoService 
+            }
         });
 
         // Recalculate daily summary

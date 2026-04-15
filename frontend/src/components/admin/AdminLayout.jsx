@@ -20,7 +20,8 @@ import {
   PieChart,
   Store,
   ChevronDown,
-  ClipboardList
+  ClipboardList,
+  History as HistoryIcon
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -64,6 +65,7 @@ export default function AdminLayout() {
     { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES' },
     { to: '/admin/inventory', icon: Package, label: 'Inventory', module: 'INVENTORY' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
+    { to: '/admin/activity-logs', icon: HistoryIcon, label: 'Activity Logs', module: 'ADMIN' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports', module: 'REPORTS' },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
     { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },

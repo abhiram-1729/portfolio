@@ -5,6 +5,7 @@ import { updateDailyPerformance } from '../services/vgeAggregationService.js';
 import { recalculateDailySummary } from './cashController.js';
 import { format } from 'date-fns';
 import { generateId } from '../utils/idGenerator.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 
 // @desc    Create order from cart
@@ -274,6 +275,22 @@ export const completePayment = async (req, res, next) => {
 
             return updated;
         }, { maxWait: 15000, timeout: 45000 });
+
+        // Log the completion of the payment
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: 'SALE_COMPLETED',
+            details: `Completed sale #${updatedOrder.orderNumber} for ₹${updatedOrder.totalAmount}`,
+            metadata: { 
+                orderId: updatedOrder.id, 
+                orderNumber: updatedOrder.orderNumber,
+                amount: updatedOrder.totalAmount,
+                paymentMode: updatedOrder.paymentMode,
+                totalItems: updatedOrder.items.reduce((sum, item) => sum + item.quantity, 0)
+            }
+        });
 
         // Notifications (Background tasks after successful transaction)
         res.json(updatedOrder);

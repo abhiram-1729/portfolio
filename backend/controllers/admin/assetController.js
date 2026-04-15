@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // ─── Asset Master CRUD ────────────────────────────────────
 
@@ -34,6 +35,16 @@ export const updateAssetRequestStatus = async (req, res) => {
     });
 
     res.json({ message: 'Request updated', request });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: req.user.storeId,
+      action: status === 'APPROVED' ? 'ASSET_REQ_APPROVED' : 'ASSET_REQ_REJECTED',
+      details: `${status === 'APPROVED' ? 'Approved' : 'Rejected'} asset request ${id} for user ${request.userId}`,
+      targetUserId: request.userId,
+      metadata: { requestId: id, status, adminRemark }
+    });
   } catch (error) {
     console.error('❌ Update Request Error:', error);
     res.status(500).json({ message: 'Error updating request', error: error.message });
@@ -299,6 +310,16 @@ export const assignAsset = async (req, res) => {
     }
 
     res.status(201).json({ message: `${assignments.length} asset(s) assigned successfully`, assignments });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: req.user.storeId,
+      action: 'ASSET_ASSIGNED',
+      details: `Assigned ${assignments.length} unit(s) of asset ${assetId} to user ${userId}`,
+      targetUserId: userId,
+      metadata: { assetId, userId, quantity: assignments.length }
+    });
   } catch (error) {
     console.error('❌ Assign Asset Error:', error);
     res.status(500).json({ message: 'Error assigning asset', error: error.message });
@@ -343,6 +364,16 @@ export const returnAsset = async (req, res) => {
     });
 
     res.json({ message: 'Asset returned successfully' });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: req.user.storeId,
+      action: 'ASSET_RETURNED',
+      details: `Returned asset assignment ${assignmentId}. Condition: ${returnCondition || 'GOOD'}`,
+      targetUserId: assignment.userId,
+      metadata: { assignmentId, returnCondition, remarks }
+    });
   } catch (error) {
     console.error('❌ Return Asset Error:', error);
     res.status(500).json({ message: 'Error returning asset', error: error.message });
@@ -557,6 +588,15 @@ export const reportIssue = async (req, res) => {
     }
 
     res.status(201).json({ message: 'Issue reported successfully', issue });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: req.user.storeId,
+      action: 'ASSET_ISSUE_REPORTED',
+      details: `Reported ${issueType} issue for asset unit ${assetUnitId}: ${description || 'No description'}`,
+      metadata: { issueId: issue.id, assetUnitId, issueType }
+    });
   } catch (error) {
     console.error('❌ Report Issue Error:', error);
     res.status(500).json({ message: 'Error reporting issue', error: error.message });
@@ -580,6 +620,15 @@ export const createAssetRequest = async (req, res) => {
     });
 
     res.status(201).json({ message: 'Request submitted successfully', request });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: req.user.storeId,
+      action: 'ASSET_REQUEST_SUBMITTED',
+      details: `Submitted ${type} request for asset ${assetId || 'New Requirement'}`,
+      metadata: { requestId: request.id, type, assetId, assetUnitId }
+    });
   } catch (error) {
     console.error('❌ Create Asset Request Error:', error);
     res.status(500).json({ message: 'Error submitting request', error: error.message });

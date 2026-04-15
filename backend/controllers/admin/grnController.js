@@ -1,6 +1,7 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // ─── CREATE GRN (Receive Goods) ─────────────────────────────────────
 export const createGRN = async (req, res) => {
@@ -119,6 +120,15 @@ export const createGRN = async (req, res) => {
     });
 
     res.status(201).json({ message: 'Goods received successfully' });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: storeId || req.user.storeId,
+      action: 'GRN_CREATED',
+      details: `Received stock for PO ${po.displayId || po.poNumber || poId}. Total unique items: ${items.length}`,
+      metadata: { poId, itemCount: items.length, status: 'COMPLETE' }
+    });
   } catch (error) {
     console.error('❌ Create GRN Error:', error);
     res.status(500).json({ message: 'Error creating goods receipt', error: error.message });

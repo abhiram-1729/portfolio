@@ -1,4 +1,5 @@
 import prisma from '../utils/prisma.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 // @desc    Get all products or search by keyword
 // @route   GET /api/products
@@ -140,6 +141,19 @@ export const requestRefill = async (req, res, next) => {
                         quantity: parseInt(i.quantity, 10)
                     }))
                 }
+            }
+        });
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: 'REFILL_REQUESTED',
+            details: `Requested refill for ${items.length} items for vehicle ${vehicleId}`,
+            metadata: { 
+                vehicleId, 
+                itemCount: items.length, 
+                refillRequestId: refillRequest.id 
             }
         });
 

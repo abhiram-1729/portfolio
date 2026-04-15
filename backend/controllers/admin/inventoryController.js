@@ -4,6 +4,7 @@ import { sendNotification } from '../../services/notificationService.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
 import fs from 'fs';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // Item Master
 export const getItems = async (req, res) => {
@@ -304,12 +305,16 @@ export const loadStock = async (req, res) => {
     const { vehicleId, items } = req.body; // items = [{ productId, quantity }]
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: vehicleId },
-      select: { storeId: true }
+      select: { id: true, storeId: true, vehicleNumber: true, displayId: true }
     });
-    const storeId = vehicle?.storeId;
+
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Vehicle not found' });
+    }
+    const storeId = vehicle.storeId;
 
     for (const item of items) {
-      const q = parseInt(item.quantity);
+      const q = parseFloat(item.quantity);
 
       // Create transaction
       await prisma.stockTransaction.create({
@@ -345,6 +350,22 @@ export const loadStock = async (req, res) => {
 
     res.json({ message: 'Stock loaded successfully' });
 
+    // Find the user assigned to this vehicle to track as targetUserId
+    const assignedUser = await prisma.user.findFirst({
+      where: { assignedVehicleId: vehicleId, status: 'ACTIVE' },
+      select: { id: true }
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId,
+      action: 'STOCK_LOADING',
+      details: `Loaded morning stock for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || vehicleId}. Total items: ${items.length}`,
+      targetUserId: assignedUser?.id,
+      metadata: { vehicleId, itemCount: items.length }
+    });
+
     sendNotification({
       vehicleIds: [vehicleId],
       roles: ['ADMIN'],
@@ -366,12 +387,16 @@ export const returnStock = async (req, res) => {
     const { vehicleId, items } = req.body;
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: vehicleId },
-      select: { storeId: true }
+      select: { id: true, storeId: true, vehicleNumber: true, displayId: true }
     });
-    const storeId = vehicle?.storeId;
+
+    if (!vehicle) {
+      return res.status(404).json({ message: 'Vehicle not found' });
+    }
+    const storeId = vehicle.storeId;
 
     for (const item of items) {
-      const q = parseInt(item.quantity);
+      const q = parseFloat(item.quantity);
 
       // Create transaction
       await prisma.stockTransaction.create({
@@ -398,6 +423,22 @@ export const returnStock = async (req, res) => {
     }
 
     res.json({ message: 'Stock returned successfully' });
+
+    // Find the user assigned to this vehicle to track as targetUserId
+    const assignedUser = await prisma.user.findFirst({
+      where: { assignedVehicleId: vehicleId, status: 'ACTIVE' },
+      select: { id: true }
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId,
+      action: 'STOCK_RETURNED',
+      details: `Processed evening stock return for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || vehicleId}. Total items: ${items.length}`,
+      targetUserId: assignedUser?.id,
+      metadata: { vehicleId, itemCount: items.length }
+    });
 
     sendNotification({
       vehicleIds: [vehicleId],
@@ -448,83 +489,101 @@ export const bulkCreateItems = async (req, res) => {
       });
     }
 
+    // 1. Pre-fetch all existing relations for this tenant to populate caches instantly
+    const [existingCats, existingUnits] = await Promise.all([
+      prisma.category.findMany({ where: { tenantId, storeId: null } }),
+      prisma.unit.findMany({ where: { tenantId, storeId: null } })
+    ]);
+
+    // Populate caches with existing data
+    existingCats.forEach(c => catCache.set(c.name.trim(), c.id));
+    existingUnits.forEach(u => unitCache.set(u.type.trim(), u.id));
+
+    // Pre-fetch all local subcategories
+    const existingSubs = await prisma.subCategory.findMany({
+      where: { categoryId: { in: existingCats.map(c => c.id) }, tenantId }
+    });
+    existingSubs.forEach(s => subCache.set(`${s.categoryId}_${s.name.trim()}`, s.id));
+
+    // 2. Pre-process relations in high-speed batches to avoid individual DB Round-Trips
+    const uniqueCatNames = [...new Set(products.filter(p => p.categoryName).map(p => String(p.categoryName).trim()))];
+    const uniqueUnitTypes = [...new Set(products.filter(p => p.unitType).map(p => String(p.unitType).trim()))];
+
+    // Find and bulk-create missing Categories
+    const missingCats = uniqueCatNames.filter(name => !catCache.has(name));
+    if (missingCats.length > 0) {
+      await prisma.category.createMany({
+        data: missingCats.map(name => ({ tenantId, name })),
+        skipDuplicates: true
+      });
+      const updatedCats = await prisma.category.findMany({ where: { tenantId, name: { in: missingCats }, storeId: null } });
+      updatedCats.forEach(c => catCache.set(c.name.trim(), c.id));
+    }
+
+    // Now resolve Sub-Categories
+    const subPairs = [];
+    products.forEach(p => {
+      if (p.categoryName && p.subCategoryName) {
+        const cId = catCache.get(String(p.categoryName).trim());
+        if (cId) subPairs.push({ categoryId: cId, name: String(p.subCategoryName).trim() });
+      }
+    });
+    const uniqueSubPairs = Array.from(new Set(subPairs.map(s => `${s.categoryId}|${s.name}`)))
+      .map(str => ({ categoryId: str.split('|')[0], name: str.split('|')[1] }));
+
+    const missingSubs = uniqueSubPairs.filter(s => !subCache.has(`${s.categoryId}_${s.name}`));
+    if (missingSubs.length > 0) {
+      await prisma.subCategory.createMany({
+        data: missingSubs.map(s => ({ ...s, tenantId })),
+        skipDuplicates: true
+      });
+      const updatedSubs = await prisma.subCategory.findMany({
+        where: { tenantId, name: { in: missingSubs.map(s => s.name) }, categoryId: { in: missingSubs.map(s => s.categoryId) } }
+      });
+      updatedSubs.forEach(s => subCache.set(`${s.categoryId}_${s.name.trim()}`, s.id));
+    }
+
+    // Resolve missing Units
+    const missingUnits = uniqueUnitTypes.filter(type => !unitCache.has(type));
+    if (missingUnits.length > 0) {
+      await prisma.unit.createMany({
+        data: missingUnits.map(type => ({ tenantId, name: type, type })),
+        skipDuplicates: true
+      });
+      const updatedUnits = await prisma.unit.findMany({ where: { tenantId, type: { in: missingUnits }, storeId: null } });
+      updatedUnits.forEach(u => unitCache.set(u.type.trim(), u.id));
+    }
+
     const parseNumber = (val) => {
       if (val === undefined || val === null || val === '') return undefined;
       const num = parseFloat(val);
       return isNaN(num) ? undefined : num;
     };
 
-    console.log(`[BulkCreate] Attempting to create ${products.length} products`);
+    console.log(`[TurboBulk] Final Phase: Mapping ${products.length} products...`);
+    const itemDataArray = [];
 
     for (const prod of products) {
-      if (!prod.name) {
-        console.warn(`[BulkCreate] Skipping product with missing name:`, prod);
-        continue;
-      }
+      if (!prod.name) continue;
 
-      // 1. Resolve Category
       let targetCategoryId = defaultCategory.id;
-      if (prod.categoryName !== undefined && prod.categoryName !== null && prod.categoryName !== '') {
-        const catNameStr = String(prod.categoryName);
-        let cat = await prisma.category.findFirst({
-          where: { tenantId, name: catNameStr, storeId: null }
-        });
-        if (!cat) {
-          cat = await prisma.category.create({
-            data: { tenantId, name: catNameStr }
-          });
-        }
-        targetCategoryId = cat.id;
+      if (prod.categoryName) {
+        targetCategoryId = catCache.get(String(prod.categoryName).trim()) || defaultCategory.id;
       }
 
-      // 2. Resolve Sub-Category
       let targetSubCategoryId = defaultSub.id;
-      if (prod.subCategoryName !== undefined && prod.subCategoryName !== null && prod.subCategoryName !== '' && targetCategoryId) {
-        const subNameStr = String(prod.subCategoryName);
-        let sub = await prisma.subCategory.findFirst({
-          where: { categoryId: targetCategoryId, name: subNameStr, tenantId }
-        });
-        if (!sub) {
-          sub = await prisma.subCategory.create({
-            data: { categoryId: targetCategoryId, name: subNameStr, tenantId }
-          });
-        }
-        targetSubCategoryId = sub.id;
+      if (prod.subCategoryName && targetCategoryId) {
+        targetSubCategoryId = subCache.get(`${targetCategoryId}_${String(prod.subCategoryName).trim()}`) || defaultSub.id;
       }
 
-      // 3. Resolve Unit
       let targetUnitId = null;
-      if (prod.unitType !== undefined && prod.unitType !== null && prod.unitType !== '') {
-        const unitStr = String(prod.unitType);
-        let unit = await prisma.unit.findFirst({
-          where: { tenantId, type: unitStr, storeId: null }
-        });
-        if (!unit) {
-          unit = await prisma.unit.create({
-            data: { tenantId, name: unitStr, type: unitStr }
-          });
-        }
-        targetUnitId = unit.id;
+      if (prod.unitType) {
+        targetUnitId = unitCache.get(String(prod.unitType).trim()) || null;
       }
 
-      // Generate display ID for item (VK-ITM-[CATEGORY]-[NUMBER])
-      let displayId = null;
-      try {
-        const catCode = (String(prod.categoryName || 'GEN')).substring(0, 4).toUpperCase();
-        displayId = await generateId({
-          entity: 'ITM',
-          tenantId: tenantId,
-          storeId: req.user?.storeId || null,
-          categoryCode: catCode
-        });
-      } catch (err) {
-        console.warn(`[BulkCreate] Failed to generate ID for ${prod.name}`, err.message);
-      }
-
-      const itemData = {
-        tenantId: tenantId,
+      itemDataArray.push({
+        tenantId,
         storeId: req.user?.storeId || null,
-        displayId: displayId,
         name: prod.name,
         description: prod.description || '',
         mrp: parseNumber(prod.mrp),
@@ -532,7 +591,6 @@ export const bulkCreateItems = async (req, res) => {
         landingPrice: parseNumber(prod.landingPrice),
         discount: parseNumber(prod.discount),
         status: prod.status || 'ACTIVE',
-        image: null,
         categoryId: targetCategoryId,
         subCategoryId: targetSubCategoryId,
         brandId: prod.brandId || defaultBrand.id,
@@ -541,20 +599,23 @@ export const bulkCreateItems = async (req, res) => {
         gst: parseNumber(prod.gst) || 0,
         isFree: prod.isFree === true || prod.isFree === 'true',
         minShopAmount: parseNumber(prod.minShopAmount) || 0,
-      };
-
-      try {
-        const item = await prisma.product.create({
-          data: itemData
-        });
-        createdItems.push(item);
-      } catch (err) {
-        console.error(`[BulkCreate] Failed to create product: ${prod.name}`, err.message);
-        // Continue with other products
-      }
+      });
+    }
+    
+    let insertCount = 0;
+    if(itemDataArray.length > 0) {
+       const chunkSize = 500;
+       for (let i = 0; i < itemDataArray.length; i += chunkSize) {
+         const chunk = itemDataArray.slice(i, i + chunkSize);
+         const result = await prisma.product.createMany({
+            data: chunk,
+            skipDuplicates: true
+         });
+         insertCount += result.count;
+       }
     }
 
-    res.status(201).json({ message: `Successfully created ${createdItems.length} items`, count: createdItems.length });
+    res.status(201).json({ message: `Successfully created ${insertCount} items`, count: insertCount });
   } catch (error) {
     console.error('❌ Bulk Create Item Error:', error);
     res.status(500).json({ message: 'Error bulk creating items', error: error.message });
@@ -617,7 +678,7 @@ export const auditVehicleStock = async (req, res) => {
     const { items } = req.body; // items = [{ productId, quantity }]
     const vehicle = await prisma.vehicle.findUnique({
       where: { id },
-      select: { storeId: true }
+      select: { id: true, storeId: true, vehicleNumber: true, displayId: true }
     });
     const storeId = vehicle?.storeId;
 
@@ -638,7 +699,7 @@ export const auditVehicleStock = async (req, res) => {
       });
 
       for (const item of items) {
-        const q = parseInt(item.quantity);
+        const q = parseFloat(item.quantity);
         
         // Get current stock for historical record
         const currentStock = await tx.vehicleStock.findUnique({
@@ -690,6 +751,22 @@ export const auditVehicleStock = async (req, res) => {
     }, {
       maxWait: 20000, // Wait up to 20s to acquire connection
       timeout: 60000  // Allow up to 60s for the entire audit to process
+    });
+
+    // Find the user assigned to this vehicle to track as targetUserId
+    const assignedUser = await prisma.user.findFirst({
+      where: { assignedVehicleId: id, status: 'ACTIVE' },
+      select: { id: true }
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId,
+      action: 'STOCK_AUDITED',
+      details: `Audited stock for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || id}. Items: ${items.length}`,
+      targetUserId: assignedUser?.id,
+      metadata: { vehicleId: id, itemCount: items.length, remark: req.body.remark }
     });
 
     res.json({ message: 'Inventory audited successfully' });
@@ -877,8 +954,23 @@ export const approveRefillRequest = async (req, res) => {
         }
       }
     }, {
-      maxWait: 50000,  // Wait up to 50 seconds to acquire a connection
-      timeout: 120000  // Allow up to 120 seconds to process the transaction
+      maxWait: 50000,
+      timeout: 120000
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: request.storeId,
+      action: 'REFILL_APPROVED',
+      details: `Approved refill request ${id} for vehicle ${request.vehicleId}. Items: ${itemsToProcess.length}`,
+      targetUserId: request.userId,
+      metadata: { 
+        refillRequestId: id, 
+        vehicleId: request.vehicleId, 
+        agentId: request.userId,
+        itemCount: itemsToProcess.length 
+      }
     });
 
     // Send immediate response to the client so UI updates instantly

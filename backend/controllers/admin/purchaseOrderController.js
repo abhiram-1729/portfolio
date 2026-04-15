@@ -1,6 +1,7 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // ─── CREATE PO ─────────────────────────────────────
 export const createPO = async (req, res) => {
@@ -69,6 +70,15 @@ export const createPO = async (req, res) => {
         vendor: { select: { vendorName: true } },
         items: { include: { product: { select: { name: true } } } }
       }
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: storeId || req.user.storeId,
+      action: 'PO_CREATED',
+      details: `Created Purchase Order ${po.displayId} for vendor ${po.vendor?.vendorName}. Total: ₹${totalAmount.toFixed(2)}`,
+      metadata: { poId: po.id, totalAmount }
     });
 
     res.status(201).json({ message: 'Purchase Order created successfully', po });
@@ -152,7 +162,17 @@ export const updatePOStatus = async (req, res) => {
 
     const po = await prisma.purchaseOrder.update({
       where: { id },
-      data: { status }
+      data: { status },
+      include: { vendor: { select: { vendorName: true } } }
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: po.storeId || req.user.storeId,
+      action: 'PO_UPDATED',
+      details: `Updated status of PO ${po.displayId} to ${status}`,
+      metadata: { poId: id, status }
     });
 
     res.json({ message: `PO status updated to ${status}`, po });

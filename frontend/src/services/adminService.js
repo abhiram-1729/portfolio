@@ -44,6 +44,9 @@ export const adminAPI = {
   // Sales
   getSales: (params) => api.get('/admin/sales', { params }),
 
+  // Activity Logs
+  getActivityLogs: (params) => api.get('/admin/activities', { params }),
+
   // Reports
   getDailyReport: (params) => api.get('/admin/reports/daily', { params }),
   getTrendsReport: (params) => api.get('/admin/reports/trends', { params }),

@@ -1,6 +1,7 @@
 import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
 import { generateId } from '../../utils/idGenerator.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 export const getVehicles = async (req, res) => {
   try {
@@ -104,10 +105,29 @@ export const createVehicle = async (req, res) => {
       }
     });
 
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: resolvedStoreId,
+      action: 'VEHICLE_CREATED',
+      details: `Registered new vehicle: ${vehicle.vehicleNumber} (${vehicle.vehicleName})`,
+      metadata: { vehicleId: vehicle.id }
+    });
+
     if (assignedUserId) {
-      await prisma.user.update({
+      const user = await prisma.user.update({
         where: { id: assignedUserId },
         data: { assignedVehicleId: vehicle.id }
+      });
+
+      logActivity({
+        userId: req.user.id,
+        tenantId: req.user.tenantId,
+        storeId: resolvedStoreId,
+        action: 'DRIVER_ASSIGNED',
+        details: `Assigned driver ${user.name} to vehicle ${vehicle.vehicleNumber}`,
+        targetUserId: user.id,
+        metadata: { vehicleId: vehicle.id }
       });
     }
 
@@ -168,6 +188,15 @@ export const updateVehicle = async (req, res) => {
       }
     });
 
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: updated.storeId || req.user.storeId,
+      action: 'VEHICLE_UPDATED',
+      details: `Updated info for vehicle: ${updated.vehicleNumber}`,
+      metadata: { vehicleId: id }
+    });
+
     // Re-assign driver: first unassign everyone currently on this vehicle, then assign new
     if (assignedUserId !== undefined) {
       // 1. Get the current assigned user(s) to notify or just unassign
@@ -178,9 +207,19 @@ export const updateVehicle = async (req, res) => {
 
       // 2. Assign the new user if provided
       if (assignedUserId && assignedUserId !== 'null' && assignedUserId !== '') {
-        await prisma.user.update({
+        const user = await prisma.user.update({
           where: { id: assignedUserId, tenantId: req.user.tenantId },
           data: { assignedVehicleId: id }
+        });
+
+        logActivity({
+          userId: req.user.id,
+          tenantId: req.user.tenantId,
+          storeId: updated.storeId || req.user.storeId,
+          action: 'DRIVER_ASSIGNED',
+          details: `Re-assigned driver ${user.name} to vehicle ${updated.vehicleNumber}`,
+          targetUserId: user.id,
+          metadata: { vehicleId: id }
         });
       }
     }
@@ -238,6 +277,14 @@ export const deleteVehicle = async (req, res) => {
     // 9. Finally delete the vehicle
     await prisma.vehicle.delete({ where: { id, tenantId: req.user.tenantId } });
 
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      action: 'VEHICLE_DELETED',
+      details: `Permanently removed vehicle ${vehicle.vehicleNumber} and all its operational history`,
+      metadata: { deletedVehicleId: id }
+    });
+
     res.json({ message: 'Vehicle deleted successfully' });
   } catch (error) {
     console.error('❌ Error deleting vehicle:', error.message);
@@ -262,9 +309,19 @@ export const assignDriver = async (req, res) => {
     // 2. If a new userId is provided, assign them to this vehicle
     // Also ensure this user isn't assigned to another vehicle (optional, but good practice)
     if (userId && userId !== 'null' && userId !== '') {
-      await prisma.user.update({
+      const user = await prisma.user.update({
         where: { id: userId, tenantId: req.user.tenantId },
         data: { assignedVehicleId: id }
+      });
+
+      logActivity({
+        userId: req.user.id,
+        tenantId: req.user.tenantId,
+        storeId: vehicle.storeId || req.user.storeId,
+        action: 'DRIVER_ASSIGNED',
+        details: `Assigned driver ${user.name} to vehicle ${vehicle.vehicleNumber}`,
+        targetUserId: user.id,
+        metadata: { vehicleId: id }
       });
     }
 

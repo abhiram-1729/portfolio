@@ -12,6 +12,7 @@ export default function AdminInventory() {
   const [searchQuery, setSearchQuery] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState('ALL');
+  const [filterSubCategory, setFilterSubCategory] = useState('ALL');
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [items, setItems] = useState([]);
@@ -122,7 +123,7 @@ export default function AdminInventory() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterCategory, filterStatus, filterFreeOnly, activeTab, subTab]);
+  }, [searchQuery, filterCategory, filterSubCategory, filterStatus, filterFreeOnly, activeTab, subTab]);
 
   const handleQuantityChange = React.useCallback((id, val) => {
     setStockQuantities(prev => ({ ...prev, [id]: val }));
@@ -154,8 +155,13 @@ export default function AdminInventory() {
 
   const loadingFilteredItems = React.useMemo(() => {
     const q = searchQuery.toLowerCase();
-    return items.filter(i => i.name.toLowerCase().includes(q));
-  }, [items, searchQuery]);
+    return items.filter(i => {
+      const matchesSearch = i.name.toLowerCase().includes(q);
+      const matchesCategory = filterCategory === 'ALL' || i.category?.name === filterCategory;
+      const matchesSubCategory = filterSubCategory === 'ALL' || i.subCategory?.name === filterSubCategory;
+      return matchesSearch && matchesCategory && matchesSubCategory;
+    });
+  }, [items, searchQuery, filterCategory, filterSubCategory]);
 
   const groupedLoadingItems = React.useMemo(() => {
     const regular = [];
@@ -686,9 +692,10 @@ export default function AdminInventory() {
   const filteredItems = items.filter(item => {
     const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = filterCategory === 'ALL' || item.category?.name === filterCategory;
+    const matchesSubCategory = filterSubCategory === 'ALL' || item.subCategory?.name === filterSubCategory;
     const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
     const matchesFree = !filterFreeOnly || item.isFree;
-    return matchesSearch && matchesCategory && matchesStatus && matchesFree;
+    return matchesSearch && matchesCategory && matchesSubCategory && matchesStatus && matchesFree;
   });
 
   const paginatedItems = React.useMemo(() => {
@@ -980,18 +987,84 @@ export default function AdminInventory() {
           )}
         </div>
 
+        {/* Categories Quick Filter */}
+        <div className="relative group mb-4">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+            <button
+              onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); }}
+              className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
+                filterCategory === 'ALL' 
+                ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+                : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+              }`}
+            >
+              All Items
+            </button>
+            {categories.map((cat) => (
+              <button
+                key={cat.id}
+                onClick={() => { setFilterCategory(cat.name); setFilterSubCategory('ALL'); }}
+                className={`flex items-center gap-2 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
+                  filterCategory === cat.name 
+                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+                  : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+                }`}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
+          {/* Subtle scroll indicator if needed, but modern browsers handle this well */}
+        </div>
+
+        {/* Sub-Categories Quick Filter */}
+        {filterCategory !== 'ALL' && (
+          <div className="relative group mb-6 animate-in slide-in-from-top-2 duration-300">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+              <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-xl border border-emerald-100 mr-2">
+                <Grid size={12} className="text-emerald-500" />
+                <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Sub Categories</span>
+              </div>
+              <button
+                onClick={() => setFilterSubCategory('ALL')}
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
+                  filterSubCategory === 'ALL' 
+                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
+                  : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+                }`}
+              >
+                All {filterCategory}
+              </button>
+              {subCategories
+                .filter(sub => {
+                  const parentCat = categories.find(c => c.name === filterCategory);
+                  return sub.categoryId === parentCat?.id;
+                })
+                .map((sub) => (
+                  <button
+                    key={sub.id}
+                    onClick={() => setFilterSubCategory(sub.name)}
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
+                      filterSubCategory === sub.name 
+                      ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
+                      : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+                    }`}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+            </div>
+          </div>
+        )}
+
         {showFilters && (
           <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-wrap gap-4 animate-in slide-in-from-top-2 duration-200">
             <div className="space-y-1 flex-1 min-w-[150px]">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Category</label>
-              <select
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
-                value={filterCategory}
-                onChange={(e) => setFilterCategory(e.target.value)}
-              >
-                <option value="ALL">All Categories</option>
-                {uniqueCategories.map(c => <option key={c} value={c}>{c}</option>)}
-              </select>
+              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Additional Filters</label>
+              <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-gray-50 p-2 rounded-xl border border-gray-100">
+                <Check size={14} className="text-emerald-500" />
+                Category Filter is active ({filterCategory})
+              </div>
             </div>
             <div className="space-y-1 flex-1 min-w-[150px]">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
@@ -1008,7 +1081,7 @@ export default function AdminInventory() {
 
             <div className="flex items-end">
               <button
-                onClick={() => { setFilterCategory('ALL'); setFilterStatus('ALL'); setSearchQuery(''); setFilterFreeOnly(false); }}
+                onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); setFilterStatus('ALL'); setSearchQuery(''); setFilterFreeOnly(false); }}
                 className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2"
               >
                 Clear Filters
@@ -2410,7 +2483,12 @@ export default function AdminInventory() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {groupedRefills.map(group => {
+                  {groupedRefills
+                  .filter(g => 
+                    g.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    g.vehicle?.vehicleNumber?.toLowerCase().includes(searchQuery.toLowerCase())
+                  )
+                  .map(group => {
                     const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
                     return (
                       <tr 
@@ -2637,6 +2715,75 @@ export default function AdminInventory() {
       
       {activeTab === 'return' && (
         <>
+          {/* Sub-tab Category Filter (Visible for relevant operational subtabs) */}
+          {['loading', 'return'].includes(subTab) && (
+            <div className="space-y-4 mb-8">
+              <div className="relative group">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                  <button
+                    onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); }}
+                    className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
+                      filterCategory === 'ALL' 
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+                      : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+                    }`}
+                  >
+                    All Items
+                  </button>
+                  {categories.map((cat) => (
+                    <button
+                      key={`subcat-filter-${cat.id}`}
+                      onClick={() => { setFilterCategory(cat.name); setFilterSubCategory('ALL'); }}
+                      className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
+                        filterCategory === cat.name 
+                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+                        : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+                      }`}
+                    >
+                      {cat.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Hierarchical Sub-Category Filter */}
+              {filterCategory !== 'ALL' && (
+                <div className="animate-in slide-in-from-top-1 duration-200">
+                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                    <button
+                      onClick={() => setFilterSubCategory('ALL')}
+                      className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
+                        filterSubCategory === 'ALL' 
+                        ? 'bg-emerald-500 border-emerald-500 text-white' 
+                        : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+                      }`}
+                    >
+                      All {filterCategory}
+                    </button>
+                    {subCategories
+                      .filter(sub => {
+                        const parentCat = categories.find(c => c.name === filterCategory);
+                        return sub.categoryId === parentCat?.id;
+                      })
+                      .map((sub) => (
+                        <button
+                          key={`subtab-subcat-${sub.id}`}
+                          onClick={() => setFilterSubCategory(sub.name)}
+                          className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
+                            filterSubCategory === sub.name 
+                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
+                            : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+                          }`}
+                        >
+                          {sub.name}
+                        </button>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           {subTab === 'loading' && renderLoading()}
           {subTab === 'return' && renderReturn()}
           {subTab === 'tracking' && renderTracking()}
@@ -2827,6 +2974,7 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
                         <input
                           type="number"
+                          step="any"
                           min="0"
                           onWheel={(e) => e.target.blur()}
                           placeholder="500"
@@ -2869,6 +3017,7 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            step="any"
                             min="0"
                             onWheel={(e) => e.target.blur()}
                             required
@@ -2887,6 +3036,7 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            step="any"
                             min="0"
                             onWheel={(e) => e.target.blur()}
                             required
@@ -2928,6 +3078,7 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Disc.</label>
                         <input
                           type="number"
+                          step="any"
                           min="0"
                           onWheel={(e) => e.target.blur()}
                           required
@@ -3048,6 +3199,7 @@ export default function AdminInventory() {
                           <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
                           <input
                             type="number"
+                            step="any"
                             min="0"
                             onWheel={(e) => e.target.blur()}
                             className="w-full bg-white border border-emerald-100 rounded-xl px-4 py-2 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
@@ -3355,6 +3507,7 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
                         <input
                           type="number"
+                          step="any"
                           min="0"
                           onWheel={(e) => e.target.blur()}
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
@@ -3395,6 +3548,7 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            step="any"
                             min="0"
                             onWheel={(e) => e.target.blur()}
                             required
@@ -3413,6 +3567,7 @@ export default function AdminInventory() {
                           <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
                           <input
                             type="number"
+                            step="any"
                             min="0"
                             onWheel={(e) => e.target.blur()}
                             required
@@ -3454,6 +3609,7 @@ export default function AdminInventory() {
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value</label>
                         <input
                           type="number"
+                          step="any"
                           min="0"
                           onWheel={(e) => e.target.blur()}
                           required
@@ -3572,6 +3728,7 @@ export default function AdminInventory() {
                           <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
                           <input
                             type="number"
+                            step="any"
                             min="0"
                             onWheel={(e) => e.target.blur()}
                             className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-2 text-sm font-black text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all shadow-sm"
@@ -3722,12 +3879,13 @@ const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStoc
         <input
           type="number"
           placeholder="0"
+          step="any"
           min="0"
           onWheel={(e) => e.target.blur()}
           className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300'}`}
           value={quantity || ''}
           onChange={(e) => {
-            const val = Math.max(0, parseInt(e.target.value) || 0);
+            const val = Math.max(0, parseFloat(e.target.value) || 0);
             onChange(item.id, val);
           }}
         />

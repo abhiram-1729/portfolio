@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { useUserStore } from '../store/userStore';
 
 const envURL = import.meta.env.VITE_API_URL;
 const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost'));
@@ -52,7 +53,12 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      localStorage.removeItem('token');
+      // 🛡️ CRITICAL FIX: To prevent infinite reload loops, we MUST clear the Zustand persisted storage
+      // simply doing localStorage.removeItem('token') is not enough because Zustand 'user-storage' 
+      // will restore it on the next page load.
+      useUserStore.getState().clearUser();
+      
+      // Force a clean redirect to login
       window.location.href = '/login';
     }
     return Promise.reject(error);

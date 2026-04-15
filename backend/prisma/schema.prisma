@@ -46,6 +46,7 @@ model Tenant {
   monthlySummaries  VgeMonthlySummary[]
   assetRequests     AssetRequest[]
   customRoles       CustomRole[]
+  activityLogs      ActivityLog[] @relation("TenantActivityLogs")
   // Procurement Relations
   vendors                Vendor[]
   vendorItemMappings     VendorItemMapping[]
@@ -110,6 +111,8 @@ model User {
   assetRequests    AssetRequest[]        @relation("UserAssetRequests")
   locationCheckIns LocationCheckIn[]
   stockAudits      StockAudit[]
+  actions           ActivityLog[] @relation("UserActions")
+  targetActions     ActivityLog[] @relation("TargetActions")
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -1229,6 +1232,7 @@ model Store {
   vendorLedger           VendorLedger[]
   vendorPayments         VendorPayment[]
   procurementStockLedger ProcurementStockLedger[]
+  activityLogs           ActivityLog[]
 
   @@index([tenantId])
 }
@@ -1629,4 +1633,26 @@ model IdSequence {
   @@unique([tenantId, entity, hub, period])
   @@index([tenantId])
   @@index([entity, hub])
+}
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  tenantId  String   @default("VK001")
+  userId       String
+  targetUserId String?  // Optional: User who the action is performed for
+  action       String   // e.g. "SALE_CREATED", "REFILL_REQUESTED", "CASH_REPORTED"
+  details      String?  // Text description
+  metadata     Json?    // Optional structured data
+  createdAt    DateTime @default(now())
+  storeId      String?
+  
+  user         User     @relation("UserActions", fields: [userId], references: [id])
+  targetUser   User?    @relation("TargetActions", fields: [targetUserId], references: [id])
+  tenant       Tenant   @relation("TenantActivityLogs", fields: [tenantId], references: [id])
+  store        Store?   @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([createdAt])
+  @@index([storeId])
 }

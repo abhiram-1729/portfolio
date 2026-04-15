@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2 } from 'lucide-react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { productsAPI } from '../services/api';
 import { useCartStore } from '../store/cartStore';
@@ -15,8 +15,10 @@ let productCache = null;
 
 export default function SalesEntry() {
   const [products, setProducts] = useState([]);
-  const [filtered, setFiltered] = useState([]);
   const [search, setSearch] = useState('');
+  const [filtered, setFiltered] = useState([]);
+  const [filterCategory, setFilterCategory] = useState('ALL');
+  const [filterSubCategory, setFilterSubCategory] = useState('ALL');
   const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
@@ -87,17 +89,48 @@ export default function SalesEntry() {
     }
   };
 
+  const categories = React.useMemo(() => {
+    const catsMap = {};
+    products.forEach(p => {
+      if (p.category) {
+        catsMap[p.category.name] = { id: p.categoryId, name: p.category.name };
+      }
+    });
+    return Object.values(catsMap);
+  }, [products]);
+
+  const subCategories = React.useMemo(() => {
+    const subsMap = {};
+    products.forEach(p => {
+      if (p.subCategory) {
+        subsMap[p.subCategory.name] = { 
+          id: p.subCategoryId, 
+          name: p.subCategory.name, 
+          categoryId: p.categoryId,
+          categoryName: p.category?.name 
+        };
+      }
+    });
+    return Object.values(subsMap);
+  }, [products]);
+
   useEffect(() => {
     let result = products;
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter((p) => p.name.toLowerCase().includes(q));
     }
+    if (filterCategory !== 'ALL') {
+      result = result.filter(p => p.category?.name === filterCategory);
+    }
+    if (filterSubCategory !== 'ALL') {
+      result = result.filter(p => p.subCategory?.name === filterSubCategory);
+    }
     if (filterFreeOnly) {
       result = result.filter((p) => p.isFree);
     }
     setFiltered(result);
-  }, [search, products, filterFreeOnly]);
+  }, [search, products, filterFreeOnly, filterCategory, filterSubCategory]);
 
   return (
     <div className="min-h-screen pb-28 pt-2">
@@ -162,6 +195,74 @@ export default function SalesEntry() {
               <button onClick={() => setSearch('')} className="p-1.5 mr-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-black text-[9px] uppercase tracking-tighter">
                 Clear
               </button>
+            )}
+          </div>
+
+          {/* Hierarchical Categories */}
+          <div className="space-y-4 pt-1">
+            <div className="relative group">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                <button
+                  onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); }}
+                  className={`whitespace-nowrap px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${
+                    filterCategory === 'ALL' 
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/10' 
+                    : 'bg-white border-emerald-100 text-slate-400 hover:text-emerald-600'
+                  }`}
+                >
+                  All Items
+                </button>
+                {categories.map((cat) => (
+                  <button
+                    key={`cat-${cat.id}`}
+                    onClick={() => { setFilterCategory(cat.name); setFilterSubCategory('ALL'); }}
+                    className={`whitespace-nowrap px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${
+                      filterCategory === cat.name 
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/10' 
+                      : 'bg-white border-emerald-100 text-slate-400 hover:text-emerald-600'
+                    }`}
+                  >
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Sub-Categories Bar */}
+            {filterCategory !== 'ALL' && (
+              <div className="animate-in slide-in-from-top-1 duration-200">
+                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                  <div className="flex items-center gap-1.5 px-2 py-1 bg-emerald-50 rounded-xl border border-emerald-100 shrink-0">
+                    <Grid size={10} className="text-emerald-500" />
+                    <span className="text-[8px] font-black text-emerald-700 uppercase tracking-tighter">Refine</span>
+                  </div>
+                  <button
+                    onClick={() => setFilterSubCategory('ALL')}
+                    className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border shrink-0 ${
+                      filterSubCategory === 'ALL' 
+                      ? 'bg-emerald-500 border-emerald-500 text-white' 
+                      : 'bg-white border-emerald-50 text-slate-400 hover:text-emerald-500'
+                    }`}
+                  >
+                    All {filterCategory}
+                  </button>
+                  {subCategories
+                    .filter(sub => sub.categoryName === filterCategory)
+                    .map((sub) => (
+                      <button
+                        key={`sub-${sub.id}`}
+                        onClick={() => setFilterSubCategory(sub.name)}
+                        className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border shrink-0 ${
+                          filterSubCategory === sub.name 
+                          ? 'bg-emerald-500 border-emerald-500 text-white' 
+                          : 'bg-white border-emerald-50 text-slate-400 hover:text-emerald-500'
+                        }`}
+                      >
+                        {sub.name}
+                      </button>
+                    ))}
+                </div>
+              </div>
             )}
           </div>
         </div>

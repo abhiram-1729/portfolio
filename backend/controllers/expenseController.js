@@ -4,6 +4,7 @@ import { sendNotification } from '../services/notificationService.js';
 import { uploadToSupabase } from '../utils/supabaseService.js';
 import { recalculateDailySummary } from './cashController.js';
 import { generateId } from '../utils/idGenerator.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 // @desc    Add expense entry
 // @route   POST /api/expenses
@@ -51,6 +52,15 @@ export const addExpense = async (req, res, next) => {
                 date: dateString,
                 status: 'PENDING'
             }
+        });
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: 'EXPENSE_REQUESTED',
+            details: `Requested ${type} expense of ₹${amount}`,
+            metadata: { expenseId: expense.id, type, amount, paymentMode }
         });
 
         // If it's a cash expense, it should be reflected in the daily summary immediately
@@ -159,6 +169,21 @@ export const updateExpenseStatus = async (req, res, next) => {
         }
 
         res.json(expense);
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: status === 'APPROVED' ? 'EXPENSE_APPROVED' : 'EXPENSE_REJECTED',
+            details: `${status === 'APPROVED' ? 'Approved' : 'Rejected'} ${expense.type} expense of ₹${expense.amount} for ${expense.user?.name}`,
+            targetUserId: expense.userId,
+            metadata: { 
+                expenseId: expense.id, 
+                status, 
+                agentId: expense.userId,
+                amount: expense.amount 
+            }
+        });
 
         sendNotification({
             userIds: [expense.userId],
@@ -280,6 +305,15 @@ export const submitToChest = async (req, res, next) => {
                 amount: parseFloat(amount),
                 denominations
             }
+        });
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: req.user.storeId,
+            action: 'CASH_TO_CHEST_SUBMITTED',
+            details: `Submitted ₹${amount} to chest`,
+            metadata: { transferId: transfer.id, amount, date: dateString }
         });
 
         // Update daily summary

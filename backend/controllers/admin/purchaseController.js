@@ -1,6 +1,7 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // ─── CREATE PURCHASE INVOICE ─────────────────────────────────────
 export const createPurchase = async (req, res) => {
@@ -149,6 +150,15 @@ export const createPurchase = async (req, res) => {
     }, {
       maxWait: 20000,
       timeout: 60000
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: storeId || req.user.storeId,
+      action: 'PURCHASE_INVOICE_CREATED',
+      details: `Created Purchase Invoice #${invoiceNumber} for vendor ${vendor.vendorName}. Total: ₹${totalAmount.toFixed(2)}`,
+      metadata: { invoiceId: invoice.id, vendorId, totalAmount }
     });
 
     res.status(201).json({ message: 'Purchase invoice created successfully', invoice });

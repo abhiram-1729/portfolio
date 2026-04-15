@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { useUserStore } from './store/userStore';
 import { useCartStore } from './store/cartStore';
@@ -40,6 +40,9 @@ import TenantLayout from './components/tenant/TenantLayout';
 import TenantDashboard from './pages/tenant/TenantDashboard';
 import TenantStores from './pages/tenant/TenantStores';
 import TenantPrivileges from './pages/tenant/TenantPrivileges';
+import TenantActivityLogs from './pages/tenant/TenantActivityLogs';
+import AdminActivityLogs from './pages/admin/AdminActivityLogs';
+import AgentActivityLogs from './pages/AgentActivityLogs';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -74,15 +77,21 @@ export default function App() {
   const { cartOwnerId, clearCart, setCartOwner } = useCartStore();
   const { initSocket, disconnectSocket, fetchNotifications } = useNotificationStore();
 
-  useEffect(() => {
+  const init = useCallback(() => {
     if (token) {
       initSocket(token);
       fetchNotifications();
       refreshUserProfile();
+    }
+  }, [token, initSocket, fetchNotifications, refreshUserProfile]);
+
+  useEffect(() => {
+    if (token) {
+      init();
     } else {
       disconnectSocket();
     }
-  }, [token, initSocket, disconnectSocket, fetchNotifications, refreshUserProfile]);
+  }, [token, init, disconnectSocket]);
 
   useEffect(() => {
     // 🛡️ Anti-leak protection: If the logged-in user doesn't own this cart storage (e.g. they switched accounts in the same browser), wipe it immediately.
@@ -131,6 +140,7 @@ export default function App() {
           <Route path="targets" element={<VgeTargets />} />
           <Route path="my-assets" element={<AgentAssets />} />
           <Route path="wallet" element={<CashWallet />} />
+          <Route path="activity-logs" element={<AgentActivityLogs />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -154,6 +164,7 @@ export default function App() {
           <Route path="expenses" element={<AdminExpenses />} />
           <Route path="procurement" element={<AdminProcurement />} />
           <Route path="finance-reports" element={<AdminFinanceReports />} />
+          <Route path="activity-logs" element={<AdminActivityLogs />} />
         </Route>
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
@@ -167,6 +178,7 @@ export default function App() {
           {/* Tenant specifically wants to manage Admins */}
           <Route path="admins" element={<AdminUsers type="admin" />} /> 
           <Route path="privileges" element={<TenantPrivileges />} />
+          <Route path="activity-logs" element={<TenantActivityLogs />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

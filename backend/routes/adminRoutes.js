@@ -14,6 +14,7 @@ import * as categoryCtr from '../controllers/admin/categoryController.js';
 import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
+import * as activityCtr from '../controllers/admin/activityController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
 
@@ -100,6 +101,9 @@ router.get('/reports/reconciliation', reportCtr.getReconciliationReport);
 router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
 router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
 router.get('/reports/agent-performance', reportCtr.getAgentPerformance);
+
+// Activity Logs
+router.get('/activities', activityCtr.getActivityLogs);
 
 // Finance
 router.get('/finance/reports', getFinanceReports);

@@ -1,5 +1,6 @@
 import prisma from '../../utils/prisma.js';
 import { sendNotification } from '../../services/notificationService.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // @desc    Create a new route with cycles
 // @route   POST /api/admin/routes/create
@@ -89,6 +90,16 @@ export const assignRouteToVehicle = async (req, res, next) => {
             metadata: { assignmentId: assignment.id, routeId, vehicleId }
         });
 
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: assignment.vehicle?.storeId || req.user.storeId,
+            action: 'ROUTE_ASSIGNED',
+            details: `Assigned route "${assignment.route.routeName}" to agent ${assignment.user?.name} with vehicle ${assignment.vehicle?.vehicleNumber}`,
+            targetUserId: userId,
+            metadata: { routeId, vehicleId, assignmentId: assignment.id }
+        });
+
         res.status(201).json(assignment);
     } catch (error) {
         next(error);
@@ -135,6 +146,16 @@ export const updateRouteAssignment = async (req, res, next) => {
             type: 'route',
             priority: 'medium',
             metadata: { assignmentId: assignment.id, routeId: assignment.routeId, vehicleId: assignment.vehicleId }
+        });
+
+        logActivity({
+            userId: req.user.id,
+            tenantId: req.user.tenantId,
+            storeId: assignment.vehicle?.storeId || req.user.storeId,
+            action: 'ROUTE_UPDATED',
+            details: `Updated route assignment for agent ${assignment.user?.name} on route "${assignment.route.routeName}"`,
+            targetUserId: assignment.userId,
+            metadata: { assignmentId: assignment.id, routeId: assignment.routeId }
         });
 
         res.json(assignment);
@@ -256,7 +277,24 @@ export const deleteRoute = async (req, res, next) => {
 export const deleteRouteAssignment = async (req, res, next) => {
     try {
         const { id } = req.params;
+        const assignment = await prisma.routeAssignment.findUnique({
+            where: { id },
+            include: { route: true, user: true }
+        });
+
         await prisma.routeAssignment.delete({ where: { id } });
+
+        if (assignment) {
+            logActivity({
+                userId: req.user.id,
+                tenantId: req.user.tenantId,
+                action: 'ROUTE_REMOVED',
+                details: `Removed route assignment for agent ${assignment.user?.name} from route "${assignment.route?.routeName}"`,
+                targetUserId: assignment.userId,
+                metadata: { assignmentId: id }
+            });
+        }
+
         res.json({ message: 'Assignment removed' });
     } catch (error) {
         next(error);

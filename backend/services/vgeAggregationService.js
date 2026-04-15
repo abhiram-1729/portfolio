@@ -12,6 +12,7 @@
 import prisma from '../utils/prisma.js';
 import { calculateIncentive, getNextLevelInfo, getNextSlabInfo } from './incentiveEngine.js';
 import { getIO } from './socketService.js';
+import { logActivity } from '../utils/activityLogger.js';
 
 /**
  * Load incentive config from DB (with fallback to defaults)
@@ -167,6 +168,19 @@ export async function updateDailyPerformance(userId, date = null) {
         totalIncentive: result.totalIncentive
       }
     });
+
+    // 4.5. Log Level Up if the level has improved
+    if (result.level !== 'NONE' && (!existing || existing.level !== result.level)) {
+      // Small delay or async fire-and-forget
+      logActivity({
+        userId,
+        tenantId: user.tenantId,
+        storeId,
+        action: 'LEVEL_UP',
+        details: `Reached incentive level: ${result.level} with ₹${totalSales.toLocaleString('en-IN')} sales`,
+        metadata: { level: result.level, totalSales, date: dateStr }
+      });
+    }
 
     // 5. Emit real-time update
     emitPerformanceUpdate(userId, performance, totalSales, config);
