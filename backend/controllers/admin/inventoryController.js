@@ -507,8 +507,24 @@ export const bulkCreateItems = async (req, res) => {
         targetUnitId = unit.id;
       }
 
+      // Generate display ID for item (VK-ITM-[CATEGORY]-[NUMBER])
+      let displayId = null;
+      try {
+        const catCode = (String(prod.categoryName || 'GEN')).substring(0, 4).toUpperCase();
+        displayId = await generateId({
+          entity: 'ITM',
+          tenantId: tenantId,
+          storeId: req.user?.storeId || null,
+          categoryCode: catCode
+        });
+      } catch (err) {
+        console.warn(`[BulkCreate] Failed to generate ID for ${prod.name}`, err.message);
+      }
+
       const itemData = {
         tenantId: tenantId,
+        storeId: req.user?.storeId || null,
+        displayId: displayId,
         name: prod.name,
         description: prod.description || '',
         mrp: parseNumber(prod.mrp),
