@@ -19,7 +19,8 @@ import {
   Receipt,
   PieChart,
   Briefcase,
-  Store
+  Store,
+  Shield
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -48,8 +49,8 @@ export default function TenantLayout() {
   const navItems = [
     { to: '/tenant', icon: LayoutDashboard, label: 'Organization', end: true },
     { to: '/tenant/stores', icon: Store, label: 'Stores' },
-    { to: '/tenant/admins', icon: Briefcase, label: 'Admin Management' },
-    { to: '/tenant/users', icon: Users, label: 'All Staff' },
+    { to: '/tenant/admins', icon: Briefcase, label: 'Management' },
+    { to: '/tenant/privileges', icon: Shield, label: 'Privileges' },
     { to: '/tenant/vehicles', icon: Truck, label: 'Fleet' },
     { to: '/tenant/reports', icon: BarChart3, label: 'Analytics' },
     { to: '/tenant/notifications', icon: Bell, label: 'System Logs' },
@@ -65,11 +66,11 @@ export default function TenantLayout() {
           <div className="h-6 w-[1.5px] bg-emerald-100 hidden md:block" />
           <h1 className="text-lg font-black text-emerald-600 hidden md:block uppercase tracking-tight">Tenant Portal</h1>
         </div>
-        
+
         <div className="flex items-center gap-4 relative">
           <div className="flex flex-col items-end hidden sm:flex">
-             <span className="text-sm font-black text-slate-900">{user?.tenantName || 'Organization'}</span>
-             <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{user?.name}</span>
+            <span className="text-sm font-black text-slate-900">{user?.tenantName || 'Organization'}</span>
+            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-widest">{user?.name}</span>
           </div>
 
           <button
@@ -83,10 +84,10 @@ export default function TenantLayout() {
               </span>
             )}
           </button>
-          
-          <NotificationPopover 
-            isOpen={isNotifOpen} 
-            onClose={() => setIsNotifOpen(false)} 
+
+          <NotificationPopover
+            isOpen={isNotifOpen}
+            onClose={() => setIsNotifOpen(false)}
             basePath="/tenant/notifications"
           />
 
@@ -144,29 +145,29 @@ export default function TenantLayout() {
         {/* Profile Footer - Organization Data */}
         <div className="p-4 border-t border-emerald-50 bg-emerald-50/10">
           <div className="bg-white rounded-2xl p-4 border border-emerald-100 shadow-sm mb-3">
-             <div className="flex items-center gap-3 mb-3">
-                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100">
-                   {user?.tenantName?.charAt(0) || 'O'}
-                </div>
-                <div className="min-w-0 flex-1">
-                   <p className="text-[11px] font-black text-slate-900 truncate leading-none mb-1 uppercase tracking-tight">{user?.tenantName}</p>
-                   <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{user?.name}</p>
-                </div>
-             </div>
-             
-             <div className="flex items-center justify-between pt-3 border-t border-emerald-50/50">
-                <div className="flex flex-col">
-                   <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Access Level</span>
-                   <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">Super Admin</span>
-                </div>
-                <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md text-[8px] font-black border border-emerald-100">
-                   <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
-                   LIVE
-                </div>
-             </div>
+            <div className="flex items-center gap-3 mb-3">
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100">
+                {user?.tenantName?.charAt(0) || 'O'}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[11px] font-black text-slate-900 truncate leading-none mb-1 uppercase tracking-tight">{user?.tenantName}</p>
+                <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest truncate">{user?.name}</p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-3 border-t border-emerald-50/50">
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-emerald-500 uppercase tracking-widest leading-none mb-0.5">Access Level</span>
+                <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">Super Admin</span>
+              </div>
+              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-md text-[8px] font-black border border-emerald-100">
+                <div className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
+                LIVE
+              </div>
+            </div>
           </div>
 
-          <button 
+          <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:bg-orange-50 hover:text-orange-600 transition-all border border-transparent hover:border-orange-100"
           >

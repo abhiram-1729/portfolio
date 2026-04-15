@@ -43,6 +43,7 @@ export default function AdminInventory() {
   const location = useLocation();
   const isTenantRoute = location.pathname.includes('/tenant/');
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -54,6 +55,7 @@ export default function AdminInventory() {
   const [deletingId, setDeletingId] = useState(null);
   const [taxRates, setTaxRates] = useState(['0', '5', '12', '18']);
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [isAuditMode, setIsAuditMode] = useState(false);
   const [auditQuantities, setAuditQuantities] = useState({}); // { productId: quantity }
@@ -85,12 +87,13 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
-      const [iRes, vRes, sRes, cRes, uRes, storeRes, aRes] = await Promise.all([
+      const [iRes, vRes, sRes, cRes, uRes, subRes, storeRes, aRes] = await Promise.all([
         adminAPI.getItems({ storeId: storeFilterId }),
         adminAPI.getVehicles({ storeId: storeFilterId }),
         adminAPI.getSettings(),
         adminAPI.getCategories(),
         adminAPI.getUnits(),
+        adminAPI.getSubCategories(),
         adminAPI.getStores(),
         adminAPI.getAuditHistory({ storeId: storeFilterId })
       ]);
@@ -98,6 +101,7 @@ export default function AdminInventory() {
       setVehicles(vRes.data);
       setAuditHistory(aRes.data || []);
       setCategories(cRes.data || []);
+      setSubCategories(subRes.data || []);
       setUnits(uRes.data || []);
       if (sRes.data?.success && sRes.data?.data?.taxRates) {
         setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
@@ -118,7 +122,7 @@ export default function AdminInventory() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterCategory, filterStatus, filterFreeOnly]);
+  }, [searchQuery, filterCategory, filterStatus, filterFreeOnly, activeTab, subTab]);
 
   const handleQuantityChange = React.useCallback((id, val) => {
     setStockQuantities(prev => ({ ...prev, [id]: val }));
@@ -243,6 +247,15 @@ export default function AdminInventory() {
     }
   };
 
+  const fetchSubCategories = async () => {
+    try {
+      const { data } = await adminAPI.getSubCategories();
+      setSubCategories(data);
+    } catch (error) {
+      toast.error('Failed to fetch sub-categories');
+    }
+  };
+
   const fetchVehicleInventory = async (vId) => {
     try {
       const { data } = await adminAPI.getVehicleInventory(vId);
@@ -269,12 +282,17 @@ export default function AdminInventory() {
   const handleDownloadSample = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
-        "Product Name": "",
-        "Landing Price": "",
-        "MRP": "",
-        "Discount (%/rs)": "",
-        "GST Slab": "",
-        "Description": ""
+        "Product Name": "Example Product",
+        "Category": "Staples",
+        "Sub Category": "Rice",
+        "Unit Type": "KG",
+        "Unit Value": "1",
+        "Landing Price": "40",
+        "MRP": "50",
+        "Discount Value": "5",
+        "Discount Type": "RUPEE",
+        "GST Slab": "0",
+        "Description": "Premium quality"
       }
     ]);
     const wb = XLSX.utils.book_new();
@@ -313,8 +331,15 @@ export default function AdminInventory() {
             const landingPriceKey = findKey('landing price') || findKey('landing');
             const mrpKey = findKey('mrp');
             const discountValueKey = findKey('discount value') || findKey('discount');
+            const discountTypeKey = findKey('discount type');
             const gstKey = findKey('gst slab') || findKey('gst') || findKey('tax');
             const descriptionKey = findKey('description');
+            
+            // New hierarchical keys
+            const subCategoryKey = keys.find(k => k.toLowerCase().includes('sub category') || k.toLowerCase().includes('sub-category'));
+            const categoryKey = keys.find(k => k.toLowerCase() === 'category' || k.toLowerCase() === 'main category');
+            const unitTypeKey = findKey('unit type');
+            const unitValueKey = findKey('unit value');
 
             if (!row[nameKey]) return null;
 
@@ -322,12 +347,8 @@ export default function AdminInventory() {
             let discountType = 'RUPEE';
             if (discountValueKey && (discountValueKey.includes('%') || discountValueKey.toLowerCase().includes('percent'))) {
               discountType = 'PERCENT';
-            } else {
-              // check if there's any other column that specifies type
-              const dTypeKey = findKey('discount type');
-              if (row[dTypeKey] && (row[dTypeKey].toString().includes('%') || row[dTypeKey].toString().toLowerCase().includes('percent'))) {
-                discountType = 'PERCENT';
-              }
+            } else if (row[discountTypeKey] && (row[discountTypeKey].toString().includes('%') || row[discountTypeKey].toString().toLowerCase().includes('percent'))) {
+              discountType = 'PERCENT';
             }
 
             const mrp = parseFloat(row[mrpKey]) || 0;
@@ -345,7 +366,11 @@ export default function AdminInventory() {
               description: row[descriptionKey] || '',
               price: parseFloat(price),
               status: 'ACTIVE',
-              isFree: false
+              isFree: false,
+              categoryName: categoryKey ? row[categoryKey] : null,
+              subCategoryName: subCategoryKey ? row[subCategoryKey] : null,
+              unitType: unitTypeKey ? row[unitTypeKey] : null,
+              unitValue: unitValueKey ? row[unitValueKey] : null
             };
           })
           .filter(p => p && p.name);
@@ -713,8 +738,12 @@ export default function AdminInventory() {
                   {item.status || 'ACTIVE'}
                 </span>
               </div>
-              <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">{item.category?.name || 'Uncategorized'}</span>
-              <div className="flex items-center gap-3 mt-1 flex-wrap">
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">{item.category?.name || 'Uncategorized'}</span>
+                <span className="text-[8px] text-gray-300 font-bold">•</span>
+                <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest">{item.subCategory?.name || 'General Item'}</span>
+              </div>
+              <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                 <div className="flex flex-col">
                   <span className="text-[10px] text-gray-400 uppercase font-black tracking-tighter">Selling</span>
                   <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
@@ -745,29 +774,35 @@ export default function AdminInventory() {
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => handleToggleStatus(item)}
-              className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
-            >
-              {item.status === 'INACTIVE' ? '' : ''}
-            </button>
+            {can('INVENTORY', 'UPDATE') && (
+              <button
+                onClick={() => handleToggleStatus(item)}
+                className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
+              >
+                {item.status === 'INACTIVE' ? '' : ''}
+              </button>
+            )}
             <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
-            <button
-              onClick={() => openEditModal(item)}
-              className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
-            >
-              <Pencil size={14} />
-            </button>
-            <button
-              onClick={() => handleDeleteItem(item)}
-              title="Delete Item"
-              disabled={deletingId === item.id}
-              className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {deletingId === item.id
-                ? <Loader2 size={14} className="animate-spin text-rose-400" />
-                : <Trash2 size={14} />}
-            </button>
+            {can('INVENTORY', 'UPDATE') && (
+              <button
+                onClick={() => openEditModal(item)}
+                className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
+              >
+                <Pencil size={14} />
+              </button>
+            )}
+            {can('INVENTORY', 'DELETE') && (
+              <button
+                onClick={() => handleDeleteItem(item)}
+                title="Delete Item"
+                disabled={deletingId === item.id}
+                className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {deletingId === item.id
+                  ? <Loader2 size={14} className="animate-spin text-rose-400" />
+                  : <Trash2 size={14} />}
+              </button>
+            )}
           </div>
         </div>
       );
@@ -830,9 +865,14 @@ export default function AdminInventory() {
                     </div>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
-                      {item.category?.name || 'Uncategorized'}
-                    </span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest w-fit bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                        {item.category?.name || 'Uncategorized'}
+                      </span>
+                      <span className="text-[8px] font-bold text-gray-500 uppercase tracking-wider pl-1">
+                        ↳ {item.subCategory?.name || 'General Item'}
+                      </span>
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-center gap-4">
@@ -862,21 +902,25 @@ export default function AdminInventory() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center justify-end gap-1 transition-all">
-                      <button
-                        onClick={() => openEditModal(item)}
-                        className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                        title="Edit Item"
-                      >
-                        <Pencil size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteItem(item)}
-                        disabled={deletingId === item.id}
-                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
-                        title="Delete Item"
-                      >
-                        {deletingId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                      </button>
+                      {can('INVENTORY', 'UPDATE') && (
+                        <button
+                          onClick={() => openEditModal(item)}
+                          className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                          title="Edit Item"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {can('INVENTORY', 'DELETE') && (
+                        <button
+                          onClick={() => handleDeleteItem(item)}
+                          disabled={deletingId === item.id}
+                          className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                          title="Delete Item"
+                        >
+                          {deletingId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -1066,8 +1110,12 @@ export default function AdminInventory() {
   };
 
   const renderLoading = () => {
-    const regularItems = groupedLoadingItems.regular;
-    const freeItems = groupedLoadingItems.free;
+    const allFiltered = [...groupedLoadingItems.regular, ...groupedLoadingItems.free];
+    const totalPages = Math.ceil(allFiltered.length / itemsPerPage);
+    const paginatedItemsFromAll = allFiltered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const regularItems = paginatedItemsFromAll.filter(i => !i.isFree);
+    const freeItems = paginatedItemsFromAll.filter(i => i.isFree);
 
     const renderLoadingTable = (itemsToRender, isFreeGroup = false) => (
       <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
@@ -1222,7 +1270,7 @@ export default function AdminInventory() {
                     ))}
                   </div>
                 )}
-                {loadingFilteredItems.length === 0 && (
+                {allFiltered.length === 0 && (
                   <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
                 )}
               </div>
@@ -1241,12 +1289,54 @@ export default function AdminInventory() {
                     {renderLoadingTable(freeItems, true)}
                   </div>
                 )}
-                {loadingFilteredItems.length === 0 && (
+                {allFiltered.length === 0 && (
                   <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
                     <p className="text-sm font-bold text-gray-400">No items found matching "{searchQuery}"</p>
                   </div>
                 )}
               </div>
+
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="pt-6 border-t border-gray-100">
+                  <div className="flex flex-wrap items-center justify-center gap-2">
+                    <button
+                      disabled={currentPage === 1}
+                      onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                    >
+                      <ArrowLeft size={14} /> Prev
+                    </button>
+                    {(() => {
+                      let pages = [];
+                      let startPage = Math.max(1, currentPage - 2);
+                      let endPage = Math.min(totalPages, startPage + 4);
+                      if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+                      for(let i = startPage; i <= endPage; i++) {
+                        if (i > 0) {
+                          pages.push(
+                            <button
+                              key={`load-page-${i}`}
+                              onClick={() => { setCurrentPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                              className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${currentPage === i ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-emerald-200'}`}
+                            >
+                              {i}
+                            </button>
+                          );
+                        }
+                      }
+                      return pages;
+                    })()}
+                    <button
+                      disabled={currentPage === totalPages}
+                      onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                    >
+                      Next <ArrowLeft size={14} className="rotate-180" />
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <button
@@ -1263,8 +1353,12 @@ export default function AdminInventory() {
   };
 
   const renderReturn = () => {
-    const regularItems = groupedLoadingItems.regular;
-    const freeItems = groupedLoadingItems.free;
+    const allFiltered = [...groupedLoadingItems.regular, ...groupedLoadingItems.free];
+    const totalPages = Math.ceil(allFiltered.length / itemsPerPage);
+    const paginatedItemsFromAll = allFiltered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    const regularItems = paginatedItemsFromAll.filter(i => !i.isFree);
+    const freeItems = paginatedItemsFromAll.filter(i => i.isFree);
 
     const renderReturnTable = (itemsToRender, isFreeGroup = false) => (
       <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
@@ -1422,7 +1516,7 @@ export default function AdminInventory() {
                         ))}
                       </div>
                     )}
-                    {loadingFilteredItems.length === 0 && (
+                    {allFiltered.length === 0 && (
                       <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
                     )}
                   </div>
@@ -1441,12 +1535,54 @@ export default function AdminInventory() {
                         {renderReturnTable(freeItems, true)}
                       </div>
                     )}
-                    {loadingFilteredItems.length === 0 && (
+                    {allFiltered.length === 0 && (
                       <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
                         <p className="text-sm font-bold text-gray-400">No items found matching "{searchQuery}"</p>
                       </div>
                     )}
                   </div>
+
+                  {/* Pagination Controls */}
+                  {totalPages > 1 && (
+                    <div className="pt-6 border-t border-gray-100">
+                      <div className="flex flex-wrap items-center justify-center gap-2">
+                        <button
+                          disabled={currentPage === 1}
+                          onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                        >
+                          <ArrowLeft size={14} /> Prev
+                        </button>
+                        {(() => {
+                          let pages = [];
+                          let startPage = Math.max(1, currentPage - 2);
+                          let endPage = Math.min(totalPages, startPage + 4);
+                          if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+                          for(let i = startPage; i <= endPage; i++) {
+                            if (i > 0) {
+                              pages.push(
+                                <button
+                                  key={`return-page-${i}`}
+                                  onClick={() => { setCurrentPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                                  className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${currentPage === i ? 'bg-orange-600 text-white shadow-lg shadow-orange-500/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-emerald-200'}`}
+                                >
+                                  {i}
+                                </button>
+                              );
+                            }
+                          }
+                          return pages;
+                        })()}
+                        <button
+                          disabled={currentPage === totalPages}
+                          onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                        >
+                          Next <ArrowLeft size={14} className="rotate-180" />
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="text-center py-16 bg-gray-50 rounded-[2.5rem] border border-dashed border-gray-200">
@@ -2425,21 +2561,26 @@ export default function AdminInventory() {
               onChange={handleExcelUpload}
               disabled={isUploading}
             />
-            <button
-              onClick={() => setShowBulkUploadModal(true)}
-              disabled={isUploading}
-              className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
-              title="Bulk Upload Excel"
-            >
-              {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
-              <span className="hidden md:block">Bulk Upload</span>
-            </button>
-            <button
-              onClick={() => { setShowAddItemModal(true); setModalTab('info'); }}
-              className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
-            >
-              <Plus size={24} />
-            </button>
+            {can('INVENTORY', 'CREATE') && (
+              <button
+                onClick={() => setShowBulkUploadModal(true)}
+                disabled={isUploading}
+                className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                title="Bulk Upload Excel"
+              >
+                {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
+                <span className="hidden md:block">Bulk Upload</span>
+              </button>
+            )}
+            {can('INVENTORY', 'CREATE') && (
+              <button
+                onClick={() => { setShowAddItemModal(true); setModalTab('info'); }}
+                className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
+                title="Add New Registry Item"
+              >
+                <Plus size={24} />
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -2626,18 +2767,35 @@ export default function AdminInventory() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Category</label>
                         <select
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
                           value={newItem.categoryId}
                           onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value, subCategoryId: 'default' })}
                         >
-                          <option value="default">Select</option>
+                          <option value="default">Select Category</option>
                           {categories.map(cat => (
                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                           ))}
                         </select>
                       </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Sub-Category</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                          value={newItem.subCategoryId}
+                          onChange={(e) => setNewItem({ ...newItem, subCategoryId: e.target.value })}
+                        >
+                          <option value="default">Select Sub-Category</option>
+                          {subCategories
+                            .filter(sub => sub.categoryId === newItem.categoryId)
+                            .map(sub => (
+                              <option key={sub.id} value={sub.id}>{sub.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
                         <select
@@ -3137,18 +3295,35 @@ export default function AdminInventory() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Category</label>
                         <select
                           className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
                           value={editItem.categoryId}
                           onChange={(e) => setEditItem({ ...editItem, categoryId: e.target.value, subCategoryId: 'default' })}
                         >
-                          <option value="default">Select</option>
+                          <option value="default">Select Category</option>
                           {categories.map(cat => (
                             <option key={cat.id} value={cat.id}>{cat.name}</option>
                           ))}
                         </select>
                       </div>
+                      <div>
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Sub-Category</label>
+                        <select
+                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                          value={editItem.subCategoryId}
+                          onChange={(e) => setEditItem({ ...editItem, subCategoryId: e.target.value })}
+                        >
+                          <option value="default">Select Sub-Category</option>
+                          {subCategories
+                            .filter(sub => sub.categoryId === editItem.categoryId)
+                            .map(sub => (
+                              <option key={sub.id} value={sub.id}>{sub.name}</option>
+                            ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
                       <div>
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
                         <select

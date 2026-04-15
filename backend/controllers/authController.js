@@ -12,7 +12,7 @@ export const loginUser = async (req, res, next) => {
 
         const user = await prisma.user.findUnique({
             where: { mobile },
-            include: { assignedVehicle: true, tenant: true, store: true },
+            include: { assignedVehicle: true, tenant: true, store: true, customRole: true },
         });
         console.log(`[DEBUG] User found: ${!!user}, Status: ${user?.status}, Role: ${user?.role}`);
 
@@ -56,6 +56,10 @@ export const loginUser = async (req, res, next) => {
                 role: user.role,
                 assignedVehicleId: user.assignedVehicleId,
                 assignedVehicle: user.assignedVehicle,
+                customRoleId: user.customRoleId,
+                customRoleName: user.customRole?.name || null,
+                permissions: user.customRole?.permissions || null,
+                portalType: user.customRole?.portalType || null,
                 token: token,
             });
         } else {
@@ -86,7 +90,8 @@ export const getUserProfile = async (req, res, next) => {
             include: {
                 tenant: { select: { name: true, logo: true } },
                 store: { select: { name: true, code: true } },
-                assignedVehicle: true
+                assignedVehicle: true,
+                customRole: true
             }
         });
 
@@ -95,6 +100,9 @@ export const getUserProfile = async (req, res, next) => {
                 ...user,
                 tenantName: user.tenant?.name,
                 storeName: user.store?.name,
+                customRoleName: user.customRole?.name || null,
+                permissions: user.customRole?.permissions || null,
+                portalType: user.customRole?.portalType || null,
             });
         } else {
             res.status(404);

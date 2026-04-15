@@ -24,11 +24,33 @@ export const useUserStore = create(
       refreshUserProfile: async () => {
         try {
           const { data } = await authAPI.me();
-          set({ user: data });
+          // Merge permissions data from customRole into user object
+          set({ user: {
+            ...data,
+            permissions: data.permissions || data.customRole?.permissions || null,
+            customRoleName: data.customRoleName || data.customRole?.name || null,
+            portalType: data.portalType || data.customRole?.portalType || null,
+            customRoleId: data.customRoleId || data.customRole?.id || null,
+          }});
         } catch (error) {
           console.error('Failed to refresh user profile:', error);
-          // If 401, the interceptor handles it, but we should be careful here
         }
+      },
+
+      can: (module, action) => {
+        const user = get().user;
+        if (!user) return false;
+        
+        // Super Admins & Owners bypass everything
+        if (['SUPER_ADMIN', 'TENANT_OWNER'].includes(user.role)) return true;
+        
+        // Standard Admins (Global, no custom role) bypass everything
+        if (user.role === 'ADMIN' && !user.customRoleId) return true;
+
+        const perms = user.permissions?.[module] || [];
+        // If searching for READ, and they have ANY permission for that module, they can "read" it
+        // Or strictly check if action is included
+        return perms.includes(action);
       },
 
       clearUser: () => {

@@ -11,6 +11,7 @@ import * as routeCtr from '../controllers/admin/routeController.js';
 import * as villageCtr from '../controllers/admin/villageController.js';
 import * as unitCtr from '../controllers/admin/unitController.js';
 import * as categoryCtr from '../controllers/admin/categoryController.js';
+import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
@@ -144,6 +145,14 @@ router.route('/categories')
 router.route('/categories/:id')
   .put(categoryCtr.updateCategory)
   .delete(categoryCtr.deleteCategory);
+
+// Sub-Categories Management
+router.route('/sub-categories')
+  .get(subCategoryCtr.getSubCategories)
+  .post(subCategoryCtr.createSubCategory);
+router.route('/sub-categories/:id')
+  .put(subCategoryCtr.updateSubCategory)
+  .delete(subCategoryCtr.deleteSubCategory);
 
 // Asset Categories Management
 router.route('/asset-categories')

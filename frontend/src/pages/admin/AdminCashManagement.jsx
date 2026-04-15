@@ -20,6 +20,7 @@ export default function AdminCashManagement() {
   const storeFilterId = searchParams.get('storeId');
   const location = useLocation();
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -344,13 +345,15 @@ export default function AdminCashManagement() {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          <button
-            onClick={() => setShowAssignModal(true)}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
-          >
-            <Plus size={18} strokeWidth={2.5} />
-            Assign
-          </button>
+          {can('CASH', 'CREATE') && (
+            <button
+              onClick={() => setShowAssignModal(true)}
+              className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+              Assign
+            </button>
+          )}
           <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
             <Calendar size={18} className="text-emerald-500 ml-2" />
             <input
@@ -482,8 +485,12 @@ export default function AdminCashManagement() {
                           <div className="flex items-center justify-end gap-1.5 text-gray-400">
                             <button onClick={() => handleOpenView(summary)} className="p-2 hover:bg-emerald-50 rounded-xl hover:text-emerald-600 transition-all"><Eye size={18} /></button>
                             <>
-                              <button onClick={() => handleOpenEdit(summary)} className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"><Pencil size={18} /></button>
-                              <button onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }} className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
+                              {can('CASH', 'UPDATE') && (
+                                <button onClick={() => handleOpenEdit(summary)} className="p-2 hover:bg-orange-50 rounded-xl hover:text-orange-600 transition-all"><Pencil size={18} /></button>
+                              )}
+                              {can('CASH', 'DELETE') && (
+                                <button onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }} className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
+                              )}
                             </>
                           </div>
                         </td>

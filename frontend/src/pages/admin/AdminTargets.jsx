@@ -63,6 +63,7 @@ const getLevelInfo = (levelName) => {
 
 export default function AdminTargets() {
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
   const [searchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
 
@@ -393,12 +394,16 @@ export default function AdminTargets() {
               onChange={e => setSelectedDate(e.target.value)}
               className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 outline-none"
             />
-            <button onClick={handleRecalculate} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-wider text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all disabled:opacity-50">
-              <RefreshCw size={14} className={isSubmitting ? 'animate-spin' : ''} /> Recalculate
-            </button>
-            <button onClick={handleEndOfDay} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50">
-              <Lock size={14} /> Lock Day
-            </button>
+            {can('TARGETS', 'UPDATE') && (
+              <button onClick={handleRecalculate} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-2xl text-xs font-black uppercase tracking-wider text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all disabled:opacity-50">
+                <RefreshCw size={14} className={isSubmitting ? 'animate-spin' : ''} /> Recalculate
+              </button>
+            )}
+            {can('TARGETS', 'UPDATE') && (
+              <button onClick={handleEndOfDay} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-amber-600 transition-all shadow-lg shadow-amber-500/20 disabled:opacity-50">
+                <Lock size={14} /> Lock Day
+              </button>
+            )}
           </div>
 
           {/* Summary Cards */}
@@ -490,9 +495,11 @@ export default function AdminTargets() {
               onChange={e => setSelectedMonth(e.target.value)}
               className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 outline-none"
             />
-            <button onClick={handleGenerateMonthly} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50">
-              <Play size={14} /> Generate Summary
-            </button>
+            {can('TARGETS', 'CREATE') && (
+              <button onClick={handleGenerateMonthly} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-emerald-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50">
+                <Play size={14} /> Generate Summary
+              </button>
+            )}
           </div>
 
           {monthlySummaries.length === 0 ? (
@@ -589,9 +596,11 @@ export default function AdminTargets() {
               onChange={e => setSelectedMonth(e.target.value)}
               className="bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-300 outline-none"
             />
-            <button onClick={handleGenerateMonthly} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50">
-              <RefreshCw size={14} className={isSubmitting ? 'animate-spin' : ''} /> Recalculate Summaries
-            </button>
+            {can('TARGETS', 'CREATE') && (
+              <button onClick={handleGenerateMonthly} disabled={isSubmitting} className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 text-white rounded-2xl text-xs font-black uppercase tracking-wider hover:bg-indigo-700 transition-all shadow-lg shadow-indigo-600/20 disabled:opacity-50">
+                <RefreshCw size={14} className={isSubmitting ? 'animate-spin' : ''} /> Recalculate Summaries
+              </button>
+            )}
           </div>
 
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
@@ -715,20 +724,20 @@ export default function AdminTargets() {
             <div className="overflow-x-auto rounded-2xl border border-gray-100">
               <table className="w-full text-left min-w-[1200px]">
                 <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Level</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales From</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales To</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Daily Apps</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales Slab</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Apps Slab</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Sales Type</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Sales Value</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Apps Rate(₹)</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-500 text-center">Incentive/Day</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center">Monthly Inc</th>
-                    <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Action</th>
-                  </tr>
+                <tr className="bg-gray-50 border-b border-gray-100">
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Level</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales From</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales To</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Daily Apps</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Sales Slab</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Apps Slab</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Sales Type</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Sales Value</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-blue-500">Apps Rate(₹)</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-500 text-center">Incentive/Day</th>
+                  <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center">Monthly Inc</th>
+                  {can('TARGETS', 'DELETE') && <th className="px-3 py-4 text-[10px] font-black uppercase tracking-widest text-gray-500">Action</th>}
+                </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 bg-white">
                   {(!config.rules || config.rules.length === 0) ? (
@@ -811,11 +820,13 @@ export default function AdminTargets() {
                                return <span className="text-xs font-black text-emerald-600">₹{monthlyTotal.toLocaleString()}</span>;
                              })()}
                           </td>
-                          <td className="p-2 text-center">
-                            <button onClick={() => deleteRule(rule.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
-                              <X size={14} strokeWidth={3} />
-                            </button>
-                          </td>
+                          {can('TARGETS', 'DELETE') && (
+                            <td className="p-2 text-center">
+                              <button onClick={() => deleteRule(rule.id)} className="p-1.5 bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-colors">
+                                <X size={14} strokeWidth={3} />
+                              </button>
+                            </td>
+                          )}
                         </tr>
                       );
                     })
@@ -824,22 +835,26 @@ export default function AdminTargets() {
               </table>
             </div>
 
-            <button
-              onClick={handleAddRule}
-              disabled={isSubmitting}
-              className="w-full py-2 bg-gray-50 border border-dashed border-gray-300 text-gray-500 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-gray-100 hover:text-gray-700 transition-all flex items-center justify-center gap-2"
-            >
-              <Target size={14} /> Add One More Row
-            </button>
+            {can('TARGETS', 'CREATE') && (
+              <button
+                onClick={handleAddRule}
+                disabled={isSubmitting}
+                className="w-full py-2 bg-gray-50 border border-dashed border-gray-300 text-gray-500 font-bold text-xs uppercase tracking-wider rounded-xl hover:bg-gray-100 hover:text-gray-700 transition-all flex items-center justify-center gap-2"
+              >
+                <Target size={14} /> Add One More Row
+              </button>
+            )}
 
-            <button
-              onClick={handleSaveConfig}
-              disabled={isSubmitting}
-              className="w-full py-3 bg-emerald-600 text-white font-black text-sm uppercase tracking-wider rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
-            >
-              {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Settings size={16} />}
-              Save Configuration
-            </button>
+            {can('TARGETS', 'UPDATE') && (
+              <button
+                onClick={handleSaveConfig}
+                disabled={isSubmitting}
+                className="w-full py-3 bg-emerald-600 text-white font-black text-sm uppercase tracking-wider rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Settings size={16} />}
+                Save Configuration
+              </button>
+            )}
           </div>
         </div>
       )}

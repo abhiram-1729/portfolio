@@ -11,6 +11,7 @@ export default function AdminVehicles() {
   const location = useLocation();
   const isTenantRoute = location.pathname.startsWith('/tenant');
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
@@ -243,21 +244,27 @@ export default function AdminVehicles() {
               </div>
 
               <div className="flex items-center gap-1">
-                <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                  className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                  {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
-                </button>
-                <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
-                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                  <Pencil size={16} />
-                </button>
-                <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete Vehicle"
-                  disabled={deletingId === vehicle.id}
-                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                  {deletingId === vehicle.id
-                    ? <Loader2 size={16} className="animate-spin text-rose-400" />
-                    : <Trash2 size={16} />}
-                </button>
+                {can('VEHICLES', 'UPDATE') && (
+                  <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                    className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                    {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                  </button>
+                )}
+                {can('VEHICLES', 'UPDATE') && (
+                  <button onClick={() => openEditModal(vehicle)} title="Edit Vehicle"
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                    <Pencil size={16} />
+                  </button>
+                )}
+                {can('VEHICLES', 'DELETE') && (
+                  <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete Vehicle"
+                    disabled={deletingId === vehicle.id}
+                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                    {deletingId === vehicle.id
+                      ? <Loader2 size={16} className="animate-spin text-rose-400" />
+                      : <Trash2 size={16} />}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -277,10 +284,12 @@ export default function AdminVehicles() {
                   <span className="text-sm font-bold text-gray-800">{vehicle.assignedUsers?.[0]?.name || 'Not Assigned'}</span>
                 </div>
               </div>
-              <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
-                <ArrowRight size={20} />
-              </button>
+              {can('VEHICLES', 'UPDATE') && (
+                <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                  className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
+                  <ArrowRight size={20} />
+                </button>
+              )}
             </div>
           </div>
         ))}
@@ -334,10 +343,12 @@ export default function AdminVehicles() {
                       </div>
                       <span className="text-sm font-bold text-gray-700">{vehicle.assignedUsers?.[0]?.name || 'Unassigned'}</span>
                     </div>
-                  <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                      className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
-                      <ArrowRight size={16} />
-                    </button>
+                    {can('VEHICLES', 'UPDATE') && (
+                      <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                        className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
+                        <ArrowRight size={16} />
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -358,19 +369,25 @@ export default function AdminVehicles() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1 transition-all">
-                    <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                      className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                      {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
-                    </button>
-                    <button onClick={() => openEditModal(vehicle)} title="Edit Details"
-                      className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                      <Pencil size={16} />
-                    </button>
-                    <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete"
-                      disabled={deletingId === vehicle.id}
-                      className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
-                      {deletingId === vehicle.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button>
+                    {can('VEHICLES', 'UPDATE') && (
+                      <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
+                        className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
+                        {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                      </button>
+                    )}
+                    {can('VEHICLES', 'UPDATE') && (
+                      <button onClick={() => openEditModal(vehicle)} title="Edit Details"
+                        className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                        <Pencil size={16} />
+                      </button>
+                    )}
+                    {can('VEHICLES', 'DELETE') && (
+                      <button onClick={() => handleDeleteVehicle(vehicle)} title="Delete"
+                        disabled={deletingId === vehicle.id}
+                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
+                        {deletingId === vehicle.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -547,20 +564,22 @@ export default function AdminVehicles() {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          <button onClick={() => { 
-            setNewVehicle({ 
-              vehicleNumber: '', 
-              vehicleName: '', 
-              assignedUserId: '', 
-              status: true,
-              storeId: storeFilterId || currentUser?.storeId || '' 
-            });
-            setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
-            setShowAddModal(true); 
-          }}
-            className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
-            <Plus size={24} />
-          </button>
+          {can('VEHICLES', 'CREATE') && (
+            <button onClick={() => { 
+              setNewVehicle({ 
+                vehicleNumber: '', 
+                vehicleName: '', 
+                assignedUserId: '', 
+                status: true,
+                storeId: storeFilterId || currentUser?.storeId || '' 
+              });
+              setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
+              setShowAddModal(true); 
+            }}
+              className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
+              <Plus size={24} />
+            </button>
+          )}
         </div>
       </div>
 

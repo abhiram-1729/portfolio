@@ -20,6 +20,7 @@ export default function AdminSales() {
   const location = useLocation();
   const isTenantRoute = location.pathname.includes('/tenant/');
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   const fetchSales = async () => {
     try {
@@ -112,9 +113,11 @@ export default function AdminSales() {
             )}
           </div>
         </div>
-        <button className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors">
-          <Download size={24} />
-        </button>
+        {can('SALES', 'CREATE') && (
+          <button className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-colors">
+            <Download size={24} />
+          </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-3">

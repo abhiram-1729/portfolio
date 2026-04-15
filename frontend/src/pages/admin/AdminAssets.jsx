@@ -50,6 +50,7 @@ export default function AdminAssets() {
   const storeId = searchParams.get('storeId');
   const location = useLocation();
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   useEffect(() => {
     fetchAll();
@@ -258,10 +259,12 @@ export default function AdminAssets() {
           <input type="text" placeholder="Search assets..." className="w-full bg-transparent border-none focus:outline-none text-sm"
             value={searchQuery} onChange={e => setSearchQuery(e.target.value)} />
         </div>
-        <button onClick={() => setShowCreateModal(true)}
-          className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors shrink-0">
-          <Plus size={24} />
-        </button>
+        {can('ASSETS', 'CREATE') && (
+          <button onClick={() => setShowCreateModal(true)}
+            className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors shrink-0">
+            <Plus size={24} />
+          </button>
+        )}
       </div>
 
       {filteredAssets.length === 0 ? (
@@ -318,22 +321,28 @@ export default function AdminAssets() {
 
                   {/* Actions */}
                   <div className="flex items-center gap-2 pt-1">
-                    <button onClick={() => { setUnitsTarget(asset); setShowAddUnitsModal(true); }}
-                      className="flex-1 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 py-2 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-100">
-                      + Add Units
-                    </button>
-                    <button onClick={() => { setEditForm({ id: asset.id, name: asset.name, categoryId: asset.categoryId || '', assetType: asset.assetType, model: asset.model || '', brand: asset.brand || '', description: asset.description || '', estimatedCost: asset.estimatedCost?.toString() || '' }); setShowEditModal(true); }}
-                      className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors">
-                      <Pencil size={14} />
-                    </button>
+                    {can('ASSETS', 'CREATE') && (
+                      <button onClick={() => { setUnitsTarget(asset); setShowAddUnitsModal(true); }}
+                        className="flex-1 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 py-2 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-100">
+                        + Add Units
+                      </button>
+                    )}
+                    {can('ASSETS', 'UPDATE') && (
+                      <button onClick={() => { setEditForm({ id: asset.id, name: asset.name, categoryId: asset.categoryId || '', assetType: asset.assetType, model: asset.model || '', brand: asset.brand || '', description: asset.description || '', estimatedCost: asset.estimatedCost?.toString() || '' }); setShowEditModal(true); }}
+                        className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                    )}
                     <button onClick={() => setShowDetailModal(asset)}
                       className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
                       <Eye size={14} />
                     </button>
-                    <button onClick={() => handleDelete(asset.id, asset.name)}
-                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
-                      <Trash2 size={14} />
-                    </button>
+                    {can('ASSETS', 'DELETE') && (
+                      <button onClick={() => handleDelete(asset.id, asset.name)}
+                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -403,20 +412,28 @@ export default function AdminAssets() {
             </select>
           </div>
 
-          <button type="submit" disabled={isSubmitting}
-            className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-            {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Assigning...</> : '✅ Assign Asset'}
-          </button>
+          {can('ASSETS', 'UPDATE') ? (
+            <button type="submit" disabled={isSubmitting}
+              className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
+              {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Assigning...</> : '✅ Assign Asset'}
+            </button>
+          ) : (
+            <p className="text-center text-[10px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 p-3 rounded-xl border border-rose-100">
+              You do not have permission to assign assets
+            </p>
+          )}
         </form>
       </div>
 
       {/* Return Asset */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
         <h3 className="text-lg font-black text-gray-900 flex items-center gap-2"><ArrowDownCircle size={20} className="text-orange-500" /> Return Asset</h3>
-        <button onClick={() => { loadTracking(); setShowReturnModal(true); }}
-          className="w-full bg-orange-50 text-orange-600 font-bold py-3 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors">
-          Process Return
-        </button>
+        {can('ASSETS', 'UPDATE') && (
+          <button onClick={() => { loadTracking(); setShowReturnModal(true); }}
+            className="w-full bg-orange-50 text-orange-600 font-bold py-3 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors">
+            Process Return
+          </button>
+        )}
       </div>
     </div>
   );
@@ -533,7 +550,7 @@ export default function AdminAssets() {
 
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[10px] text-gray-400">{new Date(issue.createdAt).toLocaleDateString('en-IN')}</span>
-                {issue.status === 'OPEN' && (
+                {issue.status === 'OPEN' && can('ASSETS', 'UPDATE') && (
                   <div className="flex gap-2">
                     <button onClick={() => handleIssueStatus(issue.id, 'RESOLVED')}
                       className="text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl hover:bg-emerald-100 border border-emerald-100">
@@ -677,7 +694,7 @@ export default function AdminAssets() {
                 }`}>Priority: {req.priority}</span>
               </div>
 
-              {req.status === 'PENDING' && (
+              {req.status === 'PENDING' && can('ASSETS', 'UPDATE') && (
                 <div className="grid grid-cols-2 gap-2 pt-1 mt-auto">
                    <button 
                      onClick={() => handleRequestUpdate(req.id, 'APPROVED')}
@@ -697,7 +714,7 @@ export default function AdminAssets() {
                 </div>
               )}
               
-              {req.status === 'APPROVED' && (
+              {req.status === 'APPROVED' && can('ASSETS', 'UPDATE') && (
                  <button 
                     onClick={() => handleRequestUpdate(req.id, 'COMPLETED')}
                     className="w-full py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all"

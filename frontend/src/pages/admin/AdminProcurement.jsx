@@ -10,6 +10,7 @@ import { procurementAPI } from '../../services/procurementService';
 import { adminAPI } from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useUserStore } from '../../store/userStore';
 
 const TABS = [
   { key: 'vendors', label: 'Vendors', icon: Users },
@@ -25,6 +26,7 @@ const TABS = [
 // ─── MAIN COMPONENT ─────────────────────────────────────
 export default function AdminProcurement() {
   const [activeTab, setActiveTab] = useState('vendors');
+  const can = useUserStore(s => s.can);
 
   return (
     <div className="space-y-6">
@@ -53,14 +55,14 @@ export default function AdminProcurement() {
       </div>
 
       {/* Tab Content */}
-      {activeTab === 'vendors' && <VendorsTab />}
-      {activeTab === 'mapping' && <MappingTab />}
-      {activeTab === 'po' && <PurchaseOrdersTab />}
-      {activeTab === 'grn' && <GRNTab />}
-      {activeTab === 'purchases' && <PurchasesTab />}
-      {activeTab === 'ledger' && <StockLedgerTab />}
-      {activeTab === 'payments' && <PaymentsTab />}
-      {activeTab === 'reports' && <ReportsTab />}
+      {activeTab === 'vendors' && <VendorsTab can={can} />}
+      {activeTab === 'mapping' && <MappingTab can={can} />}
+      {activeTab === 'po' && <PurchaseOrdersTab can={can} />}
+      {activeTab === 'grn' && <GRNTab can={can} />}
+      {activeTab === 'purchases' && <PurchasesTab can={can} />}
+      {activeTab === 'ledger' && <StockLedgerTab can={can} />}
+      {activeTab === 'payments' && <PaymentsTab can={can} />}
+      {activeTab === 'reports' && <ReportsTab can={can} />}
     </div>
   );
 }
@@ -68,7 +70,7 @@ export default function AdminProcurement() {
 // ═══════════════════════════════════════════════════════════
 // ─── VENDORS TAB ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-function VendorsTab() {
+function VendorsTab({ can }) {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -160,10 +162,12 @@ function VendorsTab() {
                 statusFilter === s ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'
               }`}>{s || 'All'}</button>
           ))}
-          <button onClick={() => { setShowForm(true); setEditVendor(null); setForm({ vendorName: '', mobile: '', email: '', address: '', gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0' }); }}
-            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-            <Plus size={16} /> Add Vendor
-          </button>
+          {can('PROCUREMENT', 'CREATE') && (
+            <button onClick={() => { setShowForm(true); setEditVendor(null); setForm({ vendorName: '', mobile: '', email: '', address: '', gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0' }); }}
+              className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
+              <Plus size={16} /> Add Vendor
+            </button>
+          )}
         </div>
       </div>
 
@@ -222,10 +226,14 @@ function VendorsTab() {
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={() => openLedger(v.id)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all" title="View Ledger"><BookOpen size={14} /></button>
-                        <button onClick={() => openEdit(v)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all" title="Edit"><Edit3 size={14} /></button>
-                        <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
-                          {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
-                        </button>
+                        {can('PROCUREMENT', 'UPDATE') && (
+                          <>
+                            <button onClick={() => openEdit(v)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all" title="Edit"><Edit3 size={14} /></button>
+                            <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
+                              {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -359,7 +367,7 @@ function VendorsTab() {
 // ═══════════════════════════════════════════════════════════
 // ─── MAPPING TAB ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-function MappingTab() {
+function MappingTab({ can }) {
   const [vendors, setVendors] = useState([]);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [products, setProducts] = useState([]);
@@ -440,7 +448,7 @@ function MappingTab() {
             <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">
               {selectedVendor ? `Items for ${selectedVendor.vendorName}` : 'Select a vendor first'}
             </h4>
-            {selectedVendor && (
+            {selectedVendor && can('PROCUREMENT', 'UPDATE') && (
               <button onClick={saveMappings} disabled={saving}
                 className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs disabled:opacity-50">
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Save
@@ -483,7 +491,7 @@ function MappingTab() {
 // ═══════════════════════════════════════════════════════════
 // ─── PURCHASE ORDERS TAB ──────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-function PurchaseOrdersTab() {
+function PurchaseOrdersTab({ can }) {
   const [pos, setPOs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -596,10 +604,12 @@ function PurchaseOrdersTab() {
               }`}>{s || 'All'}</button>
           ))}
         </div>
-        <button onClick={openForm}
-          className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-          <Plus size={16} /> New PO
-        </button>
+        {can('PROCUREMENT', 'CREATE') && (
+          <button onClick={openForm}
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
+            <Plus size={16} /> New PO
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -634,16 +644,16 @@ function PurchaseOrdersTab() {
               </div>
               {/* Status Actions */}
               <div className="flex gap-1.5 pt-1">
-                {po.status === 'CREATED' && (
+                {po.status === 'CREATED' && can('PROCUREMENT', 'UPDATE') && (
                   <>
                     <button onClick={() => updateStatus(po.id, 'APPROVED')} className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-emerald-100">Approve</button>
                     <button onClick={() => updateStatus(po.id, 'CANCELLED')} className="text-[9px] font-black bg-red-50 text-red-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-red-100">Cancel</button>
                   </>
                 )}
-                {po.status === 'APPROVED' && (
+                {po.status === 'APPROVED' && can('PROCUREMENT', 'UPDATE') && (
                   <button onClick={() => updateStatus(po.id, 'ORDERED')} className="text-[9px] font-black bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-purple-100">Mark Ordered</button>
                 )}
-                {po.status === 'DELIVERED' && (
+                {po.status === 'DELIVERED' && can('PROCUREMENT', 'UPDATE') && (
                   <button onClick={() => updateStatus(po.id, 'CLOSED')} className="text-[9px] font-black bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-gray-200">Close PO</button>
                 )}
               </div>
@@ -740,7 +750,7 @@ function PurchaseOrdersTab() {
 // ═══════════════════════════════════════════════════════════
 // ─── GRN TAB ──────────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-function GRNTab() {
+function GRNTab({ can }) {
   const [pos, setPOs] = useState([]);
   const [selectedPO, setSelectedPO] = useState(null);
   const [poDetail, setPODetail] = useState(null);
@@ -869,10 +879,16 @@ function GRNTab() {
               </tbody>
             </table>
           </div>
-          <button onClick={handleSubmitGRN} disabled={submitting}
-            className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 disabled:opacity-50 transition-all">
-            {submitting ? 'Processing...' : 'Submit Goods Receipt'}
-          </button>
+          {can('PROCUREMENT', 'UPDATE') ? (
+            <button onClick={handleSubmitGRN} disabled={submitting}
+              className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 disabled:opacity-50 transition-all">
+              {submitting ? 'Processing...' : 'Submit Goods Receipt'}
+            </button>
+          ) : (
+            <p className="text-center text-[10px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 p-3 rounded-xl border border-rose-100">
+              You do not have permission to process GRN
+            </p>
+          )}
         </div>
       )}
     </div>
@@ -882,7 +898,7 @@ function GRNTab() {
 // ═══════════════════════════════════════════════════════════
 // ─── PURCHASES TAB ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-function PurchasesTab() {
+function PurchasesTab({ can }) {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -963,10 +979,12 @@ function PurchasesTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Purchase Invoices</h4>
-        <button onClick={openForm}
-          className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-          <Plus size={16} /> New Purchase
-        </button>
+        {can('PROCUREMENT', 'CREATE') && (
+          <button onClick={openForm}
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
+            <Plus size={16} /> New Purchase
+          </button>
+        )}
       </div>
 
       {loading ? (
@@ -1162,7 +1180,7 @@ function StockLedgerTab() {
 // ═══════════════════════════════════════════════════════════
 // ─── PAYMENTS TAB ──────────────────────────────────────────
 // ═══════════════════════════════════════════════════════════
-function PaymentsTab() {
+function PaymentsTab({ can }) {
   const [payments, setPayments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -1230,10 +1248,12 @@ function PaymentsTab() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Vendor Payments</h4>
-        <button onClick={openForm}
-          className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-          <Plus size={16} /> Record Payment
-        </button>
+        {can('PROCUREMENT', 'UPDATE') && (
+          <button onClick={openForm}
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
+            <Plus size={16} /> Record Payment
+          </button>
+        )}
       </div>
 
       {loading ? (

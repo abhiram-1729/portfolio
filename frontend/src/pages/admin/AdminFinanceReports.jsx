@@ -28,6 +28,7 @@ export default function AdminFinanceReports() {
     const storeId = searchParams.get('storeId');
     const location = useLocation();
     const currentUser = useUserStore(s => s.user);
+    const can = useUserStore(s => s.can);
 
     useEffect(() => {
         loadData();
@@ -217,9 +218,11 @@ export default function AdminFinanceReports() {
                         <Coins className="text-amber-500" size={20} />
                         <h3 className="font-black text-gray-900 uppercase tracking-tight">Daily Cash Sheet</h3>
                     </div>
-                    <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">
-                        <Download size={14} /> Export PDF
-                    </button>
+                    {can('REPORTS', 'CREATE') && (
+                      <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">
+                          <Download size={14} /> Export PDF
+                      </button>
+                    )}
                 </div>
                 <div className="overflow-x-auto">
                     <table className="w-full text-left">

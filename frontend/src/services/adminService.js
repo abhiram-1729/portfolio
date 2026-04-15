@@ -77,6 +77,12 @@ export const adminAPI = {
   createCategory: (data) => api.post('/admin/categories', data),
   updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
+  
+  // Sub-Categories
+  getSubCategories: (params) => api.get('/admin/sub-categories', { params }),
+  createSubCategory: (data) => api.post('/admin/sub-categories', data),
+  updateSubCategory: (id, data) => api.put(`/admin/sub-categories/${id}`, data),
+  deleteSubCategory: (id) => api.delete(`/admin/sub-categories/${id}`),
 
   // VGE Targets & Incentives
   vgeAllPerformance: (params) => api.get('/vge/admin/all-performance', { params }),
@@ -125,6 +131,14 @@ export const adminAPI = {
   createStore: (data) => api.post('/tenant/stores', data),
   updateStore: (id, data) => api.put(`/tenant/stores/${id}`, data),
   deleteStore: (id) => api.delete(`/tenant/stores/${id}`),
+
+  // Role & Privileges Management
+  getRoles: () => api.get('/admin/roles'),
+  getRole: (id) => api.get(`/admin/roles/${id}`),
+  createRole: (data) => api.post('/admin/roles', data),
+  updateRole: (id, data) => api.put(`/admin/roles/${id}`, data),
+  deleteRole: (id) => api.delete(`/admin/roles/${id}`),
+  assignRole: (data) => api.put('/admin/roles/assign', data),
 };
 
 

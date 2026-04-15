@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 export default function AdminUsers({ type }) {
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
+  const [customRoles, setCustomRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -16,6 +17,7 @@ export default function AdminUsers({ type }) {
   const location = useLocation();
   const isTenantRoute = location.pathname.includes('/tenant/');
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   const [newUser, setNewUser] = useState({
     name: '',
@@ -27,18 +29,23 @@ export default function AdminUsers({ type }) {
     storeId: storeFilterId || currentUser?.storeId || '',
     dailyTarget: 10000,
     baseSalary: 12000,
+    customRoleId: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState(type || 'staff');
+  const [activeTab, setActiveTab] = useState(type || 'admin');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
-    if (type) setActiveTab(type);
+    if (type) {
+      setActiveTab(type);
+    } else if (activeTab === 'staff' || activeTab === 'admin') {
+      // Keep it if it's a legacy tab, but prefer all
+    }
   }, [type]);
 
   useEffect(() => {
@@ -65,8 +72,19 @@ export default function AdminUsers({ type }) {
     }
   };
 
+  const fetchCustomRoles = async () => {
+    try {
+      const res = await adminAPI.getRoles();
+      if (res.data?.success) {
+        setCustomRoles(res.data.data);
+      }
+    } catch (error) {
+      console.error('Failed to fetch roles:', error);
+    }
+  };
+
   useEffect(() => {
-    Promise.all([fetchUsers(), fetchStores()]).finally(() => setLoading(false));
+    Promise.all([fetchUsers(), fetchStores(), fetchCustomRoles()]).finally(() => setLoading(false));
   }, [storeFilterId]);
 
   const handleCreateUser = async (e) => {
@@ -76,7 +94,7 @@ export default function AdminUsers({ type }) {
       await adminAPI.createUser(newUser);
       toast.success('User created successfully');
       setShowAddModal(false);
-      setNewUser({ name: '', email: '', password: '', mobile: '', role: type === 'admin' ? 'ADMIN' : 'SALES_AGENT', vgeType: 'EMPLOYEE', storeId: storeFilterId || currentUser?.storeId || '', dailyTarget: 10000, baseSalary: 12000 });
+      setNewUser({ name: '', email: '', password: '', mobile: '', role: type === 'admin' ? 'ADMIN' : 'SALES_AGENT', vgeType: 'EMPLOYEE', storeId: storeFilterId || currentUser?.storeId || '', dailyTarget: 10000, baseSalary: 12000, customRoleId: '' });
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create user');
@@ -130,7 +148,7 @@ export default function AdminUsers({ type }) {
     }
   };
 
-  const getRoleBadge = (role) => {
+  const getRoleBadge = (roleName, customRole) => {
     const roles = {
       SUPER_ADMIN: { label: 'Sys Admin', color: 'bg-rose-50 text-rose-700 border-rose-100', icon: ShieldCheck },
       TENANT_OWNER: { label: 'Owner', color: 'bg-indigo-50 text-indigo-700 border-indigo-100', icon: ShieldCheck },
@@ -139,13 +157,20 @@ export default function AdminUsers({ type }) {
       SUPERVISOR: { label: 'Sup', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: UserCog },
       HELPER: { label: 'Helper', color: 'bg-slate-50 text-slate-700 border-slate-100', icon: Users },
     };
-    const r = roles[role] || { label: role, color: 'bg-gray-50 text-gray-700 border-gray-100', icon: User };
+    const r = roles[roleName] || { label: roleName, color: 'bg-gray-50 text-gray-700 border-gray-100', icon: User };
     const Icon = r.icon;
     return (
-      <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${r.color}`}>
-        <Icon size={8} />
-        {r.label}
-      </span>
+      <div className="flex flex-col gap-1 items-center">
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${r.color}`}>
+          <Icon size={8} />
+          {r.label}
+        </span>
+        {customRole?.name && (
+          <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[8px] font-black border border-emerald-100 bg-emerald-50 text-emerald-600 uppercase tracking-tighter">
+             <ShieldCheck size={7} /> {customRole.name}
+          </span>
+        )}
+      </div>
     );
   };
 
@@ -180,44 +205,78 @@ export default function AdminUsers({ type }) {
     return name?.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() || '??';
   };
 
-  const filteredUsers = users.filter(u => {
-    // 1. Role Filter
-    const roleMatches = activeTab === 'admin' 
-      ? u.role === 'ADMIN' 
-      : u.role === 'SALES_AGENT';
+  const filteredUsers = React.useMemo(() => {
+    return users.filter(u => {
+      // 1. Role Filter
+      const roleMatches = activeTab === 'admin'
+          ? u.role === 'ADMIN' && !u.customRoleId
+          : activeTab === 'staff'
+            ? u.role === 'SALES_AGENT' && !u.customRoleId
+            : u.customRoleId === activeTab;
 
-    if (!roleMatches) return false;
+      if (!roleMatches) return false;
 
-    // 2. Hide Current User (Self)
-    if (u.id === currentUser?.id) return false;
+      // 2. Hide Current User (Self)
+      if (u.id === currentUser?.id) return false;
 
-    // 3. Search Filter
-    const searchLower = searchTerm.toLowerCase();
-    if (
-      !u.name?.toLowerCase().includes(searchLower) &&
-      !u.mobile?.includes(searchTerm) &&
-      !u.role?.toLowerCase().includes(searchLower)
-    ) {
-      return false;
+      // 3. Search Filter
+      const searchLower = searchTerm.toLowerCase();
+      if (
+        !u.name?.toLowerCase().includes(searchLower) &&
+        !u.mobile?.includes(searchTerm) &&
+        !u.role?.toLowerCase().includes(searchLower)
+      ) {
+        return false;
+      }
+
+      // 3. Store Filter
+      if (storeFilterId && u.storeId !== storeFilterId) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [users, activeTab, searchTerm, storeFilterId, currentUser?.id]);
+
+  const handleCustomRoleChange = (roleId, isEdit = false) => {
+    const role = customRoles.find(r => r.id === roleId);
+    if (!role) {
+      if (isEdit) {
+        setEditingUser(prev => ({ ...prev, customRoleId: null, role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT' }));
+      } else {
+        setNewUser(prev => ({ ...prev, customRoleId: null, role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT' }));
+      }
+      return;
     }
 
-    // 3. Store Filter
-    if (storeFilterId && u.storeId !== storeFilterId) {
-      return false;
+    // Map portalType to system role
+    // ADMIN / SUPERVISOR -> ADMIN
+    // AGENT / HELPER -> SALES_AGENT
+    const systemRole = (role.portalType === 'ADMIN' || role.portalType === 'SUPERVISOR') ? 'ADMIN' : 'SALES_AGENT';
+    
+    if (isEdit) {
+      setEditingUser(prev => ({ ...prev, customRoleId: roleId, role: systemRole }));
+    } else {
+      setNewUser(prev => ({ ...prev, customRoleId: roleId, role: systemRole }));
     }
+  };
 
-    return true;
-  });
+  const showDetailColumns = React.useMemo(() => {
+    if (activeTab === 'admin') return false;
+    if (activeTab === 'staff') return true;
+    // For custom roles, show columns if any user in this group is operational (not ADMIN)
+    return filteredUsers.some(u => u.role !== 'ADMIN');
+  }, [activeTab, filteredUsers]);
 
-  const totalPages = Math.ceil(filteredUsers.length / ITEMS_PER_PAGE);
+  const totalPages = React.useMemo(() => Math.ceil(filteredUsers.length / ITEMS_PER_PAGE), [filteredUsers.length]);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginatedUsers = filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+  const paginatedUsers = React.useMemo(() => filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE), [filteredUsers, startIndex]);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
         <Loader2 className="animate-spin text-emerald-600" size={40} />
-        <p className="text-gray-500 font-medium tracking-wide">Loading {activeTab === 'admin' ? 'Admins' : 'Staff'}...</p>
+        <p className="text-gray-500 font-medium tracking-wide">Loading Members...</p>
       </div>
     );
   }
@@ -249,23 +308,29 @@ export default function AdminUsers({ type }) {
               </div>
               
               <div className="flex items-center gap-1">
-                <button onClick={() => { 
-                  const { password, ...userWithoutPass } = user;
-                  setEditingUser({ ...userWithoutPass, password: '' }); 
-                  setShowEditModal(true); 
-                }}
-                  className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
-                  <Pencil size={15} />
-                </button>
-                <button onClick={() => handleToggleStatus(user)}
-                  className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
-                  {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
-                </button>
-                <button onClick={() => handleDeleteUser(user.id)}
-                  disabled={deletingId === user.id}
-                  className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
-                  {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
-                </button>
+                {can('STAFF', 'UPDATE') && (
+                  <button onClick={() => { 
+                    const { password, ...userWithoutPass } = user;
+                    setEditingUser({ ...userWithoutPass, password: '' }); 
+                    setShowEditModal(true); 
+                  }}
+                    className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
+                    <Pencil size={15} />
+                  </button>
+                )}
+                {can('STAFF', 'UPDATE') && (
+                  <button onClick={() => handleToggleStatus(user)}
+                    className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
+                    {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                  </button>
+                )}
+                {can('STAFF', 'DELETE') && (
+                  <button onClick={() => handleDeleteUser(user.id)}
+                    disabled={deletingId === user.id}
+                    className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
+                    {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                  </button>
+                )}
               </div>
             </div>
 
@@ -312,8 +377,8 @@ export default function AdminUsers({ type }) {
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Context</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
-              {activeTab !== 'admin' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>}
-              {activeTab !== 'admin' && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>}
+              {showDetailColumns && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>}
+              {showDetailColumns && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>}
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
             </tr>
           </thead>
@@ -354,53 +419,70 @@ export default function AdminUsers({ type }) {
                       </span>
                     </div>
                   </td>
-                  {activeTab !== 'admin' && (
+                  {showDetailColumns && (
                     <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                      <div className="flex flex-col items-center gap-1.5">
-                        {getRoleBadge(user.role)}
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                          <Truck size={10} />
-                          {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                      {user.role !== 'ADMIN' ? (
+                        <div className="flex flex-col items-center gap-1.5">
+                          {getRoleBadge(user.role, user.customRole)}
+                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                            <Truck size={10} />
+                            {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                          </div>
+                          {getVgeTypeBadge(user.vgeType)}
                         </div>
-                        {getVgeTypeBadge(user.vgeType)}
-                      </div>
+                      ) : (
+                        <div className="flex flex-col items-center gap-1">
+                           {getRoleBadge(user.role, user.customRole)}
+                           <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1">N/A</span>
+                        </div>
+                      )}
                     </td>
                   )}
-                  {activeTab !== 'admin' && (
+                  {showDetailColumns && (
                     <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                      <span className="text-sm font-black text-indigo-600">
-                         ₹{(user.baseSalary || 0).toLocaleString()}
-                      </span>
+                      {user.role !== 'ADMIN' ? (
+                        <span className="text-sm font-black text-indigo-600">
+                           ₹{(user.baseSalary || 0).toLocaleString()}
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-bold text-gray-300">---</span>
+                      )}
                     </td>
                   )}
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1.5">
-                    <button 
-                      onClick={() => { 
-                        const { password, ...userWithoutPass } = user;
-                        setEditingUser({ ...userWithoutPass, password: '' }); 
-                        setShowEditModal(true); 
-                      }}
-                      title="Edit Profile"
-                      className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button 
-                      onClick={() => handleToggleStatus(user)}
-                      title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
-                      className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
-                    >
-                      {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteUser(user.id)}
-                      title="Permanent Removal"
-                      disabled={deletingId === user.id}
-                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
-                    >
-                      {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
-                    </button>
+                    {can('STAFF', 'UPDATE') && (
+                      <button 
+                        onClick={() => { 
+                          const { password, ...userWithoutPass } = user;
+                          setEditingUser({ ...userWithoutPass, password: '' }); 
+                          setShowEditModal(true); 
+                        }}
+                        title="Edit Profile"
+                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                    )}
+                    {can('STAFF', 'UPDATE') && (
+                      <button 
+                        onClick={() => handleToggleStatus(user)}
+                        title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
+                        className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
+                      >
+                        {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                      </button>
+                    )}
+                    {can('STAFF', 'DELETE') && (
+                      <button 
+                        onClick={() => handleDeleteUser(user.id)}
+                        title="Permanent Removal"
+                        disabled={deletingId === user.id}
+                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                      >
+                        {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -413,6 +495,13 @@ export default function AdminUsers({ type }) {
 
   const renderClassifiedUsers = () => {
     if (isTenantRoute && !storeFilterId) {
+      const usersByStore = filteredUsers.reduce((acc, u) => {
+        if (u.storeId) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
       return (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
           <div className="col-span-full mb-2">
@@ -420,7 +509,7 @@ export default function AdminUsers({ type }) {
             <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to manage its {type === 'admin' ? 'administrators' : 'operational staff'}</p>
           </div>
           {stores.map(store => {
-            const groupUsers = filteredUsers.filter(u => u.storeId === store.id);
+            const userCount = usersByStore[store.id] || 0;
             return (
               <button
                 key={store.id}
@@ -436,7 +525,7 @@ export default function AdminUsers({ type }) {
                 <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
                 
                 <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
-                  <span>{groupUsers.length} {activeTab === 'admin' ? 'Admins' : 'Staff'}</span>
+                  <span>{userCount} {activeTab === 'admin' ? 'Admins' : 'Staff'}</span>
                   <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
                 </div>
               </button>
@@ -538,19 +627,21 @@ export default function AdminUsers({ type }) {
             )}
             <h2 className="text-xl font-bold text-gray-900">User Management</h2>
           </div>
-          <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit mt-1">
-            <button
-              onClick={() => setActiveTab('admin')}
-              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'admin' ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Admins
-            </button>
-            <button
-              onClick={() => setActiveTab('staff')}
-              className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'staff' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-            >
-              Sales Exec
-            </button>
+          <div className="flex flex-col gap-1.5 mt-2">
+            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 opacity-70">
+              Custom Privilege Level
+            </span>
+            <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit flex-wrap gap-1">
+              {customRoles.map(role => (
+                <button
+                  key={role.id}
+                  onClick={() => setActiveTab(role.id)}
+                  className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === role.id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                >
+                  {role.name}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="flex items-center gap-2 mt-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{filteredUsers.length} members found</p>
@@ -594,27 +685,29 @@ export default function AdminUsers({ type }) {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          <button 
-            onClick={() => {
-              setNewUser({
-                name: '',
-                email: '',
-                password: '',
-                mobile: '',
-                role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
-                vgeType: 'EMPLOYEE',
-                storeId: storeFilterId || currentUser?.storeId || '',
-                dailyTarget: 10000,
-                baseSalary: 12000,
-              });
-              setShowAddModal(true);
-            }}
-            className="bg-emerald-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-medium text-sm active:scale-95"
-          >
-            <Plus size={18} />
-            <span className="hidden md:inline">Hire Staff</span>
-            <span className="md:hidden">Add</span>
-          </button>
+          {can('STAFF', 'CREATE') && (
+            <button 
+              onClick={() => {
+                setNewUser({
+                  name: '',
+                  email: '',
+                  password: '',
+                  mobile: '',
+                  role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
+                  vgeType: 'EMPLOYEE',
+                  storeId: storeFilterId || currentUser?.storeId || '',
+                  dailyTarget: 10000,
+                  baseSalary: 12000,
+                });
+                setShowAddModal(true);
+              }}
+              className="bg-emerald-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-medium text-sm active:scale-95"
+            >
+              <Plus size={18} />
+              <span className="hidden md:inline">Hire Staff</span>
+              <span className="md:hidden">Add</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -688,34 +781,52 @@ export default function AdminUsers({ type }) {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                 <select 
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none"
-                  value={newUser.role}
-                  onChange={(e) => setNewUser({...newUser, role: e.target.value})}
-                >
-                  <option value="SALES_AGENT">Sales</option>
-                  <option value="ADMIN">Admin</option>
-                </select>
-                <select 
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none"
-                  value={newUser.vgeType}
-                  onChange={(e) => setNewUser({...newUser, vgeType: e.target.value})}
-                >
-                  <option value="EMPLOYEE">Full-time Employee</option>
-                  <option value="FREELANCER">Freelancer (Apps only)</option>
-                </select>
-                <input 
-                  type="password"
-                  required
-                  placeholder="Password"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                  value={newUser.password}
-                  onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                />
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-emerald-600 ml-1">Assigned Privilege Level *</label>
+                <div className="relative">
+                  <ShieldCheck size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 z-10" />
+                  <select 
+                    required
+                    className="w-full bg-emerald-50 border border-emerald-100 rounded-xl pl-12 pr-4 py-3 text-sm appearance-none outline-none font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer"
+                    value={newUser.customRoleId || ''}
+                    onChange={(e) => handleCustomRoleChange(e.target.value)}
+                  >
+                    <option value="">Standard {activeTab === 'admin' ? 'Administrator' : 'Sales Member'}</option>
+                    {customRoles.map(role => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-[9px] text-gray-400 font-bold ml-1 mt-1 italic">
+                  * Privilege level determines portal access and module permissions.
+                </p>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Staff Type</label>
+                  <select 
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all font-bold text-gray-600"
+                    value={newUser.vgeType}
+                    onChange={(e) => setNewUser({...newUser, vgeType: e.target.value})}
+                  >
+                    <option value="EMPLOYEE">Full-time Employee</option>
+                    <option value="FREELANCER">Freelancer (Apps only)</option>
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Security Password</label>
+                  <input 
+                    type="password"
+                    required
+                    placeholder="Set Password"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                    value={newUser.password}
+                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
+                  />
+                </div>
+              </div>
+
                 {isTenantRoute && (
                   <div className="space-y-1 focus-within:text-emerald-600 relative">
                     <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 transition-colors">Context Branch</label>
@@ -747,7 +858,6 @@ export default function AdminUsers({ type }) {
                     />
                   </div>
                 )}
-              </div>
 
               <button 
                 type="submit"
@@ -827,6 +937,25 @@ export default function AdminUsers({ type }) {
               </div>
 
               <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 ml-1">Assigned Privilege Level *</label>
+                <div className="relative">
+                  <ShieldCheck size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500 z-10" />
+                  <select 
+                    required
+                    className="w-full bg-indigo-50 border border-indigo-100 rounded-xl pl-12 pr-4 py-3 text-sm appearance-none outline-none font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
+                    value={editingUser.customRoleId || ''}
+                    onChange={(e) => handleCustomRoleChange(e.target.value, true)}
+                  >
+                    <option value="">Standard {activeTab === 'admin' ? 'Administrator' : 'Sales Member'}</option>
+                    {customRoles.map(role => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Staff Classification</label>
                 <select 
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all font-bold text-gray-700"
                   value={editingUser.vgeType}
@@ -834,14 +963,6 @@ export default function AdminUsers({ type }) {
                 >
                   <option value="EMPLOYEE">Full-time Employee</option>
                   <option value="FREELANCER">Freelancer (Apps only)</option>
-                </select>
-                <select 
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all"
-                  value={editingUser.role}
-                  onChange={(e) => setEditingUser({...editingUser, role: e.target.value})}
-                >
-                  <option value="SALES_AGENT">Sales Agent</option>
-                  <option value="ADMIN">Admin</option>
                 </select>
               </div>
 

@@ -60,6 +60,7 @@ export default function AdminRoutes() {
   const storeId = searchParams.get('storeId');
   const location = useLocation();
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
   const fetchData = async () => {
     setIsVillagesLoading(true);
@@ -296,12 +297,14 @@ export default function AdminRoutes() {
                 onChange={(e) => setVillageSearchQuery(e.target.value)}
               />
             </div>
-            <button
-              onClick={() => { setVillageForm({ id: '', name: '', latitude: '', longitude: '' }); setShowVillageModal(true); }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
-            >
-              <Plus size={16} strokeWidth={3} /> New Village
-            </button>
+            {can('ROUTES', 'CREATE') && (
+              <button
+                onClick={() => { setVillageForm({ id: '', name: '', latitude: '', longitude: '' }); setShowVillageModal(true); }}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+              >
+                <Plus size={16} strokeWidth={3} /> New Village
+              </button>
+            )}
           </div>
 
           <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden min-h-[40vh] flex flex-col">
@@ -363,18 +366,22 @@ export default function AdminRoutes() {
                               >
                                 <MapPin size={15} />
                               </a>
-                              <button 
-                                onClick={() => { setVillageForm({ id: v.id, name: v.name, latitude: v.latitude || '', longitude: v.longitude || '' }); setShowVillageModal(true); }}
-                                className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"
-                              >
-                                <Pencil size={15} />
-                              </button>
-                              <button 
-                                onClick={() => handleDeleteVillage(v.id)}
-                                className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"
-                              >
-                                <Trash2 size={15} />
-                              </button>
+                              {can('ROUTES', 'UPDATE') && (
+                                <button 
+                                  onClick={() => { setVillageForm({ id: v.id, name: v.name, latitude: v.latitude || '', longitude: v.longitude || '' }); setShowVillageModal(true); }}
+                                  className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"
+                                >
+                                  <Pencil size={15} />
+                                </button>
+                              )}
+                              {can('ROUTES', 'DELETE') && (
+                                <button 
+                                  onClick={() => handleDeleteVillage(v.id)}
+                                  className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"
+                                >
+                                  <Trash2 size={15} />
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -450,12 +457,14 @@ export default function AdminRoutes() {
                 onChange={(e) => setRouteSearchQuery(e.target.value)}
               />
             </div>
-            <button
-              onClick={() => { setRouteForm({ id: '', routeName: '', selectedVillages: [] }); setShowRouteModal(true); }}
-              className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
-            >
-              <Plus size={16} strokeWidth={3} /> New Route
-            </button>
+            {can('ROUTES', 'CREATE') && (
+              <button
+                onClick={() => { setRouteForm({ id: '', routeName: '', selectedVillages: [] }); setShowRouteModal(true); }}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
+              >
+                <Plus size={16} strokeWidth={3} /> New Route
+              </button>
+            )}
           </div>
           
           {isRoutesLoading ? (
@@ -473,8 +482,12 @@ export default function AdminRoutes() {
                       <div className="flex justify-between items-center">
                         <h3 className="font-black text-gray-900 flex items-center gap-2 uppercase tracking-tight"><MapPin size={18} className="text-emerald-500 fill-emerald-500/10"/> {route.routeName}</h3>
                         <div className="flex gap-1">
-                          <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-all"><Pencil size={15}/></button>
-                          <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2 text-gray-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"><Trash2 size={15}/></button>
+                          {can('ROUTES', 'UPDATE') && (
+                            <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-all"><Pencil size={15}/></button>
+                          )}
+                          {can('ROUTES', 'DELETE') && (
+                            <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2 text-gray-400 hover:bg-rose-50 hover:text-rose-600 rounded-lg transition-all"><Trash2 size={15}/></button>
+                          )}
                         </div>
                       </div>
                       <div className="flex flex-wrap gap-1.5 pt-2 border-t border-gray-50">
@@ -524,12 +537,16 @@ export default function AdminRoutes() {
                           </td>
                           <td className="px-8 py-6 text-right">
                             <div className="flex items-center justify-end gap-2 transition-all">
-                              <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-emerald-600 transition-all">
-                                <Pencil size={15}/>
-                              </button>
-                              <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-rose-600 transition-all">
-                                <Trash2 size={15}/>
-                              </button>
+                              {can('ROUTES', 'UPDATE') && (
+                                <button onClick={() => { setRouteForm({ id: route.id, routeName: route.routeName, selectedVillages: route.villages || [] }); setShowRouteModal(true); }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-emerald-600 transition-all">
+                                  <Pencil size={15}/>
+                                </button>
+                              )}
+                              {can('ROUTES', 'DELETE') && (
+                                <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(route.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 shadow-sm text-gray-400 hover:text-rose-600 transition-all">
+                                  <Trash2 size={15}/>
+                                </button>
+                              )}
                             </div>
                           </td>
                         </tr>
@@ -605,12 +622,14 @@ export default function AdminRoutes() {
                 onChange={(e) => setAssignmentSearchQuery(e.target.value)}
               />
             </div>
-            <button
-              onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
-              className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
-            >
-              <Plus size={16} strokeWidth={3} /> New Assignment
-            </button>
+            {can('ROUTES', 'CREATE') && (
+              <button
+                onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
+                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+              >
+                <Plus size={16} strokeWidth={3} /> New Assignment
+              </button>
+            )}
           </div>
 
           {isAssignmentsLoading ? (
@@ -629,19 +648,23 @@ export default function AdminRoutes() {
                       <div className="flex justify-between items-center pb-3 border-b border-gray-50">
                         <h4 className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</h4>
                         <div className="flex gap-1">
-                          <button onClick={() => {
-                              setAssignmentForm({
-                                id: a.id,
-                                vehicleId: a.vehicleId,
-                                userId: a.userId,
-                                routeId: a.routeId,
-                                morningSession: a.morningSession || '',
-                                afternoonSession: a.afternoonSession || '',
-                                schedule: a.schedule || null
-                              });
-                              setShowAssignModal(true);
-                          }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15}/></button>
-                          <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15}/></button>
+                          {can('ROUTES', 'UPDATE') && (
+                            <button onClick={() => {
+                                setAssignmentForm({
+                                  id: a.id,
+                                  vehicleId: a.vehicleId,
+                                  userId: a.userId,
+                                  routeId: a.routeId,
+                                  morningSession: a.morningSession || '',
+                                  afternoonSession: a.afternoonSession || '',
+                                  schedule: a.schedule || null
+                                });
+                                setShowAssignModal(true);
+                            }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15}/></button>
+                          )}
+                          {can('ROUTES', 'DELETE') && (
+                            <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15}/></button>
+                          )}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
@@ -752,19 +775,23 @@ export default function AdminRoutes() {
                           </td>
                           <td className="px-8 py-6 text-right">
                             <div className="flex items-center justify-end gap-2 transition-all">
-                              <button onClick={() => {
-                                setAssignmentForm({
-                                  id: a.id,
-                                  vehicleId: a.vehicleId,
-                                  userId: a.userId,
-                                  routeId: a.routeId,
-                                  morningSession: a.morningSession || '',
-                                  afternoonSession: a.afternoonSession || '',
-                                  schedule: a.schedule || null
-                                });
-                                setShowAssignModal(true);
-                              }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15}/></button>
-                              <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15}/></button>
+                              {can('ROUTES', 'UPDATE') && (
+                                <button onClick={() => {
+                                  setAssignmentForm({
+                                    id: a.id,
+                                    vehicleId: a.vehicleId,
+                                    userId: a.userId,
+                                    routeId: a.routeId,
+                                    morningSession: a.morningSession || '',
+                                    afternoonSession: a.afternoonSession || '',
+                                    schedule: a.schedule || null
+                                  });
+                                  setShowAssignModal(true);
+                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15}/></button>
+                              )}
+                              {can('ROUTES', 'DELETE') && (
+                                <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15}/></button>
+                              )}
                             </div>
                           </td>
                         </tr>

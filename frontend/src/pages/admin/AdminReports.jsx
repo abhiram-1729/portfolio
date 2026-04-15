@@ -73,6 +73,7 @@ export default function AdminReports() {
   const location = useLocation();
   const isTenantRoute = location.pathname.includes('/tenant/');
   const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
 
 
   const loadDailyData = async () => {
@@ -236,53 +237,59 @@ export default function AdminReports() {
         </div>
 
         <div className="h-[280px] w-full">
-          <ResponsiveContainer width="100%" height="100%">
-            <AreaChart data={trendsData}>
-              <defs>
-                <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                </linearGradient>
-                <linearGradient id="colorProf" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#f97316" stopOpacity={0.1}/>
-                  <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-              <XAxis 
-                dataKey="date" 
-                axisLine={false} 
-                tickLine={false} 
-                tick={{fontSize: 10, fontWeight: 800, fill: '#9ca3af'}} 
-                dy={10}
-              />
-              <YAxis 
-                hide 
-              />
-              <Tooltip 
-                contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px 16px' }}
-                itemStyle={{ fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="revenue" 
-                stroke="#10b981" 
-                strokeWidth={4}
-                fillOpacity={1} 
-                fill="url(#colorRev)" 
-                animationDuration={1500}
-              />
-              <Area 
-                type="monotone" 
-                dataKey="profit" 
-                stroke="#f97316" 
-                strokeWidth={3}
-                fillOpacity={1} 
-                fill="url(#colorProf)" 
-                animationDuration={2000}
-              />
-            </AreaChart>
-          </ResponsiveContainer>
+          {trendsData && Array.isArray(trendsData) ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={trendsData}>
+                <defs>
+                  <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#10b981" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
+                  </linearGradient>
+                  <linearGradient id="colorProf" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f97316" stopOpacity={0.1}/>
+                    <stop offset="95%" stopColor="#f97316" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
+                <XAxis 
+                  dataKey="date" 
+                  axisLine={false} 
+                  tickLine={false} 
+                  tick={{fontSize: 10, fontWeight: 800, fill: '#9ca3af'}} 
+                  dy={10}
+                />
+                <YAxis 
+                  hide 
+                />
+                <Tooltip 
+                  contentStyle={{ borderRadius: '1.5rem', border: 'none', boxShadow: '0 20px 25px -5px rgb(0 0 0 / 0.1)', padding: '12px 16px' }}
+                  itemStyle={{ fontSize: '12px', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '0.05em' }}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="revenue" 
+                  stroke="#10b981" 
+                  strokeWidth={4}
+                  fillOpacity={1} 
+                  fill="url(#colorRev)" 
+                  animationDuration={1500}
+                />
+                <Area 
+                  type="monotone" 
+                  dataKey="profit" 
+                  stroke="#f97316" 
+                  strokeWidth={3}
+                  fillOpacity={1} 
+                  fill="url(#colorProf)" 
+                  animationDuration={2000}
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full w-full flex items-center justify-center bg-gray-50/50 rounded-2xl">
+               <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Insufficient Data for Trends</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -956,41 +963,59 @@ export default function AdminReports() {
             )}
           </div>
         </div>
-        <button className="bg-emerald-600 text-white p-3 rounded-2xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 active:scale-95 transition-all w-fit">
-          <Download size={22} className="stroke-[2.5px]" />
-        </button>
+        {can('REPORTS', 'CREATE') && (
+          <button className="bg-emerald-600 text-white p-3 rounded-2xl shadow-lg shadow-emerald-600/30 hover:bg-emerald-700 active:scale-95 transition-all w-fit">
+            <Download size={22} className="stroke-[2.5px]" />
+          </button>
+        )}
       </div>
 
       {isTenantRoute && !storeFilterId ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
-          <div className="col-span-full mb-2">
+        <div className="space-y-6 pt-4">
+          <div className="mb-2">
             <h3 className="text-xl font-black tracking-tight text-gray-900">Platform Branches</h3>
             <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to view analytical reports</p>
           </div>
-          {stores.map(store => (
-            <button
-              key={store.id}
-              onClick={() => setSearchParams({ storeId: store.id })}
-              className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
-            >
-              <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
-              
-              <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                <Store size={28} strokeWidth={2.5} />
-              </div>
-              <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
-              <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
-              
-              <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
-                <span>View Analytics</span>
-                <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
-              </div>
-            </button>
-          ))}
-          {stores.length === 0 && (
-            <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
-               <Store size={48} className="mx-auto text-gray-300 mb-4" />
-               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+
+          {isOverviewLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm animate-pulse">
+                  <div className="w-14 h-14 rounded-2xl bg-gray-100 mb-6" />
+                  <div className="h-5 bg-gray-100 rounded-md w-3/4 mb-3" />
+                  <div className="h-3 bg-gray-100 rounded-md w-1/2 mb-8" />
+                  <div className="h-10 bg-gray-50 rounded-xl" />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 animate-in fade-in slide-in-from-bottom-6 duration-700">
+              {stores.map(store => (
+                <button
+                  key={store.id}
+                  onClick={() => setSearchParams({ storeId: store.id })}
+                  className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+                >
+                  <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
+                  
+                  <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
+                    <Store size={28} strokeWidth={2.5} />
+                  </div>
+                  <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
+                  <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
+                  
+                  <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
+                    <span>View Analytics</span>
+                    <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
+                  </div>
+                </button>
+              ))}
+              {stores.length === 0 && (
+                <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+                   <Store size={48} className="mx-auto text-gray-300 mb-4" />
+                   <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+                </div>
+              )}
             </div>
           )}
         </div>

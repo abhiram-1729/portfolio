@@ -45,6 +45,7 @@ model Tenant {
   dailyPerformance  VgeDailyPerformance[]
   monthlySummaries  VgeMonthlySummary[]
   assetRequests     AssetRequest[]
+  customRoles       CustomRole[]
   // Procurement Relations
   vendors                Vendor[]
   vendorItemMappings     VendorItemMapping[]
@@ -86,10 +87,12 @@ model User {
   status            UserStatus @default(ACTIVE)
   vgeType           String     @default("EMPLOYEE") // EMPLOYEE or FREELANCER
   fcmToken          String?
+  customRoleId      String?
 
   tenant           Tenant                @relation(fields: [tenantId], references: [id])
   assignedVehicle  Vehicle?              @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
   store            Store?                @relation(fields: [storeId], references: [id])
+  customRole       CustomRole?           @relation(fields: [customRoleId], references: [id])
   orders           Order[]
   carts            Cart[]
   openingCash      OpeningCash[]
@@ -112,6 +115,25 @@ model User {
   @@index([assignedVehicleId])
   @@index([role])
   @@index([status])
+  @@index([customRoleId])
+}
+
+model CustomRole {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  permissions Json     // {"INVENTORY": ["READ","CREATE","UPDATE","DELETE"], ...}
+  portalType  String   @default("ADMIN") // ADMIN, AGENT, SUPERVISOR, HELPER
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  users  User[]
+
+  @@unique([tenantId, name])
+  @@index([tenantId])
 }
 
 model Category {

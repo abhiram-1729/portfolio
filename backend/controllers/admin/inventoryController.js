@@ -21,6 +21,7 @@ export const getItems = async (req, res) => {
       where,
       include: {
         category: { select: { name: true } },
+        subCategory: { select: { name: true } },
         unit: { select: { name: true, type: true } },
       }
     });
@@ -83,11 +84,14 @@ export const createItem = async (req, res) => {
     let finalBrandId = brandId;
 
     if (!finalCategoryId || finalCategoryId === 'default') {
-      const defaultCategory = await prisma.category.upsert({
-        where: { tenantId_name: { tenantId: finalTenantId, name: 'Uncategorized' } },
-        update: {},
-        create: { name: 'Uncategorized', tenantId: finalTenantId }
+      let defaultCategory = await prisma.category.findFirst({
+        where: { tenantId: finalTenantId, name: 'Uncategorized', storeId: null }
       });
+      if (!defaultCategory) {
+        defaultCategory = await prisma.category.create({
+          data: { name: 'Uncategorized', tenantId: finalTenantId, storeId: null }
+        });
+      }
       finalCategoryId = defaultCategory.id;
     }
 
@@ -210,11 +214,14 @@ export const updateItem = async (req, res) => {
     let finalBrandId = brandId;
 
     if (finalCategoryId === 'default') {
-      const defaultCategory = await prisma.category.upsert({
-        where: { tenantId_name: { tenantId: finalTenantId, name: 'Uncategorized' } },
-        update: {},
-        create: { name: 'Uncategorized', tenantId: finalTenantId }
+      let defaultCategory = await prisma.category.findFirst({
+        where: { tenantId: finalTenantId, name: 'Uncategorized', storeId: null }
       });
+      if (!defaultCategory) {
+        defaultCategory = await prisma.category.create({
+          data: { name: 'Uncategorized', tenantId: finalTenantId, storeId: null }
+        });
+      }
       finalCategoryId = defaultCategory.id;
     }
 
@@ -417,11 +424,14 @@ export const bulkCreateItems = async (req, res) => {
     const createdItems = [];
 
     // Ensure default relations exist
-    const defaultCategory = await prisma.category.upsert({
-      where: { tenantId_name: { tenantId, name: 'Uncategorized' } },
-      update: {},
-      create: { name: 'Uncategorized', tenantId }
+    let defaultCategory = await prisma.category.findFirst({
+      where: { tenantId, name: 'Uncategorized', storeId: null }
     });
+    if (!defaultCategory) {
+      defaultCategory = await prisma.category.create({
+        data: { name: 'Uncategorized', tenantId, storeId: null }
+      });
+    }
 
     const defaultBrand = await prisma.brand.upsert({
       where: { tenantId_name: { tenantId, name: 'Unbranded' } },
@@ -452,6 +462,51 @@ export const bulkCreateItems = async (req, res) => {
         continue;
       }
 
+      // 1. Resolve Category
+      let targetCategoryId = defaultCategory.id;
+      if (prod.categoryName !== undefined && prod.categoryName !== null && prod.categoryName !== '') {
+        const catNameStr = String(prod.categoryName);
+        let cat = await prisma.category.findFirst({
+          where: { tenantId, name: catNameStr, storeId: null }
+        });
+        if (!cat) {
+          cat = await prisma.category.create({
+            data: { tenantId, name: catNameStr }
+          });
+        }
+        targetCategoryId = cat.id;
+      }
+
+      // 2. Resolve Sub-Category
+      let targetSubCategoryId = defaultSub.id;
+      if (prod.subCategoryName !== undefined && prod.subCategoryName !== null && prod.subCategoryName !== '' && targetCategoryId) {
+        const subNameStr = String(prod.subCategoryName);
+        let sub = await prisma.subCategory.findFirst({
+          where: { categoryId: targetCategoryId, name: subNameStr, tenantId }
+        });
+        if (!sub) {
+          sub = await prisma.subCategory.create({
+            data: { categoryId: targetCategoryId, name: subNameStr, tenantId }
+          });
+        }
+        targetSubCategoryId = sub.id;
+      }
+
+      // 3. Resolve Unit
+      let targetUnitId = null;
+      if (prod.unitType !== undefined && prod.unitType !== null && prod.unitType !== '') {
+        const unitStr = String(prod.unitType);
+        let unit = await prisma.unit.findFirst({
+          where: { tenantId, type: unitStr, storeId: null }
+        });
+        if (!unit) {
+          unit = await prisma.unit.create({
+            data: { tenantId, name: unitStr, type: unitStr }
+          });
+        }
+        targetUnitId = unit.id;
+      }
+
       const itemData = {
         tenantId: tenantId,
         name: prod.name,
@@ -462,9 +517,11 @@ export const bulkCreateItems = async (req, res) => {
         discount: parseNumber(prod.discount),
         status: prod.status || 'ACTIVE',
         image: null,
-        categoryId: prod.categoryId || defaultCategory.id,
-        subCategoryId: prod.subCategoryId || defaultSub.id,
+        categoryId: targetCategoryId,
+        subCategoryId: targetSubCategoryId,
         brandId: prod.brandId || defaultBrand.id,
+        unitId: targetUnitId,
+        unitValue: parseNumber(prod.unitValue),
         gst: parseNumber(prod.gst) || 0,
         isFree: prod.isFree === true || prod.isFree === 'true',
         minShopAmount: parseNumber(prod.minShopAmount) || 0,

@@ -39,6 +39,7 @@ import AdminProcurement from './pages/admin/AdminProcurement';
 import TenantLayout from './components/tenant/TenantLayout';
 import TenantDashboard from './pages/tenant/TenantDashboard';
 import TenantStores from './pages/tenant/TenantStores';
+import TenantPrivileges from './pages/tenant/TenantPrivileges';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -48,7 +49,14 @@ function PrivateRoute({ children }) {
 function AdminRoute({ children }) {
   const { token, user } = useUserStore();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.role !== 'ADMIN' && user?.role !== 'TENANT_OWNER') {
+  
+  const isAuthorized = 
+    user?.role === 'ADMIN' || 
+    user?.role === 'TENANT_OWNER' || 
+    user?.portalType === 'ADMIN' || 
+    user?.portalType === 'SUPERVISOR';
+
+  if (!isAuthorized) {
      return <Navigate to="/" replace />;
   }
   return children;
@@ -106,7 +114,9 @@ export default function App() {
         {/* Root Route: If not logged in, show Login. If logged in, wrap in Layout */}
         <Route path="/" element={
           !token ? <Login /> : 
-          user?.role === 'ADMIN' ? <Navigate to="/admin" replace /> :
+          (user?.portalType === 'ADMIN' || user?.role === 'ADMIN') ? <Navigate to="/admin" replace /> :
+          (user?.portalType === 'SUPERVISOR') ? <Navigate to="/admin" replace /> : 
+          (user?.portalType === 'HELPER') ? <PrivateRoute><AgentLayout /></PrivateRoute> :
           user?.role === 'TENANT_OWNER' ? <Navigate to="/tenant" replace /> :
           <PrivateRoute><AgentLayout /></PrivateRoute>
         }>
@@ -156,6 +166,7 @@ export default function App() {
           <Route path="notifications" element={<AdminNotifications />} />
           {/* Tenant specifically wants to manage Admins */}
           <Route path="admins" element={<AdminUsers type="admin" />} /> 
+          <Route path="privileges" element={<TenantPrivileges />} />
         </Route>
 
         <Route path="*" element={<Navigate to="/" replace />} />

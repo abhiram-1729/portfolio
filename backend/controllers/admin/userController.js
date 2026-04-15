@@ -28,7 +28,7 @@ export const getUsers = async (req, res) => {
 // Create a new user (Agent/helper/supervisor)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, role, assignedVehicleId, storeId, dailyTarget, vgeType, baseSalary } = req.body;
+    const { name, email, password, mobile, role, assignedVehicleId, storeId, dailyTarget, vgeType, baseSalary, customRoleId } = req.body;
 
     const userExists = await prisma.user.findFirst({
       where: {
@@ -63,7 +63,8 @@ export const createUser = async (req, res) => {
         assignedVehicle: assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined,
         store: storeId ? { connect: { id: storeId } } : undefined,
         dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined,
-        baseSalary: baseSalary ? parseFloat(baseSalary) : undefined
+        baseSalary: baseSalary ? parseFloat(baseSalary) : undefined,
+        customRole: customRoleId ? { connect: { id: customRoleId } } : undefined
       }
     });
 
@@ -78,7 +79,7 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, storeId, status, dailyTarget, vgeType, password, baseSalary } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, storeId, status, dailyTarget, vgeType, password, baseSalary, customRoleId } = req.body;
 
     const updateData = {
       name,
@@ -94,7 +95,10 @@ export const updateUser = async (req, res) => {
         ? { disconnect: true } 
         : (storeId ? { connect: { id: storeId } } : undefined),
       dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined,
-      baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined
+      baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined,
+      customRole: customRoleId === null 
+        ? { disconnect: true } 
+        : (customRoleId ? { connect: { id: customRoleId } } : undefined)
     };
 
     // Safely update password if provided
@@ -147,15 +151,27 @@ export const deactivateUser = async (req, res) => {
       await tx.openingCash.deleteMany({ where: { userId: id } });
       await tx.closingCash.deleteMany({ where: { userId: id } });
 
-      // 3. Activity & Performance
+      // 3. Activity, Performance & Location
       await tx.vgeDailyPerformance.deleteMany({ where: { userId: id } });
       await tx.vgeMonthlySummary.deleteMany({ where: { userId: id } });
       await tx.routeAssignment.deleteMany({ where: { userId: id } });
+      await tx.locationCheckIn.deleteMany({ where: { userId: id } });
 
-      // 4. Notifications
+      // 4. Notifications & Communication
       await tx.notification.deleteMany({ where: { userId: id } });
 
-      // 5. Unlink and Purge User
+      // 5. Assets Management Purge
+      await tx.assetAssignment.deleteMany({ where: { userId: id } });
+      await tx.assetIssue.deleteMany({ where: { userId: id } });
+      await tx.assetRequest.deleteMany({ where: { userId: id } });
+
+      // 6. Detailed Operational Logs
+      await tx.stockAudit.deleteMany({ where: { userId: id } });
+      await tx.expense.deleteMany({ where: { userId: id } });
+      await tx.cashTransfer.deleteMany({ where: { userId: id } });
+      await tx.dailyCashSummary.deleteMany({ where: { userId: id } });
+
+      // 7. Unlink and Purge User
       await tx.user.update({
         where: { id },
         data: { assignedVehicleId: null }

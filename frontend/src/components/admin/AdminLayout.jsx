@@ -58,22 +58,29 @@ export default function AdminLayout() {
   };
 
   const navItems = [
-    { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
-    { to: '/admin/users', icon: Users, label: 'Users' },
-    { to: '/admin/vehicles', icon: Truck, label: 'Vehicles' },
-    { to: '/admin/routes', icon: MapPin, label: 'Routes' },
-    { to: '/admin/inventory', icon: Package, label: 'Inventory' },
-    { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History' },
-    { to: '/admin/reports', icon: BarChart3, label: 'Reports' },
-    { to: '/admin/cash', icon: Coins, label: 'Cash Flow' },
-    { to: '/admin/targets', icon: Target, label: 'Targets' },
-    { to: '/admin/assets', icon: Box, label: 'Assets' },
-    { to: '/admin/expenses', icon: Receipt, label: 'Expenses' },
-    { to: '/admin/procurement', icon: ClipboardList, label: 'Procurement' },
-    { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports' },
-    { to: '/admin/notifications', icon: Bell, label: 'Notifications' },
-    { to: '/admin/settings', icon: Settings, label: 'Settings' },
-  ];
+    { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
+    { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
+    { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
+    { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES' },
+    { to: '/admin/inventory', icon: Package, label: 'Inventory', module: 'INVENTORY' },
+    { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
+    { to: '/admin/reports', icon: BarChart3, label: 'Reports', module: 'REPORTS' },
+    { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
+    { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },
+    { to: '/admin/assets', icon: Box, label: 'Assets', module: 'ASSETS' },
+    { to: '/admin/expenses', icon: Receipt, label: 'Expenses', module: 'EXPENSES' },
+    { to: '/admin/procurement', icon: ClipboardList, label: 'Procurement', module: 'PROCUREMENT' },
+    { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
+    { to: '/admin/notifications', icon: Bell, label: 'Notifications', module: 'NOTIFICATIONS' },
+    { to: '/admin/settings', icon: Settings, label: 'Settings', module: 'SETTINGS' },
+  ].filter(item => {
+    // If no specific module or if user is owner/full admin, show all
+    if (!item.module || user?.role === 'TENANT_OWNER' || user?.role === 'ADMIN') return true;
+    
+    // Check custom permissions
+    const perms = user?.permissions?.[item.module] || [];
+    return perms.includes('READ');
+  });
 
 
   return (
