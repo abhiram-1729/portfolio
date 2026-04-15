@@ -4,7 +4,15 @@ import { sendNotification } from '../../services/notificationService.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
 import fs from 'fs';
+import path from 'path';
+import AdmZip from 'adm-zip';
+import XLSX from 'xlsx';
 import { logActivity } from '../../utils/activityLogger.js';
+
+// Global caches for bulk operations
+const catCache = new Map();
+const subCache = new Map();
+const unitCache = new Map();
 
 // Item Master
 export const getItems = async (req, res) => {
@@ -619,6 +627,218 @@ export const bulkCreateItems = async (req, res) => {
   } catch (error) {
     console.error('❌ Bulk Create Item Error:', error);
     res.status(500).json({ message: 'Error bulk creating items', error: error.message });
+  }
+};
+
+export const importZipInventory = async (req, res) => {
+  const tempDir = path.join('uploads', 'tmp', `zip-${Date.now()}`);
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: 'No ZIP file uploaded' });
+    }
+
+    const tenantId = req.user?.tenantId || getTenantId() || 'VK001';
+    const storeId = req.user?.storeId || null;
+
+    // Create temp directory
+    if (!fs.existsSync(tempDir)) {
+      fs.mkdirSync(tempDir, { recursive: true });
+    }
+
+    // Extract ZIP
+    console.log(`[ZIP Import] Processing file: ${req.file.originalname} for Tenant: ${tenantId}`);
+    const zip = new AdmZip(req.file.buffer);
+    zip.extractAllTo(tempDir, true);
+
+    // Find Excel file and Images folder
+    let files = fs.readdirSync(tempDir);
+    console.log(`[ZIP Import] Extracted ${files.length} items to ${tempDir}`);
+    
+    // If there's only one item and it's a directory, go inside it
+    if (files.length === 1 && fs.statSync(path.join(tempDir, files[0])).isDirectory()) {
+      const subDir = path.join(tempDir, files[0]);
+      console.log(`[ZIP Import] Single top-level directory detected: ${files[0]}. Descending...`);
+      // Copy contents back to tempDir or just adjust tempDir?
+      // Adjusting paths is easier
+      const subFiles = fs.readdirSync(subDir);
+      subFiles.forEach(f => {
+        fs.renameSync(path.join(subDir, f), path.join(tempDir, f));
+      });
+      files = fs.readdirSync(tempDir);
+    }
+
+    const excelFile = files.find(f => f.endsWith('.xlsx') || f.endsWith('.xls') || f.endsWith('.csv'));
+    const imageFolder = files.find(f => f.toLowerCase() === 'images' || f.toLowerCase() === 'product_images');
+    const imageFolderPath = imageFolder ? path.join(tempDir, imageFolder) : tempDir;
+
+    if (!excelFile) {
+      throw new Error('No Excel/CSV file found in ZIP');
+    }
+
+    // Parse Excel
+    const excelFilePath = path.join(tempDir, excelFile);
+    const fileBuffer = fs.readFileSync(excelFilePath);
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName]);
+
+    if (data.length === 0) {
+      throw new Error('Excel file is empty');
+    }
+
+    // Pre-create relations (similar to bulkCreateItems)
+    // Ensure default relations exist
+    let defaultCategory = await prisma.category.findFirst({
+      where: { tenantId, name: 'Uncategorized', storeId: null }
+    });
+    if (!defaultCategory) {
+      defaultCategory = await prisma.category.create({
+        data: { name: 'Uncategorized', tenantId, storeId: null }
+      });
+    }
+
+    const defaultBrand = await prisma.brand.upsert({
+      where: { tenantId_name: { tenantId, name: 'Unbranded' } },
+      update: {},
+      create: { name: 'Unbranded', tenantId }
+    });
+
+    let defaultSub = await prisma.subCategory.findFirst({
+      where: { name: 'Uncategorized', categoryId: defaultCategory.id, tenantId }
+    });
+    if (!defaultSub) {
+      defaultSub = await prisma.subCategory.create({
+        data: { name: 'Uncategorized', categoryId: defaultCategory.id, tenantId }
+      });
+    }
+
+    // Populate Caches
+    const [existingCats, existingUnits] = await Promise.all([
+      prisma.category.findMany({ where: { tenantId, storeId: null } }),
+      prisma.unit.findMany({ where: { tenantId, storeId: null } })
+    ]);
+    existingCats.forEach(c => catCache.set(c.name.trim(), c.id));
+    existingUnits.forEach(u => unitCache.set(u.type.trim(), u.id));
+
+    const existingSubs = await prisma.subCategory.findMany({
+      where: { categoryId: { in: existingCats.map(c => c.id) }, tenantId }
+    });
+    existingSubs.forEach(s => subCache.set(`${s.categoryId}_${s.name.trim()}`, s.id));
+
+    const parseNumber = (val) => {
+      if (val === undefined || val === null || val === '') return undefined;
+      const num = parseFloat(val);
+      return isNaN(num) ? undefined : num;
+    };
+
+    let successCount = 0;
+    let errorCount = 0;
+
+    for (const row of data) {
+      try {
+        const keys = Object.keys(row);
+        const findKey = (search) => keys.find(k => k.toLowerCase().includes(search.toLowerCase()));
+
+        const nameKey = findKey('product name') || findKey('name') || keys[0];
+        if (!row[nameKey]) continue;
+
+        const imgFilenameKey = findKey('image filename') || findKey('image') || findKey('filename');
+        const categoryKey = findKey('category');
+        const subCategoryKey = findKey('sub-category') || findKey('sub category');
+        const unitTypeKey = findKey('unit type');
+        
+        let imageUrl = null;
+        if (imgFilenameKey && row[imgFilenameKey]) {
+          const imgPath = path.join(imageFolderPath, row[imgFilenameKey]);
+          if (fs.existsSync(imgPath)) {
+            const fileBuffer = fs.readFileSync(imgPath);
+            const mimeType = row[imgFilenameKey].toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg';
+            imageUrl = await uploadToSupabase(fileBuffer, row[imgFilenameKey], mimeType, 'product-images', 'products');
+          }
+        }
+
+        let categoryId = defaultCategory.id;
+        if (categoryKey && row[categoryKey]) {
+          const catName = String(row[categoryKey]).trim();
+          if (catCache.has(catName)) {
+            categoryId = catCache.get(catName);
+          } else {
+            const newCat = await prisma.category.create({ data: { tenantId, name: catName } });
+            catCache.set(catName, newCat.id);
+            categoryId = newCat.id;
+          }
+        }
+
+        let subCategoryId = defaultSub.id;
+        if (subCategoryKey && row[subCategoryKey] && categoryId) {
+          const subName = String(row[subCategoryKey]).trim();
+          const cacheKey = `${categoryId}_${subName}`;
+          if (subCache.has(cacheKey)) {
+            subCategoryId = subCache.get(cacheKey);
+          } else {
+            const newSub = await prisma.subCategory.create({ data: { tenantId, categoryId, name: subName } });
+            subCache.set(cacheKey, newSub.id);
+            subCategoryId = newSub.id;
+          }
+        }
+
+        let unitId = null;
+        if (unitTypeKey && row[unitTypeKey]) {
+          const unitType = String(row[unitTypeKey]).trim();
+          if (unitCache.has(unitType)) {
+            unitId = unitCache.get(unitType);
+          } else {
+            const newUnit = await prisma.unit.create({ data: { tenantId, type: unitType, name: unitType } });
+            unitCache.set(unitType, newUnit.id);
+            unitId = newUnit.id;
+          }
+        }
+
+        const catCode = (row[categoryKey] || 'GEN').toString().substring(0, 4).toUpperCase();
+        const displayId = await generateId({ entity: 'ITM', tenantId, storeId, categoryCode: catCode });
+
+        await prisma.product.create({
+          data: {
+            tenantId,
+            storeId,
+            displayId,
+            name: row[nameKey],
+            description: row[findKey('description')] || '',
+            mrp: parseNumber(row[findKey('mrp')]),
+            price: parseNumber(row[findKey('selling price') || findKey('price')]) || 0,
+            landingPrice: parseNumber(row[findKey('landing price') || findKey('purchase price')]),
+            discount: parseNumber(row[findKey('discount')]),
+            gst: parseNumber(row[findKey('gst')]) || 0,
+            unitValue: parseNumber(row[findKey('unit value')]),
+            unitId,
+            categoryId,
+            subCategoryId,
+            brandId: defaultBrand.id,
+            image: imageUrl,
+            status: 'ACTIVE'
+          }
+        });
+        successCount++;
+      } catch (err) {
+        console.error(`Error importing row: ${row.name}`, err);
+        errorCount++;
+      }
+    }
+
+    res.json({ message: 'ZIP Import complete', success: successCount, failed: errorCount });
+  } catch (error) {
+    console.error('❌ ZIP Import Error:', error);
+    try {
+      fs.appendFileSync('zip_import_error.log', `[${new Date().toISOString()}] ERROR: ${error.message}\nSTACK: ${error.stack}\n\n`);
+    } catch (e) {}
+    res.status(500).json({ message: error.message });
+  } finally {
+    // Cleanup
+    try {
+      if (fs.existsSync(tempDir)) {
+        fs.rmSync(tempDir, { recursive: true, force: true });
+      }
+    } catch (e) {}
   }
 };
 

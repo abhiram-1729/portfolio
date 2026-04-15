@@ -16,7 +16,7 @@ import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.
 import * as assetCtr from '../controllers/admin/assetController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
-import { uploadMiddleware } from '../middleware/uploadMiddleware.js';
+import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -74,6 +74,7 @@ router.route('/inventory/items')
   );
 router.post('/inventory/items/bulk', inventoryCtr.bulkCreateItems);
 router.post('/inventory/items/bulk-delete', inventoryCtr.bulkDeleteItems);
+router.post('/inventory/items/zip-import', zipUpload.single('zipFile'), inventoryCtr.importZipInventory);
 router.route('/inventory/items/:id')
   .put(uploadMiddleware.single('image'), inventoryCtr.updateItem)
   .delete(inventoryCtr.deleteItem);

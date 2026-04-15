@@ -22,6 +22,7 @@ export default function AdminInventory() {
   const [showAddItemModal, setShowAddItemModal] = useState(false);
   const [showEditItemModal, setShowEditItemModal] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [showZipImportModal, setShowZipImportModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
   const [selectedFile, setSelectedFile] = useState(null);
   const [selectedEditFile, setSelectedEditFile] = useState(null);
@@ -288,17 +289,19 @@ export default function AdminInventory() {
   const handleDownloadSample = () => {
     const ws = XLSX.utils.json_to_sheet([
       {
-        "Product Name": "Example Product",
+        "Product Name": "Basmati Rice 1kg",
         "Category": "Staples",
         "Sub Category": "Rice",
         "Unit Type": "KG",
         "Unit Value": "1",
-        "Landing Price": "40",
-        "MRP": "50",
-        "Discount Value": "5",
+        "Landing Price": "80.00",
+        "MRP": "120.00",
+        "Selling Price": "110.00",
+        "Discount Value": "10.00",
         "Discount Type": "RUPEE",
         "GST Slab": "0",
-        "Description": "Premium quality"
+        "Image Filename": "rice_packet.jpg",
+        "Description": "Premium aged long grain basmati rice"
       }
     ]);
     const wb = XLSX.utils.book_new();
@@ -401,6 +404,33 @@ export default function AdminInventory() {
     };
 
     reader.readAsBinaryString(file);
+  };
+
+  const handleZipUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    if (!file.name.endsWith('.zip')) {
+      toast.error('Please upload a valid ZIP file');
+      return;
+    }
+
+    setIsUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('zipFile', file);
+
+      const response = await adminAPI.importZipInventory(formData);
+      toast.success(`ZIP Import Complete: ${response.data.success} successful, ${response.data.failed} failed`);
+      setShowZipImportModal(false);
+      fetchData();
+    } catch (error) {
+      console.error('ZIP upload error:', error);
+      toast.error(error.response?.data?.message || 'Failed to process ZIP file');
+    } finally {
+      setIsUploading(false);
+      e.target.value = ''; // Reset input
+    }
   };
 
   const handleCreateItem = async (e) => {
@@ -2639,6 +2669,14 @@ export default function AdminInventory() {
               onChange={handleExcelUpload}
               disabled={isUploading}
             />
+            <input
+              type="file"
+              id="zip-upload"
+              accept=".zip"
+              className="hidden"
+              onChange={handleZipUpload}
+              disabled={isUploading}
+            />
             {can('INVENTORY', 'CREATE') && (
               <button
                 onClick={() => setShowBulkUploadModal(true)}
@@ -2648,6 +2686,17 @@ export default function AdminInventory() {
               >
                 {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
                 <span className="hidden md:block">Bulk Upload</span>
+              </button>
+            )}
+            {can('INVENTORY', 'CREATE') && (
+              <button
+                onClick={() => setShowZipImportModal(true)}
+                disabled={isUploading}
+                className="bg-orange-50 text-orange-600 p-3 rounded-xl border border-orange-100 shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                title="Import ZIP (Excel + Images)"
+              >
+                {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Package size={24} />}
+                <span className="hidden md:block">Zip Import</span>
               </button>
             )}
             {can('INVENTORY', 'CREATE') && (
@@ -2834,6 +2883,54 @@ export default function AdminInventory() {
               >
                 <ArrowDownCircle size={18} className="text-gray-500" />
                 Download Sample Excel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Zip Import Modal */}
+      {showZipImportModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                <Package className="text-orange-500" />
+                ZIP Import
+              </h3>
+              <button
+                onClick={() => setShowZipImportModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div
+                onClick={() => document.getElementById('zip-upload').click()}
+                className="w-full border-2 border-dashed border-orange-200 bg-orange-50/50 hover:bg-orange-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
+                style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
+              >
+                <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3 text-orange-600 group-hover:scale-110 transition-transform">
+                  {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ArrowUpCircle size={28} />}
+                </div>
+                <span className="font-bold text-orange-800 text-sm">Upload ZIP File</span>
+                <span className="text-xs text-orange-600/70 mt-1 font-medium select-none text-center">Contains Excel + Images Folder</span>
+              </div>
+
+              <div className="relative flex items-center py-2">
+                <div className="flex-grow border-t border-gray-100"></div>
+                <span className="flex-shrink-0 mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or</span>
+                <div className="flex-grow border-t border-gray-100"></div>
+              </div>
+
+              <button
+                onClick={handleDownloadSample}
+                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
+              >
+                <ArrowDownCircle size={18} className="text-gray-500" />
+                Download Zip Template
               </button>
             </div>
           </div>

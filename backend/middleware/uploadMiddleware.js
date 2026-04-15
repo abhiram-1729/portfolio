@@ -24,3 +24,13 @@ export const uploadMiddleware = multer({
     cb(error, isValid);
   }
 });
+
+export const zipUpload = multer({
+  storage: storage,
+  limits: { fileSize: 50 * 1024 * 1024 }, // 50MB for ZIP
+  fileFilter: (req, file, cb) => {
+    const isZip = file.mimetype === 'application/zip' || file.mimetype === 'application/x-zip-compressed';
+    let error = isZip ? null : new Error('Invalid file! Only ZIP files are allowed for this operation.');
+    cb(error, isZip);
+  }
+});
