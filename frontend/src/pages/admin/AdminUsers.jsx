@@ -36,15 +36,13 @@ export default function AdminUsers({ type }) {
   const [editingUser, setEditingUser] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeTab, setActiveTab] = useState(type || 'admin');
+  const [activeTab, setActiveTab] = useState('all');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
   useEffect(() => {
     if (type) {
-      setActiveTab(type);
-    } else if (activeTab === 'staff' || activeTab === 'admin') {
-      // Keep it if it's a legacy tab, but prefer all
+      setActiveTab('all');
     }
   }, [type]);
 
@@ -207,12 +205,16 @@ export default function AdminUsers({ type }) {
 
   const filteredUsers = React.useMemo(() => {
     return users.filter(u => {
-      // 1. Role Filter
-      const roleMatches = activeTab === 'admin'
-          ? u.role === 'ADMIN' && !u.customRoleId
-          : activeTab === 'staff'
-            ? u.role === 'SALES_AGENT' && !u.customRoleId
-            : u.customRoleId === activeTab;
+      // Role Filter based on tab
+      const userIsAdmin = u.role === 'ADMIN' || u.customRole?.portalType === 'ADMIN' || u.customRole?.portalType === 'SUPERVISOR';
+      
+      const roleMatches = activeTab === 'all' 
+          ? true 
+          : activeTab === 'admin'
+            ? userIsAdmin
+            : activeTab === 'agent'
+              ? !userIsAdmin
+              : u.customRoleId === activeTab;
 
       if (!roleMatches) return false;
 
@@ -260,6 +262,13 @@ export default function AdminUsers({ type }) {
       setNewUser(prev => ({ ...prev, customRoleId: roleId, role: systemRole }));
     }
   };
+
+  const relevantCustomRoles = React.useMemo(() => {
+    return customRoles.filter(role => {
+      const isCustomAdmin = (role.portalType === 'ADMIN' || role.portalType === 'SUPERVISOR');
+      return (type === 'admin' && isCustomAdmin) || (type === 'staff' && !isCustomAdmin);
+    });
+  }, [customRoles, type]);
 
   const showDetailColumns = React.useMemo(() => {
     if (activeTab === 'admin') return false;
@@ -629,18 +638,29 @@ export default function AdminUsers({ type }) {
           </div>
           <div className="flex flex-col gap-1.5 mt-2">
             <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 opacity-70">
-              Custom Privilege Level
+              Department View
             </span>
-            <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit flex-wrap gap-1">
-              {customRoles.map(role => (
-                <button
-                  key={role.id}
-                  onClick={() => setActiveTab(role.id)}
-                  className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === role.id ? 'bg-white text-blue-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
-                >
-                  {role.name}
-                </button>
-              ))}
+            <div className="flex items-center bg-gray-200/50 p-1.5 rounded-2xl w-fit flex-wrap gap-1 border border-gray-100 shadow-sm">
+              <button
+                onClick={() => setActiveTab('all')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'all' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+              >
+                All Members
+              </button>
+              
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'admin' ? 'bg-rose-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+              >
+                Admins
+              </button>
+
+              <button
+                onClick={() => setActiveTab('agent')}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+              >
+                Agents
+              </button>
             </div>
           </div>
           <div className="flex items-center gap-2 mt-2">
