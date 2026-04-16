@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid } from 'lucide-react';
+import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid, Camera } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { productsAPI } from '../services/api';
 import { useCartStore } from '../store/cartStore';
 import ProductGrid from '../components/ProductGrid';
 import CartDrawer from '../components/CartDrawer';
+import BarcodeScannerOverlay from '../components/BarcodeScannerOverlay';
 import { getCashStatus } from '../services/cashService';
 import { getTodayPlan } from '../services/routeService';
 import toast from 'react-hot-toast';
@@ -22,6 +23,7 @@ export default function SalesEntry() {
   const [filterFreeOnly, setFilterFreeOnly] = useState(false);
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
   const [plan, setPlan] = useState(null);
   const { user } = useUserStore();
   const { items, customerMobile, setCustomerMobile, customerName, setCustomerName, totalAmount } = useCartStore();
@@ -118,7 +120,10 @@ export default function SalesEntry() {
     let result = products;
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter((p) => p.name.toLowerCase().includes(q));
+      result = result.filter((p) => 
+        p.name.toLowerCase().includes(q) || 
+        (p.barcode && p.barcode.toLowerCase().includes(q))
+      );
     }
     if (filterCategory !== 'ALL') {
       result = result.filter(p => p.category?.name === filterCategory);
@@ -190,6 +195,13 @@ export default function SalesEntry() {
             >
               <Gift size={14} strokeWidth={3} />
               Gifts
+            </button>
+            <button
+              onClick={() => setShowScanner(true)}
+              className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors shrink-0 flex items-center justify-center"
+              title="Scan Barcode"
+            >
+              <Camera size={16} strokeWidth={3} />
             </button>
             {search && (
               <button onClick={() => setSearch('')} className="p-1.5 mr-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-black text-[9px] uppercase tracking-tighter">
@@ -300,6 +312,17 @@ export default function SalesEntry() {
 
       {/* Cart Drawer */}
       <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} products={products} />
+
+      {/* Barcode Scanner Overlay */}
+      {showScanner && (
+        <BarcodeScannerOverlay
+          onScan={(code) => {
+            setSearch(code);
+            toast.success("Barcode Scanned!");
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
     </div>
   );
 }

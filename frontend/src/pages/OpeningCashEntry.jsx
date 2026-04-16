@@ -34,72 +34,76 @@ export default function OpeningCashEntry() {
     }
   };
 
-  if (loading) return null;
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-slate-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+        <p className="font-black text-slate-400 uppercase tracking-widest text-xs">Loading Status...</p>
+      </div>
+    </div>
+  );
 
   const shift1 = status?.shifts?.shift1;
   const shift2 = status?.shifts?.shift2;
   const anyShiftAssigned = shift1?.openingAssigned || shift2?.openingAssigned;
 
-  const ShiftCard = ({ shiftNum, data, icon: Icon, color, gradientFrom, gradientTo }) => {
+  const ShiftCard = ({ shiftNum, data, icon: Icon, color }) => {
     const denominations = data?.openingDenominations;
+    const isAssigned = data?.openingAssigned;
+
     return (
-      <div className={`rounded-[2rem] border overflow-hidden shadow-xl ${data?.openingAssigned ? `border-${color}-200 shadow-${color}-100/30` : 'border-gray-100 shadow-gray-100/30'}`}>
+      <div className={`rounded-3xl border overflow-hidden transition-all duration-300 ${isAssigned ? `border-${color}-200 bg-white shadow-xl shadow-${color}-100/20` : 'border-slate-100 bg-slate-50 opacity-60'}`}>
         {/* Shift Header */}
-        <div className={`p-5 flex items-center justify-between ${data?.openingAssigned ? `bg-gradient-to-r from-${color}-500 to-${color}-600 text-white` : 'bg-gray-100 text-gray-400'}`}>
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${data?.openingAssigned ? 'bg-white/20' : 'bg-white'}`}>
-              <Icon size={20} className={data?.openingAssigned ? 'text-white' : 'text-gray-300'} />
-            </div>
+        <div className={`px-5 py-3 flex items-center justify-between ${isAssigned ? `bg-${color}-500 text-white` : 'bg-slate-100 text-slate-400'}`}>
+          <div className="flex items-center gap-2.5">
+            <Icon size={16} className={isAssigned ? 'text-white' : 'text-slate-300'} />
             <div>
-              <h3 className="text-sm font-black uppercase tracking-widest">Shift {shiftNum}</h3>
-              <p className="text-[9px] font-bold uppercase tracking-wider opacity-70">
-                {shiftNum === 1 ? 'Morning Session' : 'Afternoon Session'}
-              </p>
+              <h3 className="text-[10px] font-black uppercase tracking-widest leading-none">Shift {shiftNum}</h3>
             </div>
           </div>
-          {data?.openingAssigned ? (
-            <div className="flex items-center gap-1.5 bg-white/20 px-3 py-1.5 rounded-full">
-              <CheckCircle2 size={12} />
-              <span className="text-[9px] font-black uppercase tracking-widest">Assigned</span>
+          {isAssigned ? (
+            <div className="flex items-center gap-1 bg-white/20 px-2.5 py-1 rounded-lg">
+              <CheckCircle2 size={10} />
+              <span className="text-[8px] font-black uppercase tracking-widest">Assigned</span>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5 bg-white px-3 py-1.5 rounded-full">
-              <Clock size={12} className="text-gray-400" />
-              <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Pending</span>
+            <div className="flex items-center gap-1 bg-white/60 px-2.5 py-1 rounded-lg">
+              <Clock size={10} className="text-slate-400" />
+              <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">Pending</span>
             </div>
           )}
         </div>
 
         {/* Amount */}
-        <div className="p-6 bg-white">
-          {data?.openingAssigned ? (
+        <div className="p-5">
+          {isAssigned ? (
             <div className="space-y-4">
               {data.isNoService ? (
-                <div className="text-center py-4 space-y-3">
-                  <div className="w-12 h-12 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto text-rose-500 border border-rose-100">
-                    <AlertCircle size={24} />
+                <div className="text-center py-2 space-y-2">
+                  <div className="w-10 h-10 bg-rose-50 rounded-2xl flex items-center justify-center mx-auto text-rose-500 border border-rose-100">
+                    <AlertCircle size={20} />
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-sm font-black text-rose-600 uppercase tracking-widest block">No Service Day</span>
-                    <p className="text-[10px] font-bold text-gray-400 max-w-[180px] mx-auto leading-relaxed">
-                      This shift has been marked as No Service by admin (Vehicle Damage/Maintenance).
-                    </p>
-                  </div>
+                  <span className="text-[10px] font-black text-rose-600 uppercase tracking-widest">No Service Day</span>
                 </div>
               ) : (
                 <>
-                  <div className="text-center">
-                    <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Opening Float</span>
-                    <span className="text-4xl font-black text-slate-900 tracking-tighter">₹{(data.openingCash || 0).toLocaleString()}</span>
+                  <div className="flex justify-between items-end border-b border-slate-100 pb-4">
+                    <div>
+                      <span className="text-[8px] font-black uppercase tracking-widest text-slate-400 block mb-0.5">Opening Float</span>
+                      <span className={`text-3xl font-black tracking-tighter text-${color}-600`}>₹{(data.openingCash || 0).toFixed(2)}</span>
+                    </div>
+                    <div className={`w-8 h-8 rounded-lg bg-${color}-50 flex items-center justify-center text-${color}-500 shadow-sm border border-${color}-100/50`}>
+                      <Coins size={16} />
+                    </div>
                   </div>
 
-                  {/* Denomination breakdown */}
+                  {/* Denomination breakdown: Small Grid */}
                   {denominations && (
-                    <div className="grid grid-cols-3 gap-2 pt-2">
+                    <div className="grid grid-cols-3 gap-1.5">
                       {DENOMINATIONS.filter(d => denominations[d] > 0).map(d => (
-                        <div key={d} className="bg-slate-50 rounded-xl p-2 text-center border border-slate-100">
-                          <span className="text-[9px] font-black text-slate-400 block">₹{d}</span>
-                          <span className="text-xs font-black text-slate-700">× {denominations[d]}</span>
+                        <div key={d} className="bg-slate-50/80 rounded-lg p-2 text-center border border-slate-100/50">
+                          <span className="text-[8px] font-black text-slate-400 block whitespace-nowrap">₹{d}</span>
+                          <span className="text-[11px] font-black text-slate-700 leading-none">× {denominations[d]}</span>
                         </div>
                       ))}
                     </div>
@@ -108,11 +112,11 @@ export default function OpeningCashEntry() {
               )}
             </div>
           ) : (
-            <div className="text-center py-6 space-y-2">
-              <div className="w-14 h-14 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto border border-gray-100">
-                <Clock size={24} className="text-gray-300" />
+            <div className="text-center py-4 space-y-1.5 opacity-50 grayscale">
+              <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center mx-auto border border-slate-200">
+                <Clock size={20} className="text-slate-300" />
               </div>
-              <p className="text-xs font-bold text-gray-400">Awaiting admin assignment</p>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter">Awaiting Assignment</p>
             </div>
           )}
         </div>
@@ -121,118 +125,111 @@ export default function OpeningCashEntry() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col p-5 pb-10 relative">
-      <button 
-        onClick={() => navigate('/')} 
-        className="absolute top-5 left-5 p-2 bg-white rounded-xl border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors z-10 shadow-sm"
-      >
-        <ArrowLeft size={20} />
-      </button>
-
-      <div className="max-w-lg mx-auto w-full space-y-8">
-        {/* Header Section */}
-        <div className="text-center space-y-2 mt-8">
-          <div className="inline-flex p-4 rounded-3xl bg-emerald-600 shadow-xl shadow-emerald-200 text-white mb-4">
-            <Coins size={32} strokeWidth={2.5} />
-          </div>
-          <h1 className="text-3xl font-black text-slate-900 tracking-tight">Start Your Day</h1>
-          <p className="text-slate-500 font-bold">Your daily opening cash floats (Admin assigned)</p>
-        </div>
-
-        {/* Tab Navigation */}
-        {anyShiftAssigned && (
-          <div className="flex gap-2 bg-slate-200/50 p-1.5 rounded-2xl">
-            <button
-              type="button"
-              onClick={() => navigate('/opening-cash')}
-              className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                location.pathname === '/opening-cash'
-                  ? "bg-white text-emerald-600 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              Start Day
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate('/closing-cash')}
-              className={`flex-1 py-3 px-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                location.pathname === '/closing-cash'
-                  ? "bg-white text-slate-900 shadow-sm"
-                  : "text-slate-500 hover:text-slate-700"
-              }`}
-            >
-              End Day
-            </button>
-          </div>
-        )}
-
-        {/* Vehicle Info Card */}
-        {user?.assignedVehicle && (
-          <div className="glass rounded-3xl p-5 border border-emerald-100 bg-white/70 shadow-sm flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                <Truck size={24} strokeWidth={2.5} />
-              </div>
+    <div className="min-h-screen bg-slate-50 flex flex-col font-sans max-w-lg mx-auto border-x border-slate-100 shadow-2xl relative">
+      {/* --- STICKY HEADER --- */}
+      <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-xl border-b border-slate-200/60 shadow-sm animate-in fade-in slide-in-from-top duration-500">
+        <div className="px-4 py-3 space-y-3">
+          {/* Top Row: Back, Title, Nav */}
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/')}
+                className="p-2 bg-slate-100 rounded-xl text-slate-600 hover:bg-slate-200 transition-colors"
+                aria-label="Go back"
+              >
+                <ArrowLeft size={18} />
+              </button>
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-emerald-600/40 leading-none mb-1.5">Active Vehicle</p>
-                <p className="text-lg font-black text-slate-900 leading-none">{user.assignedVehicle.vehicleNumber}</p>
+                <h1 className="text-lg font-black text-slate-900 leading-tight tracking-tight">Start Day</h1>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Opening Float</p>
               </div>
             </div>
-            <div className="bg-emerald-500/10 px-3 py-1.5 rounded-full">
-              <span className="text-[10px] font-black text-emerald-700 uppercase">{user.assignedVehicle.vehicleName || 'Standard'}</span>
+
+            <div className="flex bg-slate-100 p-1 rounded-xl gap-1">
+              <button className="px-3 py-1.5 rounded-lg text-xs font-black bg-white text-emerald-600 shadow-sm uppercase tracking-tighter">
+                Start
+              </button>
+              <button
+                onClick={() => navigate('/closing-cash')}
+                className="px-3 py-1.5 rounded-lg text-xs font-black text-slate-500 hover:bg-white/50 transition-all uppercase tracking-tighter"
+              >
+                End
+              </button>
             </div>
           </div>
-        )}
+          
+          {/* Active Vehicle Bar */}
+          {user?.assignedVehicle && (
+            <div className="bg-emerald-50/50 rounded-xl px-3 py-2 flex items-center justify-between border border-emerald-100/50">
+              <div className="flex items-center gap-2">
+                <Truck size={14} className="text-emerald-500" />
+                <span className="text-[10px] font-black text-slate-700 uppercase">{user.assignedVehicle.vehicleNumber}</span>
+              </div>
+              <span className="text-[8px] font-black text-emerald-600 uppercase bg-white px-2 py-0.5 rounded-md border border-emerald-100 shadow-sm">
+                {user.assignedVehicle.vehicleName || 'Standard'}
+              </span>
+            </div>
+          )}
+        </div>
+      </header>
 
-        {/* Two Shift Cards */}
-        <div className="space-y-4">
+      {/* --- MAIN CONTENT (SCROLLABLE) --- */}
+      <main className="flex-1 overflow-y-auto px-4 py-6">
+        <div className="space-y-4 pb-24">
           <ShiftCard shiftNum={1} data={shift1} icon={Sun} color="amber" />
           <ShiftCard shiftNum={2} data={shift2} icon={Moon} color="indigo" />
-        </div>
 
-        {/* Navigation */}
-        {anyShiftAssigned ? (
-          <div className="space-y-4">
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 shadow-sm">
-              <CheckCircle2 size={24} className="text-emerald-600 shrink-0" />
-              <p className="text-xs font-bold text-emerald-800">
-                {shift1?.openingAssigned && shift2?.openingAssigned
-                  ? 'Both shifts have been assigned. You are ready to start selling!'
-                  : shift1?.openingAssigned
-                    ? 'Shift 1 float assigned. Shift 2 will be assigned by admin later.'
-                    : 'Shift 2 float assigned. Check with admin for Shift 1.'
-                }
-              </p>
+          {!anyShiftAssigned && (
+            <div className="bg-rose-50 border border-rose-100 rounded-3xl p-8 text-center space-y-4 animate-in zoom-in duration-300">
+              <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-rose-500 mx-auto shadow-sm border border-rose-50">
+                <AlertCircle size={28} />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-base font-black text-slate-900 tracking-tight">Assignment Missing</h3>
+                <p className="text-xs font-bold text-slate-500 max-w-[240px] mx-auto leading-relaxed">
+                  Opening cash is managed by admin. Please wait for the daily float to be assigned.
+                </p>
+              </div>
+              <button 
+                type="button"
+                onClick={() => navigate('/')}
+                className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200"
+              >
+                Go Back
+              </button>
             </div>
+          )}
+
+          {anyShiftAssigned && (
+             <div className="bg-emerald-50/80 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-bottom duration-500">
+               <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-500 shadow-sm border border-emerald-100/50">
+                 <CheckCircle2 size={16} />
+               </div>
+               <p className="text-[10px] font-black text-emerald-800 uppercase tracking-tight">
+                 {shift1?.openingAssigned && shift2?.openingAssigned
+                   ? 'Both floats assigned. Ready to start!'
+                   : 'Float assigned. Check with admin for other shift.'}
+               </p>
+             </div>
+          )}
+        </div>
+      </main>
+
+      {/* --- STICKY FOOTER --- */}
+      {anyShiftAssigned && (
+        <footer className="sticky bottom-0 z-30 p-3 bg-white/90 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-8px_30px_rgb(0,0,0,0.04)] animate-in fade-in slide-in-from-bottom duration-500">
+          <div className="max-w-lg mx-auto">
             <button
               type="button"
               onClick={() => navigate('/', { replace: true })}
-              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xl py-5 rounded-[1.5rem] shadow-xl shadow-emerald-200 transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+              className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs py-3 rounded-xl shadow-lg shadow-emerald-200 active:scale-[0.98] transition-all flex items-center justify-center gap-2 group uppercase tracking-widest"
             >
               Continue to Sales
-              <ArrowRight size={22} className="group-hover:translate-x-1 transition-transform" />
+              <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
-        ) : (
-          <div className="bg-rose-50 border border-rose-100 rounded-3xl p-10 text-center space-y-4 shadow-xl shadow-rose-200/20">
-             <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-rose-500 mx-auto shadow-sm border border-rose-50">
-               <Info size={32} strokeWidth={2.5} />
-             </div>
-             <h3 className="text-xl font-black text-slate-900 tracking-tight">Access Restricted</h3>
-             <p className="text-sm font-bold text-slate-500 max-w-[240px] mx-auto leading-relaxed">
-               Opening cash is managed by the admin. Please wait for the daily float to be assigned for at least one shift.
-             </p>
-             <button 
-              type="button"
-              onClick={() => navigate('/')}
-              className="px-8 py-3 bg-slate-900 text-white rounded-xl font-black text-xs uppercase tracking-widest"
-             >
-              Go Back
-             </button>
-          </div>
-        )}
-      </div>
+        </footer>
+      )}
     </div>
   );
 }

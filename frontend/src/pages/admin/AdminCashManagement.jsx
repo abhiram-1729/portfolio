@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
-import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation } from '../../services/cashService';
+import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation, adminReviewClosing } from '../../services/cashService';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -51,9 +51,17 @@ export default function AdminCashManagement() {
   const [deletingSummary, setDeletingSummary] = useState(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  // View Detail Modal
-  const [showViewModal, setShowViewModal] = useState(false);
   const [viewingSummary, setViewingSummary] = useState(null);
+
+  // Review (Closing Edit) State
+  const [isReviewEditing, setIsReviewEditing] = useState(null); // null, 1, or 2 (shift)
+  const [reviewEditData, setReviewEditData] = useState({
+    actualCash: 0,
+    upiSales: 0,
+    cardSales: 0,
+    denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
+    remark: ''
+  });
 
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
@@ -63,10 +71,14 @@ export default function AdminCashManagement() {
       const newDenoms = { ...assignmentData.denominations, [denom]: qty };
       const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
       setAssignmentData({ ...assignmentData, denominations: newDenoms, amount: total });
-    } else {
+    } else if (type === 'edit') {
       const newDenoms = { ...editData.denominations, [denom]: qty };
       const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
       setEditData({ ...editData, denominations: newDenoms, openingCash: total });
+    } else if (type === 'review') {
+      const newDenoms = { ...reviewEditData.denominations, [denom]: qty };
+      const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
+      setReviewEditData({ ...reviewEditData, denominations: newDenoms, actualCash: total });
     }
   };
 
@@ -144,11 +156,15 @@ export default function AdminCashManagement() {
 
   const handleOpenEdit = (summary) => {
     setEditingSummary(summary);
+    const s1Opening = summary.shiftDetails?.shift1?.opening;
     setEditData({
-      openingCash: summary.openingCash,
+      openingCash: s1Opening?.totalOpeningCash || 0,
       shift: 1,
-      remark: 'Corrected by Admin',
-      denominations: summary.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+      remark: s1Opening?.isNoService ? 'Removing No Service state' : 'Corrected by Admin',
+      denominations: s1Opening?.denominations && Object.keys(s1Opening.denominations).length > 0 
+        ? s1Opening.denominations 
+        : { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
+      isNoService: s1Opening?.isNoService || false
     });
     setShowEditModal(true);
   };
@@ -160,10 +176,11 @@ export default function AdminCashManagement() {
       await adminUpdateReconciliation({
         vehicleId: editingSummary.vehicleId,
         date: editingSummary.date,
-        openingCash: editData.openingCash,
-        denominations: editData.denominations,
+        openingCash: editData.isNoService ? 0 : editData.openingCash,
+        denominations: editData.isNoService ? {} : editData.denominations,
         remark: editData.remark,
         shift: editData.shift,
+        isNoService: editData.isNoService || false,
       });
       toast.success(`Shift ${editData.shift} opening cash updated`);
       setShowEditModal(false);
@@ -190,9 +207,29 @@ export default function AdminCashManagement() {
     }
   };
 
+  const handleReviewClosing = async (vehicleId, date, shift, status, additionalData = {}) => {
+    setIsSubmitting(true);
+    try {
+      await adminReviewClosing({
+        vehicleId,
+        date,
+        shift,
+        status,
+        ...additionalData
+      });
+      toast.success(`Shift ${shift} closing ${status.toLowerCase()}`);
+      fetchSummaries();
+      setViewingSummary(null);
+    } catch (error) {
+      toast.error('Failed to review closing');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleOpenView = (summary) => {
     setViewingSummary(summary);
-    setShowViewModal(true);
+    setIsReviewEditing(null);
   };
 
   const filteredSummaries = summaries.filter(s => {
@@ -210,23 +247,38 @@ export default function AdminCashManagement() {
   const ShiftStatusBadge = ({ opening, closing }) => {
     if (closing) {
       if (closing.isNoService) return (
-        <div className="flex items-center gap-1">
-          <AlertTriangle size={12} className="text-rose-500" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-rose-600">No Service</span>
+        <div className="flex items-center gap-1 text-rose-600">
+          <AlertTriangle size={12} />
+          <span className="text-[9px] font-black uppercase tracking-widest">No Service</span>
         </div>
       );
+
+      if (closing.status === 'PENDING') return (
+        <div className="flex items-center gap-1 text-orange-600">
+          <Clock size={12} className="animate-pulse" />
+          <span className="text-[9px] font-black uppercase tracking-widest">Pending Review</span>
+        </div>
+      );
+
+      if (closing.status === 'REJECTED') return (
+        <div className="flex items-center gap-1 text-rose-600">
+          <X size={12} strokeWidth={3} />
+          <span className="text-[9px] font-black uppercase tracking-widest">Rejected</span>
+        </div>
+      );
+
       const diff = closing.difference || 0;
       if (diff === 0) return (
-        <div className="flex items-center gap-1">
-          <CheckCircle2 size={12} className="text-emerald-500" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-emerald-600">Matched</span>
+        <div className="flex items-center gap-1 text-emerald-600">
+          <CheckCircle2 size={12} />
+          <span className="text-[9px] font-black uppercase tracking-widest">Matched</span>
         </div>
       );
       return (
-        <div className="flex items-center gap-1">
-          <AlertCircle size={12} className="text-rose-500" />
-          <span className="text-[9px] font-black uppercase tracking-widest text-rose-600">
-            {diff > 0 ? `+₹${diff}` : `-₹${Math.abs(diff)}`}
+        <div className="flex items-center gap-1 text-rose-600">
+          <AlertCircle size={12} />
+          <span className="text-[9px] font-black uppercase tracking-widest">
+            {diff > 0 ? `+₹${diff.toFixed(2)}` : `-₹${Math.abs(diff).toFixed(2)}`}
           </span>
         </div>
       );
@@ -310,6 +362,375 @@ export default function AdminCashManagement() {
            setSearchParams({ storeId: id });
          }}
        />
+    );
+  }
+
+  if (viewingSummary) {
+    const s1 = viewingSummary.shiftDetails?.shift1;
+    const s2 = viewingSummary.shiftDetails?.shift2;
+
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setViewingSummary(null)}
+            className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 shadow-sm transition-all hover:bg-emerald-50"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Shift Breakdown</h2>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">
+              {viewingSummary.vehicle.vehicleNumber} • {viewingSummary.date}
+            </p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Shift 1 Card */}
+          <div className="rounded-[2.5rem] border-2 border-amber-200 overflow-hidden shadow-xl shadow-amber-900/5">
+            <div className="bg-amber-50 px-6 py-4 flex items-center justify-between border-b border-amber-100">
+              <div className="flex items-center gap-3">
+                <Sun size={18} className="text-amber-600" />
+                <span className="text-xs font-black text-amber-700 uppercase tracking-[0.1em]">Shift 1 — Morning</span>
+              </div>
+              <ShiftStatusBadge opening={s1?.opening} closing={s1?.closing} />
+            </div>
+            <div className="p-6 space-y-6 bg-white">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Initial Float</span>
+                <span className={`text-base font-black ${s1?.opening ? 'text-amber-700' : 'text-gray-300'}`}>
+                  ₹{(s1?.opening?.totalOpeningCash || 0).toFixed(2)}
+                </span>
+              </div>
+              <DenominationGrid denominations={s1?.opening?.denominations} label="Float Denominations" />
+
+              {s1?.closing ? (
+                <div className="space-y-6 animate-in fade-in duration-300">
+                  {isReviewEditing === 1 ? (
+                    <div className="bg-orange-50/50 p-5 rounded-[2rem] space-y-4 border border-orange-200 shadow-inner">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Correction Mode</span>
+                        <button onClick={() => setIsReviewEditing(null)} className="text-orange-400 hover:text-orange-600"><X size={16} /></button>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {denominationsList.map(denom => (
+                          <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-orange-100 shadow-sm">
+                            <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
+                            <input 
+                              type="number"
+                              className="w-full text-xs font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
+                              value={reviewEditData.denominations[denom] || ''}
+                              onChange={(e) => handleDenominationChange(e.target.value, denom, 'review')}
+                              placeholder="0"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="grid grid-cols-2 gap-3 pt-2">
+                        <div className="bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
+                          <span className="text-[8px] font-black text-orange-500 uppercase block mb-0.5">Correct UPI</span>
+                          <input 
+                            type="number"
+                            className="w-full text-sm font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
+                            value={reviewEditData.upiSales}
+                            onChange={(e) => setReviewEditData({...reviewEditData, upiSales: parseFloat(e.target.value) || 0})}
+                          />
+                        </div>
+                        <div className="bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
+                          <span className="text-[8px] font-black text-blue-500 uppercase block mb-0.5">Correct Card</span>
+                          <input 
+                            type="number"
+                            className="w-full text-sm font-black text-blue-700 bg-transparent border-none p-0 focus:ring-0"
+                            value={reviewEditData.cardSales}
+                            onChange={(e) => setReviewEditData({...reviewEditData, cardSales: parseFloat(e.target.value) || 0})}
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-3 pt-3 border-t border-orange-200">
+                        <div className="flex justify-between items-center px-1">
+                          <span className="text-[10px] font-black text-orange-600 uppercase">New Cash Total</span>
+                          <span className="text-xl font-black text-orange-700">₹{reviewEditData.actualCash.toFixed(2)}</span>
+                        </div>
+                        <input 
+                          className="w-full bg-white border border-orange-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-orange-200"
+                          placeholder="Admin reason for correction..."
+                          value={reviewEditData.remark}
+                          onChange={(e) => setReviewEditData({...reviewEditData, remark: e.target.value})}
+                        />
+                        <button 
+                          onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', { 
+                            actualCash: reviewEditData.actualCash,
+                            upiSales: reviewEditData.upiSales,
+                            cardSales: reviewEditData.cardSales,
+                            denominations: reviewEditData.denominations,
+                            remark: reviewEditData.remark
+                          })}
+                          disabled={isSubmitting}
+                          className="w-full bg-orange-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-orange-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20"
+                        >
+                          {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Save Corrections & Approve'}
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
+                          <span className="text-sm font-black text-emerald-600">₹{(s1.closing.cashSales || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
+                          <span className="text-sm font-black text-orange-600">₹{(s1.closing.upiSales || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
+                          <span className="text-sm font-black text-blue-600">₹{(s1.closing.cardSales || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expenses</span>
+                          <span className="text-sm font-black text-rose-500">-₹{(s1.closing.expenses || 0).toFixed(2)}</span>
+                        </div>
+                        <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
+                          <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Submission</span>
+                          <div className="flex flex-col items-end">
+                            <span className="text-base font-black text-slate-900">₹{(s1.closing.actualCash || 0).toFixed(2)}</span>
+                            <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${s1.closing.difference === 0 ? 'bg-emerald-50 text-emerald-600' : s1.closing.difference > 0 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                              {s1.closing.difference === 0 ? 'MATCHED' : `${s1.closing.difference > 0 ? '+' : ''}₹${s1.closing.difference.toFixed(2)}`}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                      <DenominationGrid denominations={s1.closing.denominations} label="Submission Denominations" />
+                      
+                      {s1.closing.remark && (
+                        <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 italic font-medium text-xs text-amber-900">
+                          <span className="text-[8px] font-black text-amber-500 uppercase block not-italic mb-1 tracking-widest">Agent Note</span>
+                          "{s1.closing.remark}"
+                        </div>
+                      )}
+
+                      {s1.closing.status === 'PENDING' && (
+                        <div className="flex gap-3 pt-2">
+                           <button 
+                             onClick={() => {
+                               setIsReviewEditing(1);
+                               setReviewEditData({
+                                 actualCash: s1.closing.actualCash,
+                                 upiSales: s1.closing.upiSales,
+                                 cardSales: s1.closing.cardSales,
+                                 denominations: s1.closing.denominations,
+                                 remark: s1.closing.remark || ''
+                               });
+                             }}
+                             className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                           >
+                             <Pencil size={12} /> Edit
+                           </button>
+                           <button 
+                             onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
+                             className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                           >
+                             Quick Approve
+                           </button>
+                           <button 
+                             onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
+                             className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                           >
+                             Reject
+                           </button>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+              ) : (
+                <div className="p-8 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
+                  <Clock size={24} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Closing Not Submitted</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Shift 2 Card */}
+          <div className="rounded-[2.5rem] border-2 border-indigo-200 overflow-hidden shadow-xl shadow-indigo-900/5">
+            <div className="bg-indigo-50 px-6 py-4 flex items-center justify-between border-b border-indigo-100">
+              <div className="flex items-center gap-3">
+                <Moon size={18} className="text-indigo-600" />
+                <span className="text-xs font-black text-indigo-700 uppercase tracking-[0.1em]">Shift 2 — Afternoon</span>
+              </div>
+              <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
+            </div>
+            <div className="p-6 space-y-6 bg-white">
+              {s2?.opening ? (
+                <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Initial Float</span>
+                    <span className="text-base font-black text-indigo-700">
+                      ₹{(s2.opening.totalOpeningCash || 0).toFixed(2)}
+                    </span>
+                  </div>
+                  <DenominationGrid denominations={s2.opening.denominations} label="Float Denominations" />
+
+                  {s2?.closing ? (
+                    <div className="space-y-6 animate-in fade-in duration-300">
+                      {isReviewEditing === 2 ? (
+                        <div className="bg-indigo-50/30 p-5 rounded-[2rem] space-y-4 border border-indigo-200 shadow-inner">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Correction Mode</span>
+                            <button onClick={() => setIsReviewEditing(null)} className="text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2">
+                            {denominationsList.map(denom => (
+                              <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                                <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
+                                <input 
+                                  type="number"
+                                  className="w-full text-xs font-black text-indigo-700 bg-transparent border-none p-0 focus:ring-0"
+                                  value={reviewEditData.denominations[denom] || ''}
+                                  onChange={(e) => handleDenominationChange(e.target.value, denom, 'review')}
+                                  placeholder="0"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                          <div className="grid grid-cols-2 gap-3 pt-2">
+                            <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
+                              <span className="text-[8px] font-black text-orange-500 uppercase block mb-0.5">Correct UPI</span>
+                              <input 
+                                type="number"
+                                className="w-full text-sm font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
+                                value={reviewEditData.upiSales}
+                                onChange={(e) => setReviewEditData({...reviewEditData, upiSales: parseFloat(e.target.value) || 0})}
+                              />
+                            </div>
+                            <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
+                              <span className="text-[8px] font-black text-blue-500 uppercase block mb-0.5">Correct Card</span>
+                              <input 
+                                type="number"
+                                className="w-full text-sm font-black text-blue-700 bg-transparent border-none p-0 focus:ring-0"
+                                value={reviewEditData.cardSales}
+                                onChange={(e) => setReviewEditData({...reviewEditData, cardSales: parseFloat(e.target.value) || 0})}
+                              />
+                            </div>
+                          </div>
+                          <div className="space-y-3 pt-3 border-t border-indigo-200">
+                            <div className="flex justify-between items-center px-1">
+                              <span className="text-[10px] font-black text-indigo-600 uppercase">New Cash Total</span>
+                              <span className="text-xl font-black text-indigo-700">₹{reviewEditData.actualCash.toFixed(2)}</span>
+                            </div>
+                            <input 
+                              className="w-full bg-white border border-indigo-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-indigo-200"
+                              placeholder="Admin reason for correction..."
+                              value={reviewEditData.remark}
+                              onChange={(e) => setReviewEditData({...reviewEditData, remark: e.target.value})}
+                            />
+                            <button 
+                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', { 
+                                actualCash: reviewEditData.actualCash,
+                                upiSales: reviewEditData.upiSales,
+                                cardSales: reviewEditData.cardSales,
+                                denominations: reviewEditData.denominations,
+                                remark: reviewEditData.remark
+                              })}
+                              disabled={isSubmitting}
+                              className="w-full bg-indigo-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
+                            >
+                              {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Save Corrections & Approve'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
+                              <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
+                              <span className="text-sm font-black text-orange-600">₹{(s2.closing.upiSales || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
+                              <span className="text-sm font-black text-blue-600">₹{(s2.closing.cardSales || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expenses</span>
+                              <span className="text-sm font-black text-rose-500">-₹{(s2.closing.expenses || 0).toFixed(2)}</span>
+                            </div>
+                            <div className="pt-2 border-t border-gray-100 flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-600 uppercase tracking-widest">Submission</span>
+                              <div className="flex flex-col items-end">
+                                <span className="text-base font-black text-slate-900">₹{(s2.closing.actualCash || 0).toFixed(2)}</span>
+                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full ${s2.closing.difference === 0 ? 'bg-emerald-50 text-emerald-600' : s2.closing.difference > 0 ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                  {s2.closing.difference === 0 ? 'MATCHED' : `${s2.closing.difference > 0 ? '+' : ''}₹${s2.closing.difference.toFixed(2)}`}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <DenominationGrid denominations={s2.closing.denominations} label="Submission Denominations" />
+                          
+                          {s2.closing.remark && (
+                            <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 italic font-medium text-xs text-indigo-900">
+                              <span className="text-[8px] font-black text-indigo-500 uppercase block not-italic mb-1 tracking-widest">Agent Note</span>
+                              "{s2.closing.remark}"
+                            </div>
+                          )}
+
+                          {s2.closing.status === 'PENDING' && (
+                            <div className="flex gap-3 pt-2">
+                               <button 
+                                 onClick={() => {
+                                   setIsReviewEditing(2);
+                                   setReviewEditData({
+                                     actualCash: s2.closing.actualCash,
+                                     upiSales: s2.closing.upiSales,
+                                     cardSales: s2.closing.cardSales,
+                                     denominations: s2.closing.denominations,
+                                     remark: s2.closing.remark || ''
+                                   });
+                                 }}
+                                 className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                               >
+                                 <Pencil size={12} /> Edit
+                               </button>
+                               <button 
+                                 onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
+                                 className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                               >
+                                 Quick Approve
+                               </button>
+                               <button 
+                                 onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
+                                 className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                               >
+                                 Reject
+                               </button>
+                            </div>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="p-8 text-center bg-gray-50/50 rounded-3xl border border-dashed border-gray-200">
+                      <Clock size={24} className="mx-auto text-gray-300 mb-2" />
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Closing Not Submitted</p>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 bg-gray-50/30 rounded-[3rem] border border-dashed border-gray-100">
+                   <Moon size={32} className="text-gray-200" />
+                   <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Shift 2 Not Operational</p>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
@@ -450,24 +871,24 @@ export default function AdminCashManagement() {
                         </td>
                         <td className="px-4 py-4">
                           <span className={`text-sm font-bold ${s1Open > 0 ? 'text-amber-600' : 'text-gray-300'}`}>
-                            ₹{s1Open.toLocaleString()}
+                            ₹{s1Open.toFixed(2)}
                           </span>
                         </td>
                         <td className="px-4 py-4">
                           {s1?.closing ? (
-                            <span className="text-sm font-bold text-amber-700">₹{s1Close.toLocaleString()}</span>
+                            <span className="text-sm font-bold text-amber-700">₹{s1Close.toFixed(2)}</span>
                           ) : (
                             <span className="text-[9px] font-bold text-gray-300 uppercase">—</span>
                           )}
                         </td>
                         <td className="px-4 py-4">
                           <span className={`text-sm font-bold ${s2Open > 0 ? 'text-indigo-600' : 'text-gray-300'}`}>
-                            ₹{s2Open.toLocaleString()}
+                            ₹{s2Open.toFixed(2)}
                           </span>
                         </td>
                         <td className="px-4 py-4">
                           {s2?.closing ? (
-                            <span className="text-sm font-bold text-indigo-700">₹{s2Close.toLocaleString()}</span>
+                            <span className="text-sm font-bold text-indigo-700">₹{s2Close.toFixed(2)}</span>
                           ) : (
                             <span className="text-[9px] font-bold text-gray-300 uppercase">—</span>
                           )}
@@ -479,7 +900,7 @@ export default function AdminCashManagement() {
                           <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
                         </td>
                         <td className="px-4 py-4">
-                          <span className="text-sm font-bold text-rose-500">₹{(summary.dailySales?.totalCash === 0 && summary.dailySales?.grandTotal > 0 ? 0 : summary.shiftDetails?.shift1?.live?.expenses + summary.shiftDetails?.shift2?.live?.expenses || 0).toLocaleString()}</span>
+                          <span className="text-sm font-bold text-rose-500">₹{(summary.dailySales?.totalCash === 0 && summary.dailySales?.grandTotal > 0 ? 0 : summary.shiftDetails?.shift1?.live?.expenses + summary.shiftDetails?.shift2?.live?.expenses || 0).toFixed(2)}</span>
                         </td>
                         <td className="px-4 py-4 text-right">
                           <div className="flex items-center justify-end gap-1.5 text-gray-400">
@@ -513,7 +934,8 @@ export default function AdminCashManagement() {
                   <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-600">Active Status</th>
                   <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-600 font-bold">Total Sales</th>
                   <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-500">Cash Sales</th>
-                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-blue-500">UPI Sales</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-orange-500">UPI Sales</th>
+                  <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-blue-500">Card Sales</th>
                   <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-rose-500">Live Exp.</th>
                   <th className="px-4 py-5 text-[10px] font-black uppercase tracking-widest text-emerald-700">In-Hand Cash</th>
                   <th className="px-5 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Details</th>
@@ -559,20 +981,23 @@ export default function AdminCashManagement() {
                           )}
                         </td>
                         <td className="px-4 py-4">
-                          <span className="text-sm font-black text-gray-900 leading-none">₹{summary.dailySales.grandTotal.toLocaleString()}</span>
+                          <span className="text-sm font-black text-gray-900 leading-none">₹{summary.dailySales.grandTotal.toFixed(2)}</span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className="text-sm font-bold text-emerald-600">₹{summary.dailySales.totalCash.toLocaleString()}</span>
+                          <span className="text-sm font-bold text-emerald-600">₹{summary.dailySales.totalCash.toFixed(2)}</span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className="text-sm font-bold text-blue-600">₹{summary.dailySales.totalUpi.toLocaleString()}</span>
+                          <span className="text-sm font-bold text-orange-600">₹{summary.dailySales.totalUpi.toFixed(2)}</span>
                         </td>
                         <td className="px-4 py-4">
-                          <span className="text-sm font-bold text-rose-500">₹{(metrics?.expenses || 0).toLocaleString()}</span>
+                          <span className="text-sm font-bold text-blue-600">₹{summary.dailySales.totalCard.toFixed(2)}</span>
+                        </td>
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-bold text-rose-500">₹{(metrics?.expenses || 0).toFixed(2)}</span>
                         </td>
                         <td className="px-4 py-4">
                           <div className="bg-emerald-100/50 px-3 py-1.5 rounded-lg w-fit border border-emerald-200/50">
-                            <span className="text-sm font-black text-emerald-700">₹{(metrics?.expected || 0).toLocaleString()}</span>
+                            <span className="text-sm font-black text-emerald-700">₹{(metrics?.expected || 0).toFixed(2)}</span>
                           </div>
                         </td>
                         <td className="px-5 py-4 text-right">
@@ -592,215 +1017,6 @@ export default function AdminCashManagement() {
           </div>
         </div>
       )}
-
-      {/* ========== VIEW DETAIL MODAL ========== */}
-      {showViewModal && viewingSummary && (() => {
-        const s1 = viewingSummary.shiftDetails?.shift1;
-        const s2 = viewingSummary.shiftDetails?.shift2;
-        const agent = viewingSummary.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT');
-        return (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-            <div className="bg-white w-full max-w-2xl rounded-[2rem] p-6 shadow-2xl flex flex-col gap-5 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-              {/* Header */}
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center text-emerald-600">
-                    <Eye size={20} />
-                  </div>
-                  <div>
-                    <h3 className="text-lg font-black text-gray-900 leading-tight">Cash Detail</h3>
-                    <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-tight">
-                      {viewingSummary.vehicle.vehicleNumber} • {viewingSummary.date}
-                      {agent ? ` • ${agent.name}` : ''}
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => { setShowViewModal(false); setViewingSummary(null); }}
-                  className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Daily Sales Breakdown */}
-              {viewingSummary.dailySales && (
-                <div className="grid grid-cols-4 gap-2 bg-gray-50 border border-gray-100 rounded-xl p-3">
-                  <div className="flex flex-col">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
-                    <span className="text-sm font-black text-emerald-600">₹{viewingSummary.dailySales.totalCash.toLocaleString()}</span>
-                  </div>
-                  <div className="flex flex-col border-l border-gray-200 pl-3">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
-                    <span className="text-sm font-black text-blue-600">₹{viewingSummary.dailySales.totalUpi.toLocaleString()}</span>
-                  </div>
-                  <div className="flex flex-col border-l border-gray-200 pl-3">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
-                    <span className="text-sm font-black text-purple-600">₹{viewingSummary.dailySales.totalCard.toLocaleString()}</span>
-                  </div>
-                  <div className="flex flex-col border-l border-gray-200 pl-3">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Total Sales</span>
-                    <span className="text-sm font-black text-gray-900">₹{viewingSummary.dailySales.grandTotal.toLocaleString()}</span>
-                  </div>
-                </div>
-              )}
-
-              {/* Two-column shift cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Shift 1 Card */}
-                <div className="rounded-2xl border-2 border-amber-200 overflow-hidden">
-                  <div className="bg-amber-50 px-5 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Sun size={16} className="text-amber-600" />
-                      <span className="text-xs font-black text-amber-700 uppercase tracking-widest">Shift 1 — Morning</span>
-                    </div>
-                    <ShiftStatusBadge opening={s1?.opening} closing={s1?.closing} />
-                  </div>
-                  <div className="p-5 space-y-4 bg-white">
-                    {/* Opening */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-[10px] font-black text-gray-400 uppercase">Opening Cash</span>
-                      <span className={`text-sm font-black ${s1?.opening ? 'text-amber-700' : 'text-gray-300'}`}>
-                        ₹{(s1?.opening?.totalOpeningCash || 0).toLocaleString()}
-                      </span>
-                    </div>
-                    <DenominationGrid denominations={s1?.opening?.denominations} label="Opening Denominations" />
-
-                    {/* Closing */}
-                    {s1?.closing ? (
-                      <>
-                        <div className="border-t border-gray-100 pt-3 space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-[10px] font-black text-gray-400 uppercase">Cash Sales</span>
-                            <span className="text-sm font-black text-emerald-600">₹{(s1.closing.cashSales || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-[10px] font-black text-gray-400 uppercase">Expenses</span>
-                            <span className="text-sm font-black text-rose-500">-₹{(s1.closing.expenses || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-[10px] font-black text-gray-400 uppercase">Expected</span>
-                            <span className="text-sm font-black text-gray-900">₹{(s1.closing.expectedCash || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-[10px] font-black text-gray-400 uppercase">Actual Submitted</span>
-                            <span className="text-sm font-black text-slate-800">₹{(s1.closing.actualCash || 0).toLocaleString()}</span>
-                          </div>
-                          <div className="flex justify-between items-center pt-1 border-t border-gray-50">
-                            <span className="text-[10px] font-black text-gray-400 uppercase">Difference</span>
-                            {s1.closing.difference === 0 ? (
-                              <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">₹0 ✓</span>
-                            ) : (
-                              <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${s1.closing.difference > 0 ? 'text-blue-600 bg-blue-50' : 'text-rose-600 bg-rose-50'}`}>
-                                {s1.closing.difference > 0 ? '+' : ''}₹{s1.closing.difference?.toLocaleString()}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        <DenominationGrid denominations={s1.closing.denominations} label="Closing Denominations" />
-                        
-                        {s1.closing.remark && (
-                          <div className="mt-3 p-3 bg-amber-50/50 rounded-xl border border-amber-100/50">
-                            <span className="text-[9px] font-black text-amber-500 uppercase tracking-widest block mb-1">Agent Remark</span>
-                            <p className="text-xs text-amber-900 font-medium italic">"{s1.closing.remark}"</p>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="border-t border-gray-100 pt-3 text-center py-4">
-                        <Clock size={20} className="mx-auto text-gray-300 mb-1" />
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">Closing not submitted</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {/* Shift 2 Card */}
-                <div className="rounded-2xl border-2 border-indigo-200 overflow-hidden">
-                  <div className="bg-indigo-50 px-5 py-3 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Moon size={16} className="text-indigo-600" />
-                      <span className="text-xs font-black text-indigo-700 uppercase tracking-widest">Shift 2 — Afternoon</span>
-                    </div>
-                    <ShiftStatusBadge opening={s2?.opening} closing={s2?.closing} />
-                  </div>
-                  <div className="p-5 space-y-4 bg-white">
-                    {s2?.opening ? (
-                      <>
-                        <div className="flex items-center justify-between">
-                          <span className="text-[10px] font-black text-gray-400 uppercase">Opening Cash</span>
-                          <span className="text-sm font-black text-indigo-700">
-                            ₹{(s2.opening.totalOpeningCash || 0).toLocaleString()}
-                          </span>
-                        </div>
-                        <DenominationGrid denominations={s2.opening.denominations} label="Opening Denominations" />
-
-                        {s2?.closing ? (
-                          <>
-                            <div className="border-t border-gray-100 pt-3 space-y-2">
-                              <div className="flex justify-between">
-                                <span className="text-[10px] font-black text-gray-400 uppercase">Cash Sales</span>
-                                <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-[10px] font-black text-gray-400 uppercase">Expenses</span>
-                                <span className="text-sm font-black text-rose-500">-₹{(s2.closing.expenses || 0).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-[10px] font-black text-gray-400 uppercase">Expected</span>
-                                <span className="text-sm font-black text-gray-900">₹{(s2.closing.expectedCash || 0).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-[10px] font-black text-gray-400 uppercase">Actual Submitted</span>
-                                <span className="text-sm font-black text-slate-800">₹{(s2.closing.actualCash || 0).toLocaleString()}</span>
-                              </div>
-                              <div className="flex justify-between items-center pt-1 border-t border-gray-50">
-                                <span className="text-[10px] font-black text-gray-400 uppercase">Difference</span>
-                                {s2.closing.difference === 0 ? (
-                                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg">₹0 ✓</span>
-                                ) : (
-                                  <span className={`text-xs font-black px-2 py-0.5 rounded-lg ${s2.closing.difference > 0 ? 'text-blue-600 bg-blue-50' : 'text-rose-600 bg-rose-50'}`}>
-                                    {s2.closing.difference > 0 ? '+' : ''}₹{s2.closing.difference?.toLocaleString()}
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-                            <DenominationGrid denominations={s2.closing.denominations} label="Closing Denominations" />
-                            
-                            {s2.closing.remark && (
-                              <div className="mt-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100/50">
-                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-widest block mb-1">Agent Remark</span>
-                                <p className="text-xs text-indigo-900 font-medium italic">"{s2.closing.remark}"</p>
-                              </div>
-                            )}
-                          </>
-                        ) : (
-                          <div className="border-t border-gray-100 pt-3 text-center py-4">
-                            <Clock size={20} className="mx-auto text-gray-300 mb-1" />
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">Closing not submitted</span>
-                          </div>
-                        )}
-                      </>
-                    ) : (
-                      <div className="text-center py-8 space-y-2">
-                        <Moon size={28} className="mx-auto text-gray-200" />
-                        <span className="text-xs font-bold text-gray-400 block">Shift 2 not assigned</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <button
-                onClick={() => { setShowViewModal(false); setViewingSummary(null); }}
-                className="w-full bg-gray-100 text-gray-600 font-black text-sm py-3 rounded-xl hover:bg-gray-200 transition-all"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        );
-      })()}
 
       {/* ========== FLOAT ASSIGNMENT MODAL ========== */}
       {showAssignModal && (
@@ -926,7 +1142,7 @@ export default function AdminCashManagement() {
                         <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">
                           {assignmentData.isNoService ? 'No Service Applied' : `Shift ${assignmentData.shift} Total`}
                         </p>
-                        <h4 className="text-2xl font-black tracking-tight">₹{assignmentData.isNoService ? '0' : assignmentData.amount.toLocaleString()}</h4>
+                        <h4 className="text-2xl font-black tracking-tight">₹{assignmentData.isNoService ? '0.00' : (assignmentData.amount || 0).toFixed(2)}</h4>
                       </div>
                       <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
                         {assignmentData.isNoService ? <AlertTriangle size={20} className="text-white opacity-40" /> : assignmentData.shift === 1 ? <Sun size={20} className="text-white opacity-40" /> : <Moon size={20} className="text-white opacity-40" />}
@@ -989,7 +1205,7 @@ export default function AdminCashManagement() {
                           <span className="text-[9px] font-black uppercase text-white/30 block">Status</span>
                           <div className="flex items-center gap-1">
                             <span className={`text-[10px] font-black uppercase truncate ${closing.difference === 0 ? 'text-white' : 'text-rose-400'}`}>
-                              {closing.difference === 0 ? 'Matched' : closing.difference > 0 ? `+₹${closing.difference}` : `-₹${Math.abs(closing.difference)}`}
+                              {closing.difference === 0 ? 'Matched' : closing.difference > 0 ? `+₹${closing.difference.toFixed(2)}` : `-₹${Math.abs(closing.difference).toFixed(2)}`}
                             </span>
                           </div>
                         </div>
@@ -1023,7 +1239,7 @@ export default function AdminCashManagement() {
                     <div className="text-center py-4 space-y-4">
                       <div className="space-y-1">
                         <span className="text-[10px] font-black uppercase text-white/30 block">Current Float In Hand</span>
-                        <span className="text-4xl font-black text-white tracking-tighter">₹{opening.totalOpeningCash?.toLocaleString()}</span>
+                        <span className="text-4xl font-black text-white tracking-tighter">₹{(opening?.totalOpeningCash || 0).toFixed(2)}</span>
                       </div>
                       <p className="text-[10px] font-bold text-white/40 leading-relaxed max-w-[200px] mx-auto uppercase tracking-wider">
                         The agent is currently operating with this float. Re-assignment is locked.
@@ -1065,39 +1281,74 @@ export default function AdminCashManagement() {
               {/* Shift Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Which Shift to Edit?</label>
-                <ShiftSelector value={editData.shift} onChange={(s) => setEditData({ ...editData, shift: s })} />
+                <ShiftSelector 
+                  value={editData.shift} 
+                  onChange={(s) => {
+                    const shiftOpening = editingSummary.shiftDetails[`shift${s}`]?.opening;
+                    setEditData({ 
+                      ...editData, 
+                      shift: s,
+                      openingCash: shiftOpening?.totalOpeningCash || 0,
+                      denominations: shiftOpening?.denominations && Object.keys(shiftOpening.denominations).length > 0 
+                        ? shiftOpening.denominations 
+                        : { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
+                      isNoService: shiftOpening?.isNoService || false,
+                      remark: shiftOpening?.isNoService ? 'Removing No Service state' : 'Corrected by Admin'
+                    });
+                  }} 
+                />
               </div>
 
-              <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
-                <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">New S{editData.shift} Opening</span>
-                <span className="text-sm font-black text-orange-700">₹{editData.openingCash.toLocaleString()}</span>
-              </div>
-
-              {/* Denominations */}
-              <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Shift {editData.shift} Denominations</label>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
-                  {denominationsList.map((denom) => (
-                    <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-orange-200 transition-all">
-                      <div className="flex items-center justify-between border-b border-gray-50 pb-1 mb-1">
-                        <span className="text-[10px] font-black text-gray-400 group-hover:text-orange-600">₹{denom}</span>
-                        <span className="text-[9px] font-bold text-orange-600/40 uppercase">₹{(denom * (editData.denominations[denom] || 0)).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <span className="text-[10px] text-gray-200">×</span>
-                        <input
-                          type="number"
-                          placeholder="0"
-                          min="0"
-                          className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200 text-center"
-                          value={editData.denominations[denom] || ''}
-                          onChange={(e) => handleDenominationChange(e.target.value, denom, 'edit')}
-                        />
-                      </div>
-                    </div>
-                  ))}
+              <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100/50 group cursor-pointer" onClick={() => setEditData({ ...editData, isNoService: !editData.isNoService })}>
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${editData.isNoService ? 'bg-rose-500 text-white' : 'bg-white text-rose-300 group-hover:text-rose-400'}`}>
+                  <AlertTriangle size={20} />
                 </div>
+                <div className="flex-1">
+                  <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block leading-none mb-1">Vehicle Damage / Service</span>
+                  <span className="text-xs font-bold text-rose-900 opacity-70">Mark Shift {editData.shift} as "No Service" for today</span>
+                </div>
+                <input 
+                  type="checkbox" 
+                  checked={editData.isNoService || false}
+                  onChange={(e) => setEditData({ ...editData, isNoService: e.target.checked })}
+                  className="w-5 h-5 rounded-lg border-rose-200 text-rose-500 focus:ring-rose-500 cursor-pointer"
+                />
               </div>
+
+              {!editData.isNoService && (
+                <>
+                  <div className="bg-orange-50/50 p-3 rounded-xl border border-orange-100">
+                    <span className="text-[10px] font-black uppercase text-orange-600 block mb-1">New S{editData.shift} Opening</span>
+                    <span className="text-sm font-black text-orange-700">₹{(editData.openingCash || 0).toFixed(2)}</span>
+                  </div>
+
+                  {/* Denominations */}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Shift {editData.shift} Denominations</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
+                      {denominationsList.map((denom) => (
+                        <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-orange-200 transition-all">
+                          <div className="flex items-center justify-between border-b border-gray-50 pb-1 mb-1">
+                            <span className="text-[10px] font-black text-gray-400 group-hover:text-orange-600">₹{denom}</span>
+                            <span className="text-[9px] font-bold text-orange-600/40 uppercase">₹{(denom * (editData.denominations[denom] || 0)).toLocaleString()}</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 justify-center">
+                            <span className="text-[10px] text-gray-200">×</span>
+                            <input
+                              type="number"
+                              placeholder="0"
+                              min="0"
+                              className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200 text-center"
+                              value={editData.denominations[denom] || ''}
+                              onChange={(e) => handleDenominationChange(e.target.value, denom, 'edit')}
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </>
+              )}
 
               <div className="bg-blue-50 border border-blue-100 rounded-xl px-4 py-3">
                 <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Independent Shifts</p>

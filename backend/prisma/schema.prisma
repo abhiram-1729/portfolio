@@ -300,6 +300,8 @@ model Order {
   totalAmount  Float
   status       OrderStatus   @default(PENDING)
   paymentMode  PaymentMode?
+  cashAmount   Float?        @default(0)
+  upiAmount    Float?        @default(0)
   mobile       String?
   createdAt    DateTime      @default(now())
   updatedAt    DateTime      @updatedAt
@@ -357,6 +359,8 @@ model Payment {
   orderId     String      @unique
   paymentMode PaymentMode
   amount      Float
+  cashAmount  Float?      @default(0)
+  upiAmount   Float?      @default(0)
   status      String
   createdAt   DateTime    @default(now())
   order       Order       @relation(fields: [orderId], references: [id])
@@ -540,6 +544,8 @@ model ClosingCash {
   shift         Int      @default(1) // 1 = Morning, 2 = Afternoon
   openingCash   Float
   cashSales     Float
+  upiSales      Float    @default(0)
+  cardSales     Float    @default(0)
   expenses      Float    @default(0)
   expectedCash  Float
   actualCash    Float
@@ -587,6 +593,8 @@ model DailyCashSummary {
   date          String
   openingCash   Float    @default(0)
   cashSales     Float    @default(0)
+  upiSales      Float    @default(0)
+  cardSales     Float    @default(0)
   expenses      Float    @default(0)
   expectedCash  Float    @default(0)
   actualCash    Float    @default(0)
@@ -803,6 +811,7 @@ enum PaymentMode {
   CASH
   UPI
   CARD
+  CASH_UPI
 }
 
 enum OrderStatus {

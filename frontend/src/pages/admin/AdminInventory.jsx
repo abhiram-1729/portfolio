@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check } from 'lucide-react';
+import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera } from 'lucide-react';
+import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
+import { DecodeHintType } from '@zxing/library';
+import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -19,8 +22,8 @@ export default function AdminInventory() {
   const [vehicles, setVehicles] = useState([]);
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showAddItemModal, setShowAddItemModal] = useState(false);
-  const [showEditItemModal, setShowEditItemModal] = useState(false);
+  const [isCreateView, setIsCreateView] = useState(false);
+  const [isEditView, setIsEditView] = useState(false);
   const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
   const [showZipImportModal, setShowZipImportModal] = useState(false);
   const [editItem, setEditItem] = useState(null);
@@ -46,6 +49,8 @@ export default function AdminInventory() {
   const isTenantRoute = location.pathname.includes('/tenant/');
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerTarget, setScannerTarget] = useState('create');
 
   // States for stock actions
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
@@ -85,6 +90,8 @@ export default function AdminInventory() {
     isFree: false,
     minShopAmount: '0',
     status: 'ACTIVE',
+    barcode: '',
+    skuCode: ''
   });
 
   const fetchData = async () => {
@@ -456,7 +463,7 @@ export default function AdminInventory() {
 
       await adminAPI.createItem(formData);
       toast.success('Item added to master');
-      setShowAddItemModal(false);
+      setIsCreateView(false);
       setSelectedFile(null);
       setPreviewUrl(null);
       setNewItem({
@@ -475,6 +482,8 @@ export default function AdminInventory() {
         gst: '0',
         isFree: false,
         minShopAmount: '0',
+        status: 'ACTIVE',
+        barcode: ''
       });
       fetchData();
     } catch (error) {
@@ -506,10 +515,25 @@ export default function AdminInventory() {
       gst: item.gst?.toString() || '0',
       isFree: item.isFree || false,
       minShopAmount: item.minShopAmount?.toString() || '0',
+      barcode: item.barcode || ''
     });
     setEditPreviewUrl(item.image || null);
-    setShowEditItemModal(true);
+    setIsEditView(true);
   };
+
+  const generateBarcode = (isEdit = false) => {
+    const timestamp = Date.now().toString().slice(-8); 
+    const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    const code = timestamp + random;
+    if (isEdit) {
+      setEditItem(prev => ({ ...prev, barcode: code }));
+    } else {
+      setNewItem(prev => ({ ...prev, barcode: code }));
+    }
+    toast.success('Unique Barcode Generated');
+  };
+
+
 
   const handleUpdateItem = async (e) => {
     e.preventDefault();
@@ -534,7 +558,7 @@ export default function AdminInventory() {
 
       await adminAPI.updateItem(editItem.id, formData);
       toast.success('Item updated successfully');
-      setShowEditItemModal(false);
+      setIsEditView(false);
       setEditItem(null);
       setSelectedEditFile(null);
       setEditPreviewUrl(null);
@@ -567,6 +591,8 @@ export default function AdminInventory() {
     try {
       await adminAPI.deleteItem(item.id);
       toast.success('Item deleted successfully');
+      setIsEditView(false);
+      setEditItem(null);
       fetchData();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to delete item');
@@ -1968,7 +1994,7 @@ export default function AdminInventory() {
             <thead>
               <tr className="bg-gray-50/50">
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>
-                <th className="px-6 py-4 text-[10px) font-black uppercase tracking-widest text-gray-400 text-center">Inventory Status</th>
+                <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Inventory Status</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Last Audit</th>
                 <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
               </tr>
@@ -2623,8 +2649,951 @@ export default function AdminInventory() {
     );
   }
 
+  const renderCreateItemView = () => {
+    return (
+      <div className="bg-white rounded-[3rem] shadow-2xl animate-in slide-in-from-right duration-500 overflow-hidden flex flex-col min-h-screen">
+        {/* Header */}
+        <div className="px-10 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setIsCreateView(false)}
+              className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-emerald-600 transition-all border border-transparent hover:border-gray-100"
+            >
+              <ArrowLeft size={24} strokeWidth={3} />
+            </button>
+            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/20">
+              <Plus size={24} strokeWidth={3} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Create Registry Item</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                Master Inventory Management System
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateView(false)}
+            className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-rose-500 transition-all border border-transparent hover:border-gray-100"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Mobile Tab Switcher */}
+        <div className="lg:hidden px-6 pt-4">
+          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
+            {[
+              { id: 'info', label: 'Identity', icon: Package },
+              { id: 'price', label: 'Pricing', icon: ArrowUpCircle },
+              { id: 'final', label: 'Finalize', icon: Grid }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setModalTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === tab.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
+              >
+                <tab.icon size={14} className={tab.id === 'price' ? 'rotate-180' : ''} />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form onSubmit={handleCreateItem} className="flex flex-col flex-1 pb-20">
+          <div className="p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
+            {/* Column 1: Product Identity */}
+            <div className={`space-y-6 lg:block ${modalTab === 'info' ? 'block' : 'hidden'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                  <Package size={16} />
+                </div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Product Identity</span>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="group">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-emerald-600 transition-colors">Item Display Name</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Premium Basmati Rice"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all shadow-sm"
+                    value={newItem.name}
+                    onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Category</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                      value={newItem.categoryId}
+                      onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value, subCategoryId: 'default' })}
+                    >
+                      <option value="default">Select Category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Sub-Category</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                      value={newItem.subCategoryId}
+                      onChange={(e) => setNewItem({ ...newItem, subCategoryId: e.target.value })}
+                    >
+                      <option value="default">Select Sub-Category</option>
+                      {subCategories
+                        .filter(sub => sub.categoryId === newItem.categoryId)
+                        .map(sub => (
+                          <option key={sub.id} value={sub.id}>{sub.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                      value={newItem.status}
+                      onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Unit Type</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
+                      value={newItem.unitId}
+                      onChange={(e) => setNewItem({ ...newItem, unitId: e.target.value })}
+                    >
+                      <option value="">Measure</option>
+                      {units.map(u => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      onWheel={(e) => e.target.blur()}
+                      placeholder="500"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                      value={newItem.unitValue}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseFloat(e.target.value) || 0);
+                        setNewItem({ ...newItem, unitValue: val.toString() });
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div className="group">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-emerald-600 transition-colors">Barcode / SKU</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Barcode size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Scan or Enter Barcode"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                        value={newItem.barcode}
+                        onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setScannerTarget('create'); setShowScanner(true); }}
+                      className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                      title="Scan Barcode"
+                    >
+                      <Camera size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => generateBarcode(false)}
+                      className="p-3.5 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 hover:bg-emerald-100 transition-colors"
+                      title="Generate Barcode"
+                    >
+                      <RefreshCw size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">HSN / SKU (6-8 Digits)</label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    placeholder="e.g. 123456"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                    value={newItem.skuCode || ''}
+                    onChange={(e) => setNewItem({ ...newItem, skuCode: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Description</label>
+                  <textarea
+                    placeholder="Product specifications..."
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-medium focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm h-28 resize-none"
+                    value={newItem.description}
+                    onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2: Economics */}
+            <div className={`space-y-6 lg:block ${modalTab === 'price' ? 'block' : 'hidden'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                  <ArrowUpCircle size={16} className="rotate-180" />
+                </div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Economics</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Purchase Price</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        required
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                        value={newItem.landingPrice}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          setNewItem({ ...newItem, landingPrice: val.toString() });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">MRP Value</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        required
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
+                        value={newItem.mrp}
+                        onChange={(e) => {
+                          const m = Math.max(0, parseFloat(e.target.value) || 0);
+                          setNewItem({
+                            ...newItem,
+                            mrp: m.toString(),
+                            price: calculateFinalPrice(m.toString(), newItem.discount, newItem.discountType)
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Type</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-xs font-black focus:bg-white outline-none appearance-none"
+                      value={newItem.discountType}
+                      onChange={(e) => {
+                        const type = e.target.value;
+                        setNewItem({
+                          ...newItem,
+                          discountType: type,
+                          price: calculateFinalPrice(newItem.mrp, newItem.discount, type)
+                        });
+                      }}
+                    >
+                      <option value="RUPEE">Flat ₹</option>
+                      <option value="PERCENT">% Off</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Disc.</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      onWheel={(e) => e.target.blur()}
+                      required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
+                      value={newItem.discount}
+                      onChange={(e) => {
+                        const d = Math.max(0, parseFloat(e.target.value) || 0);
+                        setNewItem({
+                          ...newItem,
+                          discount: d.toString(),
+                          price: calculateFinalPrice(newItem.mrp, d.toString(), newItem.discountType)
+                        });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1 block">GST Slab</label>
+                    <select
+                      className="w-full bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-3.5 text-xs font-black text-emerald-700 outline-none appearance-none cursor-pointer hover:bg-emerald-100 transition-colors"
+                      value={newItem.gst}
+                      onChange={(e) => setNewItem({ ...newItem, gst: e.target.value })}
+                    >
+                      {taxRates.map(rate => (
+                        <option key={`gst-${rate}`} value={rate}>{rate}%</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-emerald-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <div className="text-white text-6xl font-black italic">₹</div>
+                  </div>
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Final Selling Price</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-white leading-none tracking-tighter">₹{parseFloat(newItem.price || 0).toFixed(2)}</span>
+                        <span className="text-[9px] font-bold text-emerald-400/50 uppercase">incl. tax</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-emerald-800 relative z-10">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">Tax Component</span>
+                      <span className="text-sm font-black text-emerald-200">
+                        ₹{newItem.price && newItem.gst ? (parseFloat(newItem.price) - (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100))).toFixed(2) : '0.00'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">Net Revenue</span>
+                      <span className="text-sm font-black text-emerald-200">
+                        ₹{newItem.price && newItem.gst ? (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100)).toFixed(2) : '0.00'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 3: Media & Status */}
+            <div className={`space-y-6 lg:block ${modalTab === 'final' ? 'block' : 'hidden'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Grid size={16} />
+                </div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Media & Control</span>
+              </div>
+
+              <div className="space-y-5">
+                <div className="relative group">
+                  <input
+                    id="image-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFileChange}
+                  />
+                  <div 
+                    onClick={() => document.getElementById('image-input').click()}
+                    className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-emerald-500 hover:bg-emerald-50 group shadow-inner"
+                  >
+                    {previewUrl ? (
+                      <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="flex flex-col items-center gap-3">
+                        <div className="w-12 h-12 bg-white rounded-2xl shadow-md flex items-center justify-center text-gray-300 group-hover:text-emerald-500 group-hover:scale-110 transition-all">
+                          <Plus size={28} />
+                        </div>
+                        <div className="text-center px-4">
+                          <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Upload Product Image</span>
+                          <span className="text-[9px] font-bold text-gray-300 mt-1 block">PNG, JPG up to 5MB</span>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className={`p-5 rounded-[2rem] border-2 transition-all duration-300 flex flex-col gap-4 ${newItem.isFree ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50/30 border-gray-100'}`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div 
+                        onClick={() => setNewItem({ ...newItem, isFree: !newItem.isFree })}
+                        className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${newItem.isFree ? 'bg-emerald-500' : 'bg-gray-200'}`}
+                      >
+                        <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${newItem.isFree ? 'translate-x-5' : ''}`} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className={`text-[10px] font-black uppercase tracking-widest ${newItem.isFree ? 'text-emerald-700' : 'text-gray-400'}`}>Promotional Gift</span>
+                      </div>
+                    </div>
+                    {newItem.isFree && <Gift size={18} className="text-emerald-500 animate-bounce" />}
+                  </div>
+                  
+                  {newItem.isFree && (
+                    <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
+                      <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        className="w-full bg-white border border-emerald-100 rounded-xl px-4 py-2 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
+                        value={newItem.minShopAmount}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          setNewItem({ ...newItem, minShopAmount: val.toString() });
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="w-full bg-emerald-600 text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700 hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-3"
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 size={24} className="animate-spin" />
+                      Creating...
+                    </>
+                  ) : (
+                    <>
+                      Publish to Registry
+                      <CheckSquare size={20} />
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Action Bar / Footer */}
+          <div className="fixed bottom-0 left-0 right-0 px-6 lg:px-10 py-4 bg-white/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md z-30">
+            <div className="flex items-center justify-between w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={() => setIsCreateView(false)}
+                className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 hover:text-rose-500 transition-colors flex items-center gap-2"
+              >
+                <X size={14} /> <span className="sm:inline">Discard</span>
+              </button>
+
+              {/* Mobile Back Button */}
+              <div className="lg:hidden">
+                {modalTab !== 'info' && (
+                  <button 
+                    type="button" 
+                    onClick={() => setModalTab(modalTab === 'final' ? 'price' : 'info')}
+                    className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5 px-4 py-3"
+                  >
+                    <ArrowLeft size={14} /> Back
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center gap-4 w-full sm:w-auto">
+              {/* Mobile Guided Navigation */}
+              <div className="flex-1 lg:hidden">
+                {modalTab === 'info' && (
+                  <button 
+                    type="button" 
+                    onClick={() => setModalTab('price')}
+                    className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+                  >
+                    Section 2: Economics <ArrowLeft size={16} className="rotate-180" />
+                  </button>
+                )}
+                {modalTab === 'price' && (
+                  <button 
+                    type="button" 
+                    onClick={() => setModalTab('final')}
+                    className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
+                  >
+                    Step 3: Media & Publish <ArrowLeft size={16} className="rotate-180" />
+                  </button>
+                )}
+              </div>
+
+              <div className="hidden sm:flex items-center gap-4">
+                <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  New Master Log
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
+
+
+  const renderEditItemView = () => {
+    if (!editItem) return null;
+
+    return (
+      <div className="bg-white rounded-[3rem] shadow-2xl animate-in slide-in-from-right duration-500 overflow-hidden flex flex-col min-h-screen">
+        {/* Header */}
+        <div className="px-10 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => { setIsEditView(false); setEditItem(null); }}
+              className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-indigo-600 transition-all border border-transparent hover:border-gray-100"
+            >
+              <ArrowLeft size={24} strokeWidth={3} />
+            </button>
+            <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20">
+              <Pencil size={24} strokeWidth={3} />
+            </div>
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Modify Master Entry</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
+                Updating Registry: {editItem.name}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => { setIsEditView(false); setEditItem(null); }}
+            className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-rose-500 transition-all border border-transparent hover:border-gray-100"
+          >
+            <X size={24} />
+          </button>
+        </div>
+
+        {/* Mobile Tab Switcher */}
+        <div className="lg:hidden px-6 pt-4">
+          <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
+            {[
+              { id: 'info', label: 'General', icon: Package },
+              { id: 'price', label: 'Pricing', icon: ArrowUpCircle },
+              { id: 'final', label: 'Media', icon: Grid }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setModalTab(tab.id)}
+                className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}
+              >
+                <tab.icon size={14} className={tab.id === 'price' ? 'rotate-180' : ''} />
+                <span className="hidden sm:inline">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <form onSubmit={handleUpdateItem} className="flex flex-col flex-1 pb-20">
+          <div className="p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
+            {/* Column 1: Identity */}
+            <div className={`space-y-6 lg:block ${modalTab === 'info' ? 'block' : 'hidden'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
+                  <Package size={16} />
+                </div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">General Information</span>
+              </div>
+              
+              <div className="space-y-4">
+                <div className="group">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-indigo-600 transition-colors">Item Display Name</label>
+                  <input
+                    type="text"
+                    required
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all shadow-sm"
+                    value={editItem.name}
+                    onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Category</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                      value={editItem.categoryId}
+                      onChange={(e) => setEditItem({ ...editItem, categoryId: e.target.value, subCategoryId: 'default' })}
+                    >
+                      <option value="default">Select Category</option>
+                      {categories.map(cat => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Sub-Category</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                      value={editItem.subCategoryId}
+                      onChange={(e) => setEditItem({ ...editItem, subCategoryId: e.target.value })}
+                    >
+                      <option value="default">Select Sub-Category</option>
+                      {subCategories
+                        .filter(sub => sub.categoryId === editItem.categoryId)
+                        .map(sub => (
+                          <option key={sub.id} value={sub.id}>{sub.name}</option>
+                        ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                      value={editItem.status}
+                      onChange={(e) => setEditItem({ ...editItem, status: e.target.value })}
+                    >
+                      <option value="ACTIVE">Active</option>
+                      <option value="INACTIVE">Inactive</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Unit Type</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
+                      value={editItem.unitId}
+                      onChange={(e) => setEditItem({ ...editItem, unitId: e.target.value })}
+                    >
+                      <option value="">Measure</option>
+                      {units.map(u => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      onWheel={(e) => e.target.blur()}
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                      value={editItem.unitValue}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseFloat(e.target.value) || 0);
+                        setEditItem({ ...editItem, unitValue: val.toString() });
+                      }}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Barcode / SKU</label>
+                  <div className="flex gap-2">
+                    <div className="relative flex-1">
+                      <Barcode size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Scan or Enter Barcode"
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                        value={editItem.barcode}
+                        onChange={(e) => setEditItem({ ...editItem, barcode: e.target.value })}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => { setScannerTarget('edit'); setShowScanner(true); }}
+                      className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                      title="Scan Barcode"
+                    >
+                      <Camera size={20} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => generateBarcode(true)}
+                      className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors"
+                      title="Generate Barcode"
+                    >
+                      <RefreshCw size={20} />
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">HSN / SKU (6-8 Digits)</label>
+                  <input
+                    type="text"
+                    maxLength={8}
+                    placeholder="e.g. 123456"
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                    value={editItem.skuCode || ''}
+                    onChange={(e) => setEditItem({ ...editItem, skuCode: e.target.value })}
+                  />
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Description</label>
+                  <textarea
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-medium focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm h-28 resize-none"
+                    value={editItem.description}
+                    onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Column 2: Economics */}
+            <div className={`space-y-6 lg:block ${modalTab === 'price' ? 'block' : 'hidden'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
+                  <ArrowUpCircle size={16} className="rotate-180" />
+                </div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Economics & Pricing</span>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Purchase Price</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        required
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                        value={editItem.landingPrice}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseFloat(e.target.value) || 0);
+                          setEditItem({ ...editItem, landingPrice: val.toString() });
+                        }}
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">MRP Value</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
+                      <input
+                        type="number"
+                        step="any"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        required
+                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
+                        value={editItem.mrp}
+                        onChange={(e) => {
+                          const m = Math.max(0, parseFloat(e.target.value) || 0);
+                          setEditItem({
+                            ...editItem,
+                            mrp: m.toString(),
+                            price: calculateFinalPrice(m.toString(), editItem.discount, editItem.discountType)
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Type</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-xs font-black focus:bg-white outline-none appearance-none"
+                      value={editItem.discountType}
+                      onChange={(e) => {
+                        const type = e.target.value;
+                        setEditItem({
+                          ...editItem,
+                          discountType: type,
+                          price: calculateFinalPrice(editItem.mrp, editItem.discount, type)
+                        });
+                      }}
+                    >
+                      <option value="RUPEE">Flat ₹</option>
+                      <option value="PERCENT">% Off</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value</label>
+                    <input
+                      type="number"
+                      step="any"
+                      min="0"
+                      onWheel={(e) => e.target.blur()}
+                      required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
+                      value={editItem.discount}
+                      onChange={(e) => {
+                        const d = Math.max(0, parseFloat(e.target.value) || 0);
+                        setEditItem({
+                          ...editItem,
+                          discount: d.toString(),
+                          price: calculateFinalPrice(editItem.mrp, d.toString(), editItem.discountType)
+                        });
+                      }}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1 mb-1 block">GST Slab</label>
+                    <select
+                      className="w-full bg-indigo-50 border border-indigo-100 rounded-2xl px-3 py-3.5 text-xs font-black text-indigo-700 outline-none appearance-none cursor-pointer hover:bg-indigo-100 transition-colors"
+                      value={editItem.gst}
+                      onChange={(e) => setEditItem({ ...editItem, gst: e.target.value })}
+                    >
+                      {taxRates.map(rate => (
+                        <option key={`edit-gst-${rate}`} value={rate}>{rate}%</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-indigo-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-indigo-900/20 relative overflow-hidden group">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                     <div className="text-white text-6xl font-black">₹</div>
+                  </div>
+                  <div className="flex justify-between items-start relative z-10">
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Current Selling Price</span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-4xl font-black text-white leading-none tracking-tighter">₹{parseFloat(editItem.price || 0).toFixed(2)}</span>
+                        <span className="text-[9px] font-bold text-indigo-400/50 uppercase">incl. tax</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-between items-center pt-4 border-t border-indigo-800 relative z-10">
+                    <div className="flex flex-col">
+                      <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Tax Component</span>
+                      <span className="text-sm font-black text-indigo-200">
+                         ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) - (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100))).toFixed(2) : '0.00'}
+                      </span>
+                    </div>
+                    <div className="flex flex-col text-right">
+                      <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Net Revenue</span>
+                      <span className="text-sm font-black text-indigo-200">
+                         ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100)).toFixed(2) : '0.00'}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Column 3: Media & Actions */}
+            <div className={`space-y-6 lg:block ${modalTab === 'final' ? 'block' : 'hidden'}`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+                  <Grid size={16} />
+                </div>
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Media & Control</span>
+              </div>
+
+              <div className="space-y-5">
+                <div className="relative group">
+                  <input
+                    id="edit-image-input"
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => handleFileChange(e, true)}
+                  />
+                  <div 
+                    onClick={() => document.getElementById('edit-image-input').click()}
+                    className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-indigo-500 hover:bg-indigo-50 group shadow-inner"
+                  >
+                    {editPreviewUrl ? (
+                      <img src={editPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
+                    ) : (
+                      <>
+                        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center text-gray-300 group-hover:text-indigo-500 transition-all mb-4 shadow-sm">
+                          <Plus size={32} />
+                        </div>
+                        <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Swap Product Image</p>
+                      </>
+                    )}
+                    <div className="absolute inset-0 bg-indigo-600/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-blur-sm">
+                       <div className="flex flex-col items-center gap-2">
+                          <Plus className="text-white" size={32} />
+                          <span className="text-white text-[10px] font-black uppercase tracking-widest">Change Image</span>
+                       </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-orange-50/50 p-6 rounded-[2rem] border border-orange-100/50">
+                  <p className="text-[10px] font-black text-orange-600 uppercase tracking-widest mb-3">Record Management</p>
+                  <div className="space-y-3">
+                    <button
+                      type="submit"
+                      disabled={isSubmitting}
+                      className="w-full bg-indigo-600 text-white font-black text-sm py-4 rounded-2xl shadow-xl shadow-indigo-600/20 flex items-center justify-center gap-3 hover:bg-indigo-700 active:scale-[0.98] transition-all disabled:opacity-50"
+                    >
+                      {isSubmitting ? (
+                        <Loader2 className="animate-spin" size={18} />
+                      ) : (
+                        <>
+                          <Check size={20} strokeWidth={3} />
+                          Commit Changes
+                        </>
+                      )}
+                    </button>
+                    
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteItem(editItem)}
+                      disabled={isSubmitting}
+                      className="w-full bg-white text-rose-500 border border-rose-100 font-black text-sm py-4 rounded-2xl hover:bg-rose-50 transition-all flex items-center justify-center gap-3"
+                    >
+                      <Trash2 size={20} />
+                      Purge From Registry
+                    </button>
+                  </div>
+
+                  <div className="hidden sm:flex items-center gap-4 mt-6 pt-6 border-t border-orange-100/30">
+                    <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
+                       <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                       Production Record
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-6">
+    <>
+      {isCreateView && renderCreateItemView()}
+      {isEditView && renderEditItemView()}
+      {!isCreateView && !isEditView && (
+        <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold text-gray-900">Inventory Management</h2>
@@ -2701,7 +3670,7 @@ export default function AdminInventory() {
             )}
             {can('INVENTORY', 'CREATE') && (
               <button
-                onClick={() => { setShowAddItemModal(true); setModalTab('info'); }}
+                onClick={() => { setIsCreateView(true); setModalTab('info'); }}
                 className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
                 title="Add New Registry Item"
               >
@@ -2937,463 +3906,6 @@ export default function AdminInventory() {
         </div>
       )}
 
-      {/* Add Item Modal */}
-      {showAddItemModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="px-10 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-emerald-500/20">
-                  <Plus size={24} strokeWidth={3} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Create Registry Item</h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    Master Inventory Management System
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowAddItemModal(false)}
-                className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-rose-500 transition-all border border-transparent hover:border-gray-100"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            {/* Mobile Tab Switcher (Only visible on < lg screens) */}
-            <div className="lg:hidden px-6 pt-4">
-              <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
-                {[
-                  { id: 'info', label: 'Identity', icon: Package },
-                  { id: 'price', label: 'Pricing', icon: ArrowUpCircle },
-                  { id: 'final', label: 'Finalize', icon: Grid }
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setModalTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === tab.id ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
-                  >
-                    <tab.icon size={14} className={tab.id === 'price' ? 'rotate-180' : ''} />
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleCreateItem} className="flex flex-col">
-              <div className="p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Column 1: Product Identity */}
-                <div className={`space-y-6 lg:block ${modalTab === 'info' ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                      <Package size={16} />
-                    </div>
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Product Identity</span>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="group">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-emerald-600 transition-colors">Item Display Name</label>
-                      <input
-                        type="text"
-                        required
-                        placeholder="e.g. Premium Basmati Rice"
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/5 outline-none transition-all shadow-sm"
-                        value={newItem.name}
-                        onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
-                          value={newItem.categoryId}
-                          onChange={(e) => setNewItem({ ...newItem, categoryId: e.target.value, subCategoryId: 'default' })}
-                        >
-                          <option value="default">Select Category</option>
-                          {categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Sub-Category</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
-                          value={newItem.subCategoryId}
-                          onChange={(e) => setNewItem({ ...newItem, subCategoryId: e.target.value })}
-                        >
-                          <option value="default">Select Sub-Category</option>
-                          {subCategories
-                            .filter(sub => sub.categoryId === newItem.categoryId)
-                            .map(sub => (
-                              <option key={sub.id} value={sub.id}>{sub.name}</option>
-                            ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
-                          value={newItem.status}
-                          onChange={(e) => setNewItem({ ...newItem, status: e.target.value })}
-                        >
-                          <option value="ACTIVE">Active</option>
-                          <option value="INACTIVE">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Unit Type</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm appearance-none"
-                          value={newItem.unitId}
-                          onChange={(e) => setNewItem({ ...newItem, unitId: e.target.value })}
-                        >
-                          <option value="">Measure</option>
-                          {units.map(u => (
-                            <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          onWheel={(e) => e.target.blur()}
-                          placeholder="500"
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
-                          value={newItem.unitValue}
-                          onChange={(e) => {
-                            const val = Math.max(0, parseFloat(e.target.value) || 0);
-                            setNewItem({ ...newItem, unitValue: val.toString() });
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Description</label>
-                      <textarea
-                        placeholder="Product specifications..."
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-medium focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm h-28 resize-none"
-                        value={newItem.description}
-                        onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Economics */}
-                <div className={`space-y-6 lg:block ${modalTab === 'price' ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
-                      <ArrowUpCircle size={16} className="rotate-180" />
-                    </div>
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Economics</span>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Landing Price</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            onWheel={(e) => e.target.blur()}
-                            required
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
-                            value={newItem.landingPrice}
-                            onChange={(e) => {
-                              const val = Math.max(0, parseFloat(e.target.value) || 0);
-                              setNewItem({ ...newItem, landingPrice: val.toString() });
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">MRP Value</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            onWheel={(e) => e.target.blur()}
-                            required
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-sm"
-                            value={newItem.mrp}
-                            onChange={(e) => {
-                              const m = Math.max(0, parseFloat(e.target.value) || 0);
-                              setNewItem({
-                                ...newItem,
-                                mrp: m.toString(),
-                                price: calculateFinalPrice(m.toString(), newItem.discount, newItem.discountType)
-                              });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Type</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-xs font-black focus:bg-white outline-none appearance-none"
-                          value={newItem.discountType}
-                          onChange={(e) => {
-                            const type = e.target.value;
-                            setNewItem({
-                              ...newItem,
-                              discountType: type,
-                              price: calculateFinalPrice(newItem.mrp, newItem.discount, type)
-                            });
-                          }}
-                        >
-                          <option value="RUPEE">Flat ₹</option>
-                          <option value="PERCENT">% Off</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Disc.</label>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          onWheel={(e) => e.target.blur()}
-                          required
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
-                          value={newItem.discount}
-                          onChange={(e) => {
-                            const d = Math.max(0, parseFloat(e.target.value) || 0);
-                            setNewItem({
-                              ...newItem,
-                              discount: d.toString(),
-                              price: calculateFinalPrice(newItem.mrp, d.toString(), newItem.discountType)
-                            });
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1 block">GST Slab</label>
-                        <select
-                          className="w-full bg-emerald-50 border border-emerald-100 rounded-2xl px-3 py-3.5 text-xs font-black text-emerald-700 outline-none appearance-none cursor-pointer hover:bg-emerald-100 transition-colors"
-                          value={newItem.gst}
-                          onChange={(e) => setNewItem({ ...newItem, gst: e.target.value })}
-                        >
-                          {taxRates.map(rate => (
-                            <option key={`add-gst-${rate}`} value={rate}>{rate}%</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="bg-emerald-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-emerald-900/20 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                         <div className="text-white text-6xl font-black">₹</div>
-                      </div>
-                      <div className="flex justify-between items-start relative z-10">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] font-black text-emerald-400 uppercase tracking-[0.2em] mb-1">Selling Price (Final)</span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-black text-white leading-none tracking-tighter">₹{parseFloat(newItem.price || 0).toFixed(2)}</span>
-                            <span className="text-[9px] font-bold text-emerald-400/50 uppercase">incl. tax</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center pt-4 border-t border-emerald-800 relative z-10">
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">Tax Component</span>
-                          <span className="text-sm font-black text-emerald-200">
-                             ₹{newItem.price && newItem.gst ? (parseFloat(newItem.price) - (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100))).toFixed(2) : '0.00'}
-                          </span>
-                        </div>
-                        <div className="flex flex-col text-right">
-                          <span className="text-[8px] font-black text-emerald-400/40 uppercase tracking-widest">Net Revenue</span>
-                          <span className="text-sm font-black text-emerald-200">
-                             ₹{newItem.price && newItem.gst ? (parseFloat(newItem.price) / (1 + parseFloat(newItem.gst) / 100)).toFixed(2) : '0.00'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 3: Media & Actions */}
-                <div className={`space-y-6 lg:block ${modalTab === 'final' ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                      <Grid size={16} />
-                    </div>
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Finalization</span>
-                  </div>
-
-                  <div className="space-y-5">
-                    <div className="relative group">
-                      <input
-                        id="add-image-input"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileChange(e, false)}
-                      />
-                      <div 
-                        onClick={() => document.getElementById('add-image-input').click()}
-                        className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-emerald-500 hover:bg-emerald-50 group shadow-inner"
-                      >
-                        {previewUrl ? (
-                          <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="w-12 h-12 bg-white rounded-2xl shadow-md flex items-center justify-center text-gray-300 group-hover:text-emerald-500 group-hover:scale-110 transition-all">
-                               <Plus size={28} />
-                            </div>
-                            <div className="text-center">
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Upload Image</span>
-                              <span className="text-[8px] font-bold text-gray-300 uppercase tracking-tighter">JPEG/PNG Max 5MB</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={`p-5 rounded-[2rem] border-2 transition-all duration-300 flex flex-col gap-4 ${newItem.isFree ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50/30 border-gray-100'}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            onClick={() => setNewItem({ ...newItem, isFree: !newItem.isFree })}
-                            className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${newItem.isFree ? 'bg-emerald-500' : 'bg-gray-200'}`}
-                          >
-                            <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${newItem.isFree ? 'translate-x-5' : ''}`} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${newItem.isFree ? 'text-emerald-700' : 'text-gray-400'}`}>Promotional Gift</span>
-                            <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">Zero cost to customer</span>
-                          </div>
-                        </div>
-                        {newItem.isFree && <Gift size={18} className="text-emerald-500 animate-bounce" />}
-                      </div>
-                      
-                      {newItem.isFree && (
-                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
-                          <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            onWheel={(e) => e.target.blur()}
-                            className="w-full bg-white border border-emerald-100 rounded-xl px-4 py-2 text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
-                            value={newItem.minShopAmount}
-                            onChange={(e) => {
-                              const val = Math.max(0, parseFloat(e.target.value) || 0);
-                              setNewItem({ ...newItem, minShopAmount: val.toString() });
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-emerald-600 text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700 hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-3"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 size={24} className="animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          Save to Master
-                          <CheckSquare size={20} />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Bar / Footer */}
-              <div className="px-6 lg:px-10 py-6 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
-                <div className="flex items-center justify-between w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => setShowAddItemModal(false)}
-                    className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 hover:text-rose-500 transition-colors flex items-center gap-2"
-                  >
-                    <X size={14} /> <span className="sm:inline">Discard</span>
-                  </button>
-
-                  {/* Mobile Back Button (only visible if not on first tab) */}
-                  <div className="lg:hidden">
-                    {modalTab !== 'info' && (
-                      <button 
-                        type="button" 
-                        onClick={() => setModalTab(modalTab === 'final' ? 'price' : 'info')}
-                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5 px-4 py-3"
-                      >
-                        <ArrowLeft size={14} /> Back
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  {/* Mobile Guided Navigation */}
-                  <div className="flex-1 lg:hidden">
-                    {modalTab === 'info' && (
-                      <button 
-                        type="button" 
-                        onClick={() => setModalTab('price')}
-                        className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                      >
-                        Section 2: Economics <ArrowLeft size={16} className="rotate-180" />
-                      </button>
-                    )}
-                    {modalTab === 'price' && (
-                      <button 
-                        type="button" 
-                        onClick={() => setModalTab('final')}
-                        className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-500/20"
-                      >
-                        Step 3: Media & Save <ArrowLeft size={16} className="rotate-180" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="hidden sm:flex items-center gap-4">
-                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest hidden xl:block">Data synchronization active</span>
-                    <div className="w-px h-4 bg-gray-200 hidden xl:block" />
-                    <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
-                       <span className="w-2 h-2 rounded-full bg-blue-500" />
-                       Production Ready
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
       {/* Load Confirmation Modal */}
       {showLoadConfirmModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
@@ -3470,457 +3982,19 @@ export default function AdminInventory() {
           </div>
         </div>
       )}
-
-      {/* Edit Item Modal */}
-      {showEditItemModal && editItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-6xl rounded-[3rem] shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="px-10 py-6 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-500/20">
-                  <Pencil size={24} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight leading-none">Modify Master Entry</h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1.5 flex items-center gap-2">
-                    <span className="w-2 h-2 rounded-full bg-indigo-500 animate-pulse" />
-                    Updating Registry: {editItem.name}
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                onClick={() => { setShowEditItemModal(false); setEditItem(null); }}
-                className="p-3 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-rose-500 transition-all border border-transparent hover:border-gray-100"
-              >
-                <X size={24} />
-              </button>
-            </div>
-
-            {/* Mobile Tab Switcher (Only visible on < lg screens) */}
-            <div className="lg:hidden px-6 pt-4">
-              <div className="flex gap-2 p-1.5 bg-gray-100 rounded-2xl">
-                {[
-                  { id: 'info', label: 'General', icon: Package },
-                  { id: 'price', label: 'Pricing', icon: ArrowUpCircle },
-                  { id: 'final', label: 'Media', icon: Grid }
-                ].map((tab) => (
-                  <button
-                    key={tab.id}
-                    type="button"
-                    onClick={() => setModalTab(tab.id)}
-                    className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${modalTab === tab.id ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-400'}`}
-                  >
-                    <tab.icon size={14} className={tab.id === 'price' ? 'rotate-180' : ''} />
-                    <span className="hidden sm:inline">{tab.label}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <form onSubmit={handleUpdateItem} className="flex flex-col">
-              <div className="p-6 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-10">
-                {/* Column 1: Identity */}
-                <div className={`space-y-6 lg:block ${modalTab === 'info' ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                      <Package size={16} />
-                    </div>
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">General Information</span>
-                  </div>
-                  
-                  <div className="space-y-4">
-                    <div className="group">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-indigo-600 transition-colors">Item Display Name</label>
-                      <input
-                        type="text"
-                        required
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all shadow-sm"
-                        value={editItem.name}
-                        onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
-                          value={editItem.categoryId}
-                          onChange={(e) => setEditItem({ ...editItem, categoryId: e.target.value, subCategoryId: 'default' })}
-                        >
-                          <option value="default">Select Category</option>
-                          {categories.map(cat => (
-                            <option key={cat.id} value={cat.id}>{cat.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Sub-Category</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
-                          value={editItem.subCategoryId}
-                          onChange={(e) => setEditItem({ ...editItem, subCategoryId: e.target.value })}
-                        >
-                          <option value="default">Select Sub-Category</option>
-                          {subCategories
-                            .filter(sub => sub.categoryId === editItem.categoryId)
-                            .map(sub => (
-                              <option key={sub.id} value={sub.id}>{sub.name}</option>
-                            ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Status</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
-                          value={editItem.status}
-                          onChange={(e) => setEditItem({ ...editItem, status: e.target.value })}
-                        >
-                          <option value="ACTIVE">Active</option>
-                          <option value="INACTIVE">Inactive</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Unit Type</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm appearance-none"
-                          value={editItem.unitId}
-                          onChange={(e) => setEditItem({ ...editItem, unitId: e.target.value })}
-                        >
-                          <option value="">Measure</option>
-                          {units.map(u => (
-                            <option key={u.id} value={u.id}>{u.name} ({u.type})</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value/Weight</label>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          onWheel={(e) => e.target.blur()}
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
-                          value={editItem.unitValue}
-                          onChange={(e) => {
-                            const val = Math.max(0, parseFloat(e.target.value) || 0);
-                            setEditItem({ ...editItem, unitValue: val.toString() });
-                          }}
-                        />
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Description</label>
-                      <textarea
-                        className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-3.5 text-sm font-medium focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm h-28 resize-none"
-                        value={editItem.description}
-                        onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 2: Economics */}
-                <div className={`space-y-6 lg:block ${modalTab === 'price' ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-orange-50 flex items-center justify-center text-orange-600">
-                      <ArrowUpCircle size={16} className="rotate-180" />
-                    </div>
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Economics & Pricing</span>
-                  </div>
-
-                  <div className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Purchase Price</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            onWheel={(e) => e.target.blur()}
-                            required
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
-                            value={editItem.landingPrice}
-                            onChange={(e) => {
-                              const val = Math.max(0, parseFloat(e.target.value) || 0);
-                              setEditItem({ ...editItem, landingPrice: val.toString() });
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">MRP Value</label>
-                        <div className="relative">
-                          <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-gray-400">₹</span>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            onWheel={(e) => e.target.blur()}
-                            required
-                            className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-8 pr-5 py-3.5 text-sm font-bold focus:bg-white focus:border-indigo-500 outline-none transition-all shadow-sm"
-                            value={editItem.mrp}
-                            onChange={(e) => {
-                              const m = Math.max(0, parseFloat(e.target.value) || 0);
-                              setEditItem({
-                                ...editItem,
-                                mrp: m.toString(),
-                                price: calculateFinalPrice(m.toString(), editItem.discount, editItem.discountType)
-                              });
-                            }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-3">
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Type</label>
-                        <select
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-xs font-black focus:bg-white outline-none appearance-none"
-                          value={editItem.discountType}
-                          onChange={(e) => {
-                            const type = e.target.value;
-                            setEditItem({
-                              ...editItem,
-                              discountType: type,
-                              price: calculateFinalPrice(editItem.mrp, editItem.discount, type)
-                            });
-                          }}
-                        >
-                          <option value="RUPEE">Flat ₹</option>
-                          <option value="PERCENT">% Off</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block">Value</label>
-                        <input
-                          type="number"
-                          step="any"
-                          min="0"
-                          onWheel={(e) => e.target.blur()}
-                          required
-                          className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-3 py-3.5 text-sm font-bold focus:bg-white outline-none transition-all"
-                          value={editItem.discount}
-                          onChange={(e) => {
-                            const d = Math.max(0, parseFloat(e.target.value) || 0);
-                            setEditItem({
-                              ...editItem,
-                              discount: d.toString(),
-                              price: calculateFinalPrice(editItem.mrp, d.toString(), editItem.discountType)
-                            });
-                          }}
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest ml-1 mb-1 block">GST Slab</label>
-                        <select
-                          className="w-full bg-indigo-50 border border-indigo-100 rounded-2xl px-3 py-3.5 text-xs font-black text-indigo-700 outline-none appearance-none cursor-pointer hover:bg-indigo-100 transition-colors"
-                          value={editItem.gst}
-                          onChange={(e) => setEditItem({ ...editItem, gst: e.target.value })}
-                        >
-                          {taxRates.map(rate => (
-                            <option key={`edit-gst-${rate}`} value={rate}>{rate}%</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="bg-indigo-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-indigo-900/20 relative overflow-hidden group">
-                      <div className="absolute top-0 right-0 p-4 opacity-10">
-                         <div className="text-white text-6xl font-black">₹</div>
-                      </div>
-                      <div className="flex justify-between items-start relative z-10">
-                        <div className="flex flex-col">
-                          <span className="text-[9px] font-black text-indigo-400 uppercase tracking-[0.2em] mb-1">Current Selling Price</span>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-4xl font-black text-white leading-none tracking-tighter">₹{parseFloat(editItem.price || 0).toFixed(2)}</span>
-                            <span className="text-[9px] font-bold text-indigo-400/50 uppercase">incl. tax</span>
-                          </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center pt-4 border-t border-indigo-800 relative z-10">
-                        <div className="flex flex-col">
-                          <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Tax Component</span>
-                          <span className="text-sm font-black text-indigo-200">
-                             ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) - (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100))).toFixed(2) : '0.00'}
-                          </span>
-                        </div>
-                        <div className="flex flex-col text-right">
-                          <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Net Revenue</span>
-                          <span className="text-sm font-black text-indigo-200">
-                             ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100)).toFixed(2) : '0.00'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Column 3: Media & Actions */}
-                <div className={`space-y-6 lg:block ${modalTab === 'final' ? 'block' : 'hidden'}`}>
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                      <Grid size={16} />
-                    </div>
-                    <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Media & Control</span>
-                  </div>
-
-                  <div className="space-y-5">
-                    <div className="relative group">
-                      <input
-                        id="edit-image-input"
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => handleFileChange(e, true)}
-                      />
-                      <div 
-                        onClick={() => document.getElementById('edit-image-input').click()}
-                        className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-indigo-500 hover:bg-indigo-50 group shadow-inner"
-                      >
-                        {editPreviewUrl ? (
-                          <img src={editPreviewUrl} alt="Preview" className="w-full h-full object-cover" />
-                        ) : (
-                          <div className="flex flex-col items-center gap-3">
-                            <div className="w-12 h-12 bg-white rounded-2xl shadow-md flex items-center justify-center text-gray-300 group-hover:text-indigo-500 group-hover:scale-110 transition-all">
-                               <Plus size={28} />
-                            </div>
-                            <div className="text-center">
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Update Image</span>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className={`p-5 rounded-[2rem] border-2 transition-all duration-300 flex flex-col gap-4 ${editItem.isFree ? 'bg-indigo-50 border-indigo-100' : 'bg-gray-50/30 border-gray-100'}`}>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div 
-                            onClick={() => setEditItem({ ...editItem, isFree: !editItem.isFree })}
-                            className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${editItem.isFree ? 'bg-indigo-500' : 'bg-gray-200'}`}
-                          >
-                            <div className={`absolute top-1 left-1 w-5 h-5 rounded-full bg-white transition-transform shadow-sm ${editItem.isFree ? 'translate-x-5' : ''}`} />
-                          </div>
-                          <div className="flex flex-col">
-                            <span className={`text-[10px] font-black uppercase tracking-widest ${editItem.isFree ? 'text-indigo-700' : 'text-gray-400'}`}>Promotional Gift</span>
-                          </div>
-                        </div>
-                        {editItem.isFree && <Gift size={18} className="text-indigo-500 animate-bounce" />}
-                      </div>
-                      
-                      {editItem.isFree && (
-                        <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
-                          <label className="text-[9px] font-black text-indigo-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
-                          <input
-                            type="number"
-                            step="any"
-                            min="0"
-                            onWheel={(e) => e.target.blur()}
-                            className="w-full bg-white border border-indigo-100 rounded-xl px-4 py-2 text-sm font-black text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all shadow-sm"
-                            value={editItem.minShopAmount}
-                            onChange={(e) => {
-                              const val = Math.max(0, parseFloat(e.target.value) || 0);
-                              setEditItem({ ...editItem, minShopAmount: val.toString() });
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-
-                    <button
-                      type="submit"
-                      disabled={isSubmitting}
-                      className="w-full bg-indigo-600 text-white p-5 rounded-[2rem] font-black text-xs uppercase tracking-[0.3em] shadow-2xl shadow-indigo-600/30 hover:bg-indigo-700 hover:-translate-y-1 transition-all active:translate-y-0 disabled:opacity-50 flex items-center justify-center gap-3"
-                    >
-                      {isSubmitting ? (
-                        <>
-                          <Loader2 size={24} className="animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          Update Changes
-                          <CheckSquare size={20} />
-                        </>
-                      )}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Action Bar / Footer */}
-              <div className="px-6 lg:px-10 py-6 bg-gray-50/80 border-t border-gray-100 flex flex-col sm:flex-row items-center justify-between gap-4 backdrop-blur-md">
-                <div className="flex items-center justify-between w-full sm:w-auto">
-                  <button
-                    type="button"
-                    onClick={() => { setShowEditItemModal(false); setEditItem(null); }}
-                    className="px-4 py-3 text-[10px] font-black uppercase tracking-[0.25em] text-gray-400 hover:text-rose-500 transition-colors flex items-center gap-2"
-                  >
-                    <X size={14} /> <span className="sm:inline">Discard</span>
-                  </button>
-
-                  {/* Mobile Back Button */}
-                  <div className="lg:hidden">
-                    {modalTab !== 'info' && (
-                      <button 
-                        type="button" 
-                        onClick={() => setModalTab(modalTab === 'final' ? 'price' : 'info')}
-                        className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5 px-4 py-3"
-                      >
-                        <ArrowLeft size={14} /> Back
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 w-full sm:w-auto">
-                  {/* Mobile Guided Navigation */}
-                  <div className="flex-1 lg:hidden">
-                    {modalTab === 'info' && (
-                      <button 
-                        type="button" 
-                        onClick={() => setModalTab('price')}
-                        className="w-full bg-indigo-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-                      >
-                        Section 2: Economics <ArrowLeft size={16} className="rotate-180" />
-                      </button>
-                    )}
-                    {modalTab === 'price' && (
-                      <button 
-                        type="button" 
-                        onClick={() => setModalTab('final')}
-                        className="w-full bg-indigo-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-                      >
-                        Step 3: Media & Update <ArrowLeft size={16} className="rotate-180" />
-                      </button>
-                    )}
-                  </div>
-
-                  <div className="hidden sm:flex items-center gap-4">
-                    <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
-                       <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                       Production Record
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </form>
-          </div>
         </div>
       )}
-    </div>
+      {showScanner && (
+        <BarcodeScannerOverlay 
+          onScan={(code) => {
+            if (scannerTarget === 'create') setNewItem(prev => ({ ...prev, barcode: code }));
+            else setEditItem(prev => ({ ...prev, barcode: code }));
+            toast.success("Barcode Scanned!");
+          }}
+          onClose={() => setShowScanner(false)}
+        />
+      )}
+    </>
   );
 }
 

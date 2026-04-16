@@ -87,8 +87,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
         if (shift === 2) {
             const shift1Closing = await prisma.closingCash.findUnique({
                 where: { 
-                    vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
-                    tenantId: req.user.tenantId
+                    vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 }
                 }
             });
             if (!shift1Closing) {
@@ -211,6 +210,7 @@ export const deleteReconciliation = async (req, res, next) => {
 // @route   POST /api/cash/closing
 // @access  Private
 export const submitClosingCash = async (req, res, next) => {
+    console.log('[DEBUG] submitClosingCash Request Body:', req.body);
     try {
         const { vehicleId, actualCash, denominations, remark, shift = 1, isNoService = false } = req.body;
         const userId = req.user.id;
@@ -222,16 +222,17 @@ export const submitClosingCash = async (req, res, next) => {
         }
 
         // Get the opening cash for THIS shift only
+        console.log(`[DEBUG] Querying shiftOpening: vehicleId=${vehicleId}, date=${dateString}, shift=${shift}`);
         const shiftOpening = await prisma.openingCash.findUnique({
             where: { 
-                vehicleId_date_shift: { vehicleId, date: dateString, shift },
-                tenantId: req.user.tenantId
+                vehicleId_date_shift: { vehicleId, date: dateString, shift }
             }
         });
 
         if (!shiftOpening && !isNoService) {
+            console.error('[DEBUG] shiftOpening NOT FOUND for this vehicle/date/shift');
             res.status(400);
-            throw new Error(`Opening cash for Shift ${shift} must be assigned first`);
+            throw new Error(`Shift ${shift} must have an opening float assigned before closing.`);
         }
 
         // Calculate total day's Cash Sales
@@ -240,17 +241,30 @@ export const submitClosingCash = async (req, res, next) => {
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
-        const cashSalesResult = await prisma.order.aggregate({
-            _sum: { totalAmount: true },
+        const orderSalesRes = await prisma.order.groupBy({
+            by: ['paymentMode'],
+            _sum: { 
+              totalAmount: true,
+              cashAmount: true,
+              upiAmount: true
+            },
             where: {
                 tenantId: req.user.tenantId,
                 vehicleId,
-                paymentMode: 'CASH',
                 status: 'COMPLETED',
                 createdAt: { gte: startOfDay, lte: endOfDay },
             },
         });
-        const totalDaySales = cashSalesResult._sum.totalAmount || 0;
+
+        const pureCash = orderSalesRes.find(o => o.paymentMode === 'CASH')?._sum.totalAmount || 0;
+        const splitCash = orderSalesRes.find(o => o.paymentMode === 'CASH_UPI')?._sum.cashAmount || 0;
+        const totalDaySales = pureCash + splitCash;
+
+        const pureUpi = orderSalesRes.find(o => o.paymentMode === 'UPI')?._sum.totalAmount || 0;
+        const splitUpi = orderSalesRes.find(o => o.paymentMode === 'CASH_UPI')?._sum.upiAmount || 0;
+        const totalDayUpi = pureUpi + splitUpi;
+
+        const totalDayCard = orderSalesRes.find(o => o.paymentMode === 'CARD')?._sum.totalAmount || 0;
 
         // Calculate total day's expenses
         const expensesResult = await prisma.expense.aggregate({
@@ -267,16 +281,19 @@ export const submitClosingCash = async (req, res, next) => {
 
         // Per-shift calculation
         let shiftCashSales = totalDaySales;
+        let shiftUpiSales = totalDayUpi;
+        let shiftCardSales = totalDayCard;
         let shiftExpenses = totalDayExpenses;
 
         if (shift === 2) {
             const shift1Record = await prisma.closingCash.findUnique({
                 where: { 
-                    vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
-                    tenantId: req.user.tenantId
+                    vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 }
                 }
             });
             shiftCashSales = totalDaySales - (shift1Record?.cashSales || 0);
+            shiftUpiSales = totalDayUpi - (shift1Record?.upiSales || 0);
+            shiftCardSales = totalDayCard - (shift1Record?.cardSales || 0);
             shiftExpenses = totalDayExpenses - (shift1Record?.expenses || 0);
         }
 
@@ -284,10 +301,14 @@ export const submitClosingCash = async (req, res, next) => {
         const finalExpected = isNoService ? openingAmount : (openingAmount + shiftCashSales - shiftExpenses);
         const finalActual = isNoService ? openingAmount : (actualCash || 0);
         const finalSales = isNoService ? 0 : shiftCashSales;
+        const finalUpi = isNoService ? 0 : shiftUpiSales;
+        const finalCard = isNoService ? 0 : shiftCardSales;
         const finalExpenses = isNoService ? 0 : shiftExpenses;
         const difference = finalActual - finalExpected;
+        console.log(`[DEBUG] Reconciliation: Actual=${finalActual}, Expected=${finalExpected}, Difference=${difference}`);
 
-        if (difference !== 0 && !remark && !isNoService) {
+        // Use a small epsilon to handle floating point precision
+        if (Math.abs(difference) > 0.01 && !remark && !isNoService) {
             res.status(400);
             throw new Error('Remark is required if there is a difference');
         }
@@ -297,6 +318,8 @@ export const submitClosingCash = async (req, res, next) => {
             update: {
                 openingCash: openingAmount,
                 cashSales: finalSales,
+                upiSales: finalUpi,
+                cardSales: finalCard,
                 expenses: finalExpenses,
                 expectedCash: finalExpected,
                 actualCash: finalActual,
@@ -304,7 +327,8 @@ export const submitClosingCash = async (req, res, next) => {
                 denominations: denominations || {},
                 remark: isNoService ? `No Service: ${remark}` : remark,
                 userId,
-                isNoService
+                isNoService,
+                status: 'PENDING' // Changed to PENDING for admin review
             },
             create: {
                 tenantId: req.user.tenantId,
@@ -315,13 +339,16 @@ export const submitClosingCash = async (req, res, next) => {
                 shift,
                 openingCash: openingAmount,
                 cashSales: finalSales,
+                upiSales: finalUpi,
+                cardSales: finalCard,
                 expenses: finalExpenses,
                 expectedCash: finalExpected,
                 actualCash: finalActual,
                 difference,
                 denominations: denominations || {},
                 remark: isNoService ? `No Service: ${remark}` : remark,
-                isNoService
+                isNoService,
+                status: 'PENDING' // Changed to PENDING for admin review
             },
         });
 
@@ -348,7 +375,7 @@ export const submitClosingCash = async (req, res, next) => {
 
         sendNotification({
             userIds: [],
-            roles: ['ADMIN'],
+            roles: ['ADMIN', 'SUPERVISOR'],
             title: isNoService ? `Shift ${shift} - No Service Reported` : `Shift ${shift} Closed`,
             message: isNoService 
                 ? `Agent reported No Service for Shift ${shift}. Reason: ${remark}` 
@@ -389,26 +416,22 @@ export const getCashStatus = async (req, res, next) => {
         // Fetch both shifts
         const opening1 = await prisma.openingCash.findUnique({
             where: { 
-                vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
-                tenantId: req.user.tenantId
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 }
             },
         });
         const opening2 = await prisma.openingCash.findUnique({
             where: { 
-                vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 },
-                tenantId: req.user.tenantId
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 }
             },
         });
         const closing1 = await prisma.closingCash.findUnique({
             where: { 
-                vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 },
-                tenantId: req.user.tenantId
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 }
             },
         });
         const closing2 = await prisma.closingCash.findUnique({
             where: { 
-                vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 },
-                tenantId: req.user.tenantId
+                vehicleId_date_shift: { vehicleId, date: dateString, shift: 2 }
             },
         });
 
@@ -417,17 +440,30 @@ export const getCashStatus = async (req, res, next) => {
         const endOfDay = new Date();
         endOfDay.setHours(23, 59, 59, 999);
 
-        const cashSalesResult = await prisma.order.aggregate({
-            _sum: { totalAmount: true },
+        const orderSalesRes = await prisma.order.groupBy({
+            by: ['paymentMode'],
+            _sum: { 
+              totalAmount: true,
+              cashAmount: true,
+              upiAmount: true
+            },
             where: {
                 tenantId: req.user.tenantId,
                 vehicleId,
-                paymentMode: 'CASH',
                 status: 'COMPLETED',
                 createdAt: { gte: startOfDay, lte: endOfDay },
             },
         });
-        const totalCashSales = cashSalesResult._sum.totalAmount || 0;
+
+        const pureCash = orderSalesRes.find(o => o.paymentMode === 'CASH')?._sum.totalAmount || 0;
+        const splitCash = orderSalesRes.find(o => o.paymentMode === 'CASH_UPI')?._sum.cashAmount || 0;
+        const totalCashSales = pureCash + splitCash;
+
+        const pureUpi = orderSalesRes.find(o => o.paymentMode === 'UPI')?._sum.totalAmount || 0;
+        const splitUpi = orderSalesRes.find(o => o.paymentMode === 'CASH_UPI')?._sum.upiAmount || 0;
+        const totalUpiSales = pureUpi + splitUpi;
+        
+        const totalCardSales = orderSalesRes.find(o => o.paymentMode === 'CARD')?._sum.totalAmount || 0;
 
         const expensesResult = await prisma.expense.aggregate({
             _sum: { amount: true },
@@ -442,9 +478,14 @@ export const getCashStatus = async (req, res, next) => {
         const totalExpenses = expensesResult._sum.amount || 0;
 
         // Per-shift sales/expenses split
-        const s1Sales = closing1?.cashSales || (closing1 ? 0 : totalCashSales); // if S1 not closed, all current sales belong to S1
+        const s1CashSales = closing1?.cashSales || (closing1 ? 0 : totalCashSales);
+        const s1UpiSales = closing1?.upiSales || (closing1 ? 0 : totalUpiSales);
+        const s1CardSales = closing1?.cardSales || (closing1 ? 0 : totalCardSales);
         const s1Expenses = closing1?.expenses || (closing1 ? 0 : totalExpenses);
-        const s2Sales = closing1 ? totalCashSales - s1Sales : 0; // S2 only gets sales after S1 closed
+
+        const s2CashSales = closing1 ? totalCashSales - s1CashSales : 0;
+        const s2UpiSales = closing1 ? totalUpiSales - s1UpiSales : 0;
+        const s2CardSales = closing1 ? totalCardSales - s1CardSales : 0;
         const s2Expenses = closing1 ? totalExpenses - s1Expenses : 0;
 
         const totalOpening = (opening1?.totalOpeningCash || 0) + (opening2?.totalOpeningCash || 0);
@@ -456,6 +497,8 @@ export const getCashStatus = async (req, res, next) => {
             closingSubmitted: !!closing2 || !!closing1,
             openingCash: totalOpening,
             cashSales: totalCashSales,
+            upiSales: totalUpiSales,
+            cardSales: totalCardSales,
             expenses: totalExpenses,
             // Per-shift detail
             shifts: {
@@ -464,10 +507,13 @@ export const getCashStatus = async (req, res, next) => {
                     openingCash: opening1?.totalOpeningCash || 0,
                     openingDenominations: opening1?.denominations || null,
                     closingSubmitted: !!closing1,
+                    reviewStatus: closing1?.status || null,
                     closingDenominations: closing1?.denominations || null,
                     closingActual: closing1?.actualCash || 0,
                     closingDifference: closing1?.difference || 0,
-                    cashSales: closing1 ? s1Sales : totalCashSales, // if S1 not yet closed, show all current sales
+                    cashSales: closing1 ? s1CashSales : totalCashSales,
+                    upiSales: closing1 ? s1UpiSales : totalUpiSales,
+                    cardSales: closing1 ? s1CardSales : totalCardSales,
                     expenses: closing1 ? s1Expenses : totalExpenses,
                 },
                 shift2: {
@@ -475,10 +521,13 @@ export const getCashStatus = async (req, res, next) => {
                     openingCash: opening2?.totalOpeningCash || 0,
                     openingDenominations: opening2?.denominations || null,
                     closingSubmitted: !!closing2,
+                    reviewStatus: closing2?.status || null,
                     closingDenominations: closing2?.denominations || null,
                     closingActual: closing2?.actualCash || 0,
                     closingDifference: closing2?.difference || 0,
-                    cashSales: s2Sales,
+                    cashSales: s2CashSales,
+                    upiSales: s2UpiSales,
+                    cardSales: s2CardSales,
                     expenses: s2Expenses,
                 },
             },
@@ -573,27 +622,38 @@ export const getAdminCashSummary = async (req, res, next) => {
             const c1 = closings.find(c => c.shift === 1);
             const c2 = closings.find(c => c.shift === 2);
 
-            let s1Live = { cashSales: 0, expenses: 0, expected: 0 };
-            let s2Live = { cashSales: 0, expenses: 0, expected: 0 };
+            let s1Live = { cashSales: 0, upiSales: 0, cardSales: 0, expenses: 0, expected: 0 };
+            let s2Live = { cashSales: 0, upiSales: 0, cardSales: 0, expenses: 0, expected: 0 };
 
             if (o1 && !c1) {
                 s1Live.cashSales = totalRealtimeCashSales;
+                s1Live.upiSales = totalRealtimeUpiSales;
+                s1Live.cardSales = totalRealtimeCardSales;
                 s1Live.expenses = totalRealtimeExpenses;
                 s1Live.expected = o1.totalOpeningCash + s1Live.cashSales - s1Live.expenses;
             } else if (c1) {
                 s1Live.cashSales = c1.cashSales;
+                s1Live.upiSales = c1.upiSales;
+                s1Live.cardSales = c1.cardSales;
                 s1Live.expenses = c1.expenses;
                 s1Live.expected = c1.expectedCash;
             }
 
             if (o2 && !c2) {
                 const s1AccountedSales = c1?.cashSales || 0;
+                const s1AccountedUpi = c1?.upiSales || 0;
+                const s1AccountedCard = c1?.cardSales || 0;
                 const s1AccountedExpenses = c1?.expenses || 0;
+                
                 s2Live.cashSales = totalRealtimeCashSales - s1AccountedSales;
+                s2Live.upiSales = totalRealtimeUpiSales - s1AccountedUpi;
+                s2Live.cardSales = totalRealtimeCardSales - s1AccountedCard;
                 s2Live.expenses = totalRealtimeExpenses - s1AccountedExpenses;
                 s2Live.expected = o2.totalOpeningCash + s2Live.cashSales - s2Live.expenses;
             } else if (c2) {
                 s2Live.cashSales = c2.cashSales;
+                s2Live.upiSales = c2.upiSales;
+                s2Live.cardSales = c2.cardSales;
                 s2Live.expenses = c2.expenses;
                 s2Live.expected = c2.expectedCash;
             }
@@ -606,6 +666,8 @@ export const getAdminCashSummary = async (req, res, next) => {
                 storeId: v.storeId,
                 openingCash: s ? s.openingCash : 0,
                 cashSales: s ? s.cashSales : 0,
+                upiSales: s ? s.upiSales : 0,
+                cardSales: s ? s.cardSales : 0,
                 expenses: s ? s.expenses : 0,
                 expectedCash: s ? s.expectedCash : 0,
                 actualCash: s ? s.actualCash : 0,
@@ -643,9 +705,9 @@ export const getAdminCashSummary = async (req, res, next) => {
 // @access  Admin
 export const adminUpdateReconciliation = async (req, res, next) => {
     try {
-        const { vehicleId, date, openingCash, denominations, remark, shift = 1 } = req.body;
+        const { vehicleId, date, openingCash, denominations, remark, shift = 1, isNoService = false } = req.body;
 
-        if (!vehicleId || !date || openingCash === undefined) {
+        if (!vehicleId || !date || (!isNoService && openingCash === undefined)) {
             res.status(400);
             throw new Error('Vehicle ID, Date, and Opening Cash are required');
         }
@@ -653,12 +715,12 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         // Update the specific shift's OpeningCash record
         await prisma.openingCash.upsert({
             where: { 
-                vehicleId_date_shift: { vehicleId, date, shift },
-                tenantId: req.user.tenantId
+                vehicleId_date_shift: { vehicleId, date, shift }
             },
             update: {
-                totalOpeningCash: openingCash,
-                denominations: denominations || {},
+                totalOpeningCash: isNoService ? 0 : openingCash,
+                denominations: isNoService ? {} : (denominations || {}),
+                isNoService
             },
             create: {
                 tenantId: req.user.tenantId,
@@ -667,18 +729,67 @@ export const adminUpdateReconciliation = async (req, res, next) => {
                 date,
                 shift,
                 userId: req.user.id,
-                totalOpeningCash: openingCash,
-                denominations: denominations || {},
+                totalOpeningCash: isNoService ? 0 : openingCash,
+                denominations: isNoService ? {} : (denominations || {}),
+                isNoService
             },
         });
+
+        if (isNoService) {
+            // Also need to set or update closing cash?
+            // If it's No Service, automatically create a finalized closing record
+            await prisma.closingCash.upsert({
+                where: { vehicleId_date_shift: { vehicleId, date, shift } },
+                update: {
+                    userId: req.user.id,
+                    openingCash: 0,
+                    cashSales: 0,
+                    expenses: 0,
+                    expectedCash: 0,
+                    actualCash: 0,
+                    difference: 0,
+                    denominations: {},
+                    status: 'SUBMITTED',
+                    isNoService: true,
+                    remark: 'Marked as No Service by Admin'
+                },
+                create: {
+                    tenantId: req.user.tenantId,
+                    storeId: req.user.storeId,
+                    vehicleId,
+                    userId: req.user.id,
+                    date,
+                    shift,
+                    openingCash: 0,
+                    cashSales: 0,
+                    expenses: 0,
+                    expectedCash: 0,
+                    actualCash: 0,
+                    difference: 0,
+                    denominations: {},
+                    status: 'SUBMITTED',
+                    isNoService: true,
+                    remark: 'Marked as No Service by Admin'
+                }
+            });
+        } else {
+            // If it was changed from No Service -> Regular, delete the auto-generated ClosingCash if it was No Service.
+            const existingClosing = await prisma.closingCash.findUnique({
+                where: { vehicleId_date_shift: { vehicleId, date, shift } }
+            });
+            if (existingClosing && existingClosing.isNoService) {
+                await prisma.closingCash.delete({
+                    where: { vehicleId_date_shift: { vehicleId, date, shift } }
+                });
+            }
+        }
 
         // Recalculate daily summary
         const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
 
         const finalSummary = await prisma.dailyCashSummary.findUnique({
             where: { 
-                vehicleId_date: { vehicleId, date },
-                tenantId: req.user.tenantId 
+                vehicleId_date: { vehicleId, date }
             },
             include: {
                 vehicle: {
@@ -705,7 +816,9 @@ export const adminUpdateReconciliation = async (req, res, next) => {
 
 // Shared utility to recalculate daily summary (aggregates BOTH shifts)
 export async function recalculateDailySummary(vehicleId, date, tenantId, storeId) {
+    console.log('[DEBUG] recalculateDailySummary:', { vehicleId, date, tenantId, storeId });
     if (!vehicleId || !date || !tenantId) return;
+    try {
 
     // 1. Get Opening Cash from BOTH shifts
     const openings = await prisma.openingCash.findMany({
@@ -718,7 +831,7 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
     let effectiveStoreId = storeId;
     if (!effectiveStoreId) {
         const vehicle = await prisma.vehicle.findUnique({
-            where: { id: vehicleId, tenantId },
+            where: { id: vehicleId },
             select: { storeId: true }
         });
         effectiveStoreId = vehicle?.storeId;
@@ -730,17 +843,32 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
     const endOfDay = new Date(date);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const cashSalesRes = await prisma.order.aggregate({
-        _sum: { totalAmount: true },
+    const orderSalesRes = await prisma.order.groupBy({
+        by: ['paymentMode'],
+        _sum: { 
+            totalAmount: true,
+            cashAmount: true,
+            upiAmount: true
+        },
         where: {
             tenantId,
             vehicleId,
-            paymentMode: 'CASH',
             status: 'COMPLETED',
             createdAt: { gte: startOfDay, lte: endOfDay }
         }
     });
-    const cashSales = cashSalesRes._sum.totalAmount || 0;
+
+    // Calculate Cash Sales: Sum of pure CASH orders + cash portions of split orders
+    const pureCash = orderSalesRes.find(o => o.paymentMode === 'CASH')?._sum.totalAmount || 0;
+    const splitCash = orderSalesRes.find(o => o.paymentMode === 'CASH_UPI')?._sum.cashAmount || 0;
+    const cashSales = pureCash + splitCash;
+
+    // Calculate UPI Sales: Sum of pure UPI orders + UPI portions of split orders
+    const pureUpi = orderSalesRes.find(o => o.paymentMode === 'UPI')?._sum.totalAmount || 0;
+    const splitUpi = orderSalesRes.find(o => o.paymentMode === 'CASH_UPI')?._sum.upiAmount || 0;
+    const upiSales = pureUpi + splitUpi;
+
+    const cardSales = orderSalesRes.find(o => o.paymentMode === 'CARD')?._sum.totalAmount || 0;
 
     // 3. Calculate Approved/Pending Cash Expenses
     const expensesRes = await prisma.expense.aggregate({
@@ -758,16 +886,15 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
     // 4. Get Actual Cash from the LATEST closing (Shift 2 takes priority, fallback to Shift 1)
     const closing2 = await prisma.closingCash.findUnique({
         where: { 
-            vehicleId_date_shift: { vehicleId, date, shift: 2 },
-            tenantId
+            vehicleId_date_shift: { vehicleId, date, shift: 2 }
         }
     });
     const closing1 = await prisma.closingCash.findUnique({
         where: { 
-            vehicleId_date_shift: { vehicleId, date, shift: 1 },
-            tenantId
+            vehicleId_date_shift: { vehicleId, date, shift: 1 }
         }
     });
+
     const latestClosing = closing2 || closing1;
     const actualCash = latestClosing?.actualCash || 0;
 
@@ -775,20 +902,33 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
     const expectedCash = totalOpeningCash + cashSales - expenses;
     const difference = actualCash - expectedCash;
 
+    // Determine overall status based on reconciliation and review state
+    let finalStatus = 'PENDING';
+    if (latestClosing) {
+        if (closing1?.status === 'PENDING' || closing2?.status === 'PENDING') {
+            finalStatus = 'AWAITING_REVIEW'; // Admin needs to approve
+        } else if (closing1?.status === 'REJECTED' || closing2?.status === 'REJECTED') {
+            finalStatus = 'REJECTED'; 
+        } else {
+            finalStatus = (difference === 0) ? 'MATCHED' : 'MISMATCHED';
+        }
+    }
+
     // 6. Upsert Daily Summary
     return await prisma.dailyCashSummary.upsert({
         where: { 
-            vehicleId_date: { vehicleId, date },
-            tenantId
+            vehicleId_date: { vehicleId, date }
         },
         update: {
             openingCash: totalOpeningCash,
             cashSales,
+            upiSales,
+            cardSales,
             expenses,
             expectedCash,
             actualCash,
             difference,
-            status: actualCash > 0 ? (difference === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
+            status: finalStatus
         },
         create: {
             tenantId,
@@ -798,13 +938,19 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
             date,
             openingCash: totalOpeningCash,
             cashSales,
+            upiSales,
+            cardSales,
             expenses,
             expectedCash,
             actualCash,
             difference,
-            status: actualCash > 0 ? (difference === 0 ? 'MATCHED' : 'MISMATCHED') : 'PENDING'
+            status: finalStatus
         }
     });
+  } catch (error) {
+    console.error('[RecalculateSummary Error]:', error);
+    throw error;
+  }
 }
 
 // @desc    Admin: Get finance reports (aggregated cash, expenses, profitability)
@@ -875,7 +1021,7 @@ export const getFinanceReports = async (req, res, next) => {
         // Enforce vehicle names for profitability
         const profitability = await Promise.all(salesByVehicle.map(async (v) => {
             const vehicle = await prisma.vehicle.findUnique({
-                where: { id: v.vehicleId, tenantId },
+                where: { id: v.vehicleId },
                 select: { vehicleNumber: true }
             });
             return {
@@ -891,6 +1037,62 @@ export const getFinanceReports = async (req, res, next) => {
             dailySheet: dailySummaries,
             expenseBreakdown: expenses,
             profitability
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Review (Approve/Reject/Edit) closing cash for a vehicle
+// @route   PUT /api/cash/admin/closing/review
+// @access  Admin
+export const adminReviewClosingCash = async (req, res, next) => {
+    console.log('[DEBUG] adminReviewClosingCash body:', req.body);
+    try {
+        const { vehicleId, date, shift, status, actualCash, upiSales, cardSales, denominations, remark } = req.body;
+
+        if (!vehicleId || !date || !shift || !status) {
+            res.status(400);
+            throw new Error('Vehicle ID, Date, Shift, and Status are required');
+        }
+
+        const existingClosing = await prisma.closingCash.findUnique({
+            where: { vehicleId_date_shift: { vehicleId, date, shift: parseInt(shift) } }
+        });
+
+        if (!existingClosing) {
+            res.status(404);
+            throw new Error('Closing record not found');
+        }
+
+        const updateData = { status };
+        if (actualCash !== undefined) {
+            updateData.actualCash = actualCash;
+            updateData.difference = actualCash - existingClosing.expectedCash;
+        }
+        if (upiSales !== undefined) updateData.upiSales = upiSales;
+        if (cardSales !== undefined) updateData.cardSales = cardSales;
+        if (denominations) updateData.denominations = denominations;
+        if (remark) updateData.remark = remark;
+
+        const closingCash = await prisma.closingCash.update({
+            where: { vehicleId_date_shift: { vehicleId, date, shift: parseInt(shift) } },
+            data: updateData
+        });
+
+        // Recalculate daily summary
+        await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
+
+        res.json(closingCash);
+
+        // Notify the agent who submitted the cash
+        sendNotification({
+            userIds: [existingClosing.userId],
+            title: `Shift ${shift} Reconciliation ${status}`,
+            message: `Your Shift ${shift} closing has been ${status.toLowerCase()} by administration.${status === 'REJECTED' ? ' Please re-submit.' : ''}`,
+            type: 'cash',
+            priority: status === 'REJECTED' ? 'high' : 'medium',
+            metadata: { vehicleId, date, shift, status }
         });
     } catch (error) {
         next(error);

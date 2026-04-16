@@ -190,6 +190,8 @@ export const createOrderFromCart = async (req, res, next) => {
         res.status(201).json(order);
     } catch (error) {
         console.error('[Order Create Error]:', error);
+        if (error.code) console.error('[Prisma Error Code]:', error.code);
+        if (error.meta) console.error('[Prisma Error Meta]:', error.meta);
         next(error);
     }
 };
@@ -199,7 +201,7 @@ export const createOrderFromCart = async (req, res, next) => {
 // @access  Private
 export const completePayment = async (req, res, next) => {
     try {
-        const { orderId, paymentMode } = req.body;
+        const { orderId, paymentMode, cashAmount, upiAmount } = req.body;
 
         if (!orderId || !paymentMode) {
             res.status(400);
@@ -230,6 +232,8 @@ export const completePayment = async (req, res, next) => {
                 data: {
                     status: 'COMPLETED',
                     paymentMode: paymentMode,
+                    cashAmount: paymentMode === 'CASH' ? order.totalAmount : (cashAmount || 0),
+                    upiAmount: paymentMode === 'UPI' ? order.totalAmount : (upiAmount || 0),
                 },
                 include: { items: true, payment: true },
             });
@@ -242,6 +246,8 @@ export const completePayment = async (req, res, next) => {
                     orderId: orderId,
                     paymentMode: paymentMode,
                     amount: order.totalAmount,
+                    cashAmount: paymentMode === 'CASH' ? order.totalAmount : (cashAmount || 0),
+                    upiAmount: paymentMode === 'UPI' ? order.totalAmount : (upiAmount || 0),
                     status: 'COMPLETED',
                 },
             });
@@ -336,8 +342,8 @@ export const completePayment = async (req, res, next) => {
           });
         }
 
-        // 6. Recalculate Daily Cash Summary if CASH payment
-        if (paymentMode === 'CASH') {
+        // 6. Recalculate Daily Cash Summary if CASH or CASH_UPI payment
+        if (paymentMode === 'CASH' || paymentMode === 'CASH_UPI') {
             const dateString = format(new Date(), 'yyyy-MM-dd');
             recalculateDailySummary(updatedOrder.vehicleId, dateString).catch(err => {
                 console.warn('[CASH] Summary sync failed:', err.message);

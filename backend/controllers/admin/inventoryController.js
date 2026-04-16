@@ -59,7 +59,9 @@ export const createItem = async (req, res) => {
       unitValue,
       gst,
       isFree,
-      minShopAmount
+      minShopAmount,
+      barcode,
+      skuCode
     } = req.body;
 
     // Ensure we have a valid tenantId
@@ -143,6 +145,8 @@ export const createItem = async (req, res) => {
       gst: parseNumber(gst) || 0,
       isFree: isFree === 'true' || isFree === true,
       minShopAmount: parseNumber(minShopAmount) || 0,
+      barcode: barcode || null,
+      skuCode: skuCode || null,
       storeId: (req.body.storeId && req.body.storeId !== 'null' && req.body.storeId !== '') ? req.body.storeId : req.user.storeId
     };
 
@@ -190,7 +194,9 @@ export const updateItem = async (req, res) => {
       unitValue,
       categoryId,
       subCategoryId,
-      brandId
+      brandId,
+      barcode,
+      skuCode
     } = req.body;
 
     // Ensure we have a valid tenantId
@@ -270,7 +276,9 @@ export const updateItem = async (req, res) => {
       unitValue: parseNumber(unitValue),
       categoryId: finalCategoryId || undefined,
       subCategoryId: finalSubCategoryId || undefined,
-      brandId: finalBrandId || undefined
+      brandId: finalBrandId || undefined,
+      barcode: barcode === undefined ? undefined : (barcode || null),
+      skuCode: skuCode === undefined ? undefined : (skuCode || null)
     };
 
     const item = await prisma.product.update({
