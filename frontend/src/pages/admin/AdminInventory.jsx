@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera } from 'lucide-react';
+import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, ScanBarcode } from 'lucide-react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
@@ -2822,7 +2822,7 @@ export default function AdminInventory() {
                       className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors"
                       title="Scan Barcode"
                     >
-                      <Camera size={20} />
+                      <ScanBarcode size={20} />
                     </button>
                     <button
                       type="button"
@@ -3328,7 +3328,7 @@ export default function AdminInventory() {
                       className="p-3.5 bg-indigo-50 text-indigo-600 rounded-2xl border border-indigo-100 hover:bg-indigo-100 transition-colors"
                       title="Scan Barcode"
                     >
-                      <Camera size={20} />
+                      <ScanBarcode size={20} />
                     </button>
                     <button
                       type="button"

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid, Camera } from 'lucide-react';
+import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid, ScanBarcode } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { productsAPI } from '../services/api';
 import { useCartStore } from '../store/cartStore';
@@ -201,7 +201,7 @@ export default function SalesEntry() {
               className="px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-xl hover:bg-emerald-100 transition-colors shrink-0 flex items-center justify-center"
               title="Scan Barcode"
             >
-              <Camera size={16} strokeWidth={3} />
+              <ScanBarcode size={16} strokeWidth={3} />
             </button>
             {search && (
               <button onClick={() => setSearch('')} className="p-1.5 mr-1 text-emerald-600 hover:text-emerald-700 bg-emerald-50 hover:bg-emerald-100 rounded-lg transition-colors font-black text-[9px] uppercase tracking-tighter">

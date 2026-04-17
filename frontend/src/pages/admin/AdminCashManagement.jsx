@@ -132,11 +132,11 @@ export default function AdminCashManagement() {
         isNoService: assignmentData.isNoService || false,
         date: date
       });
-      
-      const msg = assignmentData.isNoService 
+
+      const msg = assignmentData.isNoService
         ? `Shift ${assignmentData.shift} marked as No Service for ${selectedVehicle.vehicleNumber}`
         : `Shift ${assignmentData.shift} float assigned to ${selectedVehicle.vehicleNumber}`;
-      
+
       toast.success(msg);
       setShowAssignModal(false);
       setAssignmentData({
@@ -161,8 +161,8 @@ export default function AdminCashManagement() {
       openingCash: s1Opening?.totalOpeningCash || 0,
       shift: 1,
       remark: s1Opening?.isNoService ? 'Removing No Service state' : 'Corrected by Admin',
-      denominations: s1Opening?.denominations && Object.keys(s1Opening.denominations).length > 0 
-        ? s1Opening.denominations 
+      denominations: s1Opening?.denominations && Object.keys(s1Opening.denominations).length > 0
+        ? s1Opening.denominations
         : { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
       isNoService: s1Opening?.isNoService || false
     });
@@ -306,13 +306,12 @@ export default function AdminCashManagement() {
             type="button"
             disabled={isDisabled}
             onClick={() => onChange(s.id)}
-            className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs uppercase tracking-wider ${
-              isDisabled ? 'border-gray-50 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50' :
-              value === s.id
-                ? s.color === 'amber'
-                  ? 'border-amber-400 bg-amber-50 text-amber-700'
-                  : 'border-indigo-400 bg-indigo-50 text-indigo-700'
-                : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
+            className={`flex-1 flex items-center gap-2 px-4 py-3 rounded-xl border-2 transition-all font-bold text-xs uppercase tracking-wider ${isDisabled ? 'border-gray-50 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50' :
+                value === s.id
+                  ? s.color === 'amber'
+                    ? 'border-amber-400 bg-amber-50 text-amber-700'
+                    : 'border-indigo-400 bg-indigo-50 text-indigo-700'
+                  : 'border-gray-100 bg-white text-gray-400 hover:border-gray-200'
               }`}
           >
             <s.icon size={16} />
@@ -352,16 +351,16 @@ export default function AdminCashManagement() {
   // Gatekeeper integration
   const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
   const isTenantRoute = location.pathname.includes('/tenant/');
-  
+
   if (isGlobalRole && isTenantRoute && !storeFilterId) {
     return (
-       <StoreSelector 
-         title="Cash Management"
-         description="Please select a store branch to manage its assigned daily shifts and cash reconciliations."
-         onSelect={(id) => {
-           setSearchParams({ storeId: id });
-         }}
-       />
+      <StoreSelector
+        title="Cash Management"
+        description="Please select a store branch to manage its assigned daily shifts and cash reconciliations."
+        onSelect={(id) => {
+          setSearchParams({ storeId: id });
+        }}
+      />
     );
   }
 
@@ -372,7 +371,7 @@ export default function AdminCashManagement() {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500">
         <div className="flex items-center gap-4">
-          <button 
+          <button
             onClick={() => setViewingSummary(null)}
             className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 shadow-sm transition-all hover:bg-emerald-50"
           >
@@ -417,7 +416,7 @@ export default function AdminCashManagement() {
                         {denominationsList.map(denom => (
                           <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-orange-100 shadow-sm">
                             <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
-                            <input 
+                            <input
                               type="number"
                               className="w-full text-xs font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
                               value={reviewEditData.denominations[denom] || ''}
@@ -430,20 +429,20 @@ export default function AdminCashManagement() {
                       <div className="grid grid-cols-2 gap-3 pt-2">
                         <div className="bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
                           <span className="text-[8px] font-black text-orange-500 uppercase block mb-0.5">Correct UPI</span>
-                          <input 
+                          <input
                             type="number"
                             className="w-full text-sm font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
                             value={reviewEditData.upiSales}
-                            onChange={(e) => setReviewEditData({...reviewEditData, upiSales: parseFloat(e.target.value) || 0})}
+                            onChange={(e) => setReviewEditData({ ...reviewEditData, upiSales: parseFloat(e.target.value) || 0 })}
                           />
                         </div>
                         <div className="bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
                           <span className="text-[8px] font-black text-blue-500 uppercase block mb-0.5">Correct Card</span>
-                          <input 
+                          <input
                             type="number"
                             className="w-full text-sm font-black text-blue-700 bg-transparent border-none p-0 focus:ring-0"
                             value={reviewEditData.cardSales}
-                            onChange={(e) => setReviewEditData({...reviewEditData, cardSales: parseFloat(e.target.value) || 0})}
+                            onChange={(e) => setReviewEditData({ ...reviewEditData, cardSales: parseFloat(e.target.value) || 0 })}
                           />
                         </div>
                       </div>
@@ -466,14 +465,14 @@ export default function AdminCashManagement() {
                             </div>
                           );
                         })()}
-                        <input 
+                        <input
                           className="w-full bg-white border border-orange-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-orange-200"
                           placeholder="Admin reason for correction..."
                           value={reviewEditData.remark}
-                          onChange={(e) => setReviewEditData({...reviewEditData, remark: e.target.value})}
+                          onChange={(e) => setReviewEditData({ ...reviewEditData, remark: e.target.value })}
                         />
-                        <button 
-                          onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', { 
+                        <button
+                          onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', {
                             actualCash: reviewEditData.actualCash,
                             upiSales: reviewEditData.upiSales,
                             cardSales: reviewEditData.cardSales,
@@ -517,7 +516,7 @@ export default function AdminCashManagement() {
                         </div>
                       </div>
                       <DenominationGrid denominations={s1.closing.denominations} label="Submission Denominations" />
-                      
+
                       {s1.closing.remark && (
                         <div className="p-4 bg-amber-50 rounded-2xl border border-amber-100 italic font-medium text-xs text-amber-900">
                           <span className="text-[8px] font-black text-amber-500 uppercase block not-italic mb-1 tracking-widest">Agent Note</span>
@@ -526,37 +525,37 @@ export default function AdminCashManagement() {
                       )}
 
                       <div className="flex gap-3 pt-2">
-                         <button 
-                           onClick={() => {
-                             setIsReviewEditing(1);
-                             setReviewEditData({
-                               actualCash: s1.closing.actualCash,
-                               upiSales: s1.closing.upiSales,
-                               cardSales: s1.closing.cardSales,
-                               denominations: s1.closing.denominations,
-                               remark: s1.closing.remark || ''
-                             });
-                           }}
-                           className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
-                         >
-                           <Pencil size={12} /> Edit
-                         </button>
-                         {s1.closing.status === 'PENDING' && (
-                           <>
-                             <button 
-                               onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
-                               className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
-                             >
-                               Quick Approve
-                             </button>
-                             <button 
-                               onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
-                               className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
-                             >
-                               Reject
-                             </button>
-                           </>
-                         )}
+                        <button
+                          onClick={() => {
+                            setIsReviewEditing(1);
+                            setReviewEditData({
+                              actualCash: s1.closing.actualCash,
+                              upiSales: s1.closing.upiSales,
+                              cardSales: s1.closing.cardSales,
+                              denominations: s1.closing.denominations,
+                              remark: s1.closing.remark || ''
+                            });
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                        >
+                          <Pencil size={12} /> Review
+                        </button>
+                        {s1.closing.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
+                              className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
+                              className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
                       </div>
                     </>
                   )}
@@ -602,7 +601,7 @@ export default function AdminCashManagement() {
                             {denominationsList.map(denom => (
                               <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-indigo-100 shadow-sm">
                                 <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
-                                <input 
+                                <input
                                   type="number"
                                   className="w-full text-xs font-black text-indigo-700 bg-transparent border-none p-0 focus:ring-0"
                                   value={reviewEditData.denominations[denom] || ''}
@@ -615,20 +614,20 @@ export default function AdminCashManagement() {
                           <div className="grid grid-cols-2 gap-3 pt-2">
                             <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
                               <span className="text-[8px] font-black text-orange-500 uppercase block mb-0.5">Correct UPI</span>
-                              <input 
+                              <input
                                 type="number"
                                 className="w-full text-sm font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
                                 value={reviewEditData.upiSales}
-                                onChange={(e) => setReviewEditData({...reviewEditData, upiSales: parseFloat(e.target.value) || 0})}
+                                onChange={(e) => setReviewEditData({ ...reviewEditData, upiSales: parseFloat(e.target.value) || 0 })}
                               />
                             </div>
                             <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
                               <span className="text-[8px] font-black text-blue-500 uppercase block mb-0.5">Correct Card</span>
-                              <input 
+                              <input
                                 type="number"
                                 className="w-full text-sm font-black text-blue-700 bg-transparent border-none p-0 focus:ring-0"
                                 value={reviewEditData.cardSales}
-                                onChange={(e) => setReviewEditData({...reviewEditData, cardSales: parseFloat(e.target.value) || 0})}
+                                onChange={(e) => setReviewEditData({ ...reviewEditData, cardSales: parseFloat(e.target.value) || 0 })}
                               />
                             </div>
                           </div>
@@ -651,14 +650,14 @@ export default function AdminCashManagement() {
                                 </div>
                               );
                             })()}
-                            <input 
+                            <input
                               className="w-full bg-white border border-indigo-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-indigo-200"
                               placeholder="Admin reason for correction..."
                               value={reviewEditData.remark}
-                              onChange={(e) => setReviewEditData({...reviewEditData, remark: e.target.value})}
+                              onChange={(e) => setReviewEditData({ ...reviewEditData, remark: e.target.value })}
                             />
-                            <button 
-                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', { 
+                            <button
+                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', {
                                 actualCash: reviewEditData.actualCash,
                                 upiSales: reviewEditData.upiSales,
                                 cardSales: reviewEditData.cardSales,
@@ -702,7 +701,7 @@ export default function AdminCashManagement() {
                             </div>
                           </div>
                           <DenominationGrid denominations={s2.closing.denominations} label="Submission Denominations" />
-                          
+
                           {s2.closing.remark && (
                             <div className="p-4 bg-indigo-50/50 rounded-2xl border border-indigo-100 italic font-medium text-xs text-indigo-900">
                               <span className="text-[8px] font-black text-indigo-500 uppercase block not-italic mb-1 tracking-widest">Agent Note</span>
@@ -711,37 +710,37 @@ export default function AdminCashManagement() {
                           )}
 
                           <div className="flex gap-3 pt-2">
-                             <button 
-                               onClick={() => {
-                                 setIsReviewEditing(2);
-                                 setReviewEditData({
-                                   actualCash: s2.closing.actualCash,
-                                   upiSales: s2.closing.upiSales,
-                                   cardSales: s2.closing.cardSales,
-                                   denominations: s2.closing.denominations,
-                                   remark: s2.closing.remark || ''
-                                 });
-                               }}
-                               className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
-                             >
-                               <Pencil size={12} /> Edit
-                             </button>
-                             {s2.closing.status === 'PENDING' && (
-                               <>
-                                 <button 
-                                   onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
-                                   className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
-                                 >
-                                   Quick Approve
-                                 </button>
-                                 <button 
-                                   onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
-                                   className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
-                                 >
-                                   Reject
-                                 </button>
-                               </>
-                             )}
+                            <button
+                              onClick={() => {
+                                setIsReviewEditing(2);
+                                setReviewEditData({
+                                  actualCash: s2.closing.actualCash,
+                                  upiSales: s2.closing.upiSales,
+                                  cardSales: s2.closing.cardSales,
+                                  denominations: s2.closing.denominations,
+                                  remark: s2.closing.remark || ''
+                                });
+                              }}
+                              className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                            >
+                              <Pencil size={12} /> Edit
+                            </button>
+                            {s2.closing.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
+                                  className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                                >
+                                  Quick Approve
+                                </button>
+                                <button
+                                  onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
+                                  className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
                           </div>
                         </>
                       )}
@@ -755,8 +754,8 @@ export default function AdminCashManagement() {
                 </>
               ) : (
                 <div className="flex flex-col items-center justify-center py-12 text-center space-y-3 bg-gray-50/30 rounded-[3rem] border border-dashed border-gray-100">
-                   <Moon size={32} className="text-gray-200" />
-                   <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Shift 2 Not Operational</p>
+                  <Moon size={32} className="text-gray-200" />
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">Shift 2 Not Operational</p>
                 </div>
               )}
             </div>
@@ -776,8 +775,8 @@ export default function AdminCashManagement() {
             {isTenantRoute && storeFilterId && (
               <>
                 <span className="text-gray-300">•</span>
-                <button 
-                  onClick={() => setSearchParams({})} 
+                <button
+                  onClick={() => setSearchParams({})}
                   className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors mt-0.5"
                 >
                   Change Store
@@ -1033,7 +1032,7 @@ export default function AdminCashManagement() {
                           </div>
                         </td>
                         <td className="px-5 py-4 text-right">
-                          <button 
+                          <button
                             onClick={() => handleOpenView(summary)}
                             className="p-2 hover:bg-white hover:shadow-sm rounded-xl text-gray-400 hover:text-emerald-600 transition-all"
                           >
@@ -1076,9 +1075,9 @@ export default function AdminCashManagement() {
               {/* Shift Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Select Shift</label>
-                <ShiftSelector 
-                  value={assignmentData.shift} 
-                  onChange={(s) => setAssignmentData({ ...assignmentData, shift: s })} 
+                <ShiftSelector
+                  value={assignmentData.shift}
+                  onChange={(s) => setAssignmentData({ ...assignmentData, shift: s })}
                   disabledShifts={(() => {
                     if (!assignmentData.vehicleId) return [];
                     const summary = summaries.find(s => s.vehicleId === assignmentData.vehicleId);
@@ -1119,7 +1118,7 @@ export default function AdminCashManagement() {
                 const shiftData = assignmentData.shift === 1 ? summary?.shiftDetails?.shift1 : summary?.shiftDetails?.shift2;
                 const opening = shiftData?.opening;
                 const closing = shiftData?.closing;
-                
+
                 if (!opening) return (
                   <>
                     <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100/50 group cursor-pointer" onClick={() => setAssignmentData({ ...assignmentData, isNoService: !assignmentData.isNoService })}>
@@ -1130,8 +1129,8 @@ export default function AdminCashManagement() {
                         <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block leading-none mb-1">Vehicle Damage / Service</span>
                         <span className="text-xs font-bold text-rose-900 opacity-70">Mark Shift {assignmentData.shift} as "No Service" for today</span>
                       </div>
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         checked={assignmentData.isNoService || false}
                         onChange={(e) => setAssignmentData({ ...assignmentData, isNoService: e.target.checked })}
                         className="w-5 h-5 rounded-lg border-rose-200 text-rose-500 focus:ring-rose-500 cursor-pointer"
@@ -1165,11 +1164,10 @@ export default function AdminCashManagement() {
                       </div>
                     )}
 
-                    <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white group overflow-hidden transition-all ${
-                      assignmentData.isNoService 
-                        ? 'bg-rose-600 shadow-rose-600/20' 
+                    <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white group overflow-hidden transition-all ${assignmentData.isNoService
+                        ? 'bg-rose-600 shadow-rose-600/20'
                         : (assignmentData.shift === 1 ? 'bg-amber-600 shadow-amber-600/20' : 'bg-indigo-600 shadow-indigo-600/20')
-                    }`}>
+                      }`}>
                       <div className="flex flex-col">
                         <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">
                           {assignmentData.isNoService ? 'No Service Applied' : `Shift ${assignmentData.shift} Total`}
@@ -1313,21 +1311,21 @@ export default function AdminCashManagement() {
               {/* Shift Selector */}
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Which Shift to Edit?</label>
-                <ShiftSelector 
-                  value={editData.shift} 
+                <ShiftSelector
+                  value={editData.shift}
                   onChange={(s) => {
                     const shiftOpening = editingSummary.shiftDetails[`shift${s}`]?.opening;
-                    setEditData({ 
-                      ...editData, 
+                    setEditData({
+                      ...editData,
                       shift: s,
                       openingCash: shiftOpening?.totalOpeningCash || 0,
-                      denominations: shiftOpening?.denominations && Object.keys(shiftOpening.denominations).length > 0 
-                        ? shiftOpening.denominations 
+                      denominations: shiftOpening?.denominations && Object.keys(shiftOpening.denominations).length > 0
+                        ? shiftOpening.denominations
                         : { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
                       isNoService: shiftOpening?.isNoService || false,
                       remark: shiftOpening?.isNoService ? 'Removing No Service state' : 'Corrected by Admin'
                     });
-                  }} 
+                  }}
                 />
               </div>
 
@@ -1339,8 +1337,8 @@ export default function AdminCashManagement() {
                   <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block leading-none mb-1">Vehicle Damage / Service</span>
                   <span className="text-xs font-bold text-rose-900 opacity-70">Mark Shift {editData.shift} as "No Service" for today</span>
                 </div>
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   checked={editData.isNoService || false}
                   onChange={(e) => setEditData({ ...editData, isNoService: e.target.checked })}
                   className="w-5 h-5 rounded-lg border-rose-200 text-rose-500 focus:ring-rose-500 cursor-pointer"
