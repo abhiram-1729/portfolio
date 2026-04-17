@@ -1,9 +1,11 @@
+import dotenv from 'dotenv';
+dotenv.config();
 import app from './app.js';
 import { initCronJobs } from './utils/cronJobs.js';
 import { createServer } from 'http';
 import { initSocket } from './services/socketService.js';
 
-const PORT = process.env.PORT || 5000; // Match .env
+const PORT = process.env.PORT || 5001; 
 
 const server = createServer(app);
 const io = initSocket(server);
