@@ -47,6 +47,8 @@ model Tenant {
   assetRequests     AssetRequest[]
   customRoles       CustomRole[]
   activityLogs      ActivityLog[] @relation("TenantActivityLogs")
+  storeCashRegisters StoreCashRegister[]
+  storeDeposits      StoreDeposit[]
   // Procurement Relations
   vendors                Vendor[]
   vendorItemMappings     VendorItemMapping[]
@@ -107,10 +109,12 @@ model User {
   assetIssues      AssetIssue[]
   expenses         Expense[]
   cashTransfers    CashTransfer[]
+  storeDeposits    StoreDeposit[]
   dailySummaries   DailyCashSummary[]    @relation("UserDailyCashSummary")
   assetRequests    AssetRequest[]        @relation("UserAssetRequests")
   locationCheckIns LocationCheckIn[]
   stockAudits      StockAudit[]
+  bankDeposits     BankDeposit[]
   actions           ActivityLog[] @relation("UserActions")
   targetActions     ActivityLog[] @relation("TargetActions")
 
@@ -612,6 +616,54 @@ model DailyCashSummary {
   @@index([date])
   @@index([userId])
   @@index([storeId])
+}
+
+model StoreCashRegister {
+  id                   String   @id @default(cuid())
+  tenantId             String   @default("VK001")
+  storeId              String
+  date                 String
+  
+  openingCash          Float
+  openingDenominations Json
+  
+  expectedClosingCash  Float?
+  actualClosingCash    Float?
+  closingDifference    Float?
+  closingDenominations Json?
+  
+  status               String   @default("OPEN") // OPEN, CLOSED
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  tenant               Tenant   @relation(fields: [tenantId], references: [id])
+  store                Store    @relation(fields: [storeId], references: [id])
+  
+  @@unique([storeId, date])
+  @@index([tenantId])
+}
+
+model StoreDeposit {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String
+  date            String
+  shift           Int
+  amount          Float
+  denominations   Json
+  description     String
+  userId          String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  store           Store    @relation(fields: [storeId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+  
+  @@unique([storeId, date, shift])
+  @@index([tenantId])
 }
 
 model Expense {
@@ -1209,6 +1261,8 @@ model Store {
   openingCash      OpeningCash[]
   closingCash      ClosingCash[]
   dailySummaries   DailyCashSummary[]
+  storeCashRegisters StoreCashRegister[]
+  storeDeposits    StoreDeposit[]
   expenses         Expense[]
   cashTransfers    CashTransfer[]
   dailyCoverages   DailyCoverage[]
@@ -1225,6 +1279,7 @@ model Store {
   orderItems         OrderItem[]
   payments           Payment[]
   routes             Route[]
+  bankDeposits       BankDeposit[]
   villages           Village[]
   assetCategories    AssetCategory[]
   incentiveConfigs   VgeIncentiveConfig[]
@@ -1664,4 +1719,27 @@ model ActivityLog {
   @@index([userId])
   @@index([createdAt])
   @@index([storeId])
+}
+
+model BankDeposit {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String
+  date            String   // YYYY-MM-DD
+  dateTime        DateTime @default(now())
+  amount          Float
+  branchName      String
+  receiptImage    String?
+  depositedBy     String   // Name
+  adminId         String?  // References User (the admin who recorded it)
+  remark          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  store           Store    @relation(fields: [storeId], references: [id])
+  admin           User?    @relation(fields: [adminId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([date])
 }

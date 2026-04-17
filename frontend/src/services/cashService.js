@@ -42,3 +42,49 @@ export const adminReviewClosing = async (data) => {
   const response = await api.put('/cash/admin/closing/review', data);
   return response.data;
 };
+
+// Store Cash Safe Endpoints
+export const getStoreCashRegister = async (date) => {
+  const response = await api.get(`/cash/store-register/${date}`);
+  return response.data;
+};
+
+export const openStoreCashRegister = async (data) => {
+  const response = await api.post('/cash/store-register/open', data);
+  return response.data;
+};
+
+export const closeStoreCashRegister = async (data) => {
+  const response = await api.post('/cash/store-register/close', data);
+  return response.data;
+};
+
+export const createStoreDeposit = async (data) => {
+  const response = await api.post('/cash/store-register/deposit', data);
+  return response.data;
+};
+
+export const updateStoreCashRegister = async (data) => {
+  const response = await api.patch('/cash/store-register/update', data);
+  return response.data;
+};
+
+export const updateStoreDeposit = async (id, data) => {
+  const response = await api.patch(`/cash/store-register/deposit/${id}`, data);
+  return response.data;
+};
+
+export const deleteStoreDeposit = async (id) => {
+  const response = await api.delete(`/cash/store-register/deposit/${id}`);
+  return response.data;
+};
+
+export const addBankDeposit = async (data) => {
+  const response = await api.post('/cash/store-register/bank-deposit', data);
+  return response.data;
+};
+
+export const deleteBankDeposit = async (id) => {
+  const response = await api.delete(`/cash/store-register/bank-deposit/${id}`);
+  return response.data;
+};
