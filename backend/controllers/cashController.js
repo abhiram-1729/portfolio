@@ -291,10 +291,10 @@ export const submitClosingCash = async (req, res, next) => {
                     vehicleId_date_shift: { vehicleId, date: dateString, shift: 1 }
                 }
             });
-            shiftCashSales = totalDaySales - (shift1Record?.cashSales || 0);
-            shiftUpiSales = totalDayUpi - (shift1Record?.upiSales || 0);
-            shiftCardSales = totalDayCard - (shift1Record?.cardSales || 0);
-            shiftExpenses = totalDayExpenses - (shift1Record?.expenses || 0);
+            shiftCashSales = Math.max(0, totalDaySales - (shift1Record?.cashSales || 0));
+            shiftUpiSales = Math.max(0, totalDayUpi - (shift1Record?.upiSales || 0));
+            shiftCardSales = Math.max(0, totalDayCard - (shift1Record?.cardSales || 0));
+            shiftExpenses = Math.max(0, totalDayExpenses - (shift1Record?.expenses || 0));
         }
 
         const openingAmount = shiftOpening?.totalOpeningCash || 0;
@@ -478,15 +478,15 @@ export const getCashStatus = async (req, res, next) => {
         const totalExpenses = expensesResult._sum.amount || 0;
 
         // Per-shift sales/expenses split
-        const s1CashSales = closing1?.cashSales || (closing1 ? 0 : totalCashSales);
-        const s1UpiSales = closing1?.upiSales || (closing1 ? 0 : totalUpiSales);
-        const s1CardSales = closing1?.cardSales || (closing1 ? 0 : totalCardSales);
-        const s1Expenses = closing1?.expenses || (closing1 ? 0 : totalExpenses);
+        const s1CashSales = opening1 ? (closing1?.cashSales || totalCashSales) : 0;
+        const s1UpiSales = opening1 ? (closing1?.upiSales || totalUpiSales) : 0;
+        const s1CardSales = opening1 ? (closing1?.cardSales || totalCardSales) : 0;
+        const s1Expenses = opening1 ? (closing1?.expenses || totalExpenses) : 0;
 
-        const s2CashSales = closing1 ? totalCashSales - s1CashSales : 0;
-        const s2UpiSales = closing1 ? totalUpiSales - s1UpiSales : 0;
-        const s2CardSales = closing1 ? totalCardSales - s1CardSales : 0;
-        const s2Expenses = closing1 ? totalExpenses - s1Expenses : 0;
+        const s2CashSales = opening2 ? (closing2?.cashSales || (closing1 ? Math.max(0, totalCashSales - closing1.cashSales) : 0)) : 0;
+        const s2UpiSales = opening2 ? (closing2?.upiSales || (closing1 ? Math.max(0, totalUpiSales - closing1.upiSales) : 0)) : 0;
+        const s2CardSales = opening2 ? (closing2?.cardSales || (closing1 ? Math.max(0, totalCardSales - closing1.cardSales) : 0)) : 0;
+        const s2Expenses = opening2 ? (closing2?.expenses || (closing1 ? Math.max(0, totalExpenses - closing1.expenses) : 0)) : 0;
 
         const totalOpening = (opening1?.totalOpeningCash || 0) + (opening2?.totalOpeningCash || 0);
 
@@ -511,10 +511,10 @@ export const getCashStatus = async (req, res, next) => {
                     closingDenominations: closing1?.denominations || null,
                     closingActual: closing1?.actualCash || 0,
                     closingDifference: closing1?.difference || 0,
-                    cashSales: closing1 ? s1CashSales : totalCashSales,
-                    upiSales: closing1 ? s1UpiSales : totalUpiSales,
-                    cardSales: closing1 ? s1CardSales : totalCardSales,
-                    expenses: closing1 ? s1Expenses : totalExpenses,
+                    cashSales: s1CashSales,
+                    upiSales: s1UpiSales,
+                    cardSales: s1CardSales,
+                    expenses: s1Expenses,
                 },
                 shift2: {
                     openingAssigned: !!opening2,
@@ -645,10 +645,10 @@ export const getAdminCashSummary = async (req, res, next) => {
                 const s1AccountedCard = c1?.cardSales || 0;
                 const s1AccountedExpenses = c1?.expenses || 0;
                 
-                s2Live.cashSales = totalRealtimeCashSales - s1AccountedSales;
-                s2Live.upiSales = totalRealtimeUpiSales - s1AccountedUpi;
-                s2Live.cardSales = totalRealtimeCardSales - s1AccountedCard;
-                s2Live.expenses = totalRealtimeExpenses - s1AccountedExpenses;
+                s2Live.cashSales = Math.max(0, totalRealtimeCashSales - s1AccountedSales);
+                s2Live.upiSales = Math.max(0, totalRealtimeUpiSales - s1AccountedUpi);
+                s2Live.cardSales = Math.max(0, totalRealtimeCardSales - s1AccountedCard);
+                s2Live.expenses = Math.max(0, totalRealtimeExpenses - s1AccountedExpenses);
                 s2Live.expected = o2.totalOpeningCash + s2Live.cashSales - s2Live.expenses;
             } else if (c2) {
                 s2Live.cashSales = c2.cashSales;
@@ -1066,12 +1066,30 @@ export const adminReviewClosingCash = async (req, res, next) => {
         }
 
         const updateData = { status };
-        if (actualCash !== undefined) {
-            updateData.actualCash = actualCash;
-            updateData.difference = actualCash - existingClosing.expectedCash;
-        }
-        if (upiSales !== undefined) updateData.upiSales = upiSales;
-        if (cardSales !== undefined) updateData.cardSales = cardSales;
+
+        // 1. Determine new values against existing
+        const newActualCash = actualCash !== undefined ? actualCash : existingClosing.actualCash;
+        const newUpiSales = upiSales !== undefined ? upiSales : existingClosing.upiSales;
+        const newCardSales = cardSales !== undefined ? cardSales : existingClosing.cardSales;
+
+        // 2. Calculate the variance from what the system originally recorded
+        const upiVariance = newUpiSales - existingClosing.upiSales;
+        const cardVariance = newCardSales - existingClosing.cardSales;
+
+        // 3. Adjust expectedCash based ONLY on the variance. 
+        // If they add 500 to UPI, it means they swapped 500 of physical cash expectation for UPI.
+        const newExpectedCash = existingClosing.expectedCash - upiVariance - cardVariance;
+
+        // 4. Calculate new difference
+        const newDifference = newActualCash - newExpectedCash;
+
+        if (actualCash !== undefined) updateData.actualCash = newActualCash;
+        if (upiSales !== undefined) updateData.upiSales = newUpiSales;
+        if (cardSales !== undefined) updateData.cardSales = newCardSales;
+        
+        // Notice we do NOT change cashSales. We only shift the expectation to match the modified payment modes.
+        updateData.expectedCash = newExpectedCash;
+        updateData.difference = newDifference;
         if (denominations) updateData.denominations = denominations;
         if (remark) updateData.remark = remark;
 

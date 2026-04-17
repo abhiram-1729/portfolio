@@ -448,10 +448,24 @@ export default function AdminCashManagement() {
                         </div>
                       </div>
                       <div className="space-y-3 pt-3 border-t border-orange-200">
-                        <div className="flex justify-between items-center px-1">
-                          <span className="text-[10px] font-black text-orange-600 uppercase">New Cash Total</span>
-                          <span className="text-xl font-black text-orange-700">₹{reviewEditData.actualCash.toFixed(2)}</span>
-                        </div>
+                        {(() => {
+                          const originalExpected = s1?.closing?.expectedCash || 0;
+                          const originalUpi = s1?.closing?.upiSales || 0;
+                          const originalCard = s1?.closing?.cardSales || 0;
+                          const liveExpected = originalExpected - ((reviewEditData.upiSales || 0) - originalUpi) - ((reviewEditData.cardSales || 0) - originalCard);
+                          const liveDiff = reviewEditData.actualCash - liveExpected;
+                          return (
+                            <div className="flex items-center justify-between px-1 bg-white p-2 rounded-xl border border-orange-100 shadow-sm">
+                              <div>
+                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected: ₹{liveExpected.toFixed(2)}</span>
+                                <span className="text-xs font-black text-orange-700 uppercase">Input: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+                              </div>
+                              <div className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(liveDiff) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {Math.abs(liveDiff) <= 0.01 ? 'MATCHED ✓' : liveDiff > 0 ? `Extra: ₹${liveDiff.toFixed(2)}` : `Short: ₹${Math.abs(liveDiff).toFixed(2)}`}
+                              </div>
+                            </div>
+                          );
+                        })()}
                         <input 
                           className="w-full bg-white border border-orange-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-orange-200"
                           placeholder="Admin reason for correction..."
@@ -511,37 +525,39 @@ export default function AdminCashManagement() {
                         </div>
                       )}
 
-                      {s1.closing.status === 'PENDING' && (
-                        <div className="flex gap-3 pt-2">
-                           <button 
-                             onClick={() => {
-                               setIsReviewEditing(1);
-                               setReviewEditData({
-                                 actualCash: s1.closing.actualCash,
-                                 upiSales: s1.closing.upiSales,
-                                 cardSales: s1.closing.cardSales,
-                                 denominations: s1.closing.denominations,
-                                 remark: s1.closing.remark || ''
-                               });
-                             }}
-                             className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
-                           >
-                             <Pencil size={12} /> Edit
-                           </button>
-                           <button 
-                             onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
-                             className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
-                           >
-                             Quick Approve
-                           </button>
-                           <button 
-                             onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
-                             className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
-                           >
-                             Reject
-                           </button>
-                        </div>
-                      )}
+                      <div className="flex gap-3 pt-2">
+                         <button 
+                           onClick={() => {
+                             setIsReviewEditing(1);
+                             setReviewEditData({
+                               actualCash: s1.closing.actualCash,
+                               upiSales: s1.closing.upiSales,
+                               cardSales: s1.closing.cardSales,
+                               denominations: s1.closing.denominations,
+                               remark: s1.closing.remark || ''
+                             });
+                           }}
+                           className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                         >
+                           <Pencil size={12} /> Edit
+                         </button>
+                         {s1.closing.status === 'PENDING' && (
+                           <>
+                             <button 
+                               onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
+                               className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                             >
+                               Quick Approve
+                             </button>
+                             <button 
+                               onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
+                               className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                             >
+                               Reject
+                             </button>
+                           </>
+                         )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -617,10 +633,24 @@ export default function AdminCashManagement() {
                             </div>
                           </div>
                           <div className="space-y-3 pt-3 border-t border-indigo-200">
-                            <div className="flex justify-between items-center px-1">
-                              <span className="text-[10px] font-black text-indigo-600 uppercase">New Cash Total</span>
-                              <span className="text-xl font-black text-indigo-700">₹{reviewEditData.actualCash.toFixed(2)}</span>
-                            </div>
+                            {(() => {
+                              const originalExpected = s2?.closing?.expectedCash || 0;
+                              const originalUpi = s2?.closing?.upiSales || 0;
+                              const originalCard = s2?.closing?.cardSales || 0;
+                              const liveExpected = originalExpected - ((reviewEditData.upiSales || 0) - originalUpi) - ((reviewEditData.cardSales || 0) - originalCard);
+                              const liveDiff = reviewEditData.actualCash - liveExpected;
+                              return (
+                                <div className="flex items-center justify-between px-1 bg-white p-2 rounded-xl border border-indigo-100 shadow-sm">
+                                  <div>
+                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected: ₹{liveExpected.toFixed(2)}</span>
+                                    <span className="text-xs font-black text-indigo-700 uppercase">Input: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+                                  </div>
+                                  <div className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(liveDiff) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    {Math.abs(liveDiff) <= 0.01 ? 'MATCHED ✓' : liveDiff > 0 ? `Extra: ₹${liveDiff.toFixed(2)}` : `Short: ₹${Math.abs(liveDiff).toFixed(2)}`}
+                                  </div>
+                                </div>
+                              );
+                            })()}
                             <input 
                               className="w-full bg-white border border-indigo-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-indigo-200"
                               placeholder="Admin reason for correction..."
@@ -680,37 +710,39 @@ export default function AdminCashManagement() {
                             </div>
                           )}
 
-                          {s2.closing.status === 'PENDING' && (
-                            <div className="flex gap-3 pt-2">
-                               <button 
-                                 onClick={() => {
-                                   setIsReviewEditing(2);
-                                   setReviewEditData({
-                                     actualCash: s2.closing.actualCash,
-                                     upiSales: s2.closing.upiSales,
-                                     cardSales: s2.closing.cardSales,
-                                     denominations: s2.closing.denominations,
-                                     remark: s2.closing.remark || ''
-                                   });
-                                 }}
-                                 className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
-                               >
-                                 <Pencil size={12} /> Edit
-                               </button>
-                               <button 
-                                 onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
-                                 className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
-                               >
-                                 Quick Approve
-                               </button>
-                               <button 
-                                 onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
-                                 className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
-                               >
-                                 Reject
-                               </button>
-                            </div>
-                          )}
+                          <div className="flex gap-3 pt-2">
+                             <button 
+                               onClick={() => {
+                                 setIsReviewEditing(2);
+                                 setReviewEditData({
+                                   actualCash: s2.closing.actualCash,
+                                   upiSales: s2.closing.upiSales,
+                                   cardSales: s2.closing.cardSales,
+                                   denominations: s2.closing.denominations,
+                                   remark: s2.closing.remark || ''
+                                 });
+                               }}
+                               className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                             >
+                               <Pencil size={12} /> Edit
+                             </button>
+                             {s2.closing.status === 'PENDING' && (
+                               <>
+                                 <button 
+                                   onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
+                                   className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                                 >
+                                   Quick Approve
+                                 </button>
+                                 <button 
+                                   onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
+                                   className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                                 >
+                                   Reject
+                                 </button>
+                               </>
+                             )}
+                          </div>
                         </>
                       )}
                     </div>
