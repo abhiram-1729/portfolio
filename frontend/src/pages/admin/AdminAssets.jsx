@@ -752,6 +752,150 @@ export default function AdminAssets() {
     );
   }
 
+  if (showCreateModal) {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => setShowCreateModal(false)}
+              className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm group"
+            >
+              <ArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Register New Asset</h2>
+              <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1 italic">Inventory Expansion & Capital Tracking</p>
+            </div>
+          </div>
+          <button 
+            onClick={() => setShowCreateModal(false)}
+            className="hidden md:flex items-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 hover:border-gray-200 transition-all shadow-sm"
+          >
+            Cancel & Return
+          </button>
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] border border-gray-50 shadow-2xl shadow-slate-200/50 overflow-hidden">
+          <div className="p-8 md:p-12">
+            <form onSubmit={handleCreate} className="max-w-4xl mx-auto space-y-10">
+              {/* Classification & Nature */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Tag size={12} className="text-emerald-500" /> Asset Category <span className="text-rose-500">*</span>
+                    </label>
+                    <select value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })} required
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-black text-emerald-800 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all cursor-pointer">
+                      <option value="">Select Category</option>
+                      {assetCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Monitor size={12} className="text-emerald-500" /> Operational Nature <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="grid grid-cols-2 gap-3 p-1.5 bg-slate-100 rounded-2xl">
+                      <button type="button" onClick={() => setForm({...form, assetType: 'ELECTRONIC'})}
+                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${form.assetType === 'ELECTRONIC' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                        Electronic
+                      </button>
+                      <button type="button" onClick={() => setForm({...form, assetType: 'NON_ELECTRONIC'})}
+                        className={`py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${form.assetType === 'NON_ELECTRONIC' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}>
+                        Bulk / Tools
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Package size={12} className="text-emerald-500" /> Identification Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g. Android POS V2"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Box size={12} className="text-emerald-500" /> Asset Description
+                    </label>
+                    <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="1" placeholder="Technical specs or usage notes..."
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-medium resize-none overflow-hidden" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Specs & Valuation */}
+              <div className="bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100 space-y-8">
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <BarChart3 size={20} className="text-emerald-500" />
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-800">Specifications & Valuation</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Brand / OEM</label>
+                    <input type="text" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} placeholder="e.g. MSwipe"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Model / Version</label>
+                    <input type="text" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="e.g. V240-X"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Estimated Value (₹)</label>
+                    <input type="number" value={form.estimatedCost} onChange={e => setForm({ ...form, estimatedCost: e.target.value })} placeholder="0"
+                      className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-emerald-600 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Media Attachment */}
+              <div className="space-y-4">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2 uppercase font-black">
+                  Visual Documentation
+                </label>
+                <div className="relative group overflow-hidden">
+                  <input type="file" accept="image/*" onChange={e => setSelectedFile(e.target.files[0])}
+                    className="absolute inset-0 opacity-0 cursor-pointer z-10" />
+                  <div className="w-full h-40 bg-slate-50 border-2 border-dashed border-slate-200 rounded-[2rem] flex flex-col items-center justify-center gap-3 group-hover:bg-emerald-50/50 group-hover:border-emerald-200 transition-all">
+                    <div className="w-12 h-12 rounded-2xl bg-white shadow-sm flex items-center justify-center text-slate-400 group-hover:text-emerald-500 transition-colors">
+                      <RefreshCcw size={20} />
+                    </div>
+                    <div className="text-center">
+                      <p className="text-xs font-black text-slate-600">{selectedFile ? selectedFile.name : 'Click or Drag Asset Identity Photo'}</p>
+                      <p className="text-[9px] font-bold text-slate-400 mt-1 uppercase tracking-tighter">PNG, JPG up to 10MB</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-4">
+                <button type="button" onClick={() => setShowCreateModal(false)}
+                  className="w-full md:w-auto px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all">
+                  Discard
+                </button>
+                <button type="submit" disabled={isSubmitting}
+                  className={`w-full md:w-auto px-16 py-5 rounded-2xl shadow-2xl shadow-emerald-500/30 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3 ${
+                    isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+                  }`}>
+                  {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Cataloging...</> : <><CheckCircle2 size={18} /> Catalog Asset</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -795,72 +939,6 @@ export default function AdminAssets() {
       {activeTab === 'issues' && renderIssues()}
       {activeTab === 'requests' && renderRequests()}
       {activeTab === 'reports' && renderReports()}
-
-      {/* ══════ Create Asset Modal ══════ */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold text-gray-900">Create Asset</h3>
-              <button onClick={() => setShowCreateModal(false)} className="p-1 hover:bg-gray-100 rounded-full text-gray-400"><X size={18} /></button>
-            </div>
-            <form onSubmit={handleCreate} className="space-y-3">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asset Category</label>
-                <select value={form.categoryId} onChange={e => setForm({ ...form, categoryId: e.target.value })} required
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="">Select Category</option>
-                  {assetCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Nature (Behavior)</label>
-                <select value={form.assetType} onChange={e => setForm({ ...form, assetType: e.target.value })}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20">
-                  <option value="ELECTRONIC">Electronic (Has Serials)</option>
-                  <option value="NON_ELECTRONIC">Non-Electronic (Bulk)</option>
-                </select>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Asset Name *</label>
-                <input type="text" required value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="e.g., Swiping Machine"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Model</label>
-                  <input type="text" value={form.model} onChange={e => setForm({ ...form, model: e.target.value })} placeholder="e.g., POS-X200"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Brand</label>
-                  <input type="text" value={form.brand} onChange={e => setForm({ ...form, brand: e.target.value })} placeholder="e.g., HP"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20" />
-                </div>
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Estimated Cost (₹)</label>
-                <input type="number" value={form.estimatedCost} onChange={e => setForm({ ...form, estimatedCost: e.target.value })} placeholder="0"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Description</label>
-                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} rows="2"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20 resize-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Image</label>
-                <input type="file" accept="image/*" onChange={e => setSelectedFile(e.target.files[0])}
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-emerald-50 file:text-emerald-700 hover:file:bg-emerald-100" />
-              </div>
-              <button type="submit" disabled={isSubmitting}
-                className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Creating...</> : '✅ Create Asset'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ══════ Edit Asset Modal ══════ */}
       {showEditModal && editForm && (

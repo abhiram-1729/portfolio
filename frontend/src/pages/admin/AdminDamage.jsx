@@ -304,55 +304,94 @@ export default function AdminDamage() {
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-xl shadow-slate-200/50">
+            <table className="w-full text-sm border-collapse">
+              <thead className="bg-gray-50/50 border-b border-gray-100">
                 <tr>
-                  <th className="text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-24">ID / Date</th>
-                  <th className="text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 min-w-[180px]">Product</th>
-                  <th className="text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Reported By</th>
-                  <th className="text-center px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-16">Qty</th>
-                  <th className="text-left px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-28">Type</th>
-                  <th className="text-right px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-24">Loss</th>
-                  <th className="text-center px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-32">Status</th>
-                  <th className="text-center px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-20">Actions</th>
+                  <th className="text-left px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 min-w-[180px]">ID / Date</th>
+                  <th className="text-left px-4 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Product</th>
+                  <th className="text-left px-4 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400">Reported By</th>
+                  <th className="text-center px-4 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-16">Qty</th>
+                  <th className="text-left px-4 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-28">Type</th>
+                  <th className="text-right px-4 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-24">Loss</th>
+                  <th className="text-center px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-32">Status</th>
+                  <th className="text-center px-6 py-4 text-[9px] font-black uppercase tracking-widest text-gray-400 w-24">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filteredEntries.map(entry => (
-                  <tr key={entry.id} className="hover:bg-gray-50/50 transition-colors">
-                    <td className="px-4 py-3">
-                      <p className="text-xs font-bold text-gray-900">{entry.displayId || entry.id.slice(0, 8)}</p>
-                      <p className="text-[10px] text-gray-400">{new Date(entry.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}</p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        {entry.product?.image ? (
-                          <img src={entry.product.image} alt="" className="w-8 h-8 rounded-lg object-cover border border-gray-100" />
-                        ) : (
-                          <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center"><Package size={14} className="text-gray-400" /></div>
-                        )}
-                        <span className="font-medium text-gray-800 truncate max-w-[150px]">{entry.product?.name}</span>
+                  <tr key={entry.id} className="hover:bg-emerald-50/30 transition-colors group">
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-0.5 whitespace-nowrap">
+                        <span className="text-xs font-black text-slate-800 tracking-tight">
+                          {entry.displayId || entry.id.slice(0, 8)}
+                        </span>
+                        <span className="text-[10px] font-bold text-slate-400">
+                          {new Date(entry.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: '2-digit' })}
+                        </span>
                       </div>
                     </td>
-                    <td className="px-4 py-3 text-xs text-gray-600">{entry.reportedBy?.name}</td>
-                    <td className="px-4 py-3 text-center font-bold text-gray-900">{entry.quantity}</td>
-                    <td className="px-4 py-3">{renderTypeBadge(entry.damageType)}</td>
-                    <td className="px-4 py-3 text-right font-bold text-red-600">₹{(entry.totalLoss || 0).toFixed(0)}</td>
-                    <td className="px-4 py-3 text-center">{renderStatusBadge(entry.status)}</td>
-                    <td className="px-4 py-3">
+                    <td className="px-4 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative">
+                          {entry.product?.image ? (
+                            <img src={entry.product.image} alt="" className="w-10 h-10 rounded-xl object-cover border border-gray-100 shadow-sm" />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center border border-slate-200">
+                              <Package size={16} className="text-slate-400" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex flex-col">
+                           <span className="font-bold text-slate-800">{entry.product?.name}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex flex-col whitespace-nowrap">
+                        <span className="text-xs font-bold text-slate-500 italic">{entry.reportedBy?.name}</span>
+                        {entry.vehicle?.vehicleNumber && (
+                           <span className="text-[9px] font-black text-emerald-600/70 uppercase flex items-center gap-1 mt-0.5">
+                             <Truck size={10} /> {entry.vehicle.vehicleNumber}
+                           </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                       <span className="w-8 h-8 inline-flex items-center justify-center rounded-lg bg-slate-50 border border-slate-100 font-black text-slate-900 text-xs">
+                         {entry.quantity}
+                       </span>
+                    </td>
+                    <td className="px-4 py-4">{renderTypeBadge(entry.damageType)}</td>
+                    <td className="px-4 py-4 text-right">
+                       <p className="text-xs font-black text-rose-600">₹{(entry.totalLoss || 0).toLocaleString()}</p>
+                    </td>
+                    <td className="px-6 py-4 text-center">{renderStatusBadge(entry.status)}</td>
+                    <td className="px-6 py-4">
                       <div className="flex items-center justify-center gap-1">
-                        <button onClick={() => openDetail(entry)} className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors" title="View Details">
-                          <Eye size={14} />
+                        <button 
+                          onClick={() => openDetail(entry)} 
+                          className="p-2 rounded-xl bg-slate-50 border border-slate-100 text-slate-400 hover:text-emerald-600 hover:bg-white hover:shadow-md transition-all" 
+                          title="View Details"
+                        >
+                          <Eye size={16} />
                         </button>
                         {(entry.status === 'PENDING' || entry.status === 'UNDER_REVIEW') && (
-                          <button onClick={() => openReview(entry)} className="p-1.5 rounded-lg hover:bg-emerald-50 text-emerald-500 hover:text-emerald-700 transition-colors" title="Review">
-                            <Shield size={14} />
+                          <button 
+                            onClick={() => openReview(entry)} 
+                            className="p-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-500 hover:text-emerald-700 hover:bg-white hover:shadow-md transition-all" 
+                            title="Review"
+                          >
+                            <Shield size={16} />
                           </button>
                         )}
                         {entry.status === 'APPROVED' && !entry.deduction && entry.adminResponsibility && entry.adminResponsibility !== 'NOT_RESPONSIBLE' && (
-                          <button onClick={() => openDeduction(entry)} className="p-1.5 rounded-lg hover:bg-orange-50 text-orange-500 hover:text-orange-700 transition-colors" title="Apply Deduction">
-                            <CreditCard size={14} />
+                          <button 
+                            onClick={() => openDeduction(entry)} 
+                            className="p-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-500 hover:text-amber-700 hover:bg-white hover:shadow-md transition-all" 
+                            title="Apply Deduction"
+                          >
+                            <CreditCard size={16} />
                           </button>
                         )}
                       </div>

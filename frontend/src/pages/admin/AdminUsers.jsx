@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -119,10 +119,10 @@ export default function AdminUsers({ type }) {
   const handleToggleStatus = async (user) => {
     const newStatus = user.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE';
     const originalStatus = user.status;
-    
+
     // Optimistic UI update
     setUsers(prev => prev.map(u => u.id === user.id ? { ...u, status: newStatus } : u));
-    
+
     try {
       await adminAPI.updateUser(user.id, { status: newStatus });
       toast.success(`User ${newStatus === 'ACTIVE' ? 'activated' : 'suspended'}`);
@@ -165,7 +165,7 @@ export default function AdminUsers({ type }) {
         </span>
         {customRole?.name && (
           <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[8px] font-black border border-emerald-100 bg-emerald-50 text-emerald-600 uppercase tracking-tighter">
-             <ShieldCheck size={7} /> {customRole.name}
+            <ShieldCheck size={7} /> {customRole.name}
           </span>
         )}
       </div>
@@ -207,14 +207,14 @@ export default function AdminUsers({ type }) {
     return users.filter(u => {
       // Role Filter based on tab
       const userIsAdmin = u.role === 'ADMIN' || u.customRole?.portalType === 'ADMIN' || u.customRole?.portalType === 'SUPERVISOR';
-      
-      const roleMatches = activeTab === 'all' 
-          ? true 
-          : activeTab === 'admin'
-            ? userIsAdmin
-            : activeTab === 'agent'
-              ? !userIsAdmin
-              : u.customRoleId === activeTab;
+
+      const roleMatches = activeTab === 'all'
+        ? true
+        : activeTab === 'admin'
+          ? userIsAdmin
+          : activeTab === 'agent'
+            ? !userIsAdmin
+            : u.customRoleId === activeTab;
 
       if (!roleMatches) return false;
 
@@ -255,7 +255,7 @@ export default function AdminUsers({ type }) {
     // ADMIN / SUPERVISOR -> ADMIN
     // AGENT / HELPER -> SALES_AGENT
     const systemRole = (role.portalType === 'ADMIN' || role.portalType === 'SUPERVISOR') ? 'ADMIN' : 'SALES_AGENT';
-    
+
     if (isEdit) {
       setEditingUser(prev => ({ ...prev, customRoleId: roleId, role: systemRole }));
     } else {
@@ -294,8 +294,8 @@ export default function AdminUsers({ type }) {
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4 mb-8">
         {groupUsers.map((user) => (
-          <div 
-            key={user.id} 
+          <div
+            key={user.id}
             className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 grayscale opacity-80' : ''}`}
           >
             <div className="flex justify-between items-start">
@@ -315,13 +315,13 @@ export default function AdminUsers({ type }) {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-1">
                 {can('STAFF', 'UPDATE') && (
-                  <button onClick={() => { 
+                  <button onClick={() => {
                     const { password, ...userWithoutPass } = user;
-                    setEditingUser({ ...userWithoutPass, password: '' }); 
-                    setShowEditModal(true); 
+                    setEditingUser({ ...userWithoutPass, password: '' });
+                    setShowEditModal(true);
                   }}
                     className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
                     <Pencil size={15} />
@@ -368,8 +368,8 @@ export default function AdminUsers({ type }) {
                 </div>
                 <div className="mt-1">
                   <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 flex flex-col items-center">
-                     <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
-                     <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
+                    <span className="text-[10px] font-black uppercase text-indigo-600 tracking-widest mb-1">Monthly CTC Package</span>
+                    <span className="text-lg font-black text-indigo-950">₹{(user.baseSalary || 0).toLocaleString()}</span>
                   </div>
                 </div>
               </>
@@ -393,8 +393,8 @@ export default function AdminUsers({ type }) {
           </thead>
           <tbody className="divide-y divide-gray-50">
             {groupUsers.map((user) => (
-              <tr 
-                key={user.id} 
+              <tr
+                key={user.id}
                 className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
               >
                 <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
@@ -421,51 +421,51 @@ export default function AdminUsers({ type }) {
                     </span>
                   </div>
                 </td>
+                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex flex-col items-center">
+                    <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
+                      <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
+                    </span>
+                  </div>
+                </td>
+                {showDetailColumns && (
                   <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                    <div className="flex flex-col items-center">
-                      <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                        <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
-                      </span>
-                    </div>
+                    {user.role !== 'ADMIN' ? (
+                      <div className="flex flex-col items-center gap-1.5">
+                        {getRoleBadge(user.role, user.customRole)}
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                          <Truck size={10} />
+                          {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
+                        </div>
+                        {getVgeTypeBadge(user.vgeType)}
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1">
+                        {getRoleBadge(user.role, user.customRole)}
+                        <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1">N/A</span>
+                      </div>
+                    )}
                   </td>
-                  {showDetailColumns && (
-                    <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                      {user.role !== 'ADMIN' ? (
-                        <div className="flex flex-col items-center gap-1.5">
-                          {getRoleBadge(user.role, user.customRole)}
-                          <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                            <Truck size={10} />
-                            {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
-                          </div>
-                          {getVgeTypeBadge(user.vgeType)}
-                        </div>
-                      ) : (
-                        <div className="flex flex-col items-center gap-1">
-                           {getRoleBadge(user.role, user.customRole)}
-                           <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1">N/A</span>
-                        </div>
-                      )}
-                    </td>
-                  )}
-                  {showDetailColumns && (
-                    <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                      {user.role !== 'ADMIN' ? (
-                        <span className="text-sm font-black text-indigo-600">
-                           ₹{(user.baseSalary || 0).toLocaleString()}
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-bold text-gray-300">---</span>
-                      )}
-                    </td>
-                  )}
+                )}
+                {showDetailColumns && (
+                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                    {user.role !== 'ADMIN' ? (
+                      <span className="text-sm font-black text-indigo-600">
+                        ₹{(user.baseSalary || 0).toLocaleString()}
+                      </span>
+                    ) : (
+                      <span className="text-[10px] font-bold text-gray-300">---</span>
+                    )}
+                  </td>
+                )}
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1.5">
                     {can('STAFF', 'UPDATE') && (
-                      <button 
-                        onClick={() => { 
+                      <button
+                        onClick={() => {
                           const { password, ...userWithoutPass } = user;
-                          setEditingUser({ ...userWithoutPass, password: '' }); 
-                          setShowEditModal(true); 
+                          setEditingUser({ ...userWithoutPass, password: '' });
+                          setShowEditModal(true);
                         }}
                         title="Edit Profile"
                         className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
@@ -474,7 +474,7 @@ export default function AdminUsers({ type }) {
                       </button>
                     )}
                     {can('STAFF', 'UPDATE') && (
-                      <button 
+                      <button
                         onClick={() => handleToggleStatus(user)}
                         title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
                         className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
@@ -483,7 +483,7 @@ export default function AdminUsers({ type }) {
                       </button>
                     )}
                     {can('STAFF', 'DELETE') && (
-                      <button 
+                      <button
                         onClick={() => handleDeleteUser(user.id)}
                         title="Permanent Removal"
                         disabled={deletingId === user.id}
@@ -526,13 +526,13 @@ export default function AdminUsers({ type }) {
                 className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
               >
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
-                
+
                 <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <Store size={28} strokeWidth={2.5} />
                 </div>
                 <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
                 <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
-                
+
                 <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
                   <span>{userCount} {activeTab === 'admin' ? 'Admins' : 'Staff'}</span>
                   <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
@@ -542,18 +542,18 @@ export default function AdminUsers({ type }) {
           })}
           {stores.length === 0 && (
             <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
-               <Store size={48} className="mx-auto text-gray-300 mb-4" />
-               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+              <Store size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
             </div>
           )}
         </div>
       );
     }
-    
+
     return (
       <div className="flex flex-col gap-6">
         {renderGroup(paginatedUsers)}
-        
+
         {totalPages > 1 && (
           <div className="flex items-center justify-between bg-white px-6 py-4 rounded-3xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-2">
@@ -561,7 +561,7 @@ export default function AdminUsers({ type }) {
                 Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredUsers.length)} of {filteredUsers.length}
               </p>
             </div>
-            
+
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -570,7 +570,7 @@ export default function AdminUsers({ type }) {
               >
                 <ChevronLeft size={16} />
               </button>
-              
+
               <div className="flex items-center gap-1">
                 {[...Array(totalPages)].map((_, i) => {
                   const pageNum = i + 1;
@@ -584,11 +584,10 @@ export default function AdminUsers({ type }) {
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${
-                          currentPage === pageNum
+                        className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${currentPage === pageNum
                             ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
                             : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                        }`}
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -617,7 +616,149 @@ export default function AdminUsers({ type }) {
     );
   };
 
-  // Only keep it for cases where we explicitly want a selector (if any)
+  if (showAddModal) {
+    return (
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 pb-20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowAddModal(false)}
+              className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm group"
+            >
+              <ArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+            </button>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Hire New Member</h2>
+              <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1 italic">Organization Expansion & Access Control</p>
+            </div>
+          </div>
+          <button
+            onClick={() => setShowAddModal(false)}
+            className="hidden md:flex items-center gap-2 px-6 py-3 bg-white border border-gray-100 rounded-2xl text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 hover:border-gray-200 transition-all shadow-sm"
+          >
+            Cancel & Return
+          </button>
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] border border-gray-50 shadow-2xl shadow-slate-200/50 overflow-hidden">
+          <div className="p-8 md:p-12">
+            <form onSubmit={handleCreateUser} className="max-w-4xl mx-auto space-y-10">
+              {/* Primary Identity Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <User size={12} className="text-emerald-500" /> Full Legal Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input type="text" required placeholder="e.g. Abhiram R"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Mail size={12} className="text-emerald-500" /> Official Email Address <span className="text-rose-500">*</span>
+                    </label>
+                    <input type="email" required placeholder="name@villagekart.com"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <Phone size={12} className="text-emerald-500" /> Mobile Number <span className="text-rose-500">*</span>
+                    </label>
+                    <input type="tel" required placeholder="e.g. +91 98765 43210"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      value={newUser.mobile} onChange={(e) => setNewUser({ ...newUser, mobile: e.target.value })} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 flex items-center gap-2">
+                      <ShieldCheck size={12} className="text-emerald-500" /> Security Password <span className="text-rose-500">*</span>
+                    </label>
+                    <input type="password" required placeholder="Set strong password"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
+                  </div>
+                </div>
+              </div>
+
+              {/* Roles & Permissions Section */}
+              <div className="bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100 space-y-8">
+                <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                  <ShieldCheck size={20} className="text-emerald-500" />
+                  <h4 className="text-xs font-black uppercase tracking-widest text-slate-800">Permissions & Access Context</h4>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Assigned Privilege Level</label>
+                    <div className="relative">
+                      <select required className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-emerald-700 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all cursor-pointer"
+                        value={newUser.customRoleId || ''} onChange={(e) => handleCustomRoleChange(e.target.value)}>
+                        <option value="">Standard {activeTab === 'admin' ? 'Administrator' : 'Sales Member'}</option>
+                        {customRoles.map(role => (
+                          <option key={role.id} value={role.id}>{role.name}</option>
+                        ))}
+                      </select>
+                      <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-emerald-500">
+                        <ChevronLeft size={16} className="-rotate-90" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Employment Context</label>
+                    <select className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-slate-700 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all"
+                      value={newUser.vgeType} onChange={(e) => setNewUser({ ...newUser, vgeType: e.target.value })}>
+                      <option value="EMPLOYEE">Full-time Employee</option>
+                      <option value="FREELANCER">Freelancer (Apps only)</option>
+                    </select>
+                  </div>
+
+                  {isTenantRoute && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Base Branch</label>
+                      <select className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-emerald-700 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all disabled:bg-slate-100"
+                        value={newUser.storeId || ''} onChange={(e) => setNewUser({ ...newUser, storeId: e.target.value })} disabled={!!storeFilterId}>
+                        {stores.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+
+                  {newUser.role !== 'ADMIN' && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Package (₹)</label>
+                      <input type="number" required placeholder="e.g. 15000"
+                        className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                        value={newUser.baseSalary} onChange={(e) => setNewUser({ ...newUser, baseSalary: e.target.value })} />
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-4">
+                <button type="button" onClick={() => setShowAddModal(false)}
+                  className="w-full md:w-auto px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all">
+                  Discard
+                </button>
+                <button type="submit" disabled={isSubmitting}
+                  className={cn('w-full md:w-auto px-16 py-5 rounded-2xl shadow-2xl shadow-emerald-500/30 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3',
+                    isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700')}>
+                  {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Validating...</> : <><CheckCircle2 size={18} /> Confirm Membership</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -626,7 +767,7 @@ export default function AdminUsers({ type }) {
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
             {isTenantRoute && storeFilterId && (
-              <button 
+              <button
                 onClick={() => setSearchParams({})}
                 className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
                 title="Back to All Branches"
@@ -647,7 +788,7 @@ export default function AdminUsers({ type }) {
               >
                 All Members
               </button>
-              
+
               <button
                 onClick={() => setActiveTab('admin')}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'admin' ? 'bg-rose-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
@@ -697,7 +838,7 @@ export default function AdminUsers({ type }) {
         <div className="flex items-center gap-3">
           <div className="relative group hidden sm:block">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-emerald-500" size={16} />
-            <input 
+            <input
               type="text"
               placeholder="Search by name or phone..."
               value={searchTerm}
@@ -706,7 +847,7 @@ export default function AdminUsers({ type }) {
             />
           </div>
           {can('STAFF', 'CREATE') && (
-            <button 
+            <button
               onClick={() => {
                 setNewUser({
                   name: '',
@@ -721,10 +862,10 @@ export default function AdminUsers({ type }) {
                 });
                 setShowAddModal(true);
               }}
-              className="bg-emerald-600 text-white flex items-center gap-2 px-4 py-2 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-medium text-sm active:scale-95"
+              className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
             >
               <Plus size={18} />
-              <span className="hidden md:inline">Hire Staff</span>
+              <span className="hidden md:inline">Hire Member</span>
               <span className="md:hidden">Add</span>
             </button>
           )}
@@ -734,166 +875,24 @@ export default function AdminUsers({ type }) {
       {/* Mobile Search - Only visible on small screens */}
       <div className="sm:hidden relative group px-1">
         <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-        <input 
+        <input
           type="text"
           placeholder="Search staff members..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
         />
       </div>
 
       {filteredUsers.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200">
           <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-             <AlertCircle size={28} className="text-gray-400" />
+            <AlertCircle size={28} className="text-gray-400" />
           </div>
           <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">No {type === 'admin' ? 'organization admins' : 'operational staff'} found</p>
         </div>
       ) : (
         renderClassifiedUsers()
-      )}
-
-      {/* Add User Modal */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">New Member</h3>
-                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Access Assignment</p>
-              </div>
-              <button 
-                onClick={() => setShowAddModal(false)}
-                className="p-2 hover:bg-gray-50 rounded-full text-gray-400"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateUser} className="space-y-3">
-              <div className="space-y-1">
-                <input 
-                  type="text"
-                  required
-                  placeholder="Full Name"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none"
-                  value={newUser.name}
-                  onChange={(e) => setNewUser({...newUser, name: e.target.value})}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <input 
-                  type="email"
-                  required
-                  placeholder="Email"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                  value={newUser.email}
-                  onChange={(e) => setNewUser({...newUser, email: e.target.value})}
-                />
-                <input 
-                  type="tel"
-                  required
-                  placeholder="Mobile"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                  value={newUser.mobile}
-                  onChange={(e) => setNewUser({...newUser, mobile: e.target.value})}
-                />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-emerald-600 ml-1">Assigned Privilege Level *</label>
-                <div className="relative">
-                  <ShieldCheck size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500 z-10" />
-                  <select 
-                    required
-                    className="w-full bg-emerald-50 border border-emerald-100 rounded-xl pl-12 pr-4 py-3 text-sm appearance-none outline-none font-bold text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 transition-all cursor-pointer"
-                    value={newUser.customRoleId || ''}
-                    onChange={(e) => handleCustomRoleChange(e.target.value)}
-                  >
-                    <option value="">Standard {activeTab === 'admin' ? 'Administrator' : 'Sales Member'}</option>
-                    {customRoles.map(role => (
-                      <option key={role.id} value={role.id}>{role.name}</option>
-                    ))}
-                  </select>
-                </div>
-                <p className="text-[9px] text-gray-400 font-bold ml-1 mt-1 italic">
-                  * Privilege level determines portal access and module permissions.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Staff Type</label>
-                  <select 
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all font-bold text-gray-600"
-                    value={newUser.vgeType}
-                    onChange={(e) => setNewUser({...newUser, vgeType: e.target.value})}
-                  >
-                    <option value="EMPLOYEE">Full-time Employee</option>
-                    <option value="FREELANCER">Freelancer (Apps only)</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase text-gray-400 tracking-widest ml-1">Security Password</label>
-                  <input 
-                    type="password"
-                    required
-                    placeholder="Set Password"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser({...newUser, password: e.target.value})}
-                  />
-                </div>
-              </div>
-
-                {isTenantRoute && (
-                  <div className="space-y-1 focus-within:text-emerald-600 relative">
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 transition-colors">Context Branch</label>
-                    <div className="relative">
-                      <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-600 z-10" />
-                      <select
-                        className="w-full bg-emerald-50 border border-emerald-100/50 rounded-xl pl-10 pr-4 py-3 text-sm outline-none appearance-none text-emerald-900 font-bold focus:ring-2 focus:ring-emerald-500/50 transition-all cursor-pointer"
-                        value={newUser.storeId || ''}
-                        onChange={(e) => setNewUser({...newUser, storeId: e.target.value})}
-                        disabled={!!storeFilterId}
-                      >
-                        {stores.map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                )}
-                {newUser.role !== 'ADMIN' && (
-                  <div className={`space-y-1 ${!isTenantRoute ? 'col-span-2' : ''}`}>
-                    <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">CTC Monthly Pay (₹)</label>
-                    <input 
-                      type="number"
-                      required
-                      placeholder="e.g. 15000"
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
-                      value={newUser.baseSalary}
-                      onChange={(e) => setNewUser({...newUser, baseSalary: e.target.value})}
-                    />
-                  </div>
-                )}
-
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-emerald-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-emerald-600/20 mt-4 hover:bg-emerald-700 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" />
-                    Processing...
-                  </>
-                ) : 'Confirm Membership'}
-              </button>
-            </form>
-          </div>
-        </div>
       )}
       {/* Edit User Modal */}
       {showEditModal && editingUser && (
@@ -909,7 +908,7 @@ export default function AdminUsers({ type }) {
                   <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Update Access & Details</p>
                 </div>
               </div>
-              <button 
+              <button
                 onClick={() => setShowEditModal(false)}
                 className="p-2 hover:bg-gray-50 rounded-full text-gray-400 transition-colors"
                 type="button"
@@ -921,37 +920,37 @@ export default function AdminUsers({ type }) {
             <form onSubmit={handleUpdateUser} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Full Name</label>
-                <input 
+                <input
                   type="text"
                   required
                   placeholder="Full Name"
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
                   value={editingUser.name}
-                  onChange={(e) => setEditingUser({...editingUser, name: e.target.value})}
+                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Email</label>
-                  <input 
+                  <input
                     type="email"
                     required
                     placeholder="Email"
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
                     value={editingUser.email}
-                    onChange={(e) => setEditingUser({...editingUser, email: e.target.value})}
+                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Mobile</label>
-                  <input 
+                  <input
                     type="tel"
                     required
                     placeholder="Mobile"
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
                     value={editingUser.mobile}
-                    onChange={(e) => setEditingUser({...editingUser, mobile: e.target.value})}
+                    onChange={(e) => setEditingUser({ ...editingUser, mobile: e.target.value })}
                   />
                 </div>
               </div>
@@ -960,7 +959,7 @@ export default function AdminUsers({ type }) {
                 <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 ml-1">Assigned Privilege Level *</label>
                 <div className="relative">
                   <ShieldCheck size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500 z-10" />
-                  <select 
+                  <select
                     required
                     className="w-full bg-indigo-50 border border-indigo-100 rounded-xl pl-12 pr-4 py-3 text-sm appearance-none outline-none font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
                     value={editingUser.customRoleId || ''}
@@ -976,10 +975,10 @@ export default function AdminUsers({ type }) {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Staff Classification</label>
-                <select 
+                <select
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all font-bold text-gray-700"
                   value={editingUser.vgeType}
-                  onChange={(e) => setEditingUser({...editingUser, vgeType: e.target.value})}
+                  onChange={(e) => setEditingUser({ ...editingUser, vgeType: e.target.value })}
                 >
                   <option value="EMPLOYEE">Full-time Employee</option>
                   <option value="FREELANCER">Freelancer (Apps only)</option>
@@ -994,7 +993,7 @@ export default function AdminUsers({ type }) {
                     <select
                       className="w-full bg-indigo-50 border border-indigo-100/50 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none appearance-none text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer"
                       value={editingUser.storeId || ''}
-                      onChange={(e) => setEditingUser({...editingUser, storeId: e.target.value})}
+                      onChange={(e) => setEditingUser({ ...editingUser, storeId: e.target.value })}
                       disabled={!!storeFilterId}
                     >
                       {stores.map(s => (
@@ -1008,30 +1007,30 @@ export default function AdminUsers({ type }) {
               {editingUser.role !== 'ADMIN' && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monthly CTC (₹)</label>
-                  <input 
+                  <input
                     type="number"
                     required
                     placeholder="Monthly Base"
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none font-bold text-indigo-600"
                     value={editingUser.baseSalary || ''}
-                    onChange={(e) => setEditingUser({...editingUser, baseSalary: e.target.value})}
+                    onChange={(e) => setEditingUser({ ...editingUser, baseSalary: e.target.value })}
                   />
                 </div>
               )}
 
               <div className="space-y-1">
                 <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Update Password</label>
-                <input 
+                <input
                   type="text"
                   placeholder="Leave blank to keep current"
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
                   value={editingUser.password || ''}
-                  onChange={(e) => setEditingUser({...editingUser, password: e.target.value})}
+                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
                 />
               </div>
 
               <div className="pt-2">
-                <button 
+                <button
                   type="submit"
                   disabled={isSubmitting}
                   className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
@@ -1050,4 +1049,8 @@ export default function AdminUsers({ type }) {
       )}
     </div>
   );
+}
+
+function cn(...inputs) {
+  return inputs.filter(Boolean).join(' ');
 }
