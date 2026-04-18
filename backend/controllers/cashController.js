@@ -851,6 +851,42 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         // Recalculate daily summary
         const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
 
+        // SYNC: Update the Store Deposit if it already exists for this shift
+        const storeId = req.user.storeId;
+        const deposit = await prisma.storeDeposit.findUnique({
+            where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
+        });
+
+        if (deposit) {
+            const allClosings = await prisma.closingCash.findMany({
+                where: { 
+                    date, 
+                    shift: parseInt(shift),
+                    vehicle: { storeId: storeId }
+                }
+            });
+
+            const totalAmount = allClosings.reduce((sum, c) => sum + (c.actualCash || 0), 0);
+            const totalDenominations = { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 };
+            
+            allClosings.forEach(c => {
+                if (c.denominations) {
+                    Object.entries(c.denominations).forEach(([denom, count]) => {
+                        totalDenominations[denom] = (totalDenominations[denom] || 0) + (parseInt(count) || 0);
+                    });
+                }
+            });
+
+            await prisma.storeDeposit.update({
+                where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } },
+                data: {
+                    amount: totalAmount,
+                    denominations: totalDenominations,
+                    description: `Auto-synced: Consolidated Deposit for Shift ${shift} (${allClosings.length} Agents)`
+                }
+            });
+        }
+
         const finalSummary = await prisma.dailyCashSummary.findUnique({
             where: { 
                 vehicleId_date: { vehicleId, date }
@@ -1165,6 +1201,42 @@ export const adminReviewClosingCash = async (req, res, next) => {
         // Recalculate daily summary
         await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
 
+        // SYNC: Update the Store Deposit if it already exists for this shift
+        const storeId = req.user.storeId;
+        const deposit = await prisma.storeDeposit.findUnique({
+            where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
+        });
+
+        if (deposit) {
+            const allClosings = await prisma.closingCash.findMany({
+                where: { 
+                    date, 
+                    shift: parseInt(shift),
+                    vehicle: { storeId: storeId } // More robust: link via vehicle's store
+                }
+            });
+
+            const totalAmount = allClosings.reduce((sum, c) => sum + (c.actualCash || 0), 0);
+            const totalDenominations = { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 };
+            
+            allClosings.forEach(c => {
+                if (c.denominations) {
+                    Object.entries(c.denominations).forEach(([denom, count]) => {
+                        totalDenominations[denom] = (totalDenominations[denom] || 0) + (parseInt(count) || 0);
+                    });
+                }
+            });
+
+            await prisma.storeDeposit.update({
+                where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } },
+                data: {
+                    amount: totalAmount,
+                    denominations: totalDenominations,
+                    description: `Auto-synced: Consolidated Deposit for Shift ${shift} (${allClosings.length} Agents)`
+                }
+            });
+        }
+
         res.json(closingCash);
 
         // Notify the agent who submitted the cash
@@ -1235,10 +1307,20 @@ export const getStoreCashRegister = async (req, res, next) => {
             include: { admin: { select: { name: true, mobile: true } } }
         });
 
+        const shiftCollectionsVal = await prisma.closingCash.groupBy({
+            by: ['shift'],
+            where: { 
+                date,
+                vehicle: { storeId }
+            },
+            _sum: { actualCash: true }
+        });
+
         res.json({
             storeRegister,
             storeDeposits: allDepositsRecords,
             bankDeposits: allBankDepositsRecords,
+            shiftCollections: shiftCollectionsVal,
             liveMetrics: {
                 assignedOut,
                 receivedIn,
@@ -1441,18 +1523,25 @@ export const updateStoreDeposit = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { amount, denominations, description } = req.body;
+        const tenantId = req.user.tenantId;
+
+        if (!id) {
+            res.status(400);
+            throw new Error('Deposit ID is required');
+        }
 
         const updated = await prisma.storeDeposit.update({
-            where: { id },
+            where: { id, tenantId },
             data: {
-                amount,
-                denominations,
+                amount: parseFloat(amount),
+                denominations: denominations || {},
                 description
             }
         });
 
         res.json(updated);
     } catch (error) {
+        console.error('[updateStoreDeposit Error]:', error);
         next(error);
     }
 };
