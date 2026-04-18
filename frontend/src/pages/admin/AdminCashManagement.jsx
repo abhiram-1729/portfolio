@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
@@ -279,46 +280,52 @@ export default function AdminCashManagement() {
     }
   };
 
-  const handleCreateDeposit = async (e, force = false) => {
-    if (e) e.preventDefault();
-    if (depositData.amount <= 0) return toast.error('Enter valid denominations');
-    if (!depositData.description) return toast.error('Description is mandatory');
+  const handleCreateDeposit = async (shiftOverride, force = false) => {
+    // Determine which shift to handle
+    const shiftToDeposit = (typeof shiftOverride === 'number') ? shiftOverride : depositData.shift;
 
     // Hard block if no completions exist for this specific shift
-    if (!hasShiftCompletions(depositData.shift)) {
-      return toast.error(`Shift ${depositData.shift} cannot be deposited yet because no agents have submitted their closing reports for this shift.`);
+    if (!hasShiftCompletions(shiftToDeposit)) {
+      return toast.error(`Shift ${shiftToDeposit} cannot be deposited yet because no agents have submitted their closing reports for this shift.`);
     }
 
     // Check for unapproved collections in this shift
-    const shiftKey = `shift${depositData.shift}`;
+    const shiftKey = `shift${shiftToDeposit}`;
     const unapproved = summaries.filter(s => {
+      // Must have an opening block to be considered for this shift
+      const opening = s.shiftDetails?.[shiftKey]?.opening;
+      if (!opening) return false;
+
       const closing = s.shiftDetails?.[shiftKey]?.closing;
-      return closing && closing.status !== 'APPROVED';
+      // Flag as unapproved if they haven't closed yet or are unapproved
+      return !closing || closing.status !== 'APPROVED';
     });
 
     if (unapproved.length > 0 && !force) {
-      setUnapprovedInfo({ count: unapproved.length, shift: depositData.shift });
+      setUnapprovedInfo({ count: unapproved.length, shift: shiftToDeposit });
+      setDepositData({ ...depositData, shift: shiftToDeposit, description: '' });
       setShowUnapprovedWarning(true);
       return;
     }
+
+    // Auto-calculate the total actual cash to deposit
+    const autoAmount = summaries.reduce((sum, s) => {
+      const closing = s.shiftDetails?.[shiftKey]?.closing;
+      return sum + (closing?.actualCash || 0);
+    }, 0);
+
+    if (autoAmount <= 0) return toast.error(`No cash collected for Shift ${shiftToDeposit}`);
 
     setIsSubmitting(true);
     try {
       await createStoreDeposit({
         date,
-        shift: depositData.shift,
-        amount: depositData.amount,
-        denominations: depositData.denominations,
-        description: depositData.description
+        shift: shiftToDeposit,
+        amount: autoAmount,
+        denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
+        description: (force && depositData.description) ? depositData.description : `Consolidated Deposit for Shift ${shiftToDeposit}`
       });
-      toast.success(`Shift ${depositData.shift} cash deposited successfully`);
-      setShowDepositModal(false);
-      setDepositData({
-        shift: 1,
-        description: '',
-        amount: 0,
-        denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-      });
+      toast.success(`Shift ${shiftToDeposit} cash deposited successfully`);
       fetchStoreRegister();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create deposit');
@@ -1039,7 +1046,178 @@ export default function AdminCashManagement() {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <>
+      {showDepositModal ? (
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300 min-h-[calc(100vh-6rem)] relative z-20">
+          <div className="bg-white border-b border-gray-100 sticky top-0 z-10 px-8 py-5 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-sky-50 rounded-2xl flex items-center justify-center text-sky-600">
+                <Coins size={24} />
+              </div>
+              <div>
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Deposit Shift Cash Report</h2>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-widest mt-1">Review Agent Collections & Submit to Store Safe</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowDepositModal(false)}
+              className="px-6 py-3 bg-gray-100 hover:bg-rose-50 text-gray-600 hover:text-rose-600 rounded-xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+            >
+              <X size={18} /> Close View
+            </button>
+          </div>
+
+          <div className="flex-1 p-8 w-full space-y-6 pb-32">
+            {/* TABS NAVIGATION */}
+            <div className="flex gap-2 bg-gray-100 p-1.5 rounded-2xl w-fit mx-auto md:mx-0">
+              {[1, 2].map((s) => (
+                <button
+                  type="button"
+                  key={s}
+                  onClick={() => setDepositData({ ...depositData, shift: s })}
+                  className={`px-8 py-3 rounded-xl text-xs font-black uppercase tracking-wider transition-all flex items-center gap-2 ${depositData.shift === s ? (s === 1 ? 'bg-amber-500 text-white shadow-xl shadow-amber-500/20' : 'bg-indigo-500 text-white shadow-xl shadow-indigo-500/20') : 'text-gray-400 hover:text-gray-600 hover:bg-gray-200'}`}
+                >
+                  {s === 1 ? <Sun size={16} /> : <Moon size={16} />}
+                  Shift {s}
+                </button>
+              ))}
+            </div>
+
+            {/* TAB CONTENT */}
+            {(() => {
+              const shift = depositData.shift || 1;
+              const shiftKey = `shift${shift}`;
+              const shiftAgents = summaries.filter(s => s.shiftDetails?.[shiftKey]?.opening);
+              
+              if (shiftAgents.length === 0) return (
+                <div key={shift} className={`bg-white rounded-[2rem] border overflow-hidden shadow-sm p-12 text-center flex flex-col items-center justify-center border-dashed animate-in fade-in duration-300 ${shift === 1 ? 'border-amber-200' : 'border-indigo-200'}`}>
+                  {shift === 1 ? <Sun size={48} className="text-amber-200 mb-4" /> : <Moon size={48} className="text-indigo-200 mb-4" />}
+                  <h3 className="text-lg font-black text-gray-300 uppercase tracking-widest">No Assignment for Shift {shift}</h3>
+                </div>
+              );
+
+              const isDeposited = isShiftDeposited(shift);
+              const hasCompletions = hasShiftCompletions(shift);
+              const totalCashCollected = shiftAgents.reduce((sum, s) => sum + (s.shiftDetails?.[shiftKey]?.closing?.actualCash || 0), 0);
+
+              return (
+                <div key={shift} className={`bg-white rounded-[2rem] border overflow-hidden shadow-sm animate-in fade-in duration-300 ${shift === 1 ? 'border-amber-100' : 'border-indigo-100'}`}>
+                  <div className={`px-6 py-5 flex items-center justify-between border-b ${shift === 1 ? 'bg-amber-50/50 border-amber-100' : 'bg-indigo-50/50 border-indigo-100'}`}>
+                    <div className="flex items-center gap-3">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white ${shift === 1 ? 'bg-amber-500' : 'bg-indigo-500'}`}>
+                        {shift === 1 ? <Sun size={20} /> : <Moon size={20} />}
+                      </div>
+                      <div>
+                        <h3 className={`text-lg font-black uppercase tracking-tight ${shift === 1 ? 'text-amber-900' : 'text-indigo-900'}`}>
+                          Shift {shift} Collection Report
+                        </h3>
+                        {isDeposited ? (
+                          <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 w-fit mt-1">
+                            <CheckCircle2 size={12}/> Deposited
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 block">Review and deposit shift collection</span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="p-6">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100 pb-2">
+                            <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent Info</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Initial Float</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Closing Status</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Admin Status</th>
+                            <th className="px-4 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Cash Collected</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {shiftAgents.map((agentSum) => {
+                            const details = agentSum.shiftDetails[shiftKey];
+                            const agentName = agentSum.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT')?.name || 'Unknown Agent';
+                            const diff = details.closing?.difference || 0;
+                            const isMatched = details.closing && diff === 0;
+
+                            return (
+                              <tr key={agentSum.id} className="hover:bg-gray-50/50 transition-colors">
+                                <td className="px-4 py-4">
+                                  <p className="text-sm font-black text-gray-900">{agentName}</p>
+                                  <p className="text-[10px] font-bold text-gray-400 uppercase">{agentSum.vehicle?.vehicleNumber || agentSum.vehicle?.vehicleName}</p>
+                                </td>
+                                <td className="px-4 py-4">
+                                  <span className="text-sm font-bold text-gray-500">₹{(details.opening?.totalOpeningCash || 0).toFixed(2)}</span>
+                                </td>
+                                <td className="px-4 py-4">
+                                  {!details.closing ? (
+                                    <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg uppercase tracking-widest flex items-center w-fit gap-1"><Clock size={10} />Pending</span>
+                                  ) : details.closing.isNoService ? (
+                                    <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg uppercase tracking-widest flex items-center w-fit gap-1"><AlertTriangle size={10} />Damage/Service</span>
+                                  ) : (
+                                    <span className={`text-[10px] font-black w-fit px-2.5 py-1 rounded-lg uppercase tracking-widest ${
+                                      isMatched ? 'text-emerald-700 bg-emerald-50' : 'text-rose-700 bg-rose-50'
+                                    }`}>
+                                      {isMatched ? 'Matched' : diff > 0 ? `+₹${diff.toFixed(2)} Extra` : `-₹${Math.abs(diff).toFixed(2)} Short`}
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4">
+                                  {!details.closing ? (
+                                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Awaiting Shift</span>
+                                  ) : details.closing.status === 'APPROVED' ? (
+                                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg uppercase tracking-widest flex items-center w-fit gap-1">
+                                      <CheckCircle2 size={10} /> Approved
+                                    </span>
+                                  ) : (
+                                    <span className="text-[10px] font-black text-amber-600 bg-amber-50 px-2.5 py-1 rounded-lg uppercase tracking-widest flex items-center w-fit gap-1">
+                                      <Clock size={10} /> Pending
+                                    </span>
+                                  )}
+                                </td>
+                                <td className="px-4 py-4 text-right">
+                                  <span className="text-base font-black text-gray-900">
+                                    ₹{(details.closing?.actualCash || 0).toFixed(2)}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                        <tfoot>
+                          <tr className="bg-gray-50/50">
+                            <td colSpan="4" className="px-4 py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Shift Collection Amount</td>
+                            <td className="px-4 py-4 text-right">
+                              <span className={`text-xl font-black ${shift === 1 ? 'text-amber-600' : 'text-indigo-600'}`}>₹{totalCashCollected.toFixed(2)}</span>
+                            </td>
+                          </tr>
+                        </tfoot>
+                      </table>
+                    </div>
+
+                    {!isDeposited && (
+                      <div className="mt-6 flex justify-end">
+                        <button
+                          onClick={() => handleCreateDeposit(shift)}
+                          disabled={!hasCompletions || isSubmitting}
+                          className={`flex items-center gap-2 px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all ${
+                            shift === 1 ? 'bg-amber-500 shadow-amber-500/20 hover:bg-amber-600' : 'bg-indigo-500 shadow-indigo-500/20 hover:bg-indigo-600'
+                          } disabled:opacity-50 disabled:cursor-not-allowed`}
+                        >
+                          {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />}
+                          Approve & Submit Shift {shift} Report
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden group">
         <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
           <Coins size={120} />
@@ -1191,14 +1369,14 @@ export default function AdminCashManagement() {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   {storeRegisterData.storeDeposits.map((dep) => (
-                    <div key={dep.id} className="bg-emerald-900/50 border border-emerald-800/50 rounded-2xl p-4 flex items-center justify-between group hover:border-emerald-700/50 transition-all">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-xl bg-emerald-800/50 flex items-center justify-center text-emerald-400 font-black">
+                    <div key={dep.id} className="bg-emerald-900/50 border border-emerald-800/50 rounded-2xl p-4 flex items-start justify-between group hover:border-emerald-700/50 transition-all">
+                      <div className="flex items-start gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-800/50 flex items-center justify-center text-emerald-400 font-black shrink-0">
                           S{dep.shift}
                         </div>
-                        <div>
+                        <div className="flex-1 mt-0.5">
                           <p className="text-xs font-black text-white">₹{dep.amount.toLocaleString()}</p>
-                          <p className="text-[9px] font-medium text-emerald-500/60 uppercase tracking-wider truncate max-w-[150px]">{dep.description}</p>
+                          <p className="text-[9px] font-medium text-emerald-500/60 uppercase tracking-wider mt-1 leading-relaxed pr-2">{dep.description}</p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
@@ -2116,120 +2294,6 @@ export default function AdminCashManagement() {
           </div>
         </div>
       )}
-
-      {/* ========== DEPOSIT SHIFT CASH MODAL ========== */}
-      {showDepositModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg rounded-[2rem] p-6 shadow-2xl flex flex-col gap-4 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center text-sky-600">
-                  <Coins size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-gray-900 leading-tight">Deposit Shift Cash</h3>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest leading-tight">Collect agent cash after shift completion</p>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowDepositModal(false)}
-                className="p-1.5 hover:bg-gray-100 rounded-lg text-gray-400 transition-colors"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateDeposit} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Select Shift to Deposit</label>
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-xl">
-                  {[1, 2].map((s) => {
-                    const deposited = isShiftDeposited(s);
-                    const hasCompletions = hasShiftCompletions(s);
-                    const isSelected = depositData.shift === s;
-                    return (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => hasCompletions && setDepositData({ ...depositData, shift: s })}
-                        className={`flex-1 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all relative ${
-                          isSelected ? 'bg-white text-sky-600 shadow-sm' : 
-                          !hasCompletions ? 'opacity-30 cursor-not-allowed grayscale' : 'text-gray-400 hover:text-gray-600'
-                        }`}
-                      >
-                        Shift {s}
-                        {deposited && (
-                          <div className="absolute -top-1 -right-1 bg-emerald-500 text-white p-0.5 rounded-full ring-2 ring-white">
-                            <CheckCircle2 size={8} strokeWidth={4} />
-                          </div>
-                        )}
-                        {deposited && <span className="block text-[7px] opacity-60">Deposited</span>}
-                        {!hasCompletions && <span className="block text-[7px] opacity-60">No Closings</span>}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between pl-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Denominations to Deposit</label>
-                  {isShiftDeposited(depositData.shift) && (
-                    <span className="text-[9px] font-black text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full uppercase tracking-widest">Already Deposited — Use Edit below</span>
-                  )}
-                </div>
-                <div className={`grid grid-cols-2 sm:grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100 ${isShiftDeposited(depositData.shift) ? 'opacity-50 pointer-events-none' : ''}`}>
-                  {denominationsList.map((denom) => (
-                    <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm group hover:border-sky-200 transition-all">
-                      <div className="flex items-center justify-between border-b border-gray-50 pb-1 mb-1">
-                        <span className="text-[10px] font-black text-gray-400 group-hover:text-sky-600">₹{denom}</span>
-                        <span className="text-[9px] font-bold text-sky-600/40 uppercase">₹{(denom * (depositData.denominations[denom] || 0)).toLocaleString()}</span>
-                      </div>
-                      <div className="flex items-center gap-1.5 justify-center">
-                        <span className="text-[10px] text-gray-200">×</span>
-                        <input
-                          type="number"
-                          placeholder="0"
-                          min="0"
-                          className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200 text-center"
-                          value={depositData.denominations[denom] || ''}
-                          onChange={(e) => handleDenominationChange(e.target.value, denom, 'deposit')}
-                        />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Mandatory Description</label>
-                <textarea
-                  required
-                  rows={2}
-                  disabled={isShiftDeposited(depositData.shift)}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500 transition-all outline-none resize-none disabled:bg-gray-100 disabled:text-gray-400"
-                  placeholder="E.g. Collected cash from 5 agents for Shift 1"
-                  value={depositData.description}
-                  onChange={(e) => setDepositData({ ...depositData, description: e.target.value })}
-                />
-              </div>
-
-              <div className="flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white bg-sky-600 shadow-sky-600/20">
-                <div className="flex flex-col">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">Total Deposit Value</p>
-                  <h4 className="text-2xl font-black tracking-tight">₹{(depositData.amount || 0).toFixed(2)}</h4>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isSubmitting || depositData.amount <= 0 || !depositData.description || isShiftDeposited(depositData.shift)}
-                className="w-full bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-400 hover:to-orange-400 text-amber-950 font-black text-base py-3.5 rounded-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50 shadow-xl shadow-amber-900/20"
-              >
-                {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <><CheckCircle2 size={20} />Confirm & Submit Deposit</>}
-              </button>
-            </form>
-          </div>
         </div>
       )}
 
@@ -2374,8 +2438,8 @@ export default function AdminCashManagement() {
       )}
 
       {/* ========== UNAPPROVED WARNING MODAL ========== */}
-      {showUnapprovedWarning && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
+      {showUnapprovedWarning && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/60 backdrop-blur-md p-4 animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-md rounded-[2.5rem] p-8 shadow-2xl flex flex-col items-center text-center gap-6 animate-in zoom-in-95 duration-300">
             <div className="w-20 h-20 bg-amber-50 rounded-3xl flex items-center justify-center text-amber-500 shadow-inner">
               <AlertTriangle size={40} strokeWidth={2.5} className="animate-bounce" />
@@ -2391,30 +2455,46 @@ export default function AdminCashManagement() {
               </p>
             </div>
 
-            <div className="flex flex-col w-full gap-3">
-              <button
-                onClick={() => {
-                  setShowUnapprovedWarning(false);
-                  handleCreateDeposit(null, true);
-                }}
-                className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-amber-500/20 active:scale-95"
-              >
-                Yes, Continue Deposit
-              </button>
-              <button
-                onClick={() => {
-                  setShowUnapprovedWarning(false);
-                  setShowDepositModal(false);
-                  setActiveTab('reconciliation');
-                }}
-                className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl transition-all active:scale-95"
-              >
-                No, Let Me Review Agents
-              </button>
-            </div>
+            <form onSubmit={(e) => {
+              e.preventDefault();
+              if (!depositData.description) return toast.error('Mandatory description is required to override.');
+              setShowUnapprovedWarning(false);
+              handleCreateDeposit(null, true);
+            }} className="flex flex-col w-full gap-4 mt-2">
+              <div className="space-y-1.5 text-left w-full">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Exception Reason (Mandatory)</label>
+                <textarea
+                  required
+                  rows={2}
+                  className="w-full bg-gray-50 border border-amber-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-700 focus:ring-4 focus:ring-amber-500/10 focus:border-amber-500 transition-all outline-none resize-none placeholder:text-amber-300/50"
+                  placeholder="Explain why you are depositing unapproved cash..."
+                  value={depositData.description}
+                  onChange={(e) => setDepositData({ ...depositData, description: e.target.value })}
+                />
+              </div>
+
+              <div className="flex flex-col w-full gap-3 pt-2">
+                <button
+                  type="submit"
+                  disabled={!depositData.description || isSubmitting}
+                  className="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-amber-500/20 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Yes, Override & Submit Deposit
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUnapprovedWarning(false);
+                  }}
+                  className="w-full bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold py-4 rounded-2xl transition-all active:scale-95"
+                >
+                  No, Let Me Review Agents
+                </button>
+              </div>
+            </form>
           </div>
         </div>
-      )}
+      , document.body)}
 
       {/* ========== BANK DEPOSIT MODAL ========== */}
       {showBankModal && (
@@ -2528,7 +2608,6 @@ export default function AdminCashManagement() {
           </div>
         </div>
       )}
-
-    </div>
+    </>
   );
 }

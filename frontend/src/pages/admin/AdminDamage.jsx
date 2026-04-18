@@ -5,7 +5,7 @@ import {
   Filter, ChevronDown, ChevronRight, Search, TrendingDown, Users, Truck,
   Image as ImageIcon, Shield, Ban, FileText, BarChart3, X, AlertCircle,
   Percent, CreditCard, RefreshCcw, Download, Info, Hammer, Droplets,
-  HelpCircle, Coins
+  HelpCircle, Coins, ArrowLeft
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { damageAPI } from '../../services/damageService';
@@ -618,13 +618,15 @@ export default function AdminDamage() {
     if (!showDetailModal || !selectedEntry) return null;
     const e = selectedEntry;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowDetailModal(false)}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={ev => ev.stopPropagation()}>
-          <div className="sticky top-0 bg-white border-b border-gray-100 p-4 flex items-center justify-between rounded-t-2xl z-10">
-            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Damage Details</h2>
-            <button onClick={() => setShowDetailModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
-          </div>
-          <div className="p-5 space-y-4">
+      <div className="w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-4">
+           <button onClick={() => setShowDetailModal(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 border border-gray-200 bg-white px-5 py-2.5 rounded-xl text-xs font-black uppercase shadow-sm transition-all hover:bg-gray-50">
+             <ArrowLeft size={16} /> Back to List
+           </button>
+           <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Damage Details</h2>
+        </div>
+        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 mx-auto max-w-4xl overflow-hidden">
+          <div className="p-6 md:p-8 space-y-6">
             {/* Header */}
             <div className="flex items-center justify-between">
               <div>
@@ -759,13 +761,15 @@ export default function AdminDamage() {
   const renderReviewModal = () => {
     if (!showReviewModal || !selectedEntry) return null;
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowReviewModal(false)}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={ev => ev.stopPropagation()}>
-          <div className="border-b border-gray-100 p-4 flex items-center justify-between">
-            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Review Damage</h2>
-            <button onClick={() => setShowReviewModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
-          </div>
-          <div className="p-5 space-y-4">
+      <div className="w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-4">
+           <button onClick={() => setShowReviewModal(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 border border-gray-200 bg-white px-5 py-2.5 rounded-xl text-xs font-black uppercase shadow-sm transition-all hover:bg-gray-50">
+             <ArrowLeft size={16} /> Back
+           </button>
+           <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Review Damage</h2>
+        </div>
+        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 mx-auto max-w-2xl overflow-hidden">
+          <div className="p-6 md:p-8 space-y-6">
             {/* Entry summary */}
             <div className="bg-gray-50 rounded-xl p-3">
               <p className="text-sm font-bold">{selectedEntry.product?.name} × {selectedEntry.quantity}</p>
@@ -842,13 +846,15 @@ export default function AdminDamage() {
     const calcAmount = deductionMode === 'FULL' ? loss : deductionMode === 'PARTIAL' ? (loss * deductionPercentage / 100) : 0;
 
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4" onClick={() => setShowDeductionModal(false)}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md" onClick={ev => ev.stopPropagation()}>
-          <div className="border-b border-gray-100 p-4 flex items-center justify-between">
-            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Apply Deduction</h2>
-            <button onClick={() => setShowDeductionModal(false)} className="p-1.5 rounded-lg hover:bg-gray-100"><X size={18} /></button>
-          </div>
-          <div className="p-5 space-y-4">
+      <div className="w-full space-y-4 animate-in fade-in zoom-in-95 duration-200">
+        <div className="flex items-center justify-between mb-4">
+           <button onClick={() => setShowDeductionModal(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 border border-gray-200 bg-white px-5 py-2.5 rounded-xl text-xs font-black uppercase shadow-sm transition-all hover:bg-gray-50">
+             <ArrowLeft size={16} /> Back
+           </button>
+           <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Apply Deduction</h2>
+        </div>
+        <div className="bg-white rounded-[2rem] shadow-sm border border-gray-100 mx-auto max-w-2xl overflow-hidden">
+          <div className="p-6 md:p-8 space-y-6">
             {/* Loss Info */}
             <div className="bg-red-50 rounded-xl p-4 border border-red-200">
               <div className="flex items-center justify-between">
@@ -947,6 +953,33 @@ export default function AdminDamage() {
   };
 
   // ───────── MAIN RENDER ─────────
+  if (showDetailModal && selectedEntry) {
+    return (
+      <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-12">
+        {renderDetailModal()}
+        {renderImageModal()}
+      </div>
+    );
+  }
+
+  if (showReviewModal && selectedEntry) {
+    return (
+      <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-12">
+        {renderReviewModal()}
+        {renderImageModal()}
+      </div>
+    );
+  }
+
+  if (showDeductionModal && selectedEntry) {
+    return (
+      <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-12">
+        {renderDeductionModal()}
+        {renderImageModal()}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       {/* Page Header - Non sticky for better vertical space */}
@@ -984,9 +1017,7 @@ export default function AdminDamage() {
       {activeTab === 'reports' && renderReportsTab()}
 
       {/* Modals */}
-      {renderDetailModal()}
-      {renderReviewModal()}
-      {renderDeductionModal()}
+      {/* Modals */}
       {renderImageModal()}
     </div>
   );
