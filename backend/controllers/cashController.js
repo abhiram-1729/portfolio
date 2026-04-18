@@ -577,6 +577,21 @@ export const getAdminCashSummary = async (req, res, next) => {
             where: { date: dateString, tenantId: req.user.tenantId, vehicleId: { in: vehicles.map(v => v.id) } }
         });
 
+        const routeAssignments = await prisma.routeAssignment.findMany({
+            where: { 
+                tenantId: req.user.tenantId, 
+                vehicleId: { in: vehicles.map(v => v.id) },
+                status: true
+            },
+            include: { 
+                route: {
+                    include: { cycles: true }
+                } 
+            }
+        });
+
+        const dayName = format(new Date(dateString), 'EEEE').toUpperCase(); // e.g., 'MONDAY'
+
         const startOfDayDate = new Date(dateString);
         startOfDayDate.setHours(0, 0, 0, 0);
         const endOfDayDate = new Date(dateString);
@@ -611,6 +626,9 @@ export const getAdminCashSummary = async (req, res, next) => {
             const closings = closingCashRecords.filter(c => c.vehicleId === v.id);
             const orders = orderAggregates.filter(o => o.vehicleId === v.id);
             const expenses = expenseAggregates.filter(e => e.vehicleId === v.id);
+            const ra = routeAssignments.find(ra => ra.vehicleId === v.id);
+            const todayCycle = ra?.route?.cycles?.find(c => c.dayOfWeek === dayName);
+            const villageName = todayCycle?.villageName || ra?.route?.routeName || 'Unspecified';
 
             const totalRealtimeCashSales = orders.filter(o => o.paymentMode === 'CASH').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
             const totalRealtimeUpiSales = orders.filter(o => o.paymentMode === 'UPI').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
@@ -664,6 +682,7 @@ export const getAdminCashSummary = async (req, res, next) => {
                 date: dateString,
                 tenantId: req.user.tenantId,
                 storeId: v.storeId,
+                villageName: villageName,
                 openingCash: s ? s.openingCash : 0,
                 cashSales: s ? s.cashSales : 0,
                 upiSales: s ? s.upiSales : 0,

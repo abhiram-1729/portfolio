@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -1326,7 +1326,7 @@ export default function AdminCashManagement() {
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50 border-b border-gray-100">
-                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle</th>
+                  <th className="px-5 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent / Vehicle</th>
                   <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-500">S1 Open</th>
                   <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-amber-400">S1 Close</th>
                   <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-indigo-500">S2 Open</th>
@@ -1365,11 +1365,15 @@ export default function AdminCashManagement() {
                         <td className="px-5 py-4">
                           <div className="flex items-center gap-3">
                             <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
-                              <Truck size={16} strokeWidth={2.5} />
+                              <User size={16} strokeWidth={2.5} />
                             </div>
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-900 leading-none">{summary.vehicle.vehicleNumber}</span>
-                              <span className="text-[10px] text-gray-400 font-bold uppercase">{summary.vehicle.vehicleName || 'Standard'}</span>
+                              <span className="text-sm font-black text-gray-900 leading-none">
+                                {summary.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT')?.name || 'No Agent'}
+                              </span>
+                              <span className="text-[10px] text-gray-400 font-bold uppercase">
+                                {summary.vehicle?.vehicleName || summary.vehicle?.vehicleNumber || 'Standard'}
+                              </span>
                             </div>
                           </div>
                         </td>
