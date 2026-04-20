@@ -39,6 +39,12 @@ export default function AdminSettings() {
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState({ name: '', categoryId: '' });
   const [editingSubCategoryId, setEditingSubCategoryId] = useState(null);
+  
+  // Search States
+  const [unitSearch, setUnitSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [subCategorySearch, setSubCategorySearch] = useState('');
+  const [assetCategorySearch, setAssetCategorySearch] = useState('');
 
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -386,12 +392,24 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 bg-emerald-900 text-emerald-100 flex items-center justify-between">
+            <div className="px-8 py-6 bg-emerald-900 text-emerald-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <FileText size={18} className="text-emerald-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Authorized Units Registry</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-emerald-800/50 rounded-full border border-emerald-700/50">{units.length} ACTIVE</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Units..." 
+                    value={unitSearch}
+                    onChange={(e) => setUnitSearch(e.target.value)}
+                    className="bg-emerald-800/50 border border-emerald-700/50 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-emerald-400 focus:bg-emerald-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-emerald-800/50 rounded-full border border-emerald-700/50 min-w-fit">{units.length} ACTIVE</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -403,7 +421,7 @@ export default function AdminSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {units.map(unit => (
+                  {units.filter(u => u.name.toLowerCase().includes(unitSearch.toLowerCase()) || u.type.toLowerCase().includes(unitSearch.toLowerCase())).map(unit => (
                     <tr key={unit.id} className="hover:bg-emerald-50/30 transition-all group">
                       <td className="py-5 px-8">
                         <span className="text-sm font-black text-slate-700">{unit.name}</span>
@@ -463,18 +481,30 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between">
+             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Hash size={18} className="text-amber-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Master Classification Indexed</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700">{categories.length} SEGMENTS</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Categories..." 
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-slate-500 focus:bg-slate-850 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700 min-w-fit">{categories.length} SEGMENTS</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left font-bold">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Operational Category</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Contextual Actions</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {categories.map(category => (
+                  {categories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase())).map(category => (
                     <tr key={category.id} className="hover:bg-amber-50/20 group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{category.name}</td>
                       <td className="py-5 px-8 text-right"><div className="flex items-center justify-end gap-2 pr-2">
@@ -533,18 +563,30 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 bg-orange-950 text-white flex items-center justify-between">
+            <div className="px-8 py-6 bg-orange-950 text-white flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Package size={18} className="text-orange-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Granular Catalog Index</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-orange-900 rounded-full border border-orange-800">{subCategories.length} RECORDS</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Sub-Cats..." 
+                    value={subCategorySearch}
+                    onChange={(e) => setSubCategorySearch(e.target.value)}
+                    className="bg-orange-900 border border-orange-800 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-orange-600 focus:bg-orange-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-orange-900 rounded-full border border-orange-800 min-w-fit">{subCategories.length} RECORDS</span>
+              </div>
             </div>
             <div className="overflow-x-auto font-bold">
               <table className="w-full text-left">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sub-segment</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Parent Segment</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Operations</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {subCategories.map(sub => (
+                  {subCategories.filter(s => s.name.toLowerCase().includes(subCategorySearch.toLowerCase()) || s.category?.name.toLowerCase().includes(subCategorySearch.toLowerCase())).map(sub => (
                     <tr key={sub.id} className="hover:bg-orange-50 transition-all group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{sub.name}</td>
                       <td className="py-5 px-8"><span className="text-[10px] px-2.5 py-1 bg-gray-100 text-gray-500 rounded-lg uppercase font-black">{sub.category?.name}</span></td>
@@ -596,18 +638,30 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 bg-indigo-950 text-indigo-50 flex items-center justify-between">
+            <div className="px-8 py-6 bg-indigo-950 text-indigo-50 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Store size={18} className="text-indigo-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Institutional Asset Registry</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-indigo-900 rounded-full border border-indigo-800">{assetCategories.length} GROUPS</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Asset Types..." 
+                    value={assetCategorySearch}
+                    onChange={(e) => setAssetCategorySearch(e.target.value)}
+                    className="bg-indigo-900 border border-indigo-800 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-indigo-600 focus:bg-indigo-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-indigo-900 rounded-full border border-indigo-800 min-w-fit">{assetCategories.length} GROUPS</span>
+              </div>
             </div>
             <div className="overflow-x-auto font-bold">
               <table className="w-full text-left">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset Grouping</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Override Options</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {assetCategories.map(category => (
+                  {assetCategories.filter(c => c.name.toLowerCase().includes(assetCategorySearch.toLowerCase())).map(category => (
                     <tr key={category.id} className="hover:bg-indigo-50 group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{category.name}</td>
                       <td className="py-5 px-8 text-right"><div className="flex items-center justify-end gap-2 pr-2">

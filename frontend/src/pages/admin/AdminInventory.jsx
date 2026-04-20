@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera } from 'lucide-react';
+import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera, PlusCircle, CheckCircle2, AlertCircle } from 'lucide-react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
@@ -7,17 +7,30 @@ import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
 import adminAPI from '../../services/adminService';
+import { procurementAPI } from '../../services/procurementService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 export default function AdminInventory() {
-  const [activeTab, setActiveTab] = useState('master');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'master';
+  const subTab = searchParams.get('sub') || 'loading';
+  const [masterSearch, setMasterSearch] = useState('');
+  const [warehouseSearch, setWarehouseSearch] = useState('');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [subCategorySearch, setSubCategorySearch] = useState('');
+  const [opsSearch, setOpsSearch] = useState('');
+  
   const [showFilters, setShowFilters] = useState(false);
-  const [filterCategory, setFilterCategory] = useState('ALL');
-  const [filterSubCategory, setFilterSubCategory] = useState('ALL');
-  const [filterStatus, setFilterStatus] = useState('ALL');
-  const [filterFreeOnly, setFilterFreeOnly] = useState(false);
+  const [masterCategory, setMasterCategory] = useState('ALL');
+  const [warehouseCategory, setWarehouseCategory] = useState('ALL');
+  const [masterSubCategory, setMasterSubCategory] = useState('ALL');
+  const [opsCategory, setOpsCategory] = useState('ALL');
+  const [opsSubCategory, setOpsSubCategory] = useState('ALL');
+  const [masterStatus, setMasterStatus] = useState('ALL');
+  const [masterFreeOnly, setMasterFreeOnly] = useState(false);
   const [items, setItems] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [stores, setStores] = useState([]);
@@ -39,11 +52,9 @@ export default function AdminInventory() {
   const [itemRemarks, setItemRemarks] = useState({});
   const [expandedAgentId, setExpandedAgentId] = useState(null);
   const [viewingAgentId, setViewingAgentId] = useState(null);
-  const [subTab, setSubTab] = useState('loading'); // sub-tab within return section
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
 
-  const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
   const location = useLocation();
   const isTenantRoute = location.pathname.includes('/tenant/');
@@ -56,7 +67,17 @@ export default function AdminInventory() {
   const [selectedVehicleId, setSelectedVehicleId] = useState('');
   const [stockQuantities, setStockQuantities] = useState({}); // { productId: quantity }
   const [vehicleInventory, setVehicleInventory] = useState([]);
+  const [loadingMaster, setLoadingMaster] = useState(false);
+  const [loadingInventory, setLoadingInventory] = useState(false);
+  const [loadingRefills, setLoadingRefills] = useState(false);
+  const [loadingAudit, setLoadingAudit] = useState(false);
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
+
   const [allVehiclesStock, setAllVehiclesStock] = useState({}); // { [vehicleId]: inventoryList }
+  const [intakeItems, setIntakeItems] = useState([]); // Draft list for bulk stock intake
+  const [intakeQuantities, setIntakeQuantities] = useState({}); // { productId: quantity }
+  const [quickIntake, setQuickIntake] = useState({ productId: '', quantity: '' });
+  const [intakeSearch, setIntakeSearch] = useState('');
   const [viewingVehicleId, setViewingVehicleId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
@@ -72,6 +93,36 @@ export default function AdminInventory() {
   const [auditHistory, setAuditHistory] = useState([]);
   const [auditRemark, setAuditRemark] = useState('');
   const [processingItems, setProcessingItems] = useState(new Set());
+  const [warehouseStock, setWarehouseStock] = useState([]);
+  const [stockInputs, setStockInputs] = useState({}); // { productId: quantity }
+
+  const handleUpdateStock = async (productId, quantity, mode = 'set') => {
+    if (quantity === undefined || quantity === '' || isNaN(quantity)) {
+      toast.error('Please enter a valid quantity');
+      return;
+    }
+
+    try {
+      setProcessingItems(prev => new Set(prev).add(productId));
+      await adminAPI.updateProductStock({
+        productId,
+        quantity: parseInt(quantity),
+        mode
+      });
+      
+      toast.success('Stock updated successfully');
+      setStockInputs(prev => ({ ...prev, [productId]: '' }));
+      fetchData(); // Refresh all data
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to update stock');
+    } finally {
+      setProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+    }
+  };
 
   const [newItem, setNewItem] = useState({
     name: '',
@@ -96,22 +147,35 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
-      const [iRes, vRes, sRes, cRes, uRes, subRes, storeRes, aRes] = await Promise.all([
-        adminAPI.getItems({ storeId: storeFilterId }),
-        adminAPI.getVehicles({ storeId: storeFilterId }),
+      setLoadingMaster(true);
+      setLoadingInventory(true);
+      setLoadingRefills(true);
+      setLoadingAudit(true);
+      setLoadingVehicles(true);
+
+      const [iRes, vRes, sRes, cRes, uRes, subRes, storeRes, aRes, stockRes] = await Promise.all([
+        adminAPI.getItems({ storeId: storeFilterId }).finally(() => setLoadingMaster(false)),
+        adminAPI.getVehicles({ storeId: storeFilterId }).finally(() => setLoadingVehicles(false)),
         adminAPI.getSettings(),
         adminAPI.getCategories(),
         adminAPI.getUnits(),
         adminAPI.getSubCategories(),
         adminAPI.getStores(),
-        adminAPI.getAuditHistory({ storeId: storeFilterId })
+        adminAPI.getAuditHistory({ storeId: storeFilterId }).finally(() => setLoadingAudit(false)),
+        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }).finally(() => setLoadingInventory(false)) : Promise.resolve({ data: [] })
       ]);
+
+      // Handle refills separately if it exists in another call or similar
+      // For now we assume refills come from another source or are part of these responses
+      setLoadingRefills(false); 
+
       setItems(iRes.data);
       setVehicles(vRes.data);
       setAuditHistory(aRes.data || []);
       setCategories(cRes.data || []);
       setSubCategories(subRes.data || []);
       setUnits(uRes.data || []);
+      setWarehouseStock(stockRes.data || []);
       if (sRes.data?.success && sRes.data?.data?.taxRates) {
         setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
       }
@@ -122,16 +186,21 @@ export default function AdminInventory() {
       toast.error('Failed to fetch inventory data');
     } finally {
       setLoading(false);
+      setLoadingMaster(false);
+      setLoadingInventory(false);
+      setLoadingRefills(false);
+      setLoadingAudit(false);
+      setLoadingVehicles(false);
     }
   };
 
   useEffect(() => {
     fetchData();
-  }, [storeFilterId]);
+  }, [storeFilterId, activeTab]);
 
-  useEffect(() => {
+   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterCategory, filterSubCategory, filterStatus, filterFreeOnly, activeTab, subTab]);
+  }, [masterSearch, warehouseSearch, auditSearch, masterCategory, masterSubCategory, masterStatus, masterFreeOnly, activeTab, subTab]);
 
   const handleQuantityChange = React.useCallback((id, val) => {
     setStockQuantities(prev => ({ ...prev, [id]: val }));
@@ -162,14 +231,14 @@ export default function AdminInventory() {
   }, [items, vehicleInventoryMap]);
 
   const loadingFilteredItems = React.useMemo(() => {
-    const q = searchQuery.toLowerCase();
+    const q = opsSearch.toLowerCase();
     return items.filter(i => {
       const matchesSearch = i.name.toLowerCase().includes(q);
-      const matchesCategory = filterCategory === 'ALL' || i.category?.name === filterCategory;
-      const matchesSubCategory = filterSubCategory === 'ALL' || i.subCategory?.name === filterSubCategory;
+      const matchesCategory = opsCategory === 'ALL' || i.category?.name === opsCategory;
+      const matchesSubCategory = opsSubCategory === 'ALL' || i.subCategory?.name === opsSubCategory;
       return matchesSearch && matchesCategory && matchesSubCategory;
     });
-  }, [items, searchQuery, filterCategory, filterSubCategory]);
+  }, [items, opsSearch, opsCategory, opsSubCategory]);
 
   const groupedLoadingItems = React.useMemo(() => {
     const regular = [];
@@ -738,21 +807,23 @@ export default function AdminInventory() {
     } catch (error) {
        console.error('Audit Save Error:', error);
        toast.error('Failed to audit inventory');
-    } finally {
+} finally {
       setIsSubmitting(false);
     }
   };
 
   const uniqueCategories = [...new Set(items.map(i => i.category?.name).filter(Boolean))];
 
-  const filteredItems = items.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory = filterCategory === 'ALL' || item.category?.name === filterCategory;
-    const matchesSubCategory = filterSubCategory === 'ALL' || item.subCategory?.name === filterSubCategory;
-    const matchesStatus = filterStatus === 'ALL' || item.status === filterStatus;
-    const matchesFree = !filterFreeOnly || item.isFree;
-    return matchesSearch && matchesCategory && matchesSubCategory && matchesStatus && matchesFree;
-  });
+  const filteredItems = React.useMemo(() => {
+    return items.filter(item => {
+      const matchesSearch = item.name.toLowerCase().includes(masterSearch.toLowerCase());
+      const matchesCategory = masterCategory === 'ALL' || item.category?.name === masterCategory;
+      const matchesSubCategory = masterSubCategory === 'ALL' || item.subCategory?.name === masterSubCategory;
+      const matchesStatus = masterStatus === 'ALL' || item.status === masterStatus;
+      const matchesFree = !masterFreeOnly || item.isFree;
+      return matchesSearch && matchesCategory && matchesSubCategory && matchesStatus && matchesFree;
+    });
+  }, [items, masterSearch, masterCategory, masterSubCategory, masterStatus, masterFreeOnly]);
 
   const paginatedItems = React.useMemo(() => {
     const start = (currentPage - 1) * itemsPerPage;
@@ -792,6 +863,14 @@ export default function AdminInventory() {
               <div className="flex items-center gap-2">
                 <h3 className={`text-[11px] font-black uppercase tracking-tight ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
                 {item.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{item.displayId}</span>}
+                <div className="flex items-center gap-1.5 ml-auto">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">SOH</span>
+                      <span className={`text-[10px] font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
+                         {item.stock || 0}
+                      </span>
+                    </div>
+                </div>
                 {item.unit && (
                   <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
                     {item.unitValue || ''} {item.unit.type}
@@ -890,6 +969,7 @@ export default function AdminInventory() {
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Category</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Pricing</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Tax</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/30">Store Stock</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
             </tr>
@@ -958,6 +1038,14 @@ export default function AdminInventory() {
                       {item.gst || 0}%
                     </span>
                   </td>
+                  <td className="px-6 py-4 text-center bg-emerald-50/10">
+                     <div className="flex flex-col items-center">
+                       <span className={`text-xs font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {item.stock || 0}
+                       </span>
+                       <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">SOH</span>
+                     </div>
+                  </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-500 text-white')}`}>
                       {item.status || 'ACTIVE'}
@@ -1012,15 +1100,15 @@ export default function AdminInventory() {
               type="text"
               placeholder="Search items..."
               className="w-full bg-transparent border-none focus:outline-none text-sm min-w-0"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              value={masterSearch}
+              onChange={(e) => setMasterSearch(e.target.value)}
             />
             <div className="flex items-center gap-1.5 shrink-0 border-l border-gray-100 pl-2">
               <button
-                onClick={() => setFilterFreeOnly(!filterFreeOnly)}
-                className={`px-2.5 py-1.5 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all border ${filterFreeOnly ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
+                onClick={() => setMasterFreeOnly(!masterFreeOnly)}
+                className={`px-2.5 py-1.5 rounded-xl text-[10px] uppercase tracking-wider font-bold transition-all border ${masterFreeOnly ? 'bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm' : 'bg-gray-50 border-gray-100 text-gray-500 hover:bg-gray-100'}`}
               >
-                {filterFreeOnly ? '✓ Free Only' : 'Free'}
+                {masterFreeOnly ? '✓ Free Only' : 'Free'}
               </button>
               <button
                 onClick={() => setShowFilters(!showFilters)}
@@ -1047,9 +1135,9 @@ export default function AdminInventory() {
         <div className="relative group mb-4">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
             <button
-              onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); }}
+              onClick={() => { setMasterCategory('ALL'); setMasterSubCategory('ALL'); }}
               className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                filterCategory === 'ALL' 
+                masterCategory === 'ALL' 
                 ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
                 : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
               }`}
@@ -1059,9 +1147,9 @@ export default function AdminInventory() {
             {categories.map((cat) => (
               <button
                 key={cat.id}
-                onClick={() => { setFilterCategory(cat.name); setFilterSubCategory('ALL'); }}
+                onClick={() => { setMasterCategory(cat.name); setMasterSubCategory('ALL'); }}
                 className={`flex items-center gap-2 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                  filterCategory === cat.name 
+                  masterCategory === cat.name 
                   ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
                   : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
                 }`}
@@ -1074,7 +1162,7 @@ export default function AdminInventory() {
         </div>
 
         {/* Sub-Categories Quick Filter */}
-        {filterCategory !== 'ALL' && (
+        {masterCategory !== 'ALL' && (
           <div className="relative group mb-6 animate-in slide-in-from-top-2 duration-300">
             <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
               <div className="flex items-center gap-2 px-3 py-1 bg-emerald-50 rounded-xl border border-emerald-100 mr-2">
@@ -1082,26 +1170,26 @@ export default function AdminInventory() {
                 <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Sub Categories</span>
               </div>
               <button
-                onClick={() => setFilterSubCategory('ALL')}
+                onClick={() => setMasterSubCategory('ALL')}
                 className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                  filterSubCategory === 'ALL' 
+                  masterSubCategory === 'ALL' 
                   ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
                   : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
                 }`}
               >
-                All {filterCategory}
+                All {masterCategory}
               </button>
               {subCategories
                 .filter(sub => {
-                  const parentCat = categories.find(c => c.name === filterCategory);
+                  const parentCat = categories.find(c => c.name === masterCategory);
                   return sub.categoryId === parentCat?.id;
                 })
                 .map((sub) => (
                   <button
                     key={sub.id}
-                    onClick={() => setFilterSubCategory(sub.name)}
+                    onClick={() => setMasterSubCategory(sub.name)}
                     className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                      filterSubCategory === sub.name 
+                      masterSubCategory === sub.name 
                       ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
                       : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
                     }`}
@@ -1119,15 +1207,15 @@ export default function AdminInventory() {
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Additional Filters</label>
               <div className="flex items-center gap-2 text-xs font-medium text-gray-500 bg-gray-50 p-2 rounded-xl border border-gray-100">
                 <Check size={14} className="text-emerald-500" />
-                Category Filter is active ({filterCategory})
+                Category Filter is active ({masterCategory})
               </div>
             </div>
             <div className="space-y-1 flex-1 min-w-[150px]">
               <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Status</label>
               <select
                 className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20 appearance-none"
-                value={filterStatus}
-                onChange={(e) => setFilterStatus(e.target.value)}
+                value={masterStatus}
+                onChange={(e) => setMasterStatus(e.target.value)}
               >
                 <option value="ALL">All Status</option>
                 <option value="ACTIVE">Active</option>
@@ -1137,7 +1225,7 @@ export default function AdminInventory() {
 
             <div className="flex items-end">
               <button
-                onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); setFilterStatus('ALL'); setSearchQuery(''); setFilterFreeOnly(false); }}
+                onClick={() => { setMasterCategory('ALL'); setMasterSubCategory('ALL'); setMasterStatus('ALL'); setMasterSearch(''); setMasterFreeOnly(false); }}
                 className="text-xs font-bold text-gray-400 hover:text-gray-600 px-3 py-2"
               >
                 Clear Filters
@@ -1352,8 +1440,8 @@ export default function AdminInventory() {
                   type="text"
                   placeholder="Search to load..."
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={opsSearch}
+                  onChange={(e) => setOpsSearch(e.target.value)}
                 />
                 <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               </div>
@@ -1400,7 +1488,7 @@ export default function AdminInventory() {
                   </div>
                 )}
                 {allFiltered.length === 0 && (
-                  <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
+                  <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{opsSearch}"</div>
                 )}
               </div>
 
@@ -1420,7 +1508,7 @@ export default function AdminInventory() {
                 )}
                 {allFiltered.length === 0 && (
                   <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                    <p className="text-sm font-bold text-gray-400">No items found matching "{searchQuery}"</p>
+                    <p className="text-sm font-bold text-gray-400">No items found matching "{opsSearch}"</p>
                   </div>
                 )}
               </div>
@@ -1592,8 +1680,8 @@ export default function AdminInventory() {
                   type="text"
                   placeholder="Search inventory..."
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  value={opsSearch}
+                  onChange={(e) => setOpsSearch(e.target.value)}
                 />
                 <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
               </div>
@@ -1646,7 +1734,7 @@ export default function AdminInventory() {
                       </div>
                     )}
                     {allFiltered.length === 0 && (
-                      <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{searchQuery}"</div>
+                      <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{opsSearch}"</div>
                     )}
                   </div>
 
@@ -1666,7 +1754,7 @@ export default function AdminInventory() {
                     )}
                     {allFiltered.length === 0 && (
                       <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                        <p className="text-sm font-bold text-gray-400">No items found matching "{searchQuery}"</p>
+                        <p className="text-sm font-bold text-gray-400">No items found matching "{opsSearch}"</p>
                       </div>
                     )}
                   </div>
@@ -1735,7 +1823,169 @@ export default function AdminInventory() {
     );
   };
 
+  const renderInventory = () => {
+    const filteredStock = warehouseStock.filter(s => 
+      s.product.name.toLowerCase().includes(warehouseSearch.toLowerCase()) &&
+      (warehouseCategory === 'ALL' || s.product.category?.name === warehouseCategory)
+    );
+
+    const totalValuation = filteredStock.reduce((acc, s) => acc + (s.quantity * (s.product.landingPrice || s.product.purchasePrice || s.product.price || 0)), 0);
+
+    return (
+      <div className="space-y-6 animate-in fade-in duration-500">
+        {loadingInventory ? (
+          <div className="grid grid-cols-1 gap-2">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="bg-white rounded-2xl p-3 border border-gray-100 shadow-sm animate-pulse flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3 flex-1">
+                  <div className="w-10 h-10 bg-gray-100 rounded-xl" />
+                  <div className="space-y-2 flex-1">
+                    <div className="w-24 h-3 bg-gray-100 rounded-md" />
+                    <div className="w-12 h-2 bg-gray-50 rounded-md" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-8">
+                  <div className="w-12 h-8 bg-gray-50 rounded-lg" />
+                  <div className="w-16 h-8 bg-gray-50 rounded-lg" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+              <Package size={24} />
+            </div>
+            <div>
+              <h3 className="text-lg font-black text-gray-900 tracking-tight">Store Stock Inventory</h3>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live warehouse stock count & valuation</p>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col md:flex-row items-center gap-4">
+             <div className="flex-1 w-full relative">
+                
+             </div>
+             <div className="flex flex-col items-end bg-gray-50 px-6 py-3 rounded-[1.5rem] border border-gray-100 min-w-fit shadow-sm">
+               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total SOH Valuation</span>
+               <span className="text-xl font-black text-emerald-600 tracking-tighter">₹{totalValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+             </div>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
+          <div className="relative flex-shrink-0">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={warehouseSearch}
+              onChange={(e) => setWarehouseSearch(e.target.value)}
+              className="pl-8 pr-3 py-2.5 rounded-2xl text-[10px] font-bold text-gray-700 bg-white border border-gray-100 focus:border-emerald-300 focus:ring-1 focus:ring-emerald-200 outline-none w-36 transition-all"
+            />
+          </div>
+          <button
+            onClick={() => setWarehouseCategory('ALL')}
+            className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
+              warehouseCategory === 'ALL' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+            }`}
+          >
+            All Stock
+          </button>
+          {categories.map(cat => (
+            <button
+              key={cat.id}
+              onClick={() => setWarehouseCategory(cat.name)}
+              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
+                warehouseCategory === cat.name ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+              }`}
+            >
+              {cat.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 gap-2">
+          {filteredStock.map((stock) => (
+            <div key={stock.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all group flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 min-w-0 flex-1">
+                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors shrink-0">
+                  {stock.product.image ? (
+                    <img src={stock.product.image} className="w-full h-full object-cover rounded-xl" alt="" />
+                  ) : (
+                    <Grid size={18} />
+                  )}
+                </div>
+                <div className="flex flex-col min-w-0">
+                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
+                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{stock.product.category?.name || 'General'}</span>
+                </div>
+              </div>
+
+              <div className="hidden sm:flex items-center gap-6 shrink-0">
+                <div className="flex flex-col items-center">
+                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Buy</span>
+                  <span className="text-[10px] font-bold text-gray-600">₹{stock.product.landingPrice || 0}</span>
+                </div>
+                <div className="flex flex-col items-center">
+                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Sale</span>
+                  <span className="text-[10px] font-bold text-gray-600">₹{stock.product.price || 0}</span>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4 shrink-0">
+                <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 group-hover:border-emerald-100 transition-colors">
+                  <input 
+                    type="number" 
+                    placeholder="New Qty"
+                    className="w-16 bg-white border border-gray-200 rounded-lg px-2 py-1 text-[10px] font-black text-center outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    value={stockInputs[stock.productId] || ''}
+                    onChange={(e) => setStockInputs(prev => ({ ...prev, [stock.productId]: e.target.value }))}
+                  />
+                  <button 
+                    onClick={() => handleUpdateStock(stock.productId, stockInputs[stock.productId], 'set')}
+                    disabled={stockInputs[stock.productId] === '' || processingItems.has(stock.productId)}
+                    className="bg-emerald-600 text-white p-1.5 rounded-lg shadow-sm hover:bg-emerald-700 active:scale-95 transition-all disabled:opacity-30 disabled:grayscale flex items-center justify-center"
+                    title="Set Absolute Stock"
+                  >
+                    {processingItems.has(stock.productId) ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} strokeWidth={3} />}
+                  </button>
+                </div>
+
+                <div className="flex flex-col items-end min-w-[3rem]">
+                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">SOH</span>
+                  <div className="flex items-baseline gap-1">
+                    <span className={`text-base font-black tracking-tighter ${stock.quantity > (stock.product.minStockAlert || 5) ? 'text-gray-950' : 'text-rose-600'}`}>
+                      {stock.quantity}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex flex-col items-end min-w-[4rem]">
+                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Valuation</span>
+                  <span className="text-xs font-black text-emerald-600 tracking-tight">₹{(stock.quantity * (stock.product.landingPrice || 0)).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
   const renderTracking = () => {
+    if (loadingVehicles) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-pulse">
+          {[...Array(6)].map((_, i) => (
+            <div key={i} className="bg-white rounded-[2rem] h-64 border border-gray-100 shadow-sm" />
+          ))}
+        </div>
+      );
+    }
+
     if (viewingVehicleId) {
       const v = vehicles.find(vh => vh.id === viewingVehicleId);
       if (!v) return null;
@@ -2105,7 +2355,7 @@ export default function AdminInventory() {
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
         <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden">
           <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600"></div>
-          <div className="flex items-center justify-between mb-8 border-b border-gray-100 pb-6">
+          <div className="flex flex-col md:flex-row items-center justify-between mb-8 border-b border-gray-100 pb-6 gap-4">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 bg-indigo-50 rounded-3xl flex items-center justify-center text-indigo-600 shadow-inner">
                 <CheckSquare size={32} />
@@ -2118,16 +2368,34 @@ export default function AdminInventory() {
                 </p>
               </div>
             </div>
-            <button 
-              onClick={fetchData} 
-              disabled={loading}
-              className="p-3 bg-gray-50 hover:bg-indigo-50 rounded-2xl text-gray-400 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 shadow-sm"
-            >
-              <Loader2 size={24} className={loading ? 'animate-spin' : ''} />
-            </button>
+            <div className="flex items-center gap-4 w-full md:w-auto">
+              <div className="relative flex-1 md:w-64">
+                <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search Vehicle or Admin..."
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
+                  value={auditSearch}
+                  onChange={(e) => setAuditSearch(e.target.value)}
+                />
+              </div>
+              <button 
+                onClick={fetchData} 
+                disabled={loading}
+                className="p-3 bg-gray-50 hover:bg-indigo-50 rounded-2xl text-gray-400 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 shadow-sm"
+              >
+                <Loader2 size={24} className={loading ? 'animate-spin' : ''} />
+              </button>
+            </div>
           </div>
 
-          {auditHistory.length === 0 ? (
+          {loadingAudit ? (
+            <div className="space-y-6">
+              {[...Array(3)].map((_, i) => (
+                <div key={i} className="h-48 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm animate-pulse" />
+              ))}
+            </div>
+          ) : auditHistory.length === 0 ? (
             <div className="text-center py-24 bg-gray-50/50 rounded-[3rem] border-2 border-dashed border-gray-100">
               <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-gray-200/50">
                 <CheckSquare size={40} className="text-gray-200" />
@@ -2137,8 +2405,13 @@ export default function AdminInventory() {
             </div>
           ) : (
             <div className="space-y-8">
-              {auditHistory.map((audit) => (
-                <div key={audit.id} className="border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-indigo-500/5 transition-all border-l-[6px] border-l-indigo-600">
+              {auditHistory
+                .filter(a => 
+                  a.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase()) || 
+                  a.user?.name?.toLowerCase().includes(auditSearch.toLowerCase())
+                )
+                .map((audit) => (
+                  <div key={audit.id} className="border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-indigo-500/5 transition-all border-l-[6px] border-l-indigo-600">
                   <div className="bg-gray-50/50 p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-6">
                     <div className="flex items-center gap-5">
                       <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
@@ -2519,7 +2792,14 @@ export default function AdminInventory() {
 
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
-        {groupedRefills.length === 0 ? (
+        {/* Skeleton Loading State */}
+        {loadingRefills ? (
+          <div className="space-y-4">
+             {[...Array(4)].map((_, i) => (
+               <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" />
+             ))}
+          </div>
+        ) : groupedRefills.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
             <Truck size={48} className="mx-auto text-gray-200 mb-4" />
             <h3 className="text-xl font-black text-gray-900 tracking-tight">No Refill Requests</h3>
@@ -2541,8 +2821,8 @@ export default function AdminInventory() {
                 <tbody className="divide-y divide-gray-50">
                   {groupedRefills
                   .filter(g => 
-                    g.user?.name?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                    g.vehicle?.vehicleNumber?.toLowerCase().includes(searchQuery.toLowerCase())
+                    g.user?.name?.toLowerCase().includes(auditSearch.toLowerCase()) || 
+                    g.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase())
                   )
                   .map(group => {
                     const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
@@ -2768,6 +3048,19 @@ export default function AdminInventory() {
                       <option value="ACTIVE">Active</option>
                       <option value="INACTIVE">Inactive</option>
                     </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1 block">Initial Store Stock</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      className="w-full bg-white border border-emerald-100 rounded-2xl px-5 py-3.5 text-sm font-bold text-emerald-700 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-sm"
+                      value={newItem.stock || ''}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                        setNewItem({ ...newItem, stock: val });
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -3276,6 +3569,19 @@ export default function AdminInventory() {
                       <option value="INACTIVE">Inactive</option>
                     </select>
                   </div>
+                  <div>
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest ml-1 mb-1 block">Current Store Stock</label>
+                    <input
+                      type="number"
+                      placeholder="0"
+                      className="w-full bg-white border border-emerald-100 rounded-2xl px-5 py-3.5 text-sm font-bold text-emerald-700 focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-sm"
+                      value={editItem.stock || 0}
+                      onChange={(e) => {
+                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                        setEditItem({ ...editItem, stock: val });
+                      }}
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -3596,9 +3902,26 @@ export default function AdminInventory() {
         <div className="space-y-6">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Inventory Management</h2>
+          <h2 className="text-2xl font-bold text-gray-900">
+            {activeTab === 'inventory' ? 'SOH Intelligence Dashboard' : 'Inventory Management'}
+          </h2>
           <div className="flex items-center gap-2">
-            <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
+            {activeTab === 'inventory' ? (
+              <div className="flex items-center gap-3 mt-1">
+                <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 shadow-sm">
+                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                   <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{warehouseStock.length} Active SKUs</span>
+                </div>
+                <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 shadow-sm">
+                   <Package size={10} className="text-blue-500" />
+                   <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
+                     {warehouseStock.reduce((acc, s) => acc + s.quantity, 0)} Total Units
+                   </span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
+            )}
             {isTenantRoute && (
               <>
                 <span className="text-gray-300">•</span>
@@ -3681,56 +4004,12 @@ export default function AdminInventory() {
         )}
       </div>
 
-      <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl flex-wrap">
-        {[
-          { key: 'master', label: 'Items' },
-          { key: 'return', label: 'Return & Stock Logs' }
-        ].map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => {
-              setActiveTab(tab.key);
-              setStockQuantities({});
-              setViewingVehicleId(null);
-            }}
-            className={`flex-1 py-3 px-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 ${
-              activeTab === tab.key ? "bg-white text-emerald-600 shadow-sm" : "text-gray-400"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
+      {/* Main tab navigation removed for sidebar dropdown */}
 
-      {activeTab === 'return' && (
-        <div className="flex gap-2 p-1 rounded-2xl flex-wrap border-b border-gray-100 mb-6 overflow-x-auto">
-          {[
-            { key: 'loading', label: 'Loading', icon: <ArrowUpCircle size={14}/> },
-            { key: 'return', label: 'Return', icon: <ArrowDownCircle size={14}/> },
-            { key: 'tracking', label: 'Tracking', icon: <Truck size={14}/> },
-            { key: 'refills', label: 'Refills', icon: <Package size={14}/> },
-            { key: 'audits', label: 'Audits History', icon: <CheckSquare size={14}/> }
-          ].map((tab) => (
-            <button
-              key={`sub-${tab.key}`}
-              onClick={() => {
-                setSubTab(tab.key);
-                setStockQuantities({});
-                setViewingVehicleId(null);
-              }}
-              className={`flex items-center gap-2 py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 ${
-                subTab === tab.key ? "bg-emerald-50 text-emerald-700 border border-emerald-100" : "text-gray-400 hover:text-gray-600"
-              }`}
-            >
-              {tab.icon}
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Sub-tab navigation removed for sidebar dropdown */}
 
       {activeTab === 'master' && renderMaster()}
-      
+      {activeTab === 'inventory' && renderInventory()}
       {activeTab === 'return' && (
         <>
           {/* Sub-tab Category Filter (Visible for relevant operational subtabs) */}
@@ -3739,9 +4018,9 @@ export default function AdminInventory() {
               <div className="relative group">
                 <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
                   <button
-                    onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); }}
+                    onClick={() => { setOpsCategory('ALL'); setOpsSubCategory('ALL'); }}
                     className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                      filterCategory === 'ALL' 
+                      opsCategory === 'ALL' 
                       ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
                       : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
                     }`}
@@ -3751,9 +4030,9 @@ export default function AdminInventory() {
                   {categories.map((cat) => (
                     <button
                       key={`subcat-filter-${cat.id}`}
-                      onClick={() => { setFilterCategory(cat.name); setFilterSubCategory('ALL'); }}
+                      onClick={() => { setOpsCategory(cat.name); setOpsSubCategory('ALL'); }}
                       className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                        filterCategory === cat.name 
+                        opsCategory === cat.name 
                         ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
                         : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
                       }`}
@@ -3765,30 +4044,30 @@ export default function AdminInventory() {
               </div>
 
               {/* Hierarchical Sub-Category Filter */}
-              {filterCategory !== 'ALL' && (
+              {opsCategory !== 'ALL' && (
                 <div className="animate-in slide-in-from-top-1 duration-200">
                   <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
                     <button
-                      onClick={() => setFilterSubCategory('ALL')}
+                      onClick={() => setOpsSubCategory('ALL')}
                       className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                        filterSubCategory === 'ALL' 
+                        opsSubCategory === 'ALL' 
                         ? 'bg-emerald-500 border-emerald-500 text-white' 
                         : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
                       }`}
                     >
-                      All {filterCategory}
+                      All {opsCategory}
                     </button>
                     {subCategories
                       .filter(sub => {
-                        const parentCat = categories.find(c => c.name === filterCategory);
+                        const parentCat = categories.find(c => c.name === opsCategory);
                         return sub.categoryId === parentCat?.id;
                       })
                       .map((sub) => (
                         <button
                           key={`subtab-subcat-${sub.id}`}
-                          onClick={() => setFilterSubCategory(sub.name)}
+                          onClick={() => setOpsSubCategory(sub.name)}
                           className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                            filterSubCategory === sub.name 
+                            opsSubCategory === sub.name 
                             ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
                             : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
                           }`}

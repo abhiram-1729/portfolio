@@ -91,6 +91,7 @@ export const ordersAPI = {
   createFromCart: (data) => api.post('/orders/create-from-cart', data),
   completePayment: (data) => api.post('/orders/complete-payment', data),
   getById: (id) => api.get(`/orders/${id}`),
+  getMyHistory: (params) => api.get('/orders/my-history', { params }),
 };
 
 export const reportsAPI = {

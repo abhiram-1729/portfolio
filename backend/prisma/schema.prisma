@@ -215,6 +215,7 @@ model Product {
   minStockAlert Int?       @default(0)
   skuCode       String?
   barcode       String?
+  stock         Int        @default(0)
   store         Store?     @relation(fields: [storeId], references: [id])
 
   tenant             Tenant               @relation(fields: [tenantId], references: [id])

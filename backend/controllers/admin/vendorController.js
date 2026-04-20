@@ -232,3 +232,40 @@ export const updateVendorMappings = async (req, res) => {
     res.status(500).json({ message: 'Error updating vendor mappings', error: error.message });
   }
 };
+export const deleteVendor = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const vendor = await prisma.vendor.findUnique({
+      where: { id },
+      include: {
+        _count: {
+          select: {
+            purchaseOrders: true,
+            purchaseInvoices: true,
+            payments: true
+          }
+        }
+      }
+    });
+
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+    // Check for transaction history
+    if (vendor._count.purchaseOrders > 0 || vendor._count.purchaseInvoices > 0 || vendor._count.payments > 0) {
+      return res.status(400).json({ 
+        message: 'Cannot delete vendor with transaction history. Please deactivate them instead.' 
+      });
+    }
+
+    await prisma.$transaction([
+      prisma.vendorItemMapping.deleteMany({ where: { vendorId: id } }),
+      prisma.vendorLedger.deleteMany({ where: { vendorId: id } }),
+      prisma.vendor.delete({ where: { id } })
+    ]);
+
+    res.json({ message: 'Vendor deleted successfully' });
+  } catch (error) {
+    console.error('❌ Delete Vendor Error:', error);
+    res.status(500).json({ message: 'Error deleting vendor', error: error.message });
+  }
+};

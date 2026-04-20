@@ -1,5 +1,5 @@
-import React from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, PackageSearch, Target, Box, Store, History, AlertTriangle } from 'lucide-react';
+import React, { useState } from 'react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 
@@ -16,19 +16,63 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'SALES' },
     { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'ROUTES' },
     { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'INVENTORY' },
+    { 
+      name: 'Inventory', 
+      icon: Package, 
+      color: 'text-emerald-600',
+      module: 'INVENTORY',
+      isAdmin: true,
+      subItems: [
+        { path: '/admin/inventory?tab=master', icon: Grid, name: 'Master' },
+        { path: '/admin/inventory?tab=inventory', icon: Truck, name: 'Inventory' },
+        { path: '/admin/inventory?tab=return&sub=loading', icon: ArrowUpCircle, name: 'Loading' },
+        { path: '/admin/inventory?tab=return&sub=return', icon: ArrowDownCircle, name: 'Return' },
+        { path: '/admin/inventory?tab=return&sub=refills', icon: Package, name: 'Refills' },
+        { path: '/admin/inventory?tab=return&sub=audits', icon: CheckSquare, name: 'Audits' },
+      ]
+    },
     { name: 'Cash Reconciliation', path: '/closing-cash', icon: Wallet, color: 'text-orange-600', bg: 'bg-orange-50', module: 'CASH' },
     { name: 'Cash Wallet', path: '/wallet', icon: Wallet, color: 'text-emerald-500', bg: 'bg-emerald-50', module: 'CASH' },
     { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50', module: 'REPORTS' },
+    { name: 'Sales History', path: '/sales-history', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { name: 'My Targets', path: '/targets', icon: Target, color: 'text-amber-600', bg: 'bg-amber-50', module: 'TARGETS' },
     { name: 'My Assets', path: '/my-assets', icon: Box, color: 'text-cyan-600', bg: 'bg-cyan-50', module: 'ASSETS' },
     { name: 'Report Damage', path: '/report-damage', icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', module: 'INVENTORY' },
     { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' }, // Profile is always allowed
+    { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { 
+      name: 'Procurement', 
+      icon: ClipboardList, 
+      color: 'text-teal-600',
+      module: 'PROCUREMENT',
+      isAdmin: true,
+      subItems: [
+        { path: '/admin/procurement?tab=vendors', icon: User, name: 'Vendors' },
+        { path: '/admin/procurement?tab=mapping', icon: Link2, name: 'Item Mapping' },
+        { path: '/admin/procurement?tab=po', icon: ClipboardList, name: 'Purchase Orders' },
+        { path: '/admin/procurement?tab=grn', icon: Truck, name: 'Goods Receipt' },
+        { path: '/admin/procurement?tab=purchases', icon: Receipt, name: 'Purchases' },
+        { path: '/admin/procurement?tab=ledger', icon: BookOpen, name: 'Stock Ledger' },
+        { path: '/admin/procurement?tab=payments', icon: CreditCard, name: 'Payments' },
+        { path: '/admin/procurement?tab=reports', icon: BarChart, name: 'Reports' },
+      ]
+    },
   ].filter(item => {
+    // Hide administrative modules for Agents
+    if (user?.role === 'SALES_AGENT' && item.isAdmin) return false;
     if (!item.module || user?.role === 'TENANT_OWNER') return true;
     const perms = user?.permissions?.[item.module] || [];
     return perms.includes('READ');
   });
+
+  const [openMenus, setOpenMenus] = useState({ 
+    Procurement: location.pathname.startsWith('/admin/procurement'),
+    Inventory: location.pathname.startsWith('/admin/inventory')
+  });
+
+  const toggleMenu = (name) => {
+    setOpenMenus(prev => ({ ...prev, [name]: !prev[name] }));
+  };
 
   return (
     <>
@@ -68,7 +112,112 @@ export default function Sidebar({ isOpen, onClose }) {
           <div className="space-y-0.5">
             <p className="px-4 text-[9px] font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Operations</p>
             {menuItems.map((item) => {
-              const isActive = location.pathname === item.path;
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isMenuOpen = openMenus[item.name];
+              const isActive = location.pathname === item.path || (hasSubItems && (
+                (item.name === 'Procurement' && location.pathname.startsWith('/admin/procurement')) ||
+                (item.name === 'Inventory' && location.pathname.startsWith('/admin/inventory'))
+              ));
+
+              if (hasSubItems) {
+                return (
+                  <div key={item.name} className="space-y-1">
+                    <button
+                      onClick={() => toggleMenu(item.name)}
+                      className={`w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 group ${isActive 
+                        ? 'bg-emerald-50 text-emerald-700 font-bold' 
+                        : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'}`}
+                    >
+                      <div className={`w-1.5 h-1.5 rounded-full transition-all duration-300 ${isActive ? 'bg-emerald-600 scale-100' : 'bg-transparent scale-0'}`} />
+                      <item.icon size={16} strokeWidth={isActive ? 3 : 2.5} className={item.color} />
+                      <span className="flex-1 font-black text-xs uppercase tracking-wide text-left">{item.name}</span>
+                      <ChevronDown 
+                        size={14} 
+                        strokeWidth={3} 
+                        className={`transition-transform duration-200 ${isMenuOpen ? 'rotate-0' : '-rotate-90'}`} 
+                      />
+                    </button>
+                    {isMenuOpen && (
+                      <div className="pl-4 space-y-1 mt-1 border-l-2 border-emerald-50/50 ml-6">
+                        {item.subItems.map((sub) => {
+                          const hasNestedItems = sub.subItems && sub.subItems.length > 0;
+                          const isNestedOpen = openMenus[sub.name];
+                          
+                          if (hasNestedItems) {
+                             const isNestedActive = location.pathname === '/admin/inventory' && new URLSearchParams(location.search).get('tab') === 'return';
+                             return (
+                               <div key={sub.name} className="space-y-0.5">
+                                 <button
+                                   onClick={() => toggleMenu(sub.name)}
+                                   className={`w-full flex items-center justify-between gap-3 px-4 py-1.5 rounded-lg transition-all duration-200 ${isNestedActive ? 'text-emerald-700' : 'text-slate-400 hover:text-slate-600'}`}
+                                 >
+                                   <div className="flex items-center gap-3">
+                                     <sub.icon size={14} strokeWidth={2.5} />
+                                     <span className="text-[10px] font-black uppercase tracking-wider whitespace-nowrap">{sub.name}</span>
+                                   </div>
+                                   <ChevronDown 
+                                     size={12} 
+                                     strokeWidth={3} 
+                                     className={`transition-transform duration-200 ${isNestedOpen ? 'rotate-0' : '-rotate-90'}`} 
+                                   />
+                                 </button>
+                                 {isNestedOpen && (
+                                   <div className="pl-4 space-y-0.5 mt-0.5 border-l border-emerald-50/30 ml-6">
+                                     {sub.subItems.map(nested => {
+                                       const targetTab = new URLSearchParams(nested.path.split('?')[1]).get('tab');
+                                       const targetSub = new URLSearchParams(nested.path.split('?')[1]).get('sub');
+                                       const isTarget = location.pathname === '/admin/inventory' && new URLSearchParams(location.search).get('tab') === targetTab && new URLSearchParams(location.search).get('sub') === targetSub;
+                                       return (
+                                         <Link
+                                           key={nested.path}
+                                           to={nested.path}
+                                           onClick={onClose}
+                                           className={`flex items-center gap-3 px-4 py-1.5 rounded-lg transition-all duration-200 ${isTarget 
+                                             ? 'bg-emerald-600 text-white shadow-sm' 
+                                             : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
+                                         >
+                                           <nested.icon size={12} strokeWidth={isTarget ? 3 : 2.5} />
+                                           <span className="text-[9px] font-black uppercase tracking-widest">{nested.name}</span>
+                                         </Link>
+                                       );
+                                     })}
+                                   </div>
+                                 )}
+                               </div>
+                             );
+                          }
+
+                          const targetTab = new URLSearchParams(sub.path.split('?')[1]).get('tab');
+                          const targetSub = new URLSearchParams(sub.path.split('?')[1]).get('sub');
+                          
+                          let isSubActive = false;
+                          if (item.name === 'Procurement') {
+                            isSubActive = location.pathname === '/admin/procurement' && new URLSearchParams(location.search).get('tab') === targetTab;
+                          } else if (item.name === 'Inventory') {
+                            isSubActive = location.pathname === '/admin/inventory' && new URLSearchParams(location.search).get('tab') === targetTab && (!targetSub || new URLSearchParams(location.search).get('sub') === targetSub);
+                          }
+
+                          return (
+                            <Link
+                              key={sub.path}
+                              to={sub.path}
+                              onClick={onClose}
+                              className={`flex items-center gap-3 px-4 py-2 rounded-lg transition-all duration-200 ${isSubActive 
+                                ? 'bg-emerald-600 text-white shadow-md' 
+                                : 'text-slate-400 hover:bg-slate-50 hover:text-slate-600'}`}
+                            >
+                              <sub.icon size={14} strokeWidth={isSubActive ? 3 : 2.5} />
+                              <span className="text-[10px] font-black uppercase tracking-wider">{sub.name}</span>
+                              {isSubActive && <div className="ml-auto w-1 h-1 rounded-full bg-white animate-pulse" />}
+                            </Link>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Link
                   key={item.path}

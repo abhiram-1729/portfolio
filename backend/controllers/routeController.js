@@ -17,6 +17,8 @@ const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 
 
 // Helper to get plan for a specific date and vehicle
 export const fetchPlanForVehicle = async (vehicleId, targetDate = new Date()) => {
+    if (!vehicleId) return null;
+
     // 1. Fetch active route assignment for vehicle
     const assignment = await prisma.routeAssignment.findFirst({
         where: {

@@ -12,7 +12,10 @@ export const getStockReport = async (req, res) => {
       where,
       include: {
         product: {
-          select: { name: true, price: true, purchasePrice: true, minStockAlert: true, status: true }
+          include: {
+            category: { select: { name: true } },
+            unit: { select: { name: true, type: true } }
+          }
         },
         warehouse: { select: { name: true } }
       }

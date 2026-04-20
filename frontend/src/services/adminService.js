@@ -40,6 +40,7 @@ export const adminAPI = {
   getAuditHistory: (params) => api.get('/admin/inventory/audit-history', { params }),
   approveRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/approve`, data),
   rejectRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/reject`, data),
+  updateProductStock: (data) => api.post('/admin/inventory/stock', data),
   importZipInventory: (data) => api.post('/admin/inventory/items/zip-import', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),

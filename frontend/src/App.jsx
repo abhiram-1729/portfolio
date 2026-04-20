@@ -21,6 +21,7 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import AdminUsers from './pages/admin/AdminUsers';
 import AdminVehicles from './pages/admin/AdminVehicles';
 import AdminInventory from './pages/admin/AdminInventory';
+import AdminPOS from './pages/admin/AdminPOS';
 import AdminSales from './pages/admin/AdminSales';
 import AdminReports from './pages/admin/AdminReports';
 import AdminCashManagement from './pages/admin/AdminCashManagement';
@@ -45,6 +46,8 @@ import AdminActivityLogs from './pages/admin/AdminActivityLogs';
 import AdminDamage from './pages/admin/AdminDamage';
 import AgentActivityLogs from './pages/AgentActivityLogs';
 import ReportDamage from './pages/ReportDamage';
+import SalesHistory from './pages/SalesHistory';
+import OrderDetail from './pages/OrderDetail';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -144,6 +147,8 @@ export default function App() {
           <Route path="wallet" element={<CashWallet />} />
           <Route path="activity-logs" element={<AgentActivityLogs />} />
           <Route path="report-damage" element={<ReportDamage />} />
+          <Route path="sales-history" element={<SalesHistory />} />
+          <Route path="order-detail/:id" element={<OrderDetail />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -151,9 +156,10 @@ export default function App() {
         <Route path="/success/:id" element={<PrivateRoute><SuccessScreen /></PrivateRoute>} />
         
         {/* Admin Routes */}
-        <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
-          <Route index element={<AdminDashboard />} />
-          <Route path="users" element={<AdminUsers />} />
+          <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
+            <Route index element={<AdminDashboard />} />
+            <Route path="pos" element={<AdminPOS />} />
+            <Route path="users" element={<AdminUsers />} />
           <Route path="vehicles" element={<AdminVehicles />} />
           <Route path="inventory" element={<AdminInventory />} />
           <Route path="sales" element={<AdminSales />} />

@@ -32,6 +32,9 @@ export const getItems = async (req, res) => {
         category: { select: { name: true } },
         subCategory: { select: { name: true } },
         unit: { select: { name: true, type: true } },
+        WarehouseInventory: {
+          select: { quantity: true }
+        }
       }
     });
     res.json(items);
@@ -165,6 +168,13 @@ export const createItem = async (req, res) => {
       data: itemData
     });
 
+    // Handle initial stock if provided (using raw SQL to bypass stale client validation)
+    const initialStock = parseInt(req.body.stock) || 0;
+    if (initialStock > 0) {
+      await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${initialStock} WHERE "id" = '${item.id}'`);
+      console.log(`[Inventory] Initial stock set for ${item.name}: ${initialStock}`);
+    }
+
     res.status(201).json({ message: 'Item created successfully', item });
   } catch (error) {
     console.error('❌ Create Item Error:', error);
@@ -285,6 +295,13 @@ export const updateItem = async (req, res) => {
       where: { id },
       data: updateData
     });
+
+    // Handle manual stock override if provided
+    if (req.body.stock !== undefined) {
+      const newStock = parseInt(req.body.stock) || 0;
+      await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${newStock} WHERE "id" = '${id}'`);
+      console.log(`[Inventory] Manual stock override for ${item.name}: ${newStock}`);
+    }
 
     res.json({ message: 'Item updated successfully', item });
   } catch (error) {
@@ -1461,5 +1478,117 @@ export const getAuditHistory = async (req, res) => {
   } catch (error) {
     console.error('getAuditHistory error:', error);
     res.status(500).json({ message: 'Error fetching audit history', error: error.message });
+  }
+};
+
+// Update Product Stock Count
+export const updateProductStock = async (req, res) => {
+  try {
+    const { productId, quantity, mode } = req.body;
+    const finalTenantId = req.user?.tenantId || getTenantId();
+
+    console.log(`[Inventory] Stock Update Request: Product=${productId}, Qty=${quantity}, Mode=${mode}, Tenant=${finalTenantId}`);
+
+    if (!productId || quantity === undefined) {
+      return res.status(400).json({ message: 'productId and quantity are required' });
+    }
+
+    const qty = parseInt(quantity);
+    if (isNaN(qty)) {
+      return res.status(400).json({ message: 'Invalid quantity' });
+    }
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      // 1. Find Product
+      const product = await tx.product.findUnique({ where: { id: productId } });
+      if (!product) throw new Error('Product not found in database');
+
+      // 2. Update Product main stock using raw SQL to bypass stale Prisma client validation
+      if (mode === 'add') {
+        await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" + ${qty} WHERE "id" = '${productId}'`);
+      } else {
+        await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${qty} WHERE "id" = '${productId}'`);
+      }
+      
+      const prod = await tx.product.findUnique({ where: { id: productId } });
+      if (!prod) throw new Error('Product not found after update');
+
+      console.log(`[Inventory] Primary stock updated for ${prod.name}. New total: ${prod.stock}`);
+
+      // 3. Find/Create Warehouse
+      let warehouse = await tx.warehouse.findFirst({
+        where: { tenantId: finalTenantId }
+      });
+
+      if (!warehouse) {
+        console.log(`[Inventory] No warehouse found for tenant ${finalTenantId}, creating default.`);
+        warehouse = await tx.warehouse.create({
+          data: {
+            tenantId: finalTenantId,
+            name: 'Main Warehouse',
+            location: 'System Generated'
+          }
+        });
+      }
+
+      // 4. Update Warehouse Inventory
+      const existingWI = await tx.warehouseInventory.findFirst({
+        where: { 
+          warehouseId: warehouse.id,
+          productId: productId 
+        }
+      });
+
+      if (existingWI) {
+        await tx.warehouseInventory.update({
+          where: { id: existingWI.id },
+          data: {
+            quantity: mode === 'add' ? { increment: qty } : qty
+          }
+        });
+      } else {
+        await tx.warehouseInventory.create({
+          data: {
+            tenantId: finalTenantId,
+            warehouseId: warehouse.id,
+            productId: productId,
+            quantity: qty
+          }
+        });
+      }
+
+      console.log(`[Inventory] Warehouse Inventory synced for warehouse ${warehouse.id}`);
+
+      // 5. Return updated product with relations for UI
+      return tx.product.findUnique({
+        where: { id: productId },
+        include: {
+          category: true,
+          subCategory: true,
+          unit: true,
+          brand: true,
+        }
+      });
+    });
+
+    // Log Activity (Non-blocking or outside transaction is fine)
+    await logActivity({
+      tenantId: finalTenantId,
+      userId: req.user.id,
+      storeId: req.user.storeId || null,
+      action: 'STOCK_UPDATE',
+      entity: 'PRODUCT',
+      entityId: productId,
+      description: `Stock ${mode === 'add' ? 'added' : 'set'}: ${qty} units for ${updatedProduct.name}. New total: ${updatedProduct.stock}`,
+    }).catch(err => console.warn('[Inventory] Log activity failed:', err.message));
+
+    res.json({ success: true, data: updatedProduct });
+  } catch (error) {
+    console.error('❌ updateProductStock Error Details:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+    res.status(500).json({ message: 'Error updating stock', error: error.message });
   }
 };

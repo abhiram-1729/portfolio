@@ -397,7 +397,56 @@ export const getOrderById = async (req, res, next) => {
 
         res.json({ ...order, items: enrichedItems });
     } catch (error) {
-        console.error('[Payment Completion Error]:', error);
+        console.error('[Get Order Error]:', error);
+        next(error);
+    }
+};
+
+// @desc    Get my orders (Agent history)
+// @route   GET /api/orders/my-history
+// @access  Private
+export const getMyOrders = async (req, res, next) => {
+    try {
+        const userId = req.user.id;
+        const tenantId = req.user.tenantId;
+        const { limit = 100, page = 1 } = req.query;
+
+        const orders = await prisma.order.findMany({
+            where: { 
+                tenantId: tenantId,
+                OR: [
+                    { agentId: userId },
+                    { userId: userId }
+                ],
+                status: { in: ['COMPLETED', 'PENDING'] }
+            },
+            orderBy: { createdAt: 'desc' },
+            take: parseInt(limit),
+            skip: (parseInt(page) - 1) * parseInt(limit),
+            include: {
+                items: true
+            }
+        });
+
+        // Bulk enrich product names
+        const allProductIds = [...new Set(orders.flatMap(o => o.items.map(i => i.productId)))];
+        const products = await prisma.product.findMany({
+            where: { id: { in: allProductIds } },
+            select: { id: true, name: true }
+        });
+        const productMap = products.reduce((acc, p) => ({ ...acc, [p.id]: p.name }), {});
+
+        const enrichedOrders = orders.map(order => ({
+            ...order,
+            items: order.items.map(item => ({
+                ...item,
+                productName: productMap[item.productId] || 'Unknown Product'
+            }))
+        }));
+
+        res.json(enrichedOrders);
+    } catch (error) {
+        console.error('[Get My Orders Error]:', error);
         next(error);
     }
 };

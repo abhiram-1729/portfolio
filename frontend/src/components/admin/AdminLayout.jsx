@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
+import { NavLink, Link, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -20,9 +20,18 @@ import {
   PieChart,
   Store,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   History as HistoryIcon,
-  AlertTriangle
+  AlertTriangle,
+  Link2,
+  BookOpen,
+  CreditCard,
+  Grid,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CheckSquare,
+  PlusCircle
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -45,7 +54,7 @@ export default function AdminLayout() {
   const [searchParams] = useSearchParams();
   const activeStoreId = searchParams.get('storeId');
   const activeStoreName = searchParams.get('storeName');
-  
+
   const displayStoreName = activeStoreName || user?.storeName || user?.tenantName || 'VillagKart';
 
   const appendParams = (path) => {
@@ -61,30 +70,72 @@ export default function AdminLayout() {
 
   const navItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
-    { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
-    { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
-    { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES' },
-    { to: '/admin/inventory', icon: Package, label: 'Inventory', module: 'INVENTORY' },
+    {
+      label: 'Operation',
+      icon: ClipboardList,
+      subItems: [
+        { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
+        { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
+        { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES' },
+      ]
+    },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
+    {
+      label: 'Inventory',
+      icon: Package,
+      module: 'INVENTORY',
+      subItems: [
+        { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid },
+        { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package },
+        { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck },
+        { to: '/admin/inventory?tab=return&sub=loading', label: 'Loading', icon: ArrowUpCircle },
+        { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle },
+        { to: '/admin/inventory?tab=return&sub=refills', label: 'Refills', icon: Package },
+        { to: '/admin/inventory?tab=return&sub=audits', label: 'Audits', icon: CheckSquare },
+      ]
+    },
     { to: '/admin/activity-logs', icon: HistoryIcon, label: 'Activity Logs', module: 'ADMIN' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports', module: 'REPORTS' },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
     { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },
     { to: '/admin/assets', icon: Box, label: 'Assets', module: 'ASSETS' },
     { to: '/admin/expenses', icon: Receipt, label: 'Expenses', module: 'EXPENSES' },
-    { to: '/admin/procurement', icon: ClipboardList, label: 'Procurement', module: 'PROCUREMENT' },
+    {
+      label: 'Procurement',
+      icon: ClipboardList,
+      module: 'PROCUREMENT',
+      subItems: [
+        { to: '/admin/procurement?tab=vendors', icon: Users, label: 'Vendors' },
+        { to: '/admin/procurement?tab=mapping', icon: Link2, label: 'Item Mapping' },
+        { to: '/admin/procurement?tab=po', icon: ClipboardList, label: 'Purchase Orders' },
+        { to: '/admin/procurement?tab=grn', icon: Truck, label: 'Goods Receipt' },
+        { to: '/admin/procurement?tab=purchases', icon: Receipt, label: 'Purchases' },
+        { to: '/admin/procurement?tab=ledger', icon: BookOpen, label: 'Stock Ledger' },
+        { to: '/admin/procurement?tab=payments', icon: CreditCard, label: 'Payments' },
+        { to: '/admin/procurement?tab=reports', icon: BarChart3, label: 'Reports' },
+      ]
+    },
     { to: '/admin/damage', icon: AlertTriangle, label: 'Damage', module: 'INVENTORY' },
     { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
-    { to: '/admin/notifications', icon: Bell, label: 'Notifications', module: 'NOTIFICATIONS' },
-    { to: '/admin/settings', icon: Settings, label: 'Settings', module: 'SETTINGS' },
   ].filter(item => {
     // If no specific module or if user is owner/full admin, show all
     if (!item.module || user?.role === 'TENANT_OWNER' || user?.role === 'ADMIN') return true;
-    
+
     // Check custom permissions
     const perms = user?.permissions?.[item.module] || [];
     return perms.includes('READ');
   });
+
+  const [openMenus, setOpenMenus] = React.useState({
+    Procurement: location.pathname.startsWith('/admin/procurement'),
+    Inventory: location.pathname.startsWith('/admin/inventory'),
+    Operation: location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes'),
+    'Return & Stock': location.search.includes('tab=return')
+  });
+
+  const toggleMenu = (label) => {
+    setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
 
 
   return (
@@ -99,9 +150,20 @@ export default function AdminLayout() {
           </div>
         </div>
         <div className="flex items-center gap-4 relative">
-          <NotificationPopover 
-            isOpen={isNotifOpen} 
-            onClose={() => setIsNotifOpen(false)} 
+          <Link
+            to={appendParams('/admin/pos')}
+            className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
+            title="Point of Sale"
+          >
+            <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+              <PlusCircle size={18} strokeWidth={3} />
+            </div>
+            <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
+          </Link>
+
+          <NotificationPopover
+            isOpen={isNotifOpen}
+            onClose={() => setIsNotifOpen(false)}
           />
           <button
             onClick={() => setIsNotifOpen(!isNotifOpen)}
@@ -114,7 +176,15 @@ export default function AdminLayout() {
               </span>
             )}
           </button>
-          
+
+          <button
+            onClick={() => navigate('/admin/settings')}
+            className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50"
+            title="Admin Settings"
+          >
+            <Settings size={22} strokeWidth={2.5} />
+          </button>
+
           <button
             onClick={handleLogout}
             className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
@@ -148,26 +218,143 @@ export default function AdminLayout() {
         <div className="flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <nav className="space-y-0.5 pb-6">
             <p className="px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Management</p>
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={appendParams(item.to)}
-                end={item.end}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
-                  isActive
-                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                )}
-              >
-                {({ isActive }) => (
-                  <>
-                    <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
-                    {item.label}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {navItems.map((item) => {
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isMenuOpen = openMenus[item.label];
+
+              if (hasSubItems) {
+                return (
+                  <div key={item.label} className="space-y-1">
+                    <button
+                      onClick={() => toggleMenu(item.label)}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
+                        (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
+                          (location.pathname.startsWith('/admin/inventory') && item.label === 'Inventory') ||
+                          ((location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes')) && item.label === 'Operation')
+                          ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
+                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon size={16} strokeWidth={2.5} />
+                        {item.label}
+                      </div>
+                      <ChevronDown
+                        size={14}
+                        className={cn("transition-transform duration-200", isMenuOpen ? "rotate-0" : "-rotate-90")}
+                      />
+                    </button>
+                    {isMenuOpen && (
+                      <div className="pl-4 space-y-1 animate-in slide-in-from-top-1 duration-200 border-l border-emerald-50 ml-6">
+                        {item.subItems.map((sub) => {
+                          const hasNestedItems = sub.subItems && sub.subItems.length > 0;
+                          const isNestedOpen = openMenus[sub.label];
+
+                          if (hasNestedItems) {
+                            const isNestedActive = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return';
+                            return (
+                              <div key={sub.label} className="space-y-0.5">
+                                <button
+                                  onClick={() => toggleMenu(sub.label)}
+                                  className={cn(
+                                    "flex items-center justify-between gap-3 px-4 py-1.5 w-full rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                    isNestedActive ? "text-emerald-600" : "text-gray-400 hover:text-gray-600"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <sub.icon size={14} strokeWidth={2.5} />
+                                    {sub.label}
+                                  </div>
+                                  <ChevronDown
+                                    size={12}
+                                    className={cn("transition-transform duration-200", isNestedOpen ? "rotate-0" : "-rotate-90")}
+                                  />
+                                </button>
+                                {isNestedOpen && (
+                                  <div className="pl-4 space-y-0.5 border-l border-emerald-50 ml-6 animate-in slide-in-from-top-1">
+                                    {sub.subItems.map(nested => {
+                                      const isTarget = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return' && searchParams.get('sub') === new URLSearchParams(nested.to.split('?')[1]).get('sub');
+                                      return (
+                                        <NavLink
+                                          key={nested.to}
+                                          to={appendParams(nested.to)}
+                                          className={cn(
+                                            "flex items-center gap-3 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
+                                            isTarget
+                                              ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                              : "text-gray-400 hover:text-gray-600"
+                                          )}
+                                        >
+                                          <nested.icon size={12} strokeWidth={isTarget ? 3 : 2.5} />
+                                          {nested.label}
+                                        </NavLink>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          const isProcurement = location.pathname === '/admin/procurement';
+                          const isInventory = location.pathname === '/admin/inventory';
+
+                          let isActive = false;
+                          if (isProcurement && item.label === 'Procurement') {
+                            isActive = searchParams.get('tab') === new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                          } else if (isInventory && item.label === 'Inventory') {
+                            const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                            const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
+                            isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
+                          } else if (item.label === 'Operation') {
+                            isActive = location.pathname === sub.to;
+                          }
+
+                          return (
+                            <NavLink
+                              key={sub.to}
+                              to={appendParams(sub.to)}
+                              className={cn(
+                                "flex items-center gap-3 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                isActive
+                                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                  : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                              )}
+                            >
+                              <sub.icon size={14} strokeWidth={isActive ? 3 : 2.5} />
+                              {sub.label}
+                              {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-white animate-pulse" />}
+                            </NavLink>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={appendParams(item.to)}
+                  end={item.end}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-3 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all duration-200 rounded-r-xl rounded-l-none border-l-4",
+                    isActive
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 border-emerald-600"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-transparent"
+                  )}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
+                      {item.label}
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
 
@@ -182,7 +369,7 @@ export default function AdminLayout() {
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100"
           >
@@ -246,27 +433,60 @@ export default function AdminLayout() {
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {navItems.slice(5).map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={appendParams(item.to)}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium border transition-all duration-200",
-                    isActive
-                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                      : "bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100"
-                  )}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              ))}
+            <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {navItems.slice(5).map((item) => {
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+
+                if (hasSubItems) {
+                  return (
+                    <div key={item.label} className="col-span-2 space-y-2 mt-2">
+                      <div className="flex items-center gap-2 px-2 py-1">
+                        <item.icon size={16} className="text-emerald-600" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {item.subItems.map((sub) => (
+                          <NavLink
+                            key={sub.to}
+                            to={appendParams(sub.to)}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={({ isActive }) => cn(
+                              "flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold border transition-all",
+                              isActive
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                : "bg-gray-50 text-gray-500 border-transparent"
+                            )}
+                          >
+                            <sub.icon size={16} />
+                            {sub.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={appendParams(item.to)}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium border transition-all duration-200",
+                      isActive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                        : "bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100"
+                    )}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         </div>

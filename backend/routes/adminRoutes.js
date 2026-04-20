@@ -80,6 +80,7 @@ router.route('/inventory/items/:id')
   .delete(inventoryCtr.deleteItem);
 
 router.post('/inventory/load', inventoryCtr.loadStock);
+router.post('/inventory/stock', inventoryCtr.updateProductStock);
 router.post('/inventory/return', inventoryCtr.returnStock);
 router.get('/inventory/vehicle/:id', inventoryCtr.getVehicleInventory);
 router.put('/inventory/vehicle/:id/audit', inventoryCtr.auditVehicleStock);

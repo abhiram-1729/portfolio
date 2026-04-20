@@ -4,8 +4,10 @@ import {
   CreditCard, BarChart3, Plus, X, Search, Loader2, Edit3,
   ToggleLeft, ToggleRight, Eye, ChevronRight, AlertTriangle,
   CheckCircle2, Clock, ArrowUpRight, ArrowDownRight, Filter,
-  FileText, DollarSign, TrendingUp, AlertCircle, Link2
+  FileText, DollarSign, TrendingUp, AlertCircle, Link2, Trash2,
+  ArrowLeft, Phone, Mail, MapPin, ShieldCheck, User
 } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
 import { procurementAPI } from '../../services/procurementService';
 import { adminAPI } from '../../services/adminService';
 import toast from 'react-hot-toast';
@@ -25,7 +27,8 @@ const TABS = [
 
 // ─── MAIN COMPONENT ─────────────────────────────────────
 export default function AdminProcurement() {
-  const [activeTab, setActiveTab] = useState('vendors');
+  const [searchParams] = useSearchParams();
+  const activeTab = searchParams.get('tab') || 'vendors';
   const can = useUserStore(s => s.can);
 
   return (
@@ -34,24 +37,6 @@ export default function AdminProcurement() {
       <div className="flex flex-col gap-1">
         <h2 className="text-2xl font-black text-gray-900 tracking-tight">Procurement & Payables</h2>
         <p className="text-sm text-gray-400 font-bold">Vendor → PO → GRN → Purchase → Stock → Payment</p>
-      </div>
-
-      {/* Tab Navigation */}
-      <div className="flex gap-1.5 bg-gray-100 p-1 rounded-2xl overflow-x-auto custom-scrollbar">
-        {TABS.map(tab => (
-          <button
-            key={tab.key}
-            onClick={() => setActiveTab(tab.key)}
-            className={`flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider whitespace-nowrap transition-all ${
-              activeTab === tab.key
-                ? 'bg-white text-emerald-600 shadow-sm'
-                : 'text-gray-400 hover:text-gray-600'
-            }`}
-          >
-            <tab.icon size={14} />
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* Tab Content */}
@@ -122,6 +107,17 @@ function VendorsTab({ can }) {
     } catch { toast.error('Error updating status'); }
   };
 
+  const handleDeleteVendor = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this vendor? This cannot be undone.')) return;
+    try {
+      await procurementAPI.deleteVendor(id);
+      toast.success('Vendor deleted');
+      loadVendors();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error deleting vendor');
+    }
+  };
+
   const openEdit = (v) => {
     setEditVendor(v);
     setForm({
@@ -145,6 +141,106 @@ function VendorsTab({ can }) {
     v.vendorName.toLowerCase().includes(search.toLowerCase()) ||
     v.mobile.includes(search)
   );
+
+  const renderForm = () => (
+    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
+      <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => { setShowForm(false); setEditVendor(null); }}
+            className="p-2 hover:bg-white rounded-xl transition-all text-gray-400 hover:text-emerald-600 shadow-sm border border-transparent hover:border-emerald-100"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <div>
+            <h3 className="text-xl font-black text-gray-900 tracking-tight">{editVendor ? 'Update Vendor Details' : 'Onboard New Vendor'}</h3>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{editVendor ? 'Refining existing partner information' : 'Registering a new supply chain partner'}</p>
+          </div>
+        </div>
+        <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
+          <Users size={24} />
+        </div>
+      </div>
+
+      <form onSubmit={handleSubmit} className="p-8 space-y-8 max-w-4xl mx-auto">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          {[
+            { name: 'vendorName', label: 'Business Name *', required: true, icon: Users },
+            { name: 'mobile', label: 'Primary Contact No. *', required: true, icon: Phone },
+            { name: 'email', label: 'Official Email ID', icon: Mail },
+            { name: 'address', label: 'Business Address', icon: MapPin },
+            { name: 'gstNumber', label: 'GST Identification Number', icon: ShieldCheck },
+            { name: 'contactPerson', label: 'POC / Contact Person Name', icon: User },
+          ].map(f => (
+            <div key={f.name} className="space-y-2 group">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">{f.label}</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                  <f.icon size={16} />
+                </div>
+                <input 
+                  required={f.required} 
+                  value={form[f.name]} 
+                  onChange={e => setForm({ ...form, [f.name]: e.target.value })}
+                  className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                  placeholder={`Enter ${f.label.toLowerCase().replace('*', '').trim()}...`}
+                />
+              </div>
+            </div>
+          ))}
+
+          <div className="space-y-2 group">
+            <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Default Credit Cycle (Days)</label>
+            <div className="relative">
+              <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                <Clock size={16} />
+              </div>
+              <input 
+                type="number" 
+                value={form.creditDays} 
+                onChange={e => setForm({ ...form, creditDays: e.target.value })}
+                className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                placeholder="30"
+              />
+            </div>
+          </div>
+
+          {!editVendor && (
+            <div className="space-y-2 group">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Opening Account Balance</label>
+              <div className="relative">
+                <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                  <DollarSign size={16} />
+                </div>
+                <input 
+                  type="number" 
+                  value={form.openingBalance} 
+                  onChange={e => setForm({ ...form, openingBalance: e.target.value })}
+                  className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                  placeholder="0.00"
+                />
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="pt-8 border-t border-gray-50 flex items-center justify-end gap-3">
+          <button 
+            type="button" 
+            onClick={() => { setShowForm(false); setEditVendor(null); }}
+            className="px-8 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-all"
+          >
+            Cancel
+          </button>
+          <button className="px-12 py-3.5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all active:translate-y-0">
+            {editVendor ? 'Save Changes' : 'Confirm & Register'}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+
+  if (showForm) return renderForm();
 
   return (
     <div className="space-y-4">
@@ -232,6 +328,9 @@ function VendorsTab({ can }) {
                             <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
                               {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
                             </button>
+                            {can('PROCUREMENT', 'DELETE') && (
+                              <button onClick={() => handleDeleteVendor(v.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all" title="Delete"><Trash2 size={14} /></button>
+                            )}
                           </>
                         )}
                       </div>
@@ -261,6 +360,9 @@ function VendorsTab({ can }) {
                     <button onClick={() => handleToggleStatus(v.id)} className="p-2 rounded-lg bg-gray-50">
                       {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
                     </button>
+                    {can('PROCUREMENT', 'DELETE') && (
+                      <button onClick={() => handleDeleteVendor(v.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg"><Trash2 size={14} /></button>
+                    )}
                   </div>
                 </div>
               </div>
@@ -270,49 +372,7 @@ function VendorsTab({ can }) {
       )}
 
       {/* Vendor Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white w-full max-w-lg rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-gray-900">{editVendor ? 'Edit Vendor' : 'New Vendor'}</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
-            </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {[
-                { name: 'vendorName', label: 'Vendor Name *', required: true },
-                { name: 'mobile', label: 'Mobile *', required: true },
-                { name: 'email', label: 'Email' },
-                { name: 'address', label: 'Address' },
-                { name: 'gstNumber', label: 'GST Number' },
-                { name: 'contactPerson', label: 'Contact Person' },
-              ].map(f => (
-                <div key={f.name} className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">{f.label}</label>
-                  <input required={f.required} value={form[f.name]} onChange={e => setForm({ ...form, [f.name]: e.target.value })}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
-              ))}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Credit Days</label>
-                  <input type="number" value={form.creditDays} onChange={e => setForm({ ...form, creditDays: e.target.value })}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
-                {!editVendor && (
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Balance</label>
-                    <input type="number" value={form.openingBalance} onChange={e => setForm({ ...form, openingBalance: e.target.value })}
-                      className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                  </div>
-                )}
-              </div>
-              <button className="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all active:scale-[0.98]">
-                {editVendor ? 'Update Vendor' : 'Create Vendor'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Form modal removed for inline view */}
 
       {/* Ledger Modal */}
       {ledgerView && ledgerData && (
@@ -374,6 +434,8 @@ function MappingTab({ can }) {
   const [mappedIds, setMappedIds] = useState(new Set());
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [vSearch, setVSearch] = useState('');
+  const [pSearch, setPSearch] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -422,12 +484,25 @@ function MappingTab({ can }) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Vendor List */}
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-50">
-            <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Select Vendor</h4>
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-50 bg-gray-50/50">
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 mb-3">Select Vendor</h4>
+            <div className="relative group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
+              <input 
+                type="text" 
+                placeholder="Search vendor..." 
+                className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-inner"
+                value={vSearch}
+                onChange={e => setVSearch(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="max-h-[60vh] overflow-y-auto">
-            {vendors.map(v => (
+          <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+            {vendors.filter(v => 
+              v.vendorName.toLowerCase().includes(vSearch.toLowerCase()) || 
+              v.mobile.includes(vSearch)
+            ).map(v => (
               <button key={v.id} onClick={() => selectVendor(v)}
                 className={`w-full text-left px-4 py-3 border-b border-gray-50 flex items-center justify-between transition-all ${
                   selectedVendor?.id === v.id ? 'bg-emerald-50 border-l-4 border-l-emerald-600' : 'hover:bg-gray-50'
@@ -443,22 +518,36 @@ function MappingTab({ can }) {
         </div>
 
         {/* Product Mapping */}
-        <div className="md:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-50 flex items-center justify-between">
-            <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">
-              {selectedVendor ? `Items for ${selectedVendor.vendorName}` : 'Select a vendor first'}
-            </h4>
+        <div className="md:col-span-2 bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/50">
+            <div className="flex flex-col gap-1">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">
+                {selectedVendor ? `Items for ${selectedVendor.vendorName}` : 'Mapping Registry'}
+              </h4>
+              {selectedVendor && (
+                <div className="relative group mt-2 min-w-[240px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={12} />
+                  <input 
+                    type="text" 
+                    placeholder="Filter products..." 
+                    className="w-full bg-white border border-gray-100 rounded-lg pl-8 pr-3 py-1.5 text-[11px] font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-inner"
+                    value={pSearch}
+                    onChange={e => setPSearch(e.target.value)}
+                  />
+                </div>
+              )}
+            </div>
             {selectedVendor && can('PROCUREMENT', 'UPDATE') && (
               <button onClick={saveMappings} disabled={saving}
-                className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs disabled:opacity-50">
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />} Save
+                className="flex items-center gap-1.5 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50">
+                {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Save Changes
               </button>
             )}
           </div>
           {selectedVendor ? (
-            <div className="max-h-[60vh] overflow-y-auto p-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {products.map(p => (
+            <div className="max-h-[60vh] overflow-y-auto p-4 custom-scrollbar bg-white">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 pb-12">
+                {products.filter(p => p.name.toLowerCase().includes(pSearch.toLowerCase())).map(p => (
                   <button key={p.id} onClick={() => toggleProduct(p.id)}
                     className={`flex items-center gap-3 p-3 rounded-xl border transition-all text-left ${
                       mappedIds.has(p.id)
@@ -498,6 +587,7 @@ function PurchaseOrdersTab({ can }) {
   const [vendors, setVendors] = useState([]);
   const [mappedItems, setMappedItems] = useState([]);
   const [statusFilter, setStatusFilter] = useState('');
+  const [search, setSearch] = useState('');
   const [form, setForm] = useState({
     vendorId: '', poDate: format(new Date(), 'yyyy-MM-dd'),
     expectedDelivery: '', remarks: '', items: []
@@ -595,19 +685,30 @@ function PurchaseOrdersTab({ can }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex flex-wrap gap-1.5">
-          {['', 'CREATED', 'APPROVED', 'ORDERED', 'DELIVERED', 'CLOSED'].map(s => (
-            <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                statusFilter === s ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'
-              }`}>{s || 'All'}</button>
-          ))}
+      <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
+        <div className="flex flex-wrap items-center gap-3 flex-1 overflow-x-auto no-scrollbar">
+          <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-2xl border border-gray-100 shadow-sm flex-1 md:max-w-xs focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all">
+            <Search size={14} className="text-gray-400" />
+            <input 
+              placeholder="Search PO # or Vendor..." 
+              value={search} 
+              onChange={e => setSearch(e.target.value)}
+              className="bg-transparent border-none focus:outline-none text-xs font-black text-gray-700 w-full placeholder:text-gray-300" 
+            />
+          </div>
+          <div className="flex gap-1">
+            {['', 'CREATED', 'APPROVED', 'ORDERED', 'DELIVERED', 'CLOSED'].map(s => (
+              <button key={s} onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                  statusFilter === s ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-200 shadow-sm'
+                }`}>{s || 'All'}</button>
+            ))}
+          </div>
         </div>
         {can('PROCUREMENT', 'CREATE') && (
           <button onClick={openForm}
-            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-            <Plus size={16} /> New PO
+            className="flex items-center gap-1.5 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 hover:-translate-y-0.5 transition-all shadow-xl shadow-emerald-600/20 active:translate-y-0">
+            <Plus size={14} strokeWidth={3} /> Create Purchase Order
           </button>
         )}
       </div>
@@ -621,8 +722,13 @@ function PurchaseOrdersTab({ can }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {pos.map(po => (
-            <div key={po.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3">
+          {pos.filter(po => 
+            !search || 
+            po.poNumber.toString().includes(search) || 
+            po.vendor?.vendorName.toLowerCase().includes(search.toLowerCase()) ||
+            po.displayId?.toLowerCase().includes(search.toLowerCase())
+          ).map(po => (
+            <div key={po.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-4 hover:border-emerald-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -908,6 +1014,18 @@ function PurchasesTab({ can }) {
     vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'),
     transportCharges: '0', otherCharges: '0', items: []
   });
+  const [showQuickVendor, setShowQuickVendor] = useState(false);
+  const [showQuickProduct, setShowQuickProduct] = useState(false);
+  const [itemSearch, setItemSearch] = useState('');
+  const [showItemResults, setShowItemResults] = useState(false);
+  const [quickVendorForm, setQuickVendorForm] = useState({
+    vendorName: '', mobile: '', email: '', address: '',
+    gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0'
+  });
+  const [quickProductForm, setQuickProductForm] = useState({ name: '', price: '', categoryId: 'default', unitId: '' });
+  const [categories, setCategories] = useState([]);
+  const [units, setUnits] = useState([]);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -922,14 +1040,42 @@ function PurchasesTab({ can }) {
 
   const openForm = async () => {
     try {
-      const [v, p] = await Promise.all([
+      const [v, p, c, u] = await Promise.all([
         procurementAPI.getVendors({ status: 'ACTIVE' }),
-        adminAPI.getItems()
+        adminAPI.getItems(),
+        adminAPI.getCategories(),
+        adminAPI.getUnits()
       ]);
       setVendors(v.data);
       setProducts(p.data.filter(x => x.status === 'ACTIVE'));
+      setCategories(c.data || []);
+      setUnits(u.data || []);
       setShowForm(true);
     } catch { toast.error('Failed to load data'); }
+  };
+
+  const handleQuickVendor = async (e) => {
+    e.preventDefault();
+    try {
+      const { data } = await procurementAPI.createVendor(quickVendorForm);
+      toast.success('Vendor added');
+      const v = await procurementAPI.getVendors({ status: 'ACTIVE' });
+      setVendors(v.data);
+      setForm(prev => ({ ...prev, vendorId: data.id }));
+      setShowQuickVendor(false);
+      setQuickVendorForm({ vendorName: '', mobile: '', email: '', address: '', gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0' });
+    } catch (err) { toast.error(err.response?.data?.message || 'Error adding vendor'); }
+  };
+
+  const handleQuickProduct = async (e) => {
+    e.preventDefault();
+    try {
+      await adminAPI.createItem({ ...quickProductForm, status: 'ACTIVE' });
+      toast.success('Product added');
+      const p = await adminAPI.getItems();
+      setProducts(p.data.filter(x => x.status === 'ACTIVE'));
+      setShowQuickProduct(false);
+    } catch (err) { toast.error(err.response?.data?.message || 'Error adding product'); }
   };
 
   const addItem = () => {
@@ -977,12 +1123,20 @@ function PurchasesTab({ can }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Purchase Invoices</h4>
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/50 p-3 rounded-[2rem] border border-gray-100">
+        <div className="relative group flex-1 max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
+          <input 
+            placeholder="Search invoice or vendor..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2.5 text-xs font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300" 
+          />
+        </div>
         {can('PROCUREMENT', 'CREATE') && (
           <button onClick={openForm}
-            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-            <Plus size={16} /> New Purchase
+            className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0">
+            <Plus size={14} strokeWidth={3} /> New Purchase
           </button>
         )}
       </div>
@@ -996,8 +1150,12 @@ function PurchasesTab({ can }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {purchases.map(p => (
-            <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-2">
+          {purchases.filter(p => 
+            !search || 
+            p.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
+            p.vendor?.vendorName.toLowerCase().includes(search.toLowerCase())
+          ).map(p => (
+            <div key={p.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 space-y-4 hover:border-emerald-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -1030,7 +1188,10 @@ function PurchasesTab({ can }) {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor *</label>
+                  <div className="flex items-center justify-between">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor *</label>
+                    <button type="button" onClick={() => setShowQuickVendor(true)} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-100"><Plus size={10} /> Add New</button>
+                  </div>
                   <select value={form.vendorId} onChange={e => setForm({...form, vendorId: e.target.value})} required
                     className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none">
                     <option value="">Select Vendor</option>
@@ -1062,31 +1223,178 @@ function PurchasesTab({ can }) {
               </div>
               {/* Items */}
               <div className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Items</label>
-                  <button type="button" onClick={addItem} className="text-[10px] font-black text-emerald-600 flex items-center gap-1"><Plus size={12} /> Add Item</button>
-                </div>
-                {form.items.map((item, idx) => (
-                  <div key={idx} className="flex gap-2 items-center bg-gray-50 p-2 rounded-xl">
-                    <select value={item.productId} onChange={e => {
-                      const prod = products.find(p => p.id === e.target.value);
-                      updateItem(idx, 'productId', e.target.value);
-                      if (prod) updateItem(idx, 'price', String(prod.purchasePrice || prod.price || 0));
-                    }} className="flex-1 bg-white rounded-lg px-2 py-1.5 text-xs font-bold border border-gray-200">
-                      <option value="">Select Item</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
-                    <input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                      className="w-16 bg-white rounded-lg px-2 py-1.5 text-xs font-bold border border-gray-200 text-center" />
-                    <input type="number" placeholder="Price" value={item.price} onChange={e => updateItem(idx, 'price', e.target.value)}
-                      className="w-20 bg-white rounded-lg px-2 py-1.5 text-xs font-bold border border-gray-200 text-center" />
-                    <button type="button" onClick={() => removeItem(idx)} className="text-red-400 hover:text-red-600"><X size={14} /></button>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                  <div className="flex flex-col">
+                    <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 pl-1">Line Items</label>
+                    <div className="relative mt-2 min-w-[280px] group">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
+                      <input 
+                        type="text"
+                        placeholder="Search & add product..."
+                        className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-inner"
+                        value={itemSearch}
+                        onChange={e => { setItemSearch(e.target.value); setShowItemResults(true); }}
+                        onFocus={() => setShowItemResults(true)}
+                      />
+                      {showItemResults && itemSearch && (
+                        <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
+                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()) || p.skuCode?.includes(itemSearch)).slice(0, 10).map(p => (
+                            <button
+                              key={p.id}
+                              type="button"
+                              onClick={() => {
+                                setForm(prev => ({
+                                  ...prev,
+                                  items: [...prev.items, { productId: p.id, quantity: 1, price: String(p.purchasePrice || p.price || 0) }]
+                                }));
+                                setItemSearch('');
+                                setShowItemResults(false);
+                              }}
+                              className="w-full text-left px-4 py-3 hover:bg-emerald-50 border-b border-gray-50 last:border-0 flex items-center justify-between group transition-colors"
+                            >
+                              <div className="flex flex-col">
+                                <span className="text-xs font-black text-gray-900 group-hover:text-emerald-700">{p.name}</span>
+                                <span className="text-[10px] text-gray-400">{p.skuCode || 'No SKU'}</span>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-xs font-black text-emerald-600">₹{p.purchasePrice || p.price}</span>
+                                <Plus size={12} className="text-emerald-400 mt-1" />
+                              </div>
+                            </button>
+                          ))}
+                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
+                            <div className="p-4 text-center text-gray-400 text-[10px] font-bold">No products found</div>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                ))}
+                  <div className="flex gap-2 self-end">
+                    <button type="button" onClick={() => setShowQuickProduct(true)} className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 bg-blue-50/50 px-3 py-2 rounded-xl hover:bg-blue-100 transition-all active:scale-95">
+                      <Plus size={12} strokeWidth={3} /> New Product
+                    </button>
+                    <button type="button" onClick={addItem} className="text-[10px] font-black text-emerald-600 flex items-center gap-1.5 bg-emerald-50/50 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-all active:scale-95">
+                      <Plus size={12} strokeWidth={3} /> Add Blank Row
+                    </button>
+                  </div>
+                </div>
+              <div className="space-y-3" onClick={() => setShowItemResults(false)}>
+                {form.items.length === 0 ? (
+                  <div className="py-8 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
+                    <Package className="mx-auto text-gray-300 mb-2 opacity-50" size={32} />
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No items added yet</p>
+                  </div>
+                ) : (
+                  form.items.map((item, idx) => (
+                    <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-gray-50/30 p-3 rounded-2xl border border-gray-100 group relative hover:border-emerald-200 transition-all animate-in slide-in-from-left-2 duration-300">
+                    <div className="flex-1 min-w-0">
+                      <select value={item.productId} onChange={e => {
+                        const prod = products.find(p => p.id === e.target.value);
+                        updateItem(idx, 'productId', e.target.value);
+                        if (prod) updateItem(idx, 'price', String(prod.purchasePrice || prod.price || 0));
+                      }} className="w-full bg-white rounded-xl px-3 py-2 text-xs font-bold border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none">
+                        <option value="">Select Item</option>
+                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="relative">
+                        <span className="absolute -top-4 left-1 text-[8px] font-bold text-gray-400 sm:hidden">QTY</span>
+                        <input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                          className="w-16 bg-white rounded-xl px-2 py-2 text-xs font-black border border-gray-200 text-center focus:ring-2 focus:ring-emerald-500" />
+                      </div>
+                      <div className="relative">
+                        <span className="absolute -top-4 left-1 text-[8px] font-bold text-gray-400 sm:hidden">PRICE</span>
+                        <input type="number" placeholder="Price" value={item.price} onChange={e => updateItem(idx, 'price', e.target.value)}
+                          className="w-24 bg-white rounded-xl px-2 py-2 text-xs font-black border border-gray-200 text-center focus:ring-2 focus:ring-emerald-500" />
+                      </div>
+                    <button type="button" onClick={() => removeItem(idx)} 
+                      className="p-2 text-red-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
+                      <X size={16} strokeWidth={3} />
+                    </button>
+                  </div>
+                </div>
+              )))}
+            </div>
               </div>
               <button className="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
                 Create Purchase Invoice
               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Vendor Modal */}
+      {showQuickVendor && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-xl rounded-[2rem] p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3 className="text-base font-black text-gray-900">Comprehensive Quick Add Vendor</h3>
+              <button onClick={() => setShowQuickVendor(false)} className="text-gray-400"><X size={18} /></button>
+            </div>
+            <form onSubmit={handleQuickVendor} className="grid grid-cols-2 gap-3">
+              <div className="col-span-2 space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor Name *</label>
+                <input required value={quickVendorForm.vendorName} onChange={e => setQuickVendorForm({...quickVendorForm, vendorName: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Mobile *</label>
+                <input required value={quickVendorForm.mobile} onChange={e => setQuickVendorForm({...quickVendorForm, mobile: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Email</label>
+                <input type="email" value={quickVendorForm.email} onChange={e => setQuickVendorForm({...quickVendorForm, email: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Contact Person</label>
+                <input value={quickVendorForm.contactPerson} onChange={e => setQuickVendorForm({...quickVendorForm, contactPerson: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">GST Number</label>
+                <input value={quickVendorForm.gstNumber} onChange={e => setQuickVendorForm({...quickVendorForm, gstNumber: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Credit Days</label>
+                <input type="number" value={quickVendorForm.creditDays} onChange={e => setQuickVendorForm({...quickVendorForm, creditDays: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Bal (₹)</label>
+                <input type="number" value={quickVendorForm.openingBalance} onChange={e => setQuickVendorForm({...quickVendorForm, openingBalance: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
+              </div>
+              <div className="col-span-2 space-y-1">
+                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Address</label>
+                <textarea rows="2" value={quickVendorForm.address} onChange={e => setQuickVendorForm({...quickVendorForm, address: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none resize-none" />
+              </div>
+              <div className="col-span-2 flex gap-3 pt-2">
+                <button type="button" onClick={() => setShowQuickVendor(false)} className="flex-1 py-3.5 text-xs font-black uppercase text-gray-400 hover:text-gray-600 transition-colors">Cancel</button>
+                <button className="flex-[2] bg-emerald-600 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all">Save Vendor</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Product Modal */}
+      {showQuickProduct && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
+            <h3 className="text-base font-black text-gray-900 border-b pb-2">Quick Add Product</h3>
+            <form onSubmit={handleQuickProduct} className="space-y-3">
+              <input placeholder="Product Name" required value={quickProductForm.name} onChange={e => setQuickProductForm({...quickProductForm, name: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none" />
+              <input type="number" placeholder="Purchase Price" value={quickProductForm.price} onChange={e => setQuickProductForm({...quickProductForm, price: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none" />
+              <select required value={quickProductForm.categoryId} onChange={e => setQuickProductForm({...quickProductForm, categoryId: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none">
+                <option value="default">Select Category</option>
+                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              </select>
+              <select required value={quickProductForm.unitId} onChange={e => setQuickProductForm({...quickProductForm, unitId: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none">
+                <option value="">Select Unit</option>
+                {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+              </select>
+              <div className="flex gap-2 pt-2">
+                <button type="button" onClick={() => setShowQuickProduct(false)} className="flex-1 py-3 text-xs font-black uppercase text-gray-400">Cancel</button>
+                <button className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest">Save Item</button>
+              </div>
             </form>
           </div>
         </div>
@@ -1102,7 +1410,11 @@ function StockLedgerTab() {
   const [ledger, setLedger] = useState([]);
   const [loading, setLoading] = useState(true);
   const [typeFilter, setTypeFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
 
+  const filteredLedger = ledger.filter(entry => 
+    !searchQuery || entry.product?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
   useEffect(() => {
     const load = async () => {
       try {
@@ -1125,24 +1437,37 @@ function StockLedgerTab() {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap gap-1.5">
-        {['', 'PURCHASE', 'SALE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'].map(t => (
-          <button key={t} onClick={() => setTypeFilter(t)}
-            className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-              typeFilter === t ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'
-            }`}>{t || 'All Types'}</button>
-        ))}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-wrap gap-1.5">
+          {['', 'PURCHASE', 'SALE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'].map(t => (
+            <button key={t} onClick={() => setTypeFilter(t)}
+              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                typeFilter === t ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-200'
+              }`}>{t || 'All Types'}</button>
+          ))}
+        </div>
+        <div className="relative group min-w-[280px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
+          <input 
+            type="text"
+            placeholder="Search stock movements..."
+            className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-inner"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-24"><Loader2 className="animate-spin text-emerald-600" size={40} /></div>
-      ) : ledger.length === 0 ? (
+      ) : filteredLedger.length === 0 ? (
         <div className="bg-white rounded-3xl p-16 border border-dashed border-gray-200 text-center">
-          <BookOpen size={48} className="mx-auto text-gray-200 mb-3" />
-          <h3 className="text-lg font-black text-gray-300">No Stock Movements</h3>
+          <BookOpen size={48} className="mx-auto text-gray-200 mb-3 opacity-50" />
+          <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">No matching movements</h3>
+          <p className="text-[10px] text-gray-300 mt-1">Try adjusting your search or filters</p>
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
           <table className="w-full text-left">
             <thead>
               <tr className="bg-gray-50/50">
@@ -1154,8 +1479,8 @@ function StockLedgerTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {ledger.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50/30">
+              {filteredLedger.map(entry => (
+                <tr key={entry.id} className="hover:bg-gray-50/30 transition-colors group">
                   <td className="px-4 py-2 text-[11px] font-bold text-gray-600">{format(new Date(entry.createdAt), 'dd MMM hh:mm a')}</td>
                   <td className="px-4 py-2 text-xs font-bold text-gray-900">{entry.product?.name}</td>
                   <td className="px-4 py-2 text-center">
@@ -1190,6 +1515,7 @@ function PaymentsTab({ can }) {
     vendorId: '', amount: '', mode: 'CASH', referenceNo: '',
     paymentDate: format(new Date(), 'yyyy-MM-dd'), invoiceIds: [], remarks: ''
   });
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     const load = async () => {
@@ -1246,12 +1572,20 @@ function PaymentsTab({ can }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h4 className="text-xs font-black uppercase tracking-widest text-gray-400">Vendor Payments</h4>
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 p-3 rounded-3xl border border-gray-100">
+        <div className="relative group flex-1 max-w-md w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
+          <input 
+            placeholder="Search vendor or reference..." 
+            value={search} 
+            onChange={e => setSearch(e.target.value)}
+            className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2.5 text-xs font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300 shadow-sm" 
+          />
+        </div>
         {can('PROCUREMENT', 'UPDATE') && (
           <button onClick={openForm}
-            className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-            <Plus size={16} /> Record Payment
+            className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0">
+            <Plus size={14} strokeWidth={3} /> Record Payment
           </button>
         )}
       </div>
@@ -1265,8 +1599,14 @@ function PaymentsTab({ can }) {
         </div>
       ) : (
         <div className="space-y-3">
-          {payments.map(p => (
-            <div key={p.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 flex items-center justify-between">
+          {payments.filter(p => 
+            !search || 
+            p.vendor?.vendorName.toLowerCase().includes(search.toLowerCase()) ||
+            p.referenceNo?.toLowerCase().includes(search.toLowerCase()) ||
+            p.displayId?.toLowerCase().includes(search.toLowerCase())
+          ).map(p => (
+            <div key={p.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 flex items-center justify-between hover:border-emerald-100 transition-all animate-in fade-in slide-in-from-bottom-2 duration-300 overflow-hidden relative group">
+              <div className="absolute left-0 top-0 bottom-0 w-1 bg-emerald-500 opacity-0 group-hover:opacity-100 transition-opacity" />
               <div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm font-black text-gray-900">₹{p.amount.toLocaleString()}</span>
