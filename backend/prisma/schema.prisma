@@ -47,6 +47,8 @@ model Tenant {
   assetRequests     AssetRequest[]
   customRoles       CustomRole[]
   activityLogs      ActivityLog[] @relation("TenantActivityLogs")
+  storeCashRegisters StoreCashRegister[]
+  storeDeposits      StoreDeposit[]
   // Procurement Relations
   vendors                Vendor[]
   vendorItemMappings     VendorItemMapping[]
@@ -60,6 +62,9 @@ model Tenant {
   vendorLedger           VendorLedger[]
   vendorPayments         VendorPayment[]
   vendorPaymentAllocations VendorPaymentAllocation[]
+  // Damage & Deduction Relations
+  damageEntries          DamageEntry[]
+  damageDeductions       DamageDeduction[]
   // ID Generation
   idSequences            IdSequence[]
 }
@@ -107,12 +112,18 @@ model User {
   assetIssues      AssetIssue[]
   expenses         Expense[]
   cashTransfers    CashTransfer[]
+  storeDeposits    StoreDeposit[]
   dailySummaries   DailyCashSummary[]    @relation("UserDailyCashSummary")
   assetRequests    AssetRequest[]        @relation("UserAssetRequests")
   locationCheckIns LocationCheckIn[]
   stockAudits      StockAudit[]
+  bankDeposits     BankDeposit[]
   actions           ActivityLog[] @relation("UserActions")
   targetActions     ActivityLog[] @relation("TargetActions")
+  damageReports     DamageEntry[] @relation("DamageReporter")
+  damageReviews     DamageEntry[] @relation("DamageReviewer")
+  deductionsReceived DamageDeduction[] @relation("DeductionTarget")
+  deductionsApplied  DamageDeduction[] @relation("DeductionApplier")
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -222,6 +233,7 @@ model Product {
   poItems            PurchaseOrderItem[]
   grnItems           GoodsReceiptItem[]
   purchaseItems      PurchaseInvoiceItem[]
+  damageEntries      DamageEntry[]
   procurementLedger  ProcurementStockLedger[]
 
   @@index([tenantId])
@@ -398,6 +410,7 @@ model Vehicle {
   expenses          Expense[]
   cashTransfers     CashTransfer[]
   stockAudits       StockAudit[]
+  damageEntries     DamageEntry[]
 
   @@unique([tenantId, vehicleNumber])
   @@index([tenantId])
@@ -614,6 +627,54 @@ model DailyCashSummary {
   @@index([storeId])
 }
 
+model StoreCashRegister {
+  id                   String   @id @default(cuid())
+  tenantId             String   @default("VK001")
+  storeId              String
+  date                 String
+  
+  openingCash          Float
+  openingDenominations Json
+  
+  expectedClosingCash  Float?
+  actualClosingCash    Float?
+  closingDifference    Float?
+  closingDenominations Json?
+  
+  status               String   @default("OPEN") // OPEN, CLOSED
+  
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  
+  tenant               Tenant   @relation(fields: [tenantId], references: [id])
+  store                Store    @relation(fields: [storeId], references: [id])
+  
+  @@unique([storeId, date])
+  @@index([tenantId])
+}
+
+model StoreDeposit {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String
+  date            String
+  shift           Int
+  amount          Float
+  denominations   Json
+  description     String
+  userId          String
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  store           Store    @relation(fields: [storeId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+  
+  @@unique([storeId, date, shift])
+  @@index([tenantId])
+}
+
 model Expense {
   id          String             @id @default(cuid())
   displayId   String?            @unique
@@ -805,6 +866,7 @@ enum TransactionType {
   LOAD
   RETURN
   AUDIT
+  DAMAGE
 }
 
 enum PaymentMode {
@@ -1209,6 +1271,8 @@ model Store {
   openingCash      OpeningCash[]
   closingCash      ClosingCash[]
   dailySummaries   DailyCashSummary[]
+  storeCashRegisters StoreCashRegister[]
+  storeDeposits    StoreDeposit[]
   expenses         Expense[]
   cashTransfers    CashTransfer[]
   dailyCoverages   DailyCoverage[]
@@ -1225,6 +1289,7 @@ model Store {
   orderItems         OrderItem[]
   payments           Payment[]
   routes             Route[]
+  bankDeposits       BankDeposit[]
   villages           Village[]
   assetCategories    AssetCategory[]
   incentiveConfigs   VgeIncentiveConfig[]
@@ -1232,6 +1297,9 @@ model Store {
   categories         Category[]
   units              Unit[]
   stockAudits        StockAudit[]
+  // Damage & Deduction store-scoped relations
+  damageEntries          DamageEntry[]
+  damageDeductions       DamageDeduction[]
   // Procurement store-scoped relations
   vendors                Vendor[]
   vendorItemMappings     VendorItemMapping[]
@@ -1324,6 +1392,7 @@ enum StockMovementType {
   TRANSFER_IN
   TRANSFER_OUT
   ADJUSTMENT
+  DAMAGE
 }
 
 enum VendorLedgerType {
@@ -1664,4 +1733,146 @@ model ActivityLog {
   @@index([userId])
   @@index([createdAt])
   @@index([storeId])
+}
+
+model BankDeposit {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String
+  date            String   // YYYY-MM-DD
+  dateTime        DateTime @default(now())
+  amount          Float
+  branchName      String
+  receiptImage    String?
+  depositedBy     String   // Name
+  adminId         String?  // References User (the admin who recorded it)
+  remark          String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  store           Store    @relation(fields: [storeId], references: [id])
+  admin           User?    @relation(fields: [adminId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([date])
+}
+
+// ─── INVENTORY DAMAGE & DEDUCTION MODULE ─────────────────────────────────────
+
+enum DamageType {
+  DAMAGED
+  EXPIRED
+  LEAKAGE
+  LOST
+}
+
+enum DamageStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  UNDER_REVIEW
+}
+
+enum SelfResponsibility {
+  SELF
+  SYSTEM
+  UNKNOWN
+}
+
+enum AdminResponsibility {
+  VGE_RESPONSIBLE
+  NEGLIGENCE
+  INTENTIONAL
+  MIS_HANDLING
+  NOT_RESPONSIBLE
+}
+
+enum DeductionMode {
+  FULL
+  PARTIAL
+  WAIVED
+}
+
+model DamageEntry {
+  id                String              @id @default(cuid())
+  displayId         String?             @unique
+  tenantId          String              @default("VK001")
+  storeId           String?
+  vehicleId         String?
+  reportedById      String              // The VGE/agent who reported
+  productId         String
+  quantity          Int
+  damageType        DamageType
+  selfResponsibility SelfResponsibility @default(UNKNOWN)
+  reason            String
+  images            String[]            // Array of image URLs
+  geoLatitude       Float?
+  geoLongitude      Float?
+  status            DamageStatus        @default(PENDING)
+
+  // Admin evaluation fields
+  adminResponsibility AdminResponsibility?
+  reviewedById      String?             // Admin who reviewed
+  reviewedAt        DateTime?
+  adminRemarks      String?
+
+  // Financial fields
+  purchaseCost      Float?              // Per-unit purchase cost at time of damage
+  totalLoss         Float?              // quantity × purchaseCost
+
+  // Stock adjustment tracking
+  stockAdjusted     Boolean             @default(false)
+
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  tenant            Tenant              @relation(fields: [tenantId], references: [id])
+  store             Store?              @relation(fields: [storeId], references: [id])
+  vehicle           Vehicle?            @relation(fields: [vehicleId], references: [id])
+  reportedBy        User                @relation("DamageReporter", fields: [reportedById], references: [id])
+  reviewedBy        User?               @relation("DamageReviewer", fields: [reviewedById], references: [id])
+  product           Product             @relation(fields: [productId], references: [id])
+  deduction         DamageDeduction?
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([vehicleId])
+  @@index([reportedById])
+  @@index([productId])
+  @@index([status])
+  @@index([createdAt])
+  @@index([damageType])
+}
+
+model DamageDeduction {
+  id                String          @id @default(cuid())
+  tenantId          String          @default("VK001")
+  storeId           String?
+  damageEntryId     String          @unique
+  userId            String          // VGE who is being deducted
+  mode              DeductionMode   @default(FULL)
+  percentage        Float?          @default(100) // For partial deduction
+  deductionAmount   Float           @default(0)
+  month             String          // YYYY-MM format for payroll period
+  status            String          @default("PENDING") // PENDING, APPLIED, DISPUTED, CANCELLED
+  appliedById       String?         // Admin who applied deduction
+  appliedAt         DateTime?
+  remarks           String?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  tenant            Tenant          @relation(fields: [tenantId], references: [id])
+  store             Store?          @relation(fields: [storeId], references: [id])
+  damageEntry       DamageEntry     @relation(fields: [damageEntryId], references: [id])
+  user              User            @relation("DeductionTarget", fields: [userId], references: [id])
+  appliedBy         User?           @relation("DeductionApplier", fields: [appliedById], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([userId])
+  @@index([damageEntryId])
+  @@index([month])
+  @@index([status])
 }

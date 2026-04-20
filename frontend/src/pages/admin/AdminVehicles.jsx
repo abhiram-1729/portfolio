@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, Package } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
@@ -29,10 +29,10 @@ export default function AdminVehicles() {
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
 
-  const [newVehicle, setNewVehicle] = useState({ 
-    vehicleNumber: '', 
-    vehicleName: '', 
-    assignedUserId: '', 
+  const [newVehicle, setNewVehicle] = useState({
+    vehicleNumber: '',
+    vehicleName: '',
+    assignedUserId: '',
     status: true,
     storeId: storeFilterId || currentUser?.storeId || ''
   });
@@ -302,7 +302,7 @@ export default function AdminVehicles() {
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle Info</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Driver Assignment</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Compliance</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle Proofs</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
             </tr>
           </thead>
@@ -415,13 +415,13 @@ export default function AdminVehicles() {
                 className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
               >
                 <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
-                
+
                 <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
                   <Store size={28} strokeWidth={2.5} />
                 </div>
                 <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
                 <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
-                
+
                 <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
                   <span>{groupVehicles.length} Vehicles</span>
                   <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
@@ -431,18 +431,18 @@ export default function AdminVehicles() {
           })}
           {stores.length === 0 && (
             <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
-               <Store size={48} className="mx-auto text-gray-300 mb-4" />
-               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+              <Store size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
             </div>
           )}
         </div>
       );
     }
-    
+
     return (
       <div className="flex flex-col gap-6">
         {renderGroup(paginatedVehicles)}
-        
+
         {totalPages > 1 && (
           <div className="flex items-center justify-between bg-white px-6 py-4 rounded-3xl border border-gray-100 shadow-sm animate-in fade-in slide-in-from-bottom-2">
             <div className="flex items-center gap-2">
@@ -450,7 +450,7 @@ export default function AdminVehicles() {
                 Showing {startIndex + 1}-{Math.min(startIndex + ITEMS_PER_PAGE, filteredVehicles.length)} of {filteredVehicles.length}
               </p>
             </div>
-            
+
             <div className="flex items-center gap-1.5">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
@@ -459,7 +459,7 @@ export default function AdminVehicles() {
               >
                 <ChevronLeft size={16} />
               </button>
-              
+
               <div className="flex items-center gap-1">
                 {[...Array(totalPages)].map((_, i) => {
                   const pageNum = i + 1;
@@ -472,11 +472,10 @@ export default function AdminVehicles() {
                       <button
                         key={pageNum}
                         onClick={() => setCurrentPage(pageNum)}
-                        className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${
-                          currentPage === pageNum
-                            ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
-                            : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
-                        }`}
+                        className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${currentPage === pageNum
+                          ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
+                          : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'
+                          }`}
                       >
                         {pageNum}
                       </button>
@@ -507,265 +506,304 @@ export default function AdminVehicles() {
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-             {isTenantRoute && storeFilterId && (
-               <button 
-                 onClick={() => setSearchParams({})}
-                 className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                 title="Back to All Branches"
-               >
-                 <ArrowLeft size={18} />
-               </button>
-             )}
-             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
-            {isTenantRoute && (
-              <>
-                <span className="text-gray-300">•</span>
-                <select
-                  value={storeFilterId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSearchParams({ storeId: e.target.value });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
-                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.25rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
-                >
-                  <option value="">All Branches</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-          <div className="relative group hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-emerald-500 transition-colors" size={16} />
-            <input 
-              type="text"
-              placeholder="Search by number or driver..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
-            />
-          </div>
-          {can('VEHICLES', 'CREATE') && (
-            <button onClick={() => { 
-              setNewVehicle({ 
-                vehicleNumber: '', 
-                vehicleName: '', 
-                assignedUserId: '', 
-                status: true,
-                storeId: storeFilterId || currentUser?.storeId || '' 
-              });
-              setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
-              setShowAddModal(true); 
-            }}
-              className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
-              <Plus size={24} />
+      {/* ── Full Page Add Vehicle View ───────────────── */}
+      {showAddModal ? (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 min-h-screen">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Register New Vehicle</h2>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mt-1 italic">Fleet Expansion & Asset Registration</p>
+            </div>
+            <button onClick={() => setShowAddModal(false)} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 border border-gray-100 bg-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all hover:border-gray-200">
+              <ArrowLeft size={16} /> Back
             </button>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Search - Only visible on small screens */}
-      <div className="sm:hidden relative group px-1">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-        <input 
-          type="text"
-          placeholder="Search fleet..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
-        />
-      </div>
-
-      {/* Vehicle Data Representation */}
-      <div className="space-y-4">
-        {filteredVehicles.length === 0 ? (
-          <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
-            <Truck size={48} className="mx-auto text-gray-300 mb-2" />
-            <p className="text-gray-500">No vehicles found</p>
           </div>
-        ) : (
-          renderClassifiedVehicles()
-        )}
-      </div>
 
-      {/* ── Add Vehicle Modal ───────────────────────────────── */}
-      {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900">Add New Vehicle</h3>
-              <button onClick={() => setShowAddModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
-            </div>
-
-            <form onSubmit={handleCreateVehicle} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Number <span className="text-red-500">*</span></label>
-                <input type="text" required placeholder="e.g. KA 01 AB 1234"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                  value={newVehicle.vehicleNumber} onChange={(e) => setNewVehicle({ ...newVehicle, vehicleNumber: e.target.value })} />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Name</label>
-                <input type="text" placeholder="e.g. Tata Ace Gold"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                  value={newVehicle.vehicleName} onChange={(e) => setNewVehicle({ ...newVehicle, vehicleName: e.target.value })} />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assign To</label>
-                <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
-                  value={newVehicle.assignedUserId} onChange={(e) => setNewVehicle({ ...newVehicle, assignedUserId: e.target.value })}>
-                  <option value="">-- Unassigned --</option>
-                  {users.filter(u => !u.assignedVehicleId).map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
-
-
-              <div className="space-y-3 pt-1 border-t border-gray-50">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents</p>
-                <DocUpload label="RC Document" fieldKey="rcDocument" existing={null} files={documents} setFiles={setDocuments} />
-                <DocUpload label="Insurance Document" fieldKey="insuranceDocument" existing={null} files={documents} setFiles={setDocuments} />
-                <DocUpload label="Permit Document" fieldKey="permitDocument" existing={null} files={documents} setFiles={setDocuments} />
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <span className="text-sm font-medium text-gray-700">Status Active</span>
-                <button type="button" onClick={() => setNewVehicle({ ...newVehicle, status: !newVehicle.status })}
-                  className={cn('w-12 h-6 rounded-full relative transition-colors', newVehicle.status ? 'bg-emerald-500' : 'bg-gray-300')}>
-                  <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white transition-all', newVehicle.status ? 'right-1' : 'left-1')} />
-                </button>
-              </div>
-
-              <button type="submit" disabled={isSubmitting}
-                className={cn('w-full text-white font-bold py-4 rounded-xl shadow-lg mt-2 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2',
-                  isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 shadow-emerald-600/20 hover:bg-emerald-700')}>
-                {isSubmitting ? <><Loader2 className="animate-spin" size={18} />Adding...</> : 'Add Vehicle'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Edit Vehicle Modal ──────────────────────────────── */}
-      {showEditModal && editingVehicle && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto border border-indigo-50">
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Edit Vehicle</h3>
-                <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Update Details & Documents</p>
-              </div>
-              <button onClick={() => { setShowEditModal(false); setEditingVehicle(null); }}
-                className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
-            </div>
-
-            <form onSubmit={handleUpdateVehicle} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Number <span className="text-red-500">*</span></label>
-                <input type="text" required
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                  value={editingVehicle.vehicleNumber}
-                  onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleNumber: e.target.value })} />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Name</label>
-                <input type="text" placeholder="e.g. Tata Ace Gold"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                  value={editingVehicle.vehicleName || ''}
-                  onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleName: e.target.value })} />
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Driver</label>
-                <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                  value={editingVehicle.assignedUserId || ''}
-                  onChange={(e) => setEditingVehicle({ ...editingVehicle, assignedUserId: e.target.value })}>
-                  <option value="">-- Unassigned --</option>
-                  {users.filter(u => !u.assignedVehicleId || u.assignedVehicleId === editingVehicle.id).map(u => (
-                    <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                  ))}
-                </select>
-              </div>
-
-
-              <div className="space-y-3 pt-1 border-t border-gray-50">
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents (upload to replace)</p>
-                <DocUpload label="RC Document" fieldKey="rcDocument" existing={editingVehicle.rcDocument} files={editDocuments} setFiles={setEditDocuments} />
-                <DocUpload label="Insurance Document" fieldKey="insuranceDocument" existing={editingVehicle.insuranceDocument} files={editDocuments} setFiles={setEditDocuments} />
-                <DocUpload label="Permit Document" fieldKey="permitDocument" existing={editingVehicle.permitDocument} files={editDocuments} setFiles={setEditDocuments} />
-              </div>
-
-              <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                <span className="text-sm font-medium text-gray-700">Status Active</span>
-                <button type="button" onClick={() => setEditingVehicle({ ...editingVehicle, status: !editingVehicle.status })}
-                  className={cn('w-12 h-6 rounded-full relative transition-colors', editingVehicle.status ? 'bg-emerald-500' : 'bg-gray-300')}>
-                  <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white transition-all', editingVehicle.status ? 'right-1' : 'left-1')} />
-                </button>
-              </div>
-
-              <button type="submit" disabled={isSubmitting}
-                className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-70">
-                {isSubmitting ? <><Loader2 className="animate-spin" size={18} />Saving...</> : 'Save Changes'}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Assign Driver Modal ─────────────────────────────── */}
-      {showAssignModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[80vh] flex flex-col">
-            <div className="flex items-center justify-between mb-6 shrink-0">
-              <div>
-                <h3 className="text-xl font-bold text-gray-900">Assign Driver</h3>
-                <p className="text-xs text-gray-400 font-medium tracking-wide">Vehicle: {selectedVehicle?.vehicleNumber}</p>
-              </div>
-              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {users.filter(u => !u.assignedVehicleId).map(user => (
-                <button key={user.id} disabled={isSubmitting} onClick={() => handleAssignDriver(user.id)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
-                      {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
+          <div className="bg-white rounded-[2.5rem] border border-gray-50 shadow-2xl shadow-slate-200/50 overflow-hidden">
+            <div className="p-8 md:p-12">
+              <form onSubmit={handleCreateVehicle} className="max-w-4xl mx-auto space-y-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <Truck size={12} className="text-emerald-500" /> Vehicle Number <span className="text-red-500">*</span>
+                      </label>
+                      <input type="text" required placeholder="e.g. KA 01 AB 1234"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                        value={newVehicle.vehicleNumber} onChange={(e) => setNewVehicle({ ...newVehicle, vehicleNumber: e.target.value })} />
                     </div>
-                    <div className="flex flex-col items-start">
-                      <span className="font-bold text-gray-900 text-sm">{user.name}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <Package size={12} className="text-emerald-500" /> Vehicle Model / Name
+                      </label>
+                      <input type="text" placeholder="e.g. Tata Ace Gold"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                        value={newVehicle.vehicleName} onChange={(e) => setNewVehicle({ ...newVehicle, vehicleName: e.target.value })} />
                     </div>
                   </div>
-                  {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
-                </button>
-              ))}
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <User size={12} className="text-emerald-500" /> Driver Assignment
+                      </label>
+                      <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight appearance-none mt-0.5"
+                        value={newVehicle.assignedUserId} onChange={(e) => setNewVehicle({ ...newVehicle, assignedUserId: e.target.value })}>
+                        <option value="">-- Unassigned --</option>
+                        {users.filter(u => !u.assignedVehicleId).map(u => (
+                          <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl border border-dotted border-slate-200">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Initial Asset Status</span>
+                        <span className={cn("text-xs font-black uppercase mt-1", newVehicle.status ? "text-emerald-600" : "text-rose-400")}>
+                          {newVehicle.status ? "Active Fleet" : "Pending Activation"}
+                        </span>
+                      </div>
+                      <button type="button" onClick={() => setNewVehicle({ ...newVehicle, status: !newVehicle.status })}
+                        className={cn('w-14 h-7 rounded-full relative transition-all shadow-inner', newVehicle.status ? 'bg-emerald-500' : 'bg-slate-300')}>
+                        <div className={cn('absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300', newVehicle.status ? 'right-1.5' : 'left-1.5')} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <FileText size={20} className="text-emerald-500" />
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-800">Compliance & Registration</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <DocUpload label="RC (Certificate)" fieldKey="rcDocument" existing={null} files={documents} setFiles={setDocuments} />
+                    <DocUpload label="Insurance" fieldKey="insuranceDocument" existing={null} files={documents} setFiles={setDocuments} />
+                    <DocUpload label="Permit" fieldKey="permitDocument" existing={null} files={documents} setFiles={setDocuments} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-8 border-t border-slate-100">
+                  <button type="button" onClick={() => setShowAddModal(false)}
+                    className="w-full md:w-auto px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all border border-transparent hover:border-gray-50">
+                    Discard Changes
+                  </button>
+                  <button type="submit" disabled={isSubmitting}
+                    className={cn('w-full md:w-auto px-16 py-5 rounded-2xl shadow-2xl shadow-emerald-500/30 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3',
+                      isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700')}>
+                    {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Processing...</> : <><CheckCircle2 size={18} /> Register Vehicle</>}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
+      ) : (
+        <>
+          {/* Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3">
+                {isTenantRoute && storeFilterId && (
+                  <button
+                    onClick={() => setSearchParams({})}
+                    className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                    title="Back to All Branches"
+                  >
+                    <ArrowLeft size={18} />
+                  </button>
+                )}
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
+              </div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
+                {isTenantRoute && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <select
+                      value={storeFilterId || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSearchParams({ storeId: e.target.value });
+                        } else {
+                          setSearchParams({});
+                        }
+                      }}
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.25rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1rem'
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="relative group hidden sm:block">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-emerald-500 transition-colors" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search by number or driver..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
+                />
+              </div>
+              {can('VEHICLES', 'CREATE') && (
+                <button onClick={() => {
+                  setNewVehicle({
+                    vehicleNumber: '',
+                    vehicleName: '',
+                    assignedUserId: '',
+                    status: true,
+                    storeId: storeFilterId || currentUser?.storeId || ''
+                  });
+                  setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
+                  setShowAddModal(true);
+                }}
+                  className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
+                  <Plus size={24} />
+                </button>
+              )}
+            </div>
+          </div>
+
+
+          {/* Mobile Search - Only visible on small screens */}
+          <div className="sm:hidden relative group px-1">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+            <input
+              type="text"
+              placeholder="Search fleet..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
+            />
+          </div>
+
+          {/* Vehicle Data Representation */}
+          <div className="space-y-4">
+            {filteredVehicles.length === 0 ? (
+              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
+                <Truck size={48} className="mx-auto text-gray-300 mb-2" />
+                <p className="text-gray-500">No vehicles found</p>
+              </div>
+            ) : (
+              renderClassifiedVehicles()
+            )}
+          </div>
+
+
+
+          {/* ── Edit Vehicle Modal ──────────────────────────────── */}
+          {showEditModal && editingVehicle && (
+            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto border border-indigo-50">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Edit Vehicle</h3>
+                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Update Details & Documents</p>
+                  </div>
+                  <button onClick={() => { setShowEditModal(false); setEditingVehicle(null); }}
+                    className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
+                </div>
+
+                <form onSubmit={handleUpdateVehicle} className="space-y-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Number <span className="text-red-500">*</span></label>
+                    <input type="text" required
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={editingVehicle.vehicleNumber}
+                      onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleNumber: e.target.value })} />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Name</label>
+                    <input type="text" placeholder="e.g. Tata Ace Gold"
+                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={editingVehicle.vehicleName || ''}
+                      onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleName: e.target.value })} />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Driver</label>
+                    <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
+                      value={editingVehicle.assignedUserId || ''}
+                      onChange={(e) => setEditingVehicle({ ...editingVehicle, assignedUserId: e.target.value })}>
+                      <option value="">-- Unassigned --</option>
+                      {users.filter(u => !u.assignedVehicleId || u.assignedVehicleId === editingVehicle.id).map(u => (
+                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
+                      ))}
+                    </select>
+                  </div>
+
+
+                  <div className="space-y-3 pt-1 border-t border-gray-50">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents (upload to replace)</p>
+                    <DocUpload label="RC Document" fieldKey="rcDocument" existing={editingVehicle.rcDocument} files={editDocuments} setFiles={setEditDocuments} />
+                    <DocUpload label="Insurance Document" fieldKey="insuranceDocument" existing={editingVehicle.insuranceDocument} files={editDocuments} setFiles={setEditDocuments} />
+                    <DocUpload label="Permit Document" fieldKey="permitDocument" existing={editingVehicle.permitDocument} files={editDocuments} setFiles={setEditDocuments} />
+                  </div>
+
+                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                    <span className="text-sm font-medium text-gray-700">Status Active</span>
+                    <button type="button" onClick={() => setEditingVehicle({ ...editingVehicle, status: !editingVehicle.status })}
+                      className={cn('w-12 h-6 rounded-full relative transition-colors', editingVehicle.status ? 'bg-emerald-500' : 'bg-gray-300')}>
+                      <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white transition-all', editingVehicle.status ? 'right-1' : 'left-1')} />
+                    </button>
+                  </div>
+
+                  <button type="submit" disabled={isSubmitting}
+                    className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-70">
+                    {isSubmitting ? <><Loader2 className="animate-spin" size={18} />Saving...</> : 'Save Changes'}
+                  </button>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ── Assign Driver Modal ─────────────────────────────── */}
+          {showAssignModal && (
+            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[80vh] flex flex-col">
+                <div className="flex items-center justify-between mb-6 shrink-0">
+                  <div>
+                    <h3 className="text-xl font-bold text-gray-900">Assign Driver</h3>
+                    <p className="text-xs text-gray-400 font-medium tracking-wide">Vehicle: {selectedVehicle?.vehicleNumber}</p>
+                  </div>
+                  <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
+                </div>
+
+                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                  {users.filter(u => !u.assignedVehicleId).map(user => (
+                    <button key={user.id} disabled={isSubmitting} onClick={() => handleAssignDriver(user.id)}
+                      className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                          {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
+                        </div>
+                        <div className="flex flex-col items-start">
+                          <span className="font-bold text-gray-900 text-sm">{user.name}</span>
+                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
+                        </div>
+                      </div>
+                      {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

@@ -40,6 +40,7 @@ const PADDING_CONFIG = {
   PINV: 5,
   GRN: 5,
   PAY: 5,
+  DMG: 4,
   default: 3,
 };
 

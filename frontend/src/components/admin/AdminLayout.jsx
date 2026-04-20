@@ -21,7 +21,8 @@ import {
   Store,
   ChevronDown,
   ClipboardList,
-  History as HistoryIcon
+  History as HistoryIcon,
+  AlertTriangle
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -72,6 +73,7 @@ export default function AdminLayout() {
     { to: '/admin/assets', icon: Box, label: 'Assets', module: 'ASSETS' },
     { to: '/admin/expenses', icon: Receipt, label: 'Expenses', module: 'EXPENSES' },
     { to: '/admin/procurement', icon: ClipboardList, label: 'Procurement', module: 'PROCUREMENT' },
+    { to: '/admin/damage', icon: AlertTriangle, label: 'Damage', module: 'INVENTORY' },
     { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
     { to: '/admin/notifications', icon: Bell, label: 'Notifications', module: 'NOTIFICATIONS' },
     { to: '/admin/settings', icon: Settings, label: 'Settings', module: 'SETTINGS' },

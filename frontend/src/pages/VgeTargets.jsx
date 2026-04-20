@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Target, TrendingUp, Award, Zap, ChevronRight, Trophy, Star, Crown, Flame, Gift, Users, ArrowUp, ArrowDown, Minus, Loader2, Calendar, ChevronDown } from 'lucide-react';
+import { Target, TrendingUp, Award, Zap, ChevronRight, Trophy, Star, Crown, Flame, Gift, Users, ArrowUp, ArrowDown, Minus, Loader2, Calendar, ChevronDown, PartyPopper, Medal } from 'lucide-react';
 import { vgeAPI } from '../services/api';
 import toast from 'react-hot-toast';
 import io from 'socket.io-client';
@@ -125,7 +125,9 @@ export default function VgeTargets() {
             </div>
             <div>
               <p className="text-xs font-black uppercase tracking-widest opacity-80">Level Unlocked!</p>
-              <p className="text-2xl font-black tracking-tight">{showLevelAlert} 🎉</p>
+              <p className="text-2xl font-black tracking-tight flex items-center gap-2">
+                {showLevelAlert} <PartyPopper size={28} className="text-white/40" />
+              </p>
             </div>
           </div>
         </div>
@@ -377,7 +379,7 @@ export default function VgeTargets() {
             </div>
           ) : (
             history.map(day => {
-              const dayLevel = LEVEL_CONFIG[day.level || 'NONE'];
+              const dayLevel = getLevelInfo(day.level);
               const DayIcon = dayLevel.icon;
               return (
                 <div key={day.id} className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm">
@@ -423,7 +425,7 @@ export default function VgeTargets() {
             </div>
           ) : (
             leaderboard.map((entry, idx) => {
-              const entryLevel = LEVEL_CONFIG[entry.level || 'NONE'];
+              const entryLevel = getLevelInfo(entry.level);
               const isTop3 = idx < 3;
               const rankColors = ['text-amber-500', 'text-gray-400', 'text-orange-400'];
 
@@ -434,7 +436,7 @@ export default function VgeTargets() {
                   <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
                     isTop3 ? `bg-gradient-to-br ${entryLevel.gradient} text-white` : 'bg-gray-100 text-gray-500'
                   }`}>
-                    {isTop3 ? ['🥇', '🥈', '🥉'][idx] : `#${entry.rank}`}
+                    {isTop3 ? <Medal size={20} /> : `#${entry.rank}`}
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-black text-gray-900 truncate">{entry.name}</p>

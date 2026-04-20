@@ -42,7 +42,9 @@ import TenantStores from './pages/tenant/TenantStores';
 import TenantPrivileges from './pages/tenant/TenantPrivileges';
 import TenantActivityLogs from './pages/tenant/TenantActivityLogs';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
+import AdminDamage from './pages/admin/AdminDamage';
 import AgentActivityLogs from './pages/AgentActivityLogs';
+import ReportDamage from './pages/ReportDamage';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -141,6 +143,7 @@ export default function App() {
           <Route path="my-assets" element={<AgentAssets />} />
           <Route path="wallet" element={<CashWallet />} />
           <Route path="activity-logs" element={<AgentActivityLogs />} />
+          <Route path="report-damage" element={<ReportDamage />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -165,6 +168,7 @@ export default function App() {
           <Route path="procurement" element={<AdminProcurement />} />
           <Route path="finance-reports" element={<AdminFinanceReports />} />
           <Route path="activity-logs" element={<AdminActivityLogs />} />
+          <Route path="damage" element={<AdminDamage />} />
         </Route>
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>

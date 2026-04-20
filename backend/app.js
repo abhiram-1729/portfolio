@@ -19,6 +19,7 @@ import storeRoutes from './routes/storeRoutes.js';
 import procurementRoutes from './routes/procurementRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
+import damageRoutes from './routes/damageRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -34,7 +35,7 @@ const corsOptions = {
     callback(null, origin || true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   optionsSuccessStatus: 204 // Some legacy browsers (IE11, various SmartTVs) choke on 200
 };
@@ -65,6 +66,7 @@ apiRouter.use('/tenant/stores', storeRoutes);
 apiRouter.use('/procurement', procurementRoutes);
 apiRouter.use('/admin/roles', roleRoutes);
 apiRouter.use('/activities', activityRoutes);
+apiRouter.use('/damage', damageRoutes);
 
 // Mount the apiRouter both WITH and WITHOUT /api prefix
 // This ensures compatibility with proxies that might or might not strip the prefix

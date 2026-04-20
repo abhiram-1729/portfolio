@@ -51,7 +51,7 @@ export default function TodayPlan() {
     setMarkingSlot(slot);
     try {
       await routeService.markCoverage(slot);
-      toast.success(`${slot === 'MORNING' ? '🌅 Morning' : '🌆 Evening'} coverage marked!`);
+      toast.success(`${slot === 'MORNING' ? 'Morning' : 'Evening'} coverage marked!`);
       fetchStatus();
     } catch (err) {
       toast.error(err.response?.data?.message || `Failed to mark ${slot.toLowerCase()}`);
@@ -245,7 +245,7 @@ export default function TodayPlan() {
                   <div>
                     <h5 className="font-bold text-gray-900 text-sm">Morning — Part A</h5>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {coverage.morningDone ? '✅ Completed' : 'Before 2:00 PM'}
+                      {coverage.morningDone ? 'Completed' : 'Before 2:00 PM'}
                     </p>
                   </div>
                 </div>
@@ -284,7 +284,7 @@ export default function TodayPlan() {
                   <div>
                     <h5 className="font-bold text-gray-900 text-sm">Evening — Part B</h5>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {coverage.eveningDone ? '✅ Completed' : 'After 2:00 PM'}
+                      {coverage.eveningDone ? 'Completed' : 'After 2:00 PM'}
                     </p>
                   </div>
                 </div>

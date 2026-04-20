@@ -577,6 +577,21 @@ export const getAdminCashSummary = async (req, res, next) => {
             where: { date: dateString, tenantId: req.user.tenantId, vehicleId: { in: vehicles.map(v => v.id) } }
         });
 
+        const routeAssignments = await prisma.routeAssignment.findMany({
+            where: { 
+                tenantId: req.user.tenantId, 
+                vehicleId: { in: vehicles.map(v => v.id) },
+                status: true
+            },
+            include: { 
+                route: {
+                    include: { cycles: true }
+                } 
+            }
+        });
+
+        const dayName = format(new Date(dateString), 'EEEE').toUpperCase(); // e.g., 'MONDAY'
+
         const startOfDayDate = new Date(dateString);
         startOfDayDate.setHours(0, 0, 0, 0);
         const endOfDayDate = new Date(dateString);
@@ -611,6 +626,9 @@ export const getAdminCashSummary = async (req, res, next) => {
             const closings = closingCashRecords.filter(c => c.vehicleId === v.id);
             const orders = orderAggregates.filter(o => o.vehicleId === v.id);
             const expenses = expenseAggregates.filter(e => e.vehicleId === v.id);
+            const ra = routeAssignments.find(ra => ra.vehicleId === v.id);
+            const todayCycle = ra?.route?.cycles?.find(c => c.dayOfWeek === dayName);
+            const villageName = todayCycle?.villageName || ra?.route?.routeName || 'Unspecified';
 
             const totalRealtimeCashSales = orders.filter(o => o.paymentMode === 'CASH').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
             const totalRealtimeUpiSales = orders.filter(o => o.paymentMode === 'UPI').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
@@ -664,6 +682,7 @@ export const getAdminCashSummary = async (req, res, next) => {
                 date: dateString,
                 tenantId: req.user.tenantId,
                 storeId: v.storeId,
+                villageName: villageName,
                 openingCash: s ? s.openingCash : 0,
                 cashSales: s ? s.cashSales : 0,
                 upiSales: s ? s.upiSales : 0,
@@ -710,6 +729,51 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         if (!vehicleId || !date || (!isNoService && openingCash === undefined)) {
             res.status(400);
             throw new Error('Vehicle ID, Date, and Opening Cash are required');
+        }
+
+        if (!isNoService) {
+            // Validate against Store Safe
+            const storeId = req.user.storeId;
+            if (!storeId) {
+                res.status(400);
+                throw new Error('Admin must belong to a Store to manage cash.');
+            }
+
+            const storeRegister = await prisma.storeCashRegister.findUnique({
+                where: { storeId_date: { storeId, date } }
+            });
+
+            if (!storeRegister) {
+                res.status(400);
+                throw new Error('Please initialize the Store Cash Safe for today before assigning floats.');
+            }
+
+            // Calculate live available
+            const allOpening = await prisma.openingCash.aggregate({
+                where: { storeId, date },
+                _sum: { totalOpeningCash: true }
+            });
+
+            const allDeposits = await prisma.storeDeposit.aggregate({
+                where: { storeId, date },
+                _sum: { amount: true }
+            });
+
+            const assignedOut = allOpening._sum.totalOpeningCash || 0;
+            const receivedIn = allDeposits._sum.amount || 0;
+            const liveAvailable = storeRegister.openingCash - assignedOut + receivedIn;
+
+            // Existing float for this shift
+            const existing = await prisma.openingCash.findUnique({
+                where: { vehicleId_date_shift: { vehicleId, date, shift } }
+            });
+            const existingFloat = existing ? existing.totalOpeningCash : 0;
+            const additionalNeeded = openingCash - existingFloat;
+
+            if (additionalNeeded > liveAvailable) {
+                res.status(400);
+                throw new Error(`Insufficient Store Cash. Available: ₹${liveAvailable.toFixed(2)}`);
+            }
         }
 
         // Update the specific shift's OpeningCash record
@@ -786,6 +850,42 @@ export const adminUpdateReconciliation = async (req, res, next) => {
 
         // Recalculate daily summary
         const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
+
+        // SYNC: Update the Store Deposit if it already exists for this shift
+        const storeId = req.user.storeId;
+        const deposit = await prisma.storeDeposit.findUnique({
+            where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
+        });
+
+        if (deposit) {
+            const allClosings = await prisma.closingCash.findMany({
+                where: { 
+                    date, 
+                    shift: parseInt(shift),
+                    vehicle: { storeId: storeId }
+                }
+            });
+
+            const totalAmount = allClosings.reduce((sum, c) => sum + (c.actualCash || 0), 0);
+            const totalDenominations = { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 };
+            
+            allClosings.forEach(c => {
+                if (c.denominations) {
+                    Object.entries(c.denominations).forEach(([denom, count]) => {
+                        totalDenominations[denom] = (totalDenominations[denom] || 0) + (parseInt(count) || 0);
+                    });
+                }
+            });
+
+            await prisma.storeDeposit.update({
+                where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } },
+                data: {
+                    amount: totalAmount,
+                    denominations: totalDenominations,
+                    description: `Auto-synced: Consolidated Deposit for Shift ${shift} (${allClosings.length} Agents)`
+                }
+            });
+        }
 
         const finalSummary = await prisma.dailyCashSummary.findUnique({
             where: { 
@@ -1101,6 +1201,42 @@ export const adminReviewClosingCash = async (req, res, next) => {
         // Recalculate daily summary
         await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
 
+        // SYNC: Update the Store Deposit if it already exists for this shift
+        const storeId = req.user.storeId;
+        const deposit = await prisma.storeDeposit.findUnique({
+            where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
+        });
+
+        if (deposit) {
+            const allClosings = await prisma.closingCash.findMany({
+                where: { 
+                    date, 
+                    shift: parseInt(shift),
+                    vehicle: { storeId: storeId } // More robust: link via vehicle's store
+                }
+            });
+
+            const totalAmount = allClosings.reduce((sum, c) => sum + (c.actualCash || 0), 0);
+            const totalDenominations = { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 };
+            
+            allClosings.forEach(c => {
+                if (c.denominations) {
+                    Object.entries(c.denominations).forEach(([denom, count]) => {
+                        totalDenominations[denom] = (totalDenominations[denom] || 0) + (parseInt(count) || 0);
+                    });
+                }
+            });
+
+            await prisma.storeDeposit.update({
+                where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } },
+                data: {
+                    amount: totalAmount,
+                    denominations: totalDenominations,
+                    description: `Auto-synced: Consolidated Deposit for Shift ${shift} (${allClosings.length} Agents)`
+                }
+            });
+        }
+
         res.json(closingCash);
 
         // Notify the agent who submitted the cash
@@ -1112,6 +1248,361 @@ export const adminReviewClosingCash = async (req, res, next) => {
             priority: status === 'REJECTED' ? 'high' : 'medium',
             metadata: { vehicleId, date, shift, status }
         });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get the current day's Store Cash Register summary with live bounds
+// @route   GET /api/cash/store-register/:date
+// @access  Admin
+export const getStoreCashRegister = async (req, res, next) => {
+    try {
+        const { date } = req.params;
+        const storeId = req.user.storeId;
+
+        if (!storeId) {
+            res.status(400);
+            throw new Error('Admin must belong to a Store to view cash register.');
+        }
+
+        const storeRegister = await prisma.storeCashRegister.findUnique({
+            where: { storeId_date: { storeId, date } }
+        });
+
+        // Compute live metrics regardless of whether store is open so frontend can show 0
+        const allOpening = await prisma.openingCash.aggregate({
+            where: { storeId, date },
+            _sum: { totalOpeningCash: true }
+        });
+
+        const allDeposits = await prisma.storeDeposit.aggregate({
+            where: { storeId, date },
+            _sum: { amount: true }
+        });
+
+        const allDepositsRecords = await prisma.storeDeposit.findMany({
+            where: { storeId, date },
+            orderBy: { shift: 'asc' }
+        });
+
+        const allBankDeposits = await prisma.bankDeposit.aggregate({
+            where: { storeId, date },
+            _sum: { amount: true }
+        });
+
+        const assignedOut = allOpening._sum.totalOpeningCash || 0;
+        const receivedIn = allDeposits._sum.amount || 0;
+        const bankTransferred = allBankDeposits._sum.amount || 0;
+        
+        let liveExpected = 0;
+        let liveAvailable = 0;
+        if (storeRegister) {
+            liveExpected = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+            liveAvailable = liveExpected; // same math
+        }
+
+        const allBankDepositsRecords = await prisma.bankDeposit.findMany({
+            where: { storeId, date },
+            include: { admin: { select: { name: true, mobile: true } } }
+        });
+
+        const shiftCollectionsVal = await prisma.closingCash.groupBy({
+            by: ['shift'],
+            where: { 
+                date,
+                vehicle: { storeId }
+            },
+            _sum: { actualCash: true }
+        });
+
+        res.json({
+            storeRegister,
+            storeDeposits: allDepositsRecords,
+            bankDeposits: allBankDepositsRecords,
+            shiftCollections: shiftCollectionsVal,
+            liveMetrics: {
+                assignedOut,
+                receivedIn,
+                bankTransferred,
+                liveExpected,
+                liveAvailable
+            }
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Open the Store Cash Register for the day
+// @route   POST /api/cash/store-register/open
+// @access  Admin
+export const openStoreCashRegister = async (req, res, next) => {
+    try {
+        const { date, openingCash, denominations } = req.body;
+        const storeId = req.user.storeId;
+
+        if (!storeId || !date || openingCash === undefined || !denominations) {
+            res.status(400);
+            throw new Error('Store ID, Date, Opening Cash, and Denominations are required');
+        }
+
+        const newRegister = await prisma.storeCashRegister.create({
+            data: {
+                tenantId: req.user.tenantId,
+                storeId,
+                date,
+                openingCash,
+                openingDenominations: denominations,
+                status: 'OPEN'
+            }
+        });
+
+        res.json(newRegister);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            res.status(400);
+            return next(new Error('Store Cash Register is already open for this date'));
+        }
+        next(error);
+    }
+};
+
+// @desc    Close the Store Cash Register for the day
+// @route   POST /api/cash/store-register/close
+// @access  Admin
+export const closeStoreCashRegister = async (req, res, next) => {
+    try {
+        const { date, actualClosingCash, denominations } = req.body;
+        const storeId = req.user.storeId;
+
+        if (!storeId || !date || actualClosingCash === undefined || !denominations) {
+            res.status(400);
+            throw new Error('Store ID, Date, Closing Cash, and Denominations are required');
+        }
+
+        // Calculate live expected physically first
+        const storeRegister = await prisma.storeCashRegister.findUnique({
+            where: { storeId_date: { storeId, date } }
+        });
+
+        if (!storeRegister) {
+            res.status(404);
+            throw new Error('Store Cash Register not found for this date');
+        }
+
+        if (storeRegister.status === 'CLOSED') {
+            res.status(400);
+            throw new Error('Store Cash Register is already closed for this date');
+        }
+
+        const allOpening = await prisma.openingCash.aggregate({
+            where: { storeId, date },
+            _sum: { totalOpeningCash: true }
+        });
+
+        const allDeposits = await prisma.storeDeposit.aggregate({
+            where: { storeId, date },
+            _sum: { amount: true }
+        });
+
+        const allBankDeposits = await prisma.bankDeposit.aggregate({
+            where: { storeId, date },
+            _sum: { amount: true }
+        });
+
+        const assignedOut = allOpening._sum.totalOpeningCash || 0;
+        const receivedIn = allDeposits._sum.amount || 0;
+        const bankTransferred = allBankDeposits._sum.amount || 0;
+        const liveExpected = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+
+        const closingDifference = actualClosingCash - liveExpected;
+
+        const closedRegister = await prisma.storeCashRegister.update({
+            where: { storeId_date: { storeId, date } },
+            data: {
+                expectedClosingCash: liveExpected,
+                actualClosingCash,
+                closingDifference,
+                closingDenominations: denominations,
+                status: 'CLOSED'
+            }
+        });
+
+        res.json(closedRegister);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Create a store deposit per shift
+// @route   POST /api/cash/store-register/deposit
+// @access  Admin
+export const createStoreDeposit = async (req, res, next) => {
+    try {
+        const { date, shift, amount, denominations, description } = req.body;
+        const storeId = req.user.storeId;
+
+        if (!storeId || !date || !shift || amount === undefined || !denominations || !description) {
+            res.status(400);
+            throw new Error('All fields are required (date, shift, amount, denominations, description)');
+        }
+
+        const deposit = await prisma.storeDeposit.create({
+            data: {
+                tenantId: req.user.tenantId,
+                storeId,
+                date,
+                shift: parseInt(shift),
+                amount,
+                denominations,
+                description,
+                userId: req.user.id
+            }
+        });
+
+        res.json(deposit);
+    } catch (error) {
+        if (error.code === 'P2002') {
+            res.status(400);
+            return next(new Error(`A deposit for shift ${req.body.shift} has already been submitted for this date.`));
+        }
+        next(error);
+    }
+};
+
+// @desc    Admin: Update Store Cash Register (Opening Cash or reset status)
+// @route   PATCH /api/cash/store-register/update
+// @access  Admin
+export const updateStoreCashRegister = async (req, res, next) => {
+    try {
+        const { date, openingCash, denominations, status, actualClosingCash, isClosingUpdate } = req.body;
+        const storeId = req.user.storeId;
+
+        if (!storeId || !date) {
+            res.status(400);
+            throw new Error('Store ID and Date are required');
+        }
+
+        const existing = await prisma.storeCashRegister.findUnique({
+            where: { storeId_date: { storeId, date } }
+        });
+
+        if (!existing) {
+            res.status(404);
+            throw new Error('Store Register not found');
+        }
+
+        const updateData = {};
+        if (openingCash !== undefined) updateData.openingCash = openingCash;
+        if (denominations) updateData.openingDenominations = denominations;
+        if (status) updateData.status = status;
+
+        if (isClosingUpdate && actualClosingCash !== undefined) {
+            updateData.actualClosingCash = actualClosingCash;
+            updateData.closingDenominations = denominations; // reuse denominations field if provided
+            updateData.closingDifference = actualClosingCash - existing.expectedClosingCash;
+        }
+
+        const updated = await prisma.storeCashRegister.update({
+            where: { storeId_date: { storeId, date } },
+            data: updateData
+        });
+
+        res.json(updated);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Update a specific Store Deposit
+// @route   PATCH /api/cash/store-register/deposit/:id
+// @access  Admin
+export const updateStoreDeposit = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        const { amount, denominations, description } = req.body;
+        const tenantId = req.user.tenantId;
+
+        if (!id) {
+            res.status(400);
+            throw new Error('Deposit ID is required');
+        }
+
+        const updated = await prisma.storeDeposit.update({
+            where: { id, tenantId },
+            data: {
+                amount: parseFloat(amount),
+                denominations: denominations || {},
+                description
+            }
+        });
+
+        res.json(updated);
+    } catch (error) {
+        console.error('[updateStoreDeposit Error]:', error);
+        next(error);
+    }
+};
+
+// @desc    Admin: Delete a specific Store Deposit
+// @route   DELETE /api/cash/store-register/deposit/:id
+// @access  Admin
+export const deleteStoreDeposit = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+
+        await prisma.storeDeposit.delete({
+            where: { id }
+        });
+
+        res.json({ message: 'Deposit deleted successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+// @desc    Admin: Add a Bank Deposit
+// @route   POST /api/cash/store-register/bank-deposit
+// @access  Admin
+export const adminAddBankDeposit = async (req, res, next) => {
+    try {
+        const { date, amount, branchName, receiptImage, depositedBy, adminId, remark } = req.body;
+        const storeId = req.user.storeId;
+
+        if (!storeId || !date || !amount || !branchName || !depositedBy) {
+            res.status(400);
+            throw new Error('All mandatory fields are required (Amount, Branch, Deposited By)');
+        }
+
+        const bankDeposit = await prisma.bankDeposit.create({
+            data: {
+                tenantId: req.user.tenantId,
+                storeId,
+                date,
+                amount,
+                branchName,
+                receiptImage,
+                depositedBy,
+                adminId,
+                remark
+            }
+        });
+
+        res.json(bankDeposit);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Admin: Delete a Bank Deposit
+// @route   DELETE /api/cash/store-register/bank-deposit/:id
+// @access  Admin
+export const deleteBankDeposit = async (req, res, next) => {
+    try {
+        const { id } = req.params;
+        await prisma.bankDeposit.delete({ where: { id } });
+        res.json({ message: 'Bank deposit deleted successfully' });
     } catch (error) {
         next(error);
     }
