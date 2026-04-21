@@ -1267,7 +1267,24 @@ export const getStoreCashRegister = async (req, res, next) => {
         }
 
         const storeRegister = await prisma.storeCashRegister.findUnique({
-            where: { storeId_date: { storeId, date } }
+            where: { storeId_date: { storeId, date } },
+            include: {
+                openedBy: { select: { name: true } },
+                closedBy: { select: { name: true } }
+            }
+        });
+
+        // 🆕 Fetch previous day's closing if today is not initialized or for carry-over check
+        const previousRegister = await prisma.storeCashRegister.findFirst({
+            where: { 
+                storeId, 
+                date: { lt: date },
+                status: 'CLOSED' 
+            },
+            orderBy: { date: 'desc' },
+            include: {
+                closedBy: { select: { name: true } }
+            }
         });
 
         // Compute live metrics regardless of whether store is open so frontend can show 0
@@ -1291,21 +1308,40 @@ export const getStoreCashRegister = async (req, res, next) => {
             _sum: { amount: true }
         });
 
-        const assignedOut = allOpening._sum.totalOpeningCash || 0;
-        const receivedIn = allDeposits._sum.amount || 0;
-        const bankTransferred = allBankDeposits._sum.amount || 0;
-        
-        let liveExpected = 0;
-        let liveAvailable = 0;
-        if (storeRegister) {
-            liveExpected = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
-            liveAvailable = liveExpected; // same math
-        }
+
 
         const allBankDepositsRecords = await prisma.bankDeposit.findMany({
             where: { storeId, date },
             include: { admin: { select: { name: true, mobile: true } } }
         });
+
+        // Safe Movements
+        const allSafeDeposits = await prisma.safeTransaction.aggregate({
+            where: { storeId, date, type: 'DEPOSIT' },
+            _sum: { amount: true }
+        });
+
+        const allSafeWithdrawals = await prisma.safeTransaction.aggregate({
+            where: { storeId, date, type: 'WITHDRAW' },
+            _sum: { amount: true }
+        });
+
+        const movedToSafe = allSafeDeposits._sum.amount || 0;
+        const withdrawnFromSafe = allSafeWithdrawals._sum.amount || 0;
+
+        const assignedOut = allOpening._sum.totalOpeningCash || 0;
+        const receivedIn = allDeposits._sum.amount || 0;
+        const bankTransferred = allBankDeposits._sum.amount || 0;
+        
+        let totalStoreCash = 0;
+        let safeBalance = 0;
+        let availableCash = 0;
+        
+        if (storeRegister) {
+            totalStoreCash = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+            safeBalance = movedToSafe - withdrawnFromSafe - bankTransferred;
+            availableCash = totalStoreCash - safeBalance;
+        }
 
         const shiftCollectionsVal = await prisma.closingCash.groupBy({
             by: ['shift'],
@@ -1318,6 +1354,7 @@ export const getStoreCashRegister = async (req, res, next) => {
 
         res.json({
             storeRegister,
+            previousRegister,
             storeDeposits: allDepositsRecords,
             bankDeposits: allBankDepositsRecords,
             shiftCollections: shiftCollectionsVal,
@@ -1325,11 +1362,287 @@ export const getStoreCashRegister = async (req, res, next) => {
                 assignedOut,
                 receivedIn,
                 bankTransferred,
-                liveExpected,
-                liveAvailable
+                totalStoreCash: parseFloat(totalStoreCash.toFixed(2)),
+                safeBalance: parseFloat(safeBalance.toFixed(2)),
+                availableCash: parseFloat(availableCash.toFixed(2)),
+                liveExpected: parseFloat(totalStoreCash.toFixed(2)) // backward compatibility
             }
         });
 
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Get computed audit ledger for store cash register
+// @route   GET /api/cash/store-register/:date/ledger
+// @access  Admin
+export const getStoreCashLedger = async (req, res, next) => {
+    try {
+        const { date } = req.params;
+        const storeId = req.user.storeId;
+
+        if (!storeId) {
+            res.status(400);
+            throw new Error('Admin must belong to a Store.');
+        }
+
+        const storeRegister = await prisma.storeCashRegister.findUnique({
+            where: { storeId_date: { storeId, date } },
+            include: { 
+                openedBy: { select: { name: true } },
+                closedBy: { select: { name: true } }
+            }
+        });
+
+        if (!storeRegister) {
+            return res.json({
+                ledger: [],
+                summary: {
+                    openingCash: 0, totalOutflow: 0, totalInflow: 0,
+                    totalBankTransfer: 0, currentBalance: 0,
+                    status: 'NOT_INITIALIZED', entryCount: 0
+                }
+            });
+        }
+
+        let runningBalance = 0;
+
+        // Fetch all related records for this store & date
+        const agentOutflows = await prisma.openingCash.findMany({
+            where: { storeId, date },
+            include: {
+                vehicle: {
+                    select: {
+                        vehicleNumber: true,
+                        vehicleName: true,
+                        assignedUsers: { select: { name: true, role: true } }
+                    }
+                },
+                user: { select: { name: true } }
+            },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        const agentInflows = await prisma.storeDeposit.findMany({
+            where: { storeId, date },
+            include: { user: { select: { name: true } } },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        const bankTransfers = await prisma.bankDeposit.findMany({
+            where: { storeId, date },
+            include: { admin: { select: { name: true } } },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        const safeMovements = await prisma.safeTransaction.findMany({
+            where: { storeId, date },
+            include: { user: { select: { name: true } } },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        // Build ledger entries
+        const entries = [];
+
+        // 1. Opening entry
+        entries.push({
+            id: storeRegister.id,
+            type: 'OPENING',
+            label: 'Store Safe Initialized',
+            amount: storeRegister.openingCash,
+            direction: 'IN',
+            timestamp: storeRegister.createdAt,
+            userName: storeRegister.openedBy?.name || 'Admin',
+            reference: null,
+            referenceName: 'Daily Opening Cash',
+            metadata: { denominations: storeRegister.openingDenominations }
+        });
+
+        // 2. Agent outflows (float given to agents)
+        agentOutflows.forEach(o => {
+            if (o.totalOpeningCash <= 0 && !o.isNoService) return;
+            const agentName = o.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT')?.name || 'Unknown Agent';
+            entries.push({
+                id: o.id,
+                type: 'AGENT_OUTFLOW',
+                label: `Float Assigned → ${agentName}`,
+                amount: o.totalOpeningCash,
+                direction: 'OUT',
+                timestamp: o.createdAt,
+                userName: o.user?.name || 'Admin',
+                reference: o.vehicleId,
+                referenceName: `${agentName} • ${o.vehicle?.vehicleNumber || ''} • Shift ${o.shift}`,
+                metadata: { shift: o.shift, denominations: o.denominations, vehicleNumber: o.vehicle?.vehicleNumber, isNoService: o.isNoService }
+            });
+        });
+
+        // 3. Agent inflows (shift cash deposited into safe)
+        agentInflows.forEach(d => {
+            entries.push({
+                id: d.id,
+                type: 'AGENT_INFLOW',
+                label: `Shift ${d.shift} Cash Deposited`,
+                amount: d.amount,
+                direction: 'IN',
+                timestamp: d.createdAt,
+                userName: d.user?.name || 'Admin',
+                reference: d.id,
+                referenceName: d.description || `Shift ${d.shift} Collection`,
+                metadata: { shift: d.shift, denominations: d.denominations }
+            });
+        });
+
+        // 4. Bank transfers (cash moved from safe to bank)
+        bankTransfers.forEach(b => {
+            entries.push({
+                id: b.id,
+                type: 'BANK_TRANSFER',
+                label: `Bank Transfer → ${b.branchName}`,
+                amount: b.amount,
+                direction: 'OUT',
+                timestamp: b.createdAt || b.dateTime,
+                userName: b.admin?.name || b.depositedBy,
+                reference: b.id,
+                referenceName: `${b.branchName} • ${b.depositedBy}`,
+                metadata: { branchName: b.branchName, receiptImage: b.receiptImage, remark: b.remark }
+            });
+        });
+
+        // 5. Safe movements (Available <-> Safe)
+        safeMovements.forEach(s => {
+            entries.push({
+                id: s.id,
+                type: 'SAFE_MOVEMENT',
+                label: s.type === 'DEPOSIT' ? 'Moved to Safe' : 'Moved to Available',
+                amount: s.amount,
+                direction: s.type === 'DEPOSIT' ? 'OUT_TO_SAFE' : 'IN_FROM_SAFE',
+                timestamp: s.createdAt,
+                userName: s.user?.name || 'Admin',
+                reference: s.id,
+                referenceName: s.description || (s.type === 'DEPOSIT' ? 'Counter → Safe' : 'Safe → Counter'),
+                metadata: { type: s.type, denominations: s.denominations, description: s.description }
+            });
+        });
+
+        // Sort all entries chronologically
+        entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
+
+        // Compute running balance (before/after for each entry)
+        const ledger = entries.map(entry => {
+            const before = runningBalance;
+            if (['IN', 'IN_FROM_SAFE'].includes(entry.direction)) {
+                // For Total Store Balance, movements between Safe and Counter are internal
+                // But wait, direction IN/OUT should represent Total Store Cash impact
+                // SAFE_MOVEMENT doesn't change Total Cash.
+                if (entry.type !== 'SAFE_MOVEMENT') {
+                    runningBalance += (entry.direction === 'IN' ? entry.amount : -entry.amount);
+                }
+            } else if (['OUT', 'OUT_TO_SAFE'].includes(entry.direction)) {
+                if (entry.type !== 'SAFE_MOVEMENT') {
+                    runningBalance -= entry.amount;
+                }
+            } 
+            // Wait, this is getting complex. Let's simplify:
+            // Total Cash = Opening - AgentOut + AgentIn - BankTransfer
+            // Safe Cash = (SafeMove Deposit) - (SafeMove Withdraw) - (BankTransfer)
+            // Available = Total - Safe
+            
+            // Let's just track Total Store Balance in the ledger list first
+            if (entry.type !== 'SAFE_MOVEMENT') {
+                if (entry.direction === 'IN') runningBalance += entry.amount;
+                else if (entry.direction === 'OUT') runningBalance -= entry.amount;
+            }
+            
+            return {
+                ...entry,
+                balanceBefore: parseFloat(before.toFixed(2)),
+                balanceAfter: parseFloat(runningBalance.toFixed(2))
+            };
+        });
+
+        // Closing entry if store is closed
+        if (storeRegister.status === 'CLOSED' && storeRegister.actualClosingCash !== null) {
+            ledger.push({
+                id: `${storeRegister.id}-closing`,
+                type: 'CLOSING',
+                label: 'Store Safe Closed',
+                amount: storeRegister.actualClosingCash,
+                direction: 'NEUTRAL',
+                timestamp: storeRegister.updatedAt,
+                userName: storeRegister.closedBy?.name || 'Admin',
+                reference: null,
+                referenceName: `Physical: ₹${storeRegister.actualClosingCash?.toFixed(2)} | Variance: ₹${storeRegister.closingDifference?.toFixed(2)}`,
+                metadata: {
+                    expectedClosingCash: storeRegister.expectedClosingCash,
+                    actualClosingCash: storeRegister.actualClosingCash,
+                    closingDifference: storeRegister.closingDifference,
+                    denominations: storeRegister.closingDenominations
+                },
+                balanceBefore: parseFloat(runningBalance.toFixed(2)),
+                balanceAfter: parseFloat(runningBalance.toFixed(2))
+            });
+        }
+
+        const totalOutflow = entries.filter(e => e.type === 'AGENT_OUTFLOW').reduce((s, e) => s + e.amount, 0);
+        const totalInflow = entries.filter(e => e.type === 'AGENT_INFLOW').reduce((s, e) => s + e.amount, 0);
+        const totalBank = entries.filter(e => e.type === 'BANK_TRANSFER').reduce((s, e) => s + e.amount, 0);
+        
+        // Calculate Safe Cash specifically
+        const totalMovedToSafe = safeMovements.filter(s => s.type === 'DEPOSIT').reduce((s, e) => s + e.amount, 0);
+        const totalWithdrawnFromSafe = safeMovements.filter(s => s.type === 'WITHDRAW').reduce((s, e) => s + e.amount, 0);
+        
+        const safeBalance = totalMovedToSafe - totalWithdrawnFromSafe - totalBank;
+        const totalStoreCash = parseFloat(runningBalance.toFixed(2));
+        const availableCash = totalStoreCash - safeBalance;
+
+        res.json({
+            ledger,
+            summary: {
+                openingCash: storeRegister.openingCash,
+                totalOutflow: parseFloat(totalOutflow.toFixed(2)),
+                totalInflow: parseFloat(totalInflow.toFixed(2)),
+                totalBankTransfer: parseFloat(totalBank.toFixed(2)),
+                totalStoreCash,
+                safeBalance: parseFloat(safeBalance.toFixed(2)),
+                availableCash: parseFloat(availableCash.toFixed(2)),
+                currentBalance: totalStoreCash, // Keeping for backward compatibility
+                status: storeRegister.status,
+                entryCount: ledger.length
+            }
+        });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    Add movement between Available Cash and Safe Cash
+// @route   POST /api/cash/safe-movement
+// @access  Admin
+export const createSafeTransaction = async (req, res, next) => {
+    try {
+        const { date, amount, type, denominations, description } = req.body;
+        const storeId = req.user.storeId;
+
+        if (!storeId || !date || !amount || !type) {
+            res.status(400);
+            throw new Error('Store ID, Date, Amount, and Type are required');
+        }
+
+        const movement = await prisma.safeTransaction.create({
+            data: {
+                tenantId: req.user.tenantId,
+                storeId,
+                date,
+                amount,
+                type, // DEPOSIT or WITHDRAW
+                denominations,
+                description,
+                userId: req.user.id
+            }
+        });
+
+        res.json(movement);
     } catch (error) {
         next(error);
     }
@@ -1355,6 +1668,7 @@ export const openStoreCashRegister = async (req, res, next) => {
                 date,
                 openingCash,
                 openingDenominations: denominations,
+                openedById: req.user.id,
                 status: 'OPEN'
             }
         });
@@ -1426,11 +1740,30 @@ export const closeStoreCashRegister = async (req, res, next) => {
                 actualClosingCash,
                 closingDifference,
                 closingDenominations: denominations,
+                closedById: req.user.id,
                 status: 'CLOSED'
             }
         });
 
         res.json(closedRegister);
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc    RESET Store Cash Register for testing
+// @route   DELETE /api/cash/store-register/:date/reset
+// @access  Admin
+export const resetStoreCashRegister = async (req, res, next) => {
+    try {
+        const { date } = req.params;
+        const storeId = req.user.storeId;
+
+        await prisma.storeCashRegister.delete({
+            where: { storeId_date: { storeId, date } }
+        });
+
+        res.json({ message: 'Register reset successfully' });
     } catch (error) {
         next(error);
     }

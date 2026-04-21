@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
-import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation, adminReviewClosing, getStoreCashRegister, openStoreCashRegister, closeStoreCashRegister, createStoreDeposit, updateStoreCashRegister, updateStoreDeposit, deleteStoreDeposit, addBankDeposit } from '../../services/cashService';
+import { getAdminReconciliation, adminSubmitOpeningCash, adminUpdateReconciliation, adminDeleteReconciliation, adminReviewClosing, getStoreCashRegister, getStoreCashLedger, createSafeMovement, openStoreCashRegister, closeStoreCashRegister, createStoreDeposit, updateStoreCashRegister, updateStoreDeposit, deleteStoreDeposit, addBankDeposit, resetStoreCashRegister } from '../../services/cashService';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -104,6 +104,19 @@ export default function AdminCashManagement() {
   const [showEditDepositModal, setShowEditDepositModal] = useState(false);
   const [editingDeposit, setEditingDeposit] = useState(null);
 
+  // Ledger State
+  const [ledgerData, setLedgerData] = useState(null);
+  const [ledgerLoading, setLedgerLoading] = useState(false);
+  const [showSafeMovementModal, setShowSafeMovementModal] = useState(false);
+  const [safeMovementData, setSafeMovementData] = useState({
+    amount: '',
+    type: 'DEPOSIT', // DEPOSIT to safe, WITHDRAW from safe
+    description: '',
+    denominations: {
+      500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0
+    }
+  });
+
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
   const handleDenominationChange = (value, denom, type = 'assign') => {
@@ -128,6 +141,10 @@ export default function AdminCashManagement() {
       const newDenoms = { ...depositData.denominations, [denom]: qty };
       const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
       setDepositData({ ...depositData, denominations: newDenoms, amount: total });
+    } else if (type === 'safe') {
+      const newDenoms = { ...safeMovementData.denominations, [denom]: qty };
+      const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
+      setSafeMovementData({ ...safeMovementData, denominations: newDenoms, amount: total });
     }
   };
 
@@ -170,11 +187,71 @@ export default function AdminCashManagement() {
     }
   };
 
+  const fetchLedger = async () => {
+    setLedgerLoading(true);
+    try {
+      const data = await getStoreCashLedger(date);
+      setLedgerData(data);
+    } catch (error) {
+      setLedgerData(null);
+    } finally {
+      setLedgerLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchSummaries();
     fetchVehicles();
     fetchStoreRegister();
   }, [date]);
+
+  // Lazy-load ledger when tab is active
+  useEffect(() => {
+    if (activeTab === 'ledger') {
+      fetchLedger();
+    }
+  }, [activeTab, date]);
+
+  // 🆕 Automate Auto-fill from yesterday when opening modal
+  useEffect(() => {
+    if (showOpenStoreModal && storeRegisterData?.previousRegister) {
+      const denoms = storeRegisterData.previousRegister.closingDenominations || {};
+      setStoreDenomData({
+         amount: storeRegisterData.previousRegister.actualClosingCash,
+         denominations: { ...denoms }
+      });
+      toast.success('Auto-filled from yesterday\'s closing');
+    }
+  }, [showOpenStoreModal, storeRegisterData?.previousRegister]);
+
+  const handleSafeMovement = async (e) => {
+    e.preventDefault();
+    if (!safeMovementData.amount || parseFloat(safeMovementData.amount) <= 0) {
+      return toast.error('Enter a valid amount');
+    }
+
+    try {
+      await createSafeMovement({
+        date,
+        amount: parseFloat(safeMovementData.amount),
+        type: safeMovementData.type,
+        description: safeMovementData.description,
+        denominations: safeMovementData.denominations
+      });
+      toast.success(safeMovementData.type === 'DEPOSIT' ? 'Moved to Safe' : 'Moved to Available');
+      setShowSafeMovementModal(false);
+      setSafeMovementData({
+        amount: '',
+        type: 'DEPOSIT',
+        description: '',
+        denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 }
+      });
+      fetchStoreRegister();
+      if (activeTab === 'ledger') fetchLedger();
+    } catch (error) {
+      toast.error('Failed to record movement');
+    }
+  };
 
   const handleAssignFloat = async (e) => {
     e.preventDefault();
@@ -356,11 +433,216 @@ export default function AdminCashManagement() {
       setShowDepositConfirmModal(false);
       setDepositConfirmData(null);
       fetchStoreRegister();
+      if (activeTab === 'ledger') fetchLedger();
+      fetchStoreRegister();
+      if (activeTab === 'ledger') fetchLedger();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to create deposit');
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handlePrintShiftReport = (shift, shiftData, aggregatedDenoms, totalCash) => {
+    const depositDetails = storeRegisterData?.storeDeposits?.find(d => d.shift === shift);
+    const adminName = depositDetails?.user?.name || user?.name || 'Authorized Admin';
+    const reportDate = format(new Date(date), 'dd MMMM yyyy');
+
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+      <html>
+        <head>
+          <title>Shift Deposit Report - ${date}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap');
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: 'Inter', sans-serif; background-color: #f3f4f6; color: #1f2937; padding: 20px; line-height: 1.4; }
+            
+            /* A4 Perspective Container */
+            .a4-container {
+               width: 210mm;
+               min-height: 297mm;
+               padding: 2.54cm; /* Standard margins */
+               margin: 0 auto;
+               background: white;
+               box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+               border: 1px solid #e5e7eb;
+               position: relative;
+               display: flex;
+               flex-direction: column;
+            }
+
+            .header { display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #059669; padding-bottom: 20px; margin-bottom: 30px; }
+            .logo-section h1 { font-size: 28px; font-weight: 800; color: #059669; letter-spacing: -1px; }
+            .logo-section p { font-size: 10px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 1px; }
+            
+            .report-info { text-align: right; }
+            .report-id { font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; }
+            .report-val { font-size: 14px; font-weight: 700; color: #111827; }
+
+            .main-title { text-align: center; margin-bottom: 35px; border-bottom: 1px solid #f1f1f1; padding-bottom: 15px; }
+            .main-title h2 { font-size: 18px; text-transform: uppercase; letter-spacing: 3px; color: #374151; font-weight: 800; }
+
+            .meta-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-bottom: 30px; }
+            .meta-box { background: #f9fafb; padding: 15px; border-radius: 12px; border: 1px solid #f1f1f1; }
+            .meta-label { font-size: 9px; font-weight: 800; color: #9ca3af; text-transform: uppercase; margin-bottom: 4px; }
+            .meta-value { font-size: 13px; font-weight: 700; }
+
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th { text-align: left; background: #f3f4f6; padding: 10px 12px; font-size: 9px; font-weight: 800; color: #4b5563; text-transform: uppercase; border: 1px solid #e5e7eb; }
+            td { padding: 10px 12px; font-size: 11px; border: 1px solid #e5e7eb; vertical-align: top; }
+            
+            .v-num { font-size: 12px; font-weight: 800; color: #111827; margin-bottom: 3px; }
+            .v-denoms { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 5px; }
+            .v-denom-pill { font-size: 8px; font-weight: 700; background: #f0fdf4; color: #166534; padding: 1px 5px; border-radius: 4px; border: 1px solid #dcfce7; }
+
+            .total-section { background: #111827; color: white; padding: 15px 20px; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
+            .total-label { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+            .total-value { font-size: 22px; font-weight: 800; font-family: 'Inter', monospace; }
+
+            .cons-denoms { margin-bottom: 30px; border: 1px solid #e5e7eb; border-radius: 12px; padding: 15px; }
+            .cons-title { font-size: 10px; font-weight: 800; color: #9ca3af; text-transform: uppercase; margin-bottom: 12px; border-bottom: 1px solid #f1f1f1; padding-bottom: 8px; }
+            .cons-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 8px; }
+            .cons-item { text-align: center; border-right: 1px solid #f1f1f1; }
+            .cons-item:last-child { border-right: none; }
+            .cons-d { font-size: 9px; font-weight: 700; color: #6b7280; }
+            .cons-c { font-size: 12px; font-weight: 800; color: #111827; }
+
+            .notes-area { margin-bottom: 40px; }
+            .notes-box { border-bottom: 1px dotted #9ca3af; min-height: 40px; padding: 10px 0; font-size: 11px; }
+
+            .signature-section { margin-top: auto; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; padding-top: 40px; border-top: 1px solid #f1f1f1; }
+            .sig-box { text-align: center; }
+            .sig-line { border-top: 1px solid #1f2937; margin-bottom: 8px; }
+            .sig-label { font-size: 10px; font-weight: 800; text-transform: uppercase; color: #6b7280; }
+
+            @media print {
+              body { background: white; padding: 0; }
+              .a4-container { box-shadow: none; border: none; width: 100%; margin: 0; height: auto; }
+              .no-print { display: none; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="a4-container">
+            <div class="header">
+              <div class="logo-section">
+                <h1>VILLAGKART</h1>
+                <p>Advanced Sales Tracking System</p>
+              </div>
+              <div class="report-info">
+                <div class="report-id">Document No</div>
+                <div class="report-val">REP/CASH/${date.replace(/-/g, '')}/${shift}</div>
+              </div>
+            </div>
+
+            <div class="main-title">
+              <h2>Shift Deposit Report</h2>
+            </div>
+
+            <div class="meta-grid">
+              <div class="meta-box">
+                 <div class="meta-label">Operation Details</div>
+                 <div class="meta-value">Store: VILLAGKART MAIN OFFICE</div>
+                 <div class="meta-value">Collection Date: ${reportDate}</div>
+              </div>
+              <div class="meta-box" style="border-left: 4px solid ${shift === 1 ? '#f59e0b' : '#6366f1'}">
+                 <div class="meta-label">Shift Identification</div>
+                 <div class="meta-value" style="font-size: 16px">${shift === 1 ? '☀️ Day' : '🌙 Night'} (Shift ${shift})</div>
+                 <div class="meta-value" style="color: #059669">${depositDetails ? 'Status: DEPOSITED' : 'Status: PENDING'}</div>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th style="width: 45%">Vehicle (Route) & Denominations</th>
+                  <th style="width: 25%">Agent Name</th>
+                  <th style="width: 15%">Status</th>
+                  <th style="width: 15%; text-align: right">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${shiftData.map(v => {
+                  const denoms = v.closing?.denominations || {};
+                  const activeDenoms = Object.entries(denoms).filter(([_, count]) => count > 0);
+
+                  return `
+                    <tr>
+                      <td>
+                        <div class="v-num">${v.vehicle}</div>
+                        <div class="v-denoms">
+                          ${activeDenoms.length > 0 ? activeDenoms.map(([d, c]) => `
+                            <span class="v-denom-pill">₹${d} × ${c}</span>
+                          `).join('') : '<span class="v-denom-pill" style="background:#fef2f2; color:#991b1b; border-color:#fee2e2">No Denoms</span>'}
+                        </div>
+                      </td>
+                      <td style="font-weight: 700">${v.agentName}</td>
+                      <td style="font-weight: 700; color: ${v.closing ? '#059669' : '#b45309'}">${v.closing ? 'CLOSED' : 'PENDING'}</td>
+                      <td style="text-align: right; font-weight: 800; font-family: monospace">₹${(v.closing?.actualCash || 0).toFixed(2)}</td>
+                    </tr>
+                  `;
+                }).join('')}
+              </tbody>
+            </table>
+
+            <div class="total-section">
+              <div class="total-label">Grand Total Shift Handover</div>
+              <div class="total-value">₹${totalCash.toFixed(2)}</div>
+            </div>
+
+            <div class="cons-denoms">
+              <div class="cons-title">Physical Cash Inventory Summary (Consolidated)</div>
+              <div class="cons-grid">
+                ${[500, 200, 100, 50, 20, 10, 5, 2, 1].map(d => {
+                  const count = aggregatedDenoms[d] || 0;
+                  return `
+                    <div class="cons-item">
+                      <div class="cons-d">₹${d}</div>
+                      <div class="cons-c">${count}</div>
+                    </div>
+                  `;
+                }).join('')}
+              </div>
+            </div>
+
+            <div class="notes-area">
+               <div class="meta-label">Approver Remarks / Physical Discrepancy Notes</div>
+               <div class="notes-box">${depositDetails?.description || 'No remarks provided.'}</div>
+            </div>
+
+            <div class="signature-section">
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div class="sig-label">Driver / Agent Signal</div>
+                <div style="font-size: 8px; color: #9ca3af; margin-top: 5px">I hereby confirm the physical handover of above cash.</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div class="sig-label">Cashier / Verifier</div>
+                <div style="font-size: 11px; font-weight: 800; margin-bottom: 2px">${adminName}</div>
+                <div style="font-size: 8px; color: #9ca3af">System Authorized ID</div>
+              </div>
+              <div class="sig-box">
+                <div class="sig-line"></div>
+                <div class="sig-label">Operations Manager</div>
+                <div style="font-size: 8px; color: #9ca3af; margin-top: 5px">Official Seal Required</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="no-print" style="position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; gap: 15px;">
+            <button onclick="window.print()" style="background: #111827; color: white; border: none; padding: 14px 28px; border-radius: 12px; font-weight: 800; cursor: pointer; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.2); display: flex; items-center: center gap: 10px;">
+              Print Document
+            </button>
+            <button onclick="window.close()" style="background: white; color: #374151; border: 1px solid #e5e7eb; padding: 14px 28px; border-radius: 12px; font-weight: 800; cursor: pointer;">
+              Close Preview
+            </button>
+          </div>
+        </body>
+      </html>
+    `);
+    printWindow.document.close();
   };
 
   const handleCreateBankDeposit = async (e) => {
@@ -388,6 +670,7 @@ export default function AdminCashManagement() {
         remark: ''
       });
       fetchStoreRegister();
+      if (activeTab === 'ledger') fetchLedger();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to transfer money');
     } finally {
@@ -448,6 +731,7 @@ export default function AdminCashManagement() {
       await deleteStoreDeposit(id);
       toast.success('Deposit deleted successfully');
       fetchStoreRegister();
+      if (activeTab === 'ledger') fetchLedger();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete deposit');
     } finally {
@@ -1157,15 +1441,36 @@ export default function AdminCashManagement() {
                         <h3 className={`text-lg font-black uppercase tracking-tight ${shift === 1 ? 'text-amber-900' : 'text-indigo-900'}`}>
                           Shift {shift} Collection Report
                         </h3>
-                        {isDeposited ? (
-                          <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full uppercase tracking-widest flex items-center gap-1 w-fit mt-1">
-                            <CheckCircle2 size={12}/> Deposited
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 block">Review and deposit shift collection</span>
-                        )}
+                        <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                          {isDeposited ? (
+                            <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 px-2.5 py-1 rounded-lg uppercase tracking-widest flex items-center gap-1.5 w-fit">
+                              <CheckCircle2 size={12}/> Deposited
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block bg-gray-100 px-2.5 py-1 rounded-lg w-fit">Awaiting Deposit</span>
+                          )}
+                          
+                          {totalCashCollected > 0 && (
+                            <button
+                              onClick={() => handlePrintShiftReport(shift, shiftAgents.map(a => ({ vehicle: a.vehicle?.vehicleNumber || a.vehicle?.vehicleName, agentName: a.assignedUsers?.[0]?.name || 'N/A', closing: a.shiftDetails[shiftKey].closing })), aggregatedDenominations, totalCashCollected)}
+                              className="flex items-center gap-2 px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 hover:bg-emerald-100 transition-all border border-emerald-100"
+                            >
+                              <Printer size={12} />
+                              Download Prof. Report
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+                    {isDeposited && (
+                       <div className="flex flex-col items-end">
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Submitted By</p>
+                          <p className="text-[11px] font-black text-emerald-600 uppercase tracking-tight">
+                             {storeRegisterData?.storeDeposits?.find(d => d.shift === shift)?.user?.name || 'Admin'}
+                          </p>
+                       </div>
+                    )}
                   </div>
 
                   <div className="p-6">
@@ -1275,7 +1580,7 @@ export default function AdminCashManagement() {
                       </div>
                     )}
 
-                    {!isDeposited && (
+                    {!isDeposited && totalCashCollected > 0 && (
                       <div className="mt-6 flex justify-end">
                         <button
                           onClick={() => handleInitiateDeposit(shift)}
@@ -1309,18 +1614,77 @@ export default function AdminCashManagement() {
             </div>
             <div>
               <h2 className="text-xl font-black text-white uppercase tracking-tight">Store Cash</h2>
-              <p className="text-xs font-bold text-emerald-400 uppercase tracking-widest mt-1">
-                {storeRegisterData?.storeRegister?.status === 'OPEN'
-                  ? (
-                    <span className="flex items-center gap-2">
-                      <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse" />
-                      Active • Opening Cash: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}
-                    </span>
-                  )
-                  : storeRegisterData?.storeRegister?.status === 'CLOSED'
-                    ? `Closed • Day Diff ₹${storeRegisterData.storeRegister.closingDifference?.toFixed(2)}`
-                    : 'Awaiting Daily Initialization'}
-              </p>
+              <div className="flex flex-col gap-0.5 mt-0.5">
+                <p className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                  {storeRegisterData?.storeRegister?.status === 'OPEN'
+                    ? (
+                      <div className="flex flex-col gap-2">
+                        <span className="flex items-center gap-2">
+                          <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse" />
+                          <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active • Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}</span>
+                        </span>
+                        
+                        {/* Carry-over Mismatch Alert for Active Safe */}
+                        {storeRegisterData.previousRegister && Math.abs(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash) > 0.01 && (
+                           <div className="px-3 py-2 bg-rose-500/20 border border-rose-500/40 rounded-xl flex items-center gap-2.5 animate-pulse">
+                              <AlertTriangle size={14} className="text-rose-400" />
+                              <div className="flex flex-col">
+                                 <span className="text-[8px] font-black text-rose-300 uppercase tracking-widest">Opening Mismatch Alert</span>
+                                 <span className="text-[10px] font-bold text-white leading-tight">
+                                    Started with ₹{(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash).toFixed(2)} {storeRegisterData.storeRegister.openingCash < storeRegisterData.previousRegister.actualClosingCash ? 'less' : 'more'} than yesterday's close
+                                 </span>
+                              </div>
+                           </div>
+                        )}
+                      </div>
+                    )
+                    : storeRegisterData?.storeRegister?.status === 'CLOSED'
+                      ? (
+                         <div className="flex flex-col gap-1.5 mt-1">
+                            <div className="flex items-center gap-2">
+                               <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Closed on {storeRegisterData.storeRegister.date}</span>
+                               {storeRegisterData.storeRegister.closingDifference === 0 ? (
+                                  <span className="bg-emerald-400/20 text-emerald-300 text-[8px] font-black px-2 py-0.5 rounded border border-emerald-400/30 uppercase">Status: Balanced</span>
+                               ) : (
+                                  <span className={`${storeRegisterData.storeRegister.closingDifference < 0 ? 'bg-rose-500/20 text-rose-300 border-rose-500/50' : 'bg-amber-500/20 text-amber-300 border-amber-500/50'} text-[8px] font-black px-2 py-0.5 rounded border uppercase`}>
+                                     Status: {storeRegisterData.storeRegister.closingDifference < 0 ? 'Shortage' : 'Surplus'}
+                                  </span>
+                               )}
+                            </div>
+                            
+                            {storeRegisterData.storeRegister.closingDifference !== 0 && (
+                               <div className={`mt-1 px-4 py-3 rounded-2xl flex items-center gap-4 border shadow-2xl animate-bounce ${
+                                  storeRegisterData.storeRegister.closingDifference < 0 
+                                     ? 'bg-rose-600 border-rose-400 text-white' 
+                                     : 'bg-amber-500 border-amber-300 text-white'
+                               }`}>
+                                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                     <AlertTriangle size={24} />
+                                  </div>
+                                  <div>
+                                     <p className="text-[10px] font-black uppercase tracking-[0.1em] opacity-80">Variance Detected</p>
+                                     <p className="text-lg font-black leading-none">
+                                        {storeRegisterData.storeRegister.closingDifference < 0 ? '-' : '+'} ₹{Math.abs(storeRegisterData.storeRegister.closingDifference).toFixed(2)}
+                                     </p>
+                                  </div>
+                               </div>
+                            )}
+                         </div>
+                      )
+                      : 'Awaiting Daily Initialization'}
+                </p>
+                {storeRegisterData?.storeRegister?.openedBy && (
+                   <p className="text-[8px] font-black text-white/40 uppercase tracking-widest flex items-center gap-1.5">
+                      <User size={8} /> Opened By {storeRegisterData.storeRegister.openedBy.name}
+                      {storeRegisterData?.storeRegister?.closedBy && (
+                         <>
+                            <span className="opacity-20">|</span>
+                            <CheckCircle2 size={8} /> Closed By {storeRegisterData.storeRegister.closedBy.name}
+                         </>
+                      )}
+                   </p>
+                )}
+              </div>
             </div>
           </div>
 
@@ -1359,6 +1723,17 @@ export default function AdminCashManagement() {
                     </div>
                   </div>
                 </div>
+
+                <button
+                  onClick={() => {
+                    setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: storeRegisterData.liveMetrics?.availableCash || 0 }));
+                    setShowSafeMovementModal(true);
+                  }}
+                  className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                >
+                  <Vault size={16} strokeWidth={3} />
+                  Move to Safe
+                </button>
 
                 <button
                   onClick={() => {
@@ -1403,7 +1778,12 @@ export default function AdminCashManagement() {
 
         {storeRegisterData?.storeRegister && (
           <div className="space-y-6 mt-6">
-            <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 relative z-10">
+            <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 relative z-10">
+               {/* TWO POOL SYSTEM IN HEADER */}
+              <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl">
+                <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Available Cash</p>
+                <p className="text-xl font-black text-sky-400">₹{(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
+              </div>
               <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50 group relative">
                 <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Opening Cash</p>
                 <div className="flex items-center justify-between">
@@ -1412,7 +1792,7 @@ export default function AdminCashManagement() {
                     onClick={() => {
                       setStoreDenomData({
                         amount: storeRegisterData.storeRegister.openingCash,
-                        denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                        denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
                       });
                       setShowEditStoreModal(true);
                     }}
@@ -1424,19 +1804,27 @@ export default function AdminCashManagement() {
               </div>
               <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
                 <p className="text-[10px] font-black tracking-widest uppercase text-amber-500 mb-1">Agent Outflow</p>
-                <p className="text-xl font-black text-amber-400">-₹{storeRegisterData.liveMetrics?.assignedOut?.toFixed(2)}</p>
+                <p className="text-xl font-black text-amber-400">-₹{(storeRegisterData?.liveMetrics?.assignedOut || 0).toFixed(2)}</p>
               </div>
               <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
-                <p className="text-[10px] font-black tracking-widest uppercase text-sky-500 mb-1">Agent Inflow</p>
-                <p className="text-xl font-black text-sky-400">+₹{storeRegisterData.liveMetrics?.receivedIn?.toFixed(2)}</p>
+                <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Agent Inflow</p>
+                <p className="text-xl font-black text-emerald-400">+₹{(storeRegisterData?.liveMetrics?.receivedIn || 0).toFixed(2)}</p>
               </div>
-              <div className="bg-white/5 border border-white/10 p-4 rounded-3xl backdrop-blur-sm">
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
                 <p className="text-[10px] font-black tracking-widest uppercase text-rose-500 mb-1">Bank Transfer</p>
-                <p className="text-xl font-black text-rose-400">-₹{storeRegisterData.liveMetrics?.bankTransferred?.toFixed(2)}</p>
+                <p className="text-xl font-black text-rose-400">-₹{(storeRegisterData?.liveMetrics?.bankTransferred || 0).toFixed(2)}</p>
               </div>
-              <div className="bg-white rounded-3xl p-4 shadow-xl border-b-4 border-emerald-100">
-                <p className="text-[10px] font-black tracking-widest uppercase text-emerald-600 mb-1">Safe Balance</p>
-                <p className="text-xl font-black text-emerald-900">₹{storeRegisterData.liveMetrics?.liveExpected?.toFixed(2)}</p>
+              
+             
+
+              <div className="bg-white rounded-2xl p-4 shadow-xl border-b-4 border-emerald-100">
+                <div className="flex items-center justify-between mb-1">
+                   <p className="text-[10px] font-black tracking-widest uppercase text-emerald-600">Total Cash</p>
+                   <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded text-[8px] font-black text-emerald-600 border border-emerald-100">
+                      SAFE: ₹{(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(0)}
+                   </div>
+                </div>
+                <p className="text-xl font-black text-emerald-900">₹{(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</p>
               </div>
             </div>
 
@@ -1536,7 +1924,57 @@ export default function AdminCashManagement() {
           </div>
         )}
       </div>
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+
+      {/* SIMULATOR TOOLS (TEMPORARY) */}
+      <div className="flex items-center gap-3 mb-6 bg-slate-900/5 p-4 rounded-[2rem] border border-slate-200 border-dashed">
+         <div className="w-10 h-10 bg-slate-900 rounded-xl flex items-center justify-center text-white">
+            <Clock size={20} />
+         </div>
+         <div>
+            <h4 className="text-xs font-black text-slate-900 uppercase tracking-widest">Simulator Tools</h4>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-tight">Test your safe transition workflow</p>
+         </div>
+         <div className="ml-auto flex gap-2">
+            <button 
+               onClick={async () => {
+                  try {
+                     await resetStoreCashRegister(date);
+                     toast.success('Safe reset for today');
+                     fetchStoreRegister();
+                  } catch (e) {
+                     toast.error('Failed to reset safe');
+                  }
+               }}
+               className="px-4 py-2 bg-rose-100 text-rose-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-rose-200 transition-all border border-rose-200"
+            >
+               Reset Today
+            </button>
+            <button 
+               onClick={() => {
+                  const tomorrow = new Date(date);
+                  tomorrow.setDate(tomorrow.getDate() + 1);
+                  setDate(format(tomorrow, 'yyyy-MM-dd'));
+                  toast.success('Jumped to Tomorrow');
+               }}
+               className="px-4 py-2 bg-emerald-100 text-emerald-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-emerald-200 transition-all border border-emerald-200"
+            >
+               Jump to Next Day
+            </button>
+            <button 
+               onClick={() => {
+                  const yesterday = new Date(date);
+                  yesterday.setDate(yesterday.getDate() - 1);
+                  setDate(format(yesterday, 'yyyy-MM-dd'));
+                  toast.success('Jumped to Yesterday');
+               }}
+               className="px-4 py-2 bg-amber-100 text-amber-600 text-[10px] font-black uppercase tracking-widest rounded-lg hover:bg-amber-200 transition-all border border-amber-200"
+            >
+               Back to Yesterday
+            </button>
+         </div>
+      </div>
+
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
 
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-black text-gray-900 tracking-tight">Cash Management</h2>
@@ -1620,6 +2058,12 @@ export default function AdminCashManagement() {
           className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'live' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
         >
           Live Cash Status
+        </button>
+        <button
+          onClick={() => setActiveTab('ledger')}
+          className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'ledger' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
+        >
+          <BookOpen size={14} /> Audit Ledger
         </button>
       </div>
 
@@ -1745,7 +2189,7 @@ export default function AdminCashManagement() {
             </table>
           </div>
         </div>
-      ) : (
+      ) : activeTab === 'live' ? (
         /* LIVE CASH STATUS TABLE */
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="overflow-x-auto">
@@ -1838,7 +2282,224 @@ export default function AdminCashManagement() {
             </table>
           </div>
         </div>
-      )}
+      ) : activeTab === 'ledger' ? (
+        /* ========== AUDIT LEDGER VIEW ========== */
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {ledgerLoading ? (
+            <div className="flex items-center justify-center py-24">
+              <Loader2 className="animate-spin text-emerald-500" size={32} />
+            </div>
+          ) : !ledgerData || ledgerData.ledger.length === 0 ? (
+            <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-16 text-center">
+              <BookOpen size={48} className="mx-auto text-gray-200 mb-4" />
+              <h3 className="text-lg font-black text-gray-300 uppercase tracking-widest">No Ledger Entries</h3>
+              <p className="text-sm font-medium text-gray-400 mt-2">Initialize the Store Safe to start recording transactions</p>
+            </div>
+          ) : (
+            <>
+              {/* Cash Pool Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {/* Available / Counter Cash */}
+                <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative group overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                    <Coins size={80} />
+                  </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center text-sky-600">
+                      <Coins size={20} />
+                    </div>
+                    <button 
+                      onClick={() => {
+                        setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: ledgerData.summary.availableCash }));
+                        setShowSafeMovementModal(true);
+                      }}
+                      className="text-[10px] font-black text-sky-600 uppercase tracking-widest bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors flex items-center gap-1.5"
+                    >
+                      <ArrowRight size={12} /> Move to Safe
+                    </button>
+                  </div>
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">At Hand (Counter)</h3>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-gray-900 tabular-nums">₹{ledgerData.summary.availableCash.toFixed(2)}</span>
+                  </div>
+                  <p className="text-[10px] font-bold text-gray-400 mt-2">Opening − Outflow + Inflow</p>
+                </div>
+
+                {/* Safe Cash */}
+                <div className="bg-slate-900 rounded-[2rem] p-6 shadow-xl relative group overflow-hidden border border-slate-800">
+                  <div className="absolute top-0 right-0 p-4 opacity-[0.05] group-hover:opacity-[0.1] transition-opacity">
+                    <Vault size={80} className="text-white" />
+                  </div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                      <Vault size={20} />
+                    </div>
+                    <div className="flex gap-2">
+                       <button 
+                        onClick={() => {
+                          setSafeMovementData(prev => ({ ...prev, type: 'WITHDRAW', amount: '' }));
+                          setShowSafeMovementModal(true);
+                        }}
+                        className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
+                      >
+                        Withdraw
+                      </button>
+                    </div>
+                  </div>
+                  <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Store Safe Balance</h3>
+                  <div className="mt-1 flex items-baseline gap-1.5">
+                    <span className="text-2xl font-black text-white tabular-nums">₹{ledgerData.summary.safeBalance.toFixed(2)}</span>
+                    {ledgerData.summary.safeBalance < 0 && (
+                       <div className="flex items-center gap-1 text-rose-400">
+                          <AlertCircle size={12} />
+                          <span className="text-[10px] font-black">NEGATIVE</span>
+                       </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] font-bold text-slate-500 mt-2">Deposits − Bank Transfers</p>
+                </div>
+
+                {/* Formula Visualization */}
+                <div className="bg-gradient-to-br from-gray-50 to-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col justify-center">
+                  <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Total Store Cash</h3>
+                  <div className="flex items-center gap-3">
+                    <div className="text-center">
+                      <p className="text-xs font-black text-gray-800">₹{ledgerData.summary.availableCash.toFixed(1)}</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase">Available</p>
+                    </div>
+                    <span className="text-gray-300 font-bold">+</span>
+                    <div className="text-center">
+                      <p className="text-xs font-black text-gray-800">₹{ledgerData.summary.safeBalance.toFixed(1)}</p>
+                      <p className="text-[8px] font-bold text-gray-400 uppercase">Safe</p>
+                    </div>
+                    <span className="text-gray-300 font-bold">=</span>
+                    <div className="bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100 text-center">
+                      <p className="text-sm font-black text-emerald-600">₹{ledgerData.summary.totalStoreCash.toFixed(2)}</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Ledger Table */}
+              <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-600">
+                      <BookOpen size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Immutable Cash Ledger</h3>
+                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{ledgerData.summary.entryCount} entries • {date} • {ledgerData.summary.status}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
+                    <Lock size={12} className="text-gray-400" />
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Read-Only</span>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest w-[80px]">Time</th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Action</th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reference</th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Performed By</th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Amount</th>
+                        <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Store Balance</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {ledgerData.ledger.map((entry) => {
+                        const typeConfig = {
+                          'OPENING': { icon: Coins, bg: 'bg-emerald-50', text: 'text-emerald-600', badge: 'INIT' },
+                          'AGENT_OUTFLOW': { icon: ArrowUpRight, bg: 'bg-amber-50', text: 'text-amber-600', badge: 'OUT' },
+                          'AGENT_INFLOW': { icon: ArrowDownLeft, bg: 'bg-sky-50', text: 'text-sky-600', badge: 'IN' },
+                          'BANK_TRANSFER': { icon: Building2, bg: 'bg-rose-50', text: 'text-rose-600', badge: 'BANK' },
+                          'SAFE_MOVEMENT': { icon: Vault, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'INTERNAL' },
+                          'CLOSING': { icon: Lock, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'CLOSE' },
+                        };
+                        const cfg = typeConfig[entry.type] || typeConfig['OPENING'];
+                        const Icon = cfg.icon;
+
+                        return (
+                          <tr key={entry.id} className={`hover:bg-gray-50/80 transition-colors ${['CLOSING', 'SAFE_MOVEMENT'].includes(entry.type) ? 'bg-slate-50/30' : ''}`}>
+                            <td className="px-5 py-3.5">
+                              <span className="text-[11px] font-bold text-gray-500 tabular-nums">
+                                {format(new Date(entry.timestamp), 'hh:mm a')}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-8 h-8 rounded-lg ${cfg.bg} flex items-center justify-center ${cfg.text}`}>
+                                  <Icon size={16} strokeWidth={2.5} />
+                                </div>
+                                <div>
+                                  <span className="text-xs font-black text-gray-800 block leading-tight">{entry.label}</span>
+                                  <span className={`text-[8px] font-black uppercase tracking-widest ${cfg.text} opacity-70`}>{cfg.badge}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className="text-[10px] font-bold text-gray-400 leading-relaxed block max-w-[220px] truncate" title={entry.referenceName}>
+                                {entry.referenceName}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">{entry.userName}</span>
+                            </td>
+                            <td className="px-4 py-3.5 text-right">
+                              <span className={`text-sm font-black tabular-nums ${
+                                entry.direction === 'IN' || entry.direction === 'IN_FROM_SAFE' ? 'text-emerald-600' :
+                                entry.direction === 'OUT' || entry.direction === 'OUT_TO_SAFE' ? 'text-rose-600' : 'text-gray-600'
+                              }`}>
+                                {['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? '+' : ['OUT', 'OUT_TO_SAFE'].includes(entry.direction) ? '−' : ''}₹{entry.amount.toFixed(2)}
+                                {entry.type === 'SAFE_MOVEMENT' && (
+                                   <span className="text-[8px] font-black block text-gray-400 uppercase tracking-tighter">
+                                     {entry.direction === 'OUT_TO_SAFE' ? 'MOVE TO SAFE' : 'MOVE TO AVAILABLE'}
+                                   </span>
+                                )}
+                              </span>
+                            </td>
+                            <td className="px-5 py-3.5 text-right">
+                              <div className="flex flex-col items-end">
+                                <span className="text-[11px] font-black text-gray-700 tabular-nums">₹{entry.balanceAfter.toFixed(2)}</span>
+                                <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Total Store</span>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Footer Legend */}
+                <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-emerald-500"></div>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Inflow</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-rose-500"></div>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Outflow</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-2 h-2 rounded-full bg-slate-400"></div>
+                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">System</span>
+                    </div>
+                  </div>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-wider flex items-center gap-1">
+                    <Shield size={10} /> All entries are immutable after creation
+                  </p>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      ) : null}
 
       {/* ========== FLOAT ASSIGNMENT MODAL ========== */}
       {showAssignModal && (
@@ -2274,6 +2935,91 @@ export default function AdminCashManagement() {
         </div>
       )}
 
+      {/* ========== SAFE MOVEMENT MODAL ========== */}
+      {showSafeMovementModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4 overflow-y-auto">
+          <div className="bg-white w-full max-w-lg rounded-[2.5rem] p-8 shadow-2xl flex flex-col gap-6 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className={`w-12 h-12 rounded-[1.25rem] flex items-center justify-center ${safeMovementData.type === 'DEPOSIT' ? 'bg-sky-50 text-sky-600' : 'bg-amber-50 text-amber-600'}`}>
+                  <Vault size={24} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 leading-tight">
+                    {safeMovementData.type === 'DEPOSIT' ? 'Move to Safe' : 'Withdraw from Safe'}
+                  </h3>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{date}</p>
+                </div>
+              </div>
+              <button 
+                onClick={() => setShowSafeMovementModal(false)}
+                className="w-10 h-10 flex items-center justify-center hover:bg-gray-100 rounded-2xl text-gray-400 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={handleSafeMovement} className="space-y-6">
+               <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
+                <div className="grid grid-cols-3 gap-3">
+                  {denominationsList.map((denom) => (
+                    <div key={denom} className="space-y-1.5 text-center">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">₹{denom}</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={safeMovementData.denominations[denom] || ''}
+                        onChange={(e) => handleDenominationChange(e.target.value, denom, 'safe')}
+                        placeholder="0"
+                        className="w-full bg-white border border-gray-200 rounded-xl px-2 py-2 text-center text-sm font-black focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 outline-none transition-all"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between bg-slate-900 px-6 py-4 rounded-2xl shadow-lg border border-slate-800">
+                <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Amount</span>
+                <span className="text-xl font-black text-white tabular-nums">₹{parseFloat(safeMovementData.amount || 0).toFixed(2)}</span>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                   Remark / Purpose
+                </label>
+                <textarea
+                  value={safeMovementData.description}
+                  onChange={(e) => setSafeMovementData({ ...safeMovementData, description: e.target.value })}
+                  placeholder="e.g. End of day safe deposit"
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm font-bold text-gray-700 focus:bg-white focus:ring-2 focus:ring-sky-500/10 focus:border-sky-500 outline-none transition-all h-24 resize-none"
+                />
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  type="button"
+                  onClick={() => setShowSafeMovementModal(false)}
+                  className="flex-1 bg-gray-100 text-gray-500 font-black text-xs py-4 rounded-2xl uppercase tracking-widest hover:bg-gray-200 transition-all border border-gray-200/50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className={`flex-1 text-white font-black text-xs py-4 rounded-2xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 ${
+                    safeMovementData.type === 'DEPOSIT' 
+                      ? 'bg-sky-600 hover:bg-sky-700 shadow-sky-600/20' 
+                      : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
+                  }`}
+                >
+                  {safeMovementData.type === 'DEPOSIT' ? <Vault size={16} /> : <ArrowDownLeft size={16} />}
+                  Confirm Movement
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       {/* ========== OPEN STORE CASH MODAL ========== */}
       {showOpenStoreModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
@@ -2295,6 +3041,59 @@ export default function AdminCashManagement() {
                 <X size={18} />
               </button>
             </div>
+
+            {storeRegisterData?.previousRegister && (
+               <div className="bg-slate-900 rounded-2xl p-4 border border-slate-800">
+                  <div className="flex items-center justify-between mb-3">
+                     <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Yesterday's Carry-over</span>
+                     <span className="text-[10px] font-black text-emerald-400 bg-emerald-400/10 px-2 py-0.5 rounded-md uppercase">Matched Records</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                     <div>
+                        <p className="text-xl font-black text-white">₹{storeRegisterData.previousRegister.actualClosingCash?.toLocaleString()}</p>
+                        <p className="text-[8px] font-bold text-slate-500 uppercase mt-1">
+                           Closed by {storeRegisterData.previousRegister.closedBy?.name || 'Admin'} on {storeRegisterData.previousRegister.date}
+                        </p>
+                     </div>
+                     <div className="flex gap-1.5">
+                        <button 
+                           onClick={() => {
+                              const denoms = storeRegisterData.previousRegister.closingDenominations || {};
+                              setStoreDenomData({
+                                 amount: storeRegisterData.previousRegister.actualClosingCash,
+                                 denominations: { ...denoms }
+                              });
+                           }}
+                           className="text-[9px] font-black text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-2 rounded-lg uppercase tracking-tight transition-all"
+                        >
+                           Auto-Fill From Yesterday
+                        </button>
+                     </div>
+                  </div>
+                  
+                  <div className="mt-4 grid grid-cols-5 gap-2 pt-3 border-t border-white/5">
+                     {Object.entries(storeRegisterData.previousRegister.closingDenominations || {})
+                        .filter(([_, count]) => count > 0)
+                        .map(([d, c]) => (
+                           <div key={d} className="text-center">
+                              <p className="text-[8px] font-bold text-slate-500">₹{d}</p>
+                              <p className="text-[10px] font-black text-slate-300">×{c}</p>
+                           </div>
+                        ))
+                     }
+                  </div>
+               </div>
+            )}
+
+            {storeRegisterData?.previousRegister && storeDenomData.amount > 0 && Math.abs(storeDenomData.amount - storeRegisterData.previousRegister.actualClosingCash) > 0.01 && (
+               <div className="bg-rose-50 border border-rose-100 rounded-2xl p-3 flex items-center gap-3 animate-pulse">
+                  <AlertTriangle className="text-rose-500" size={20} />
+                  <div>
+                     <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest">Cash Mismatch Alert</p>
+                     <p className="text-xs font-bold text-rose-900 leading-none mt-1">Difference of ₹{(storeDenomData.amount - storeRegisterData.previousRegister.actualClosingCash).toFixed(2)} detected from yesterday's close.</p>
+                  </div>
+               </div>
+            )}
 
             <div className="space-y-2">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Denominations</label>
@@ -2763,7 +3562,7 @@ export default function AdminCashManagement() {
                     value={bankData.amount || ''}
                     onChange={(e) => setBankData({ ...bankData, amount: parseFloat(e.target.value) || 0 })}
                   />
-                  <p className="text-[9px] font-bold text-gray-400 uppercase pl-1">Available: ₹{storeRegisterData.liveMetrics.liveAvailable.toFixed(2)}</p>
+                  <p className="text-[9px] font-bold text-gray-400 uppercase pl-1">Available in Safe: ₹{(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Branch Name</label>

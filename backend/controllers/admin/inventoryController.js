@@ -37,7 +37,17 @@ export const getItems = async (req, res) => {
         }
       }
     });
-    res.json(items);
+
+    // Map each item and ensure the 'stock' field reflects the SUM of WarehouseInventory
+    const processedItems = items.map(item => {
+      const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+      return {
+        ...item,
+        stock: warehouseQty > 0 ? warehouseQty : (item.stock || 0)
+      };
+    });
+
+    res.json(processedItems);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching items', error: error.message });
   }
@@ -348,6 +358,16 @@ export const loadStock = async (req, res) => {
 
     for (const item of items) {
       const q = parseFloat(item.quantity);
+      if (isNaN(q) || q <= 0) continue;
+
+      // 🆕 VALIDATION: Ensure requested quantity doesn't exceed Store Stock
+      const prod = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (!prod) {
+        return res.status(404).json({ message: `Product ${item.productId} not found` });
+      }
+      if (Math.floor(q) > (prod.stock || 0)) {
+        return res.status(400).json({ message: `Insufficient stock for ${prod.name}. Available in store: ${prod.stock}` });
+      }
 
       // Create transaction
       await prisma.stockTransaction.create({
@@ -367,17 +387,23 @@ export const loadStock = async (req, res) => {
           vehicleId_productId: { vehicleId, productId: item.productId }
         },
         update: {
-          quantity: { increment: q },
-          openingQuantity: { increment: q }
+          quantity: { increment: Math.floor(q) },
+          openingQuantity: { increment: Math.floor(q) }
         },
         create: {
           tenantId: req.user.tenantId,
           storeId,
           vehicleId,
           productId: item.productId,
-          quantity: q,
-          openingQuantity: q
+          quantity: Math.floor(q),
+          openingQuantity: Math.floor(q)
         }
+      });
+ 
+      // 🆕 DECREMENT main product stock
+      await prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { decrement: Math.floor(q) } }
       });
     }
 
@@ -444,14 +470,22 @@ export const returnStock = async (req, res) => {
       });
 
       // Update vehicle stock
-      await prisma.vehicleStock.update({
+      // Update vehicle stock
+      await prisma.vehicleStock.updateMany({
         where: {
-          vehicleId_productId: { vehicleId, productId: item.productId }
+          vehicleId,
+          productId: item.productId
         },
         data: {
-          quantity: { decrement: q },
-          openingQuantity: { decrement: q }
+          quantity: { decrement: Math.floor(q) },
+          openingQuantity: { decrement: Math.floor(q) }
         }
+      });
+ 
+      // 🆕 INCREMENT main product stock back
+      await prisma.product.update({
+        where: { id: item.productId },
+        data: { stock: { increment: Math.floor(q) } }
       });
     }
 
@@ -1149,7 +1183,14 @@ export const approveRefillRequest = async (req, res) => {
             openingQuantity: item.quantity
           }
         });
+ 
+        // 🆕 DECREMENT main product stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: Math.floor(item.quantity) } }
+        });
       }
+
 
       const processedItemIds = itemsToProcess.map(i => i.id);
       
@@ -1319,8 +1360,14 @@ export const rejectRefillRequest = async (req, res) => {
       include: { items: true }
     });
 
-    if (!request) return res.status(404).json({ message: 'Refill request not found' });
-    if (request.status !== 'PENDING') return res.status(400).json({ message: 'Request is already processed' });
+    if (!request) {
+      console.log('Reject Refill Failed: Not found', id);
+      return res.status(404).json({ message: 'Refill request not found' });
+    }
+    if (request.status !== 'PENDING') {
+      console.log('Reject Refill Failed: Already processed', id, 'Status:', request.status);
+      return res.status(400).json({ message: `Request is already ${request.status}` });
+    }
 
     let itemsToProcess = request.items;
     if (rejectedItemIds && Array.isArray(rejectedItemIds)) {

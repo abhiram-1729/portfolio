@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera, PlusCircle, CheckCircle2, AlertCircle } from 'lucide-react';
+import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera, PlusCircle, CheckCircle2, AlertCircle, ClipboardList, CheckCircle } from 'lucide-react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
@@ -236,7 +236,8 @@ export default function AdminInventory() {
       const matchesSearch = i.name.toLowerCase().includes(q);
       const matchesCategory = opsCategory === 'ALL' || i.category?.name === opsCategory;
       const matchesSubCategory = opsSubCategory === 'ALL' || i.subCategory?.name === opsSubCategory;
-      return matchesSearch && matchesCategory && matchesSubCategory;
+      const hasStock = (i.stock || 0) > 0;
+      return matchesSearch && matchesCategory && matchesSubCategory && hasStock;
     });
   }, [items, opsSearch, opsCategory, opsSubCategory]);
 
@@ -249,6 +250,13 @@ export default function AdminInventory() {
     });
     return { regular, free };
   }, [loadingFilteredItems]);
+
+  const hasInvalidQuantities = React.useMemo(() => {
+    return Object.entries(stockQuantities).some(([pid, qty]) => {
+      const prod = items.find(p => p.id === pid);
+      return prod && (parseInt(qty) || 0) > (prod.stock || 0);
+    });
+  }, [stockQuantities, items]);
 
   const groupedRefills = React.useMemo(() => {
     const groups = {};
@@ -761,6 +769,18 @@ export default function AdminInventory() {
       .map(([productId, quantity]) => ({ productId, quantity: parseInt(quantity) }));
 
     if (actionItems.length === 0) return toast.error('Please enter quantities');
+
+    if (type === 'LOAD') {
+      const overStockItems = actionItems.filter(ai => {
+        const prod = items.find(p => p.id === ai.productId);
+        return prod && ai.quantity > (prod.stock || 0);
+      });
+
+      if (overStockItems.length > 0) {
+        const names = overStockItems.map(oi => items.find(p => p.id === oi.productId)?.name).join(', ');
+        return toast.error(`Insufficient stock for: ${names}`);
+      }
+    }
 
     setIsSubmitting(true);
     try {
@@ -1341,7 +1361,8 @@ export default function AdminInventory() {
             <tr className="bg-gray-50/50">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Load Quantity</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/10">Load Qty</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
             </tr>
           </thead>
@@ -1374,20 +1395,28 @@ export default function AdminInventory() {
                   <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
                     <span className="text-xs font-bold text-gray-500">₹{price}</span>
                   </td>
-                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                    <div className="flex justify-center">
+                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                    <span className={`text-sm font-black ${item.stock <= (item.minStockAlert || 5) ? 'text-rose-600' : 'text-gray-900'}`}>
+                      {item.stock || 0}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-emerald-50/5">
+                    <div className="flex flex-col items-center gap-1">
                       <input
                         type="number"
                         placeholder="0"
                         min="0"
                         onWheel={(e) => e.target.blur()}
-                        className="w-20 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"
+                        className={`w-20 bg-white border ${qty > (item.stock || 0) ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-emerald-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm`}
                         value={stockQuantities[item.id] || ''}
                         onChange={(e) => {
                           const val = Math.max(0, parseInt(e.target.value) || 0);
                           handleQuantityChange(item.id, val);
                         }}
                       />
+                      {qty > (item.stock || 0) && (
+                        <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -1558,8 +1587,8 @@ export default function AdminInventory() {
 
             <button
               onClick={handleInitiateLoad}
-              disabled={isSubmitting}
-              className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2"
+              disabled={isSubmitting || hasInvalidQuantities}
+              className={`w-full ${hasInvalidQuantities ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-emerald-600/20`}
             >
               {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Initiate Loading'}
             </button>
@@ -1584,7 +1613,8 @@ export default function AdminInventory() {
             <tr className="bg-gray-50/50">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">In Vehicle</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Return Qty</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-orange-600 text-center bg-orange-50/10">Return Qty</th>
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Return Value</th>
             </tr>
           </thead>
@@ -1613,6 +1643,9 @@ export default function AdminInventory() {
                   </td>
                   <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
                     <span className="text-sm font-black text-gray-700">{currentStock}</span>
+                  </td>
+                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                    <span className="text-[11px] font-black text-emerald-600">{item.stock || 0}</span>
                   </td>
                   <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
                     <div className="flex justify-center">
@@ -2350,6 +2383,105 @@ export default function AdminInventory() {
     );
   };
 
+  const renderOpeningStock = () => {
+    return (
+      <div className="space-y-6 sm:px-2">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+           <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
+                 <ClipboardList size={28} />
+              </div>
+              <div className="flex flex-col">
+                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Opening Stock Initialization</h2>
+                 <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Master Inventory Setup</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-300" />
+                    <span className="text-[10px] font-bold text-gray-400">Set your starting balances</span>
+                 </div>
+              </div>
+           </div>
+           <div className="flex items-center gap-3">
+              <div className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                 <span className="text-[10px] font-black uppercase tracking-widest">Live Store Connectivity Active</span>
+              </div>
+           </div>
+        </div>
+        
+        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50">
+                  <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400">Product Detail</th>
+                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Category</th>
+                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Current Store Stock</th>
+                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-indigo-600 text-center bg-indigo-50/30">Set Opening Stock</th>
+                  <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50/50">
+                {items.map(item => (
+                  <tr key={`opening-${item.id}`} className="hover:bg-gray-50/30 transition-all group">
+                     <td className="px-8 py-5">
+                        <div className="flex items-center gap-4">
+                           <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
+                              {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package size={18} />}
+                           </div>
+                           <div className="flex flex-col">
+                              <span className="text-sm font-black text-gray-800 leading-tight">{item.name}</span>
+                              <span className="text-[10px] font-bold text-gray-400">ID: {item.displayId || item.id.substring(0,8)}</span>
+                           </div>
+                        </div>
+                     </td>
+                     <td className="px-6 py-5 text-center">
+                        <span className="px-3 py-1 bg-gray-50 text-gray-500 rounded-xl text-[9px] font-black uppercase tracking-wider border border-gray-100">{item.category?.name}</span>
+                     </td>
+                     <td className="px-6 py-5 text-center">
+                        <div className="flex flex-col items-center">
+                          <span className="text-sm font-black text-gray-700">{item.stock || 0}</span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">In Warehouse</span>
+                        </div>
+                     </td>
+                     <td className="px-6 py-5 text-center bg-indigo-50/10">
+                        <div className="flex justify-center">
+                          <div className="relative">
+                            <input 
+                               type="number"
+                               className="w-28 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-center font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm group-hover:shadow-md"
+                               placeholder="Enter Qty"
+                               value={stockInputs[item.id] || ''}
+                               onChange={(e) => setStockInputs(p => ({ ...p, [item.id]: e.target.value }))}
+                            />
+                          </div>
+                        </div>
+                     </td>
+                     <td className="px-8 py-5 text-right">
+                        <button 
+                           onClick={() => handleUpdateStock(item.id, stockInputs[item.id], 'set')}
+                           disabled={processingItems.has(item.id) || !stockInputs[item.id]}
+                           className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-30 flex items-center gap-2 ml-auto"
+                        >
+                           {processingItems.has(item.id) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} strokeWidth={3} />}
+                           Initialize
+                        </button>
+                     </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          {items.length === 0 && (
+            <div className="py-20 text-center flex flex-col items-center">
+               <Package size={48} className="text-gray-200 mb-4" />
+               <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No products available to initialize</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
   const renderAuditHistory = () => {
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
@@ -2533,7 +2665,9 @@ export default function AdminInventory() {
       setItemRemarks({});
       loadRefillRequests();
     } catch (error) {
-      toast.error('Failed to approve refill');
+      console.error('Approve Error:', error);
+      const msg = error.response?.data?.message || 'Failed to approve refill';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -2584,7 +2718,9 @@ export default function AdminInventory() {
       toast.success('Refill request rejected');
       loadRefillRequests();
     } catch (error) {
-      toast.error('Failed to reject refill');
+      console.error('Reject Error:', error);
+      const msg = error.response?.data?.message || 'Failed to reject refill';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -2674,6 +2810,7 @@ export default function AdminInventory() {
                       {/* Items List */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                         {req.items.map(item => {
+                          const prod = items.find(p => p.id === item.productId);
                           let excessBadge = null;
                           if (req.status === 'PENDING') {
                             const vehicleInventory = allVehiclesStock[req.vehicleId] || [];
@@ -2713,6 +2850,14 @@ export default function AdminInventory() {
                                 </div>
                                 <div className="flex-1 min-w-0">
                                   <span className="text-[13px] font-black text-gray-900 leading-none truncate block">{item.product?.name}</span>
+                                  {req.status === 'PENDING' && (
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Store:</span>
+                                      <span className={`text-[10px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                        {prod?.stock || 0}
+                                      </span>
+                                    </div>
+                                  )}
                                 </div>
                               </div>
 
@@ -2742,8 +2887,8 @@ export default function AdminInventory() {
                                     </button>
                                     <button
                                       onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
-                                      disabled={processingItems.has(item.id)}
-                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm shadow-emerald-500/20 disabled:opacity-50"
+                                      disabled={processingItems.has(item.id) || (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0)}
+                                      className={`w-10 h-10 flex items-center justify-center rounded-xl ${ (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'} disabled:opacity-50 transition-all`}
                                     >
                                       {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
                                     </button>
@@ -2773,8 +2918,18 @@ export default function AdminInventory() {
                           </button>
                           <button 
                             onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id, req.items); }} 
-                            disabled={isSubmitting} 
-                            className="w-full sm:w-auto px-10 py-4 sm:py-2.5 bg-emerald-600 text-white font-black text-[10px] uppercase tracking-widest rounded-2xl hover:bg-emerald-700 active:scale-95 transition-all shadow-xl shadow-emerald-500/20 disabled:opacity-50 flex items-center justify-center gap-2"
+                            disabled={isSubmitting || req.items.some(item => {
+                              if (unselectedRefillItems.includes(item.id)) return false;
+                              const prod = items.find(p => p.id === item.productId);
+                              const qty = editedQuantities[item.id] ?? item.quantity;
+                              return prod && qty > (prod.stock || 0);
+                            })} 
+                            className={`w-full sm:w-auto px-10 py-4 sm:py-2.5 ${req.items.some(item => {
+                              if (unselectedRefillItems.includes(item.id)) return false;
+                              const prod = items.find(p => p.id === item.productId);
+                              const qty = editedQuantities[item.id] ?? item.quantity;
+                              return prod && qty > (prod.stock || 0);
+                            }) ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20'} text-white font-black text-[10px] uppercase tracking-widest rounded-2xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
                           >
                             {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
                             Approve Refill
@@ -4086,6 +4241,7 @@ export default function AdminInventory() {
           {subTab === 'tracking' && renderTracking()}
           {subTab === 'refills' && renderRefills()}
           {subTab === 'audits' && renderAuditHistory()}
+          {subTab === 'opening' && renderOpeningStock()}
         </>
       )}
 

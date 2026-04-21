@@ -58,6 +58,7 @@ model Tenant {
   goodsReceiptItems      GoodsReceiptItem[]
   purchaseInvoices       PurchaseInvoice[]
   purchaseInvoiceItems   PurchaseInvoiceItem[]
+  safeTransactions       SafeTransaction[]
   procurementStockLedger ProcurementStockLedger[]
   vendorLedger           VendorLedger[]
   vendorPayments         VendorPayment[]
@@ -124,6 +125,9 @@ model User {
   damageReviews     DamageEntry[] @relation("DamageReviewer")
   deductionsReceived DamageDeduction[] @relation("DeductionTarget")
   deductionsApplied  DamageDeduction[] @relation("DeductionApplier")
+  safeTransactions   SafeTransaction[]
+  openedRegisters    StoreCashRegister[] @relation("OpenedRegisters")
+  closedRegisters    StoreCashRegister[] @relation("ClosedRegisters")
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -642,16 +646,23 @@ model StoreCashRegister {
   closingDifference    Float?
   closingDenominations Json?
   
+  openedById           String?
+  closedById           String?
+  
   status               String   @default("OPEN") // OPEN, CLOSED
   
   createdAt            DateTime @default(now())
   updatedAt            DateTime @updatedAt
   
+  openedBy             User?    @relation("OpenedRegisters", fields: [openedById], references: [id])
+  closedBy             User?    @relation("ClosedRegisters", fields: [closedById], references: [id])
   tenant               Tenant   @relation(fields: [tenantId], references: [id])
   store                Store    @relation(fields: [storeId], references: [id])
   
   @@unique([storeId, date])
   @@index([tenantId])
+  @@index([openedById])
+  @@index([closedById])
 }
 
 model StoreDeposit {
@@ -1311,8 +1322,28 @@ model Store {
   vendorPayments         VendorPayment[]
   procurementStockLedger ProcurementStockLedger[]
   activityLogs           ActivityLog[]
+  safeTransactions       SafeTransaction[]
 
   @@index([tenantId])
+}
+
+model SafeTransaction {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String
+  date            String   // YYYY-MM-DD
+  amount          Float
+  type            String   // "DEPOSIT" (Available -> Safe), "WITHDRAW" (Safe -> Available)
+  denominations   Json?
+  description     String?
+  userId          String
+  createdAt       DateTime @default(now())
+  
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  store           Store    @relation(fields: [storeId], references: [id])
+  user            User     @relation(fields: [userId], references: [id])
+
+  @@index([storeId, date])
 }
 
 model StockAudit {

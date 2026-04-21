@@ -16,7 +16,10 @@ import {
     updateStoreDeposit,
     deleteStoreDeposit,
     adminAddBankDeposit,
-    deleteBankDeposit
+    deleteBankDeposit,
+    getStoreCashLedger,
+    createSafeTransaction,
+    resetStoreCashRegister
 } from '../controllers/cashController.js';
 import { protect, admin } from '../middleware/authMiddleware.js';
 
@@ -32,6 +35,8 @@ router.delete('/admin/reconciliation/:vehicleId/:date', protect, admin, deleteRe
 router.post('/admin/opening', protect, admin, adminSubmitOpeningCash);
 
 // Store Cash Safe Routes
+router.get('/store-register/:date/ledger', protect, admin, getStoreCashLedger);
+router.post('/safe-movement', protect, admin, createSafeTransaction);
 router.get('/store-register/:date', protect, admin, getStoreCashRegister);
 router.post('/store-register/open', protect, admin, openStoreCashRegister);
 router.post('/store-register/close', protect, admin, closeStoreCashRegister);
@@ -41,5 +46,6 @@ router.patch('/store-register/deposit/:id', protect, admin, updateStoreDeposit);
 router.delete('/store-register/deposit/:id', protect, admin, deleteStoreDeposit);
 router.post('/store-register/bank-deposit', protect, admin, adminAddBankDeposit);
 router.delete('/store-register/bank-deposit/:id', protect, admin, deleteBankDeposit);
+router.delete('/store-register/:date/reset', protect, admin, resetStoreCashRegister);
 
 export default router;

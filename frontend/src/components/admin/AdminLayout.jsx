@@ -87,6 +87,7 @@ export default function AdminLayout() {
       subItems: [
         { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid },
         { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package },
+        { to: '/admin/inventory?tab=return&sub=opening', label: 'Opening Stock', icon: ClipboardList },
         { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck },
         { to: '/admin/inventory?tab=return&sub=loading', label: 'Loading', icon: ArrowUpCircle },
         { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle },
@@ -388,8 +389,8 @@ export default function AdminLayout() {
       <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-3 md:hidden">
         {navItems.slice(0, 5).map((item) => (
           <NavLink
-            key={item.to}
-            to={appendParams(item.to)}
+            key={item.to || item.label}
+            to={appendParams(item.to || '#')}
             end={item.end}
             className={({ isActive }) => cn(
               "flex flex-col items-center gap-1 transition-all duration-200 min-w-[64px]",
