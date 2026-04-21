@@ -87,7 +87,7 @@ export default function AdminLayout() {
       subItems: [
         { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid },
         { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package },
-        { to: '/admin/inventory?tab=return&sub=opening', label: 'Opening Stock', icon: ClipboardList },
+        // { to: '/admin/inventory?tab=return&sub=opening', label: 'Opening Stock', icon: ClipboardList },
         { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck },
         { to: '/admin/inventory?tab=return&sub=loading', label: 'Loading', icon: ArrowUpCircle },
         { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle },

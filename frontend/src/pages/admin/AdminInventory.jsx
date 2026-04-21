@@ -22,14 +22,17 @@ export default function AdminInventory() {
   const [categorySearch, setCategorySearch] = useState('');
   const [subCategorySearch, setSubCategorySearch] = useState('');
   const [opsSearch, setOpsSearch] = useState('');
+  const [returnSearch, setReturnSearch] = useState('');
   const [openingSearch, setOpeningSearch] = useState('');
-  
+
   const [showFilters, setShowFilters] = useState(false);
   const [masterCategory, setMasterCategory] = useState('ALL');
   const [warehouseCategory, setWarehouseCategory] = useState('ALL');
   const [masterSubCategory, setMasterSubCategory] = useState('ALL');
   const [opsCategory, setOpsCategory] = useState('ALL');
+  const [returnCategory, setReturnCategory] = useState('ALL');
   const [opsSubCategory, setOpsSubCategory] = useState('ALL');
+  const [returnSubCategory, setReturnSubCategory] = useState('ALL');
   const [masterStatus, setMasterStatus] = useState('ALL');
   const [masterFreeOnly, setMasterFreeOnly] = useState(false);
   const [items, setItems] = useState([]);
@@ -93,6 +96,7 @@ export default function AdminInventory() {
   const [modalTab, setModalTab] = useState('info'); // info or price
   const [auditHistory, setAuditHistory] = useState([]);
   const [auditRemark, setAuditRemark] = useState('');
+  const [selectedAuditId, setSelectedAuditId] = useState(null);
   const [processingItems, setProcessingItems] = useState(new Set());
   const [warehouseStock, setWarehouseStock] = useState([]);
   const [stockInputs, setStockInputs] = useState({}); // { productId: quantity }
@@ -110,7 +114,7 @@ export default function AdminInventory() {
         quantity: parseInt(quantity),
         mode
       });
-      
+
       toast.success('Stock updated successfully');
       setStockInputs(prev => ({ ...prev, [productId]: '' }));
       fetchData(); // Refresh all data
@@ -168,7 +172,7 @@ export default function AdminInventory() {
 
       // Handle refills separately if it exists in another call or similar
       // For now we assume refills come from another source or are part of these responses
-      setLoadingRefills(false); 
+      setLoadingRefills(false);
 
       setItems(iRes.data);
       setVehicles(vRes.data);
@@ -199,7 +203,7 @@ export default function AdminInventory() {
     fetchData();
   }, [storeFilterId, activeTab]);
 
-   useEffect(() => {
+  useEffect(() => {
     setCurrentPage(1);
   }, [masterSearch, warehouseSearch, auditSearch, masterCategory, masterSubCategory, masterStatus, masterFreeOnly, activeTab, subTab]);
 
@@ -234,7 +238,9 @@ export default function AdminInventory() {
   const loadingFilteredItems = React.useMemo(() => {
     const q = opsSearch.toLowerCase();
     return items.filter(i => {
-      const matchesSearch = i.name.toLowerCase().includes(q);
+      const matchesSearch = i.name.toLowerCase().includes(q) ||
+        (i.barcode && i.barcode.toLowerCase().includes(q)) ||
+        (i.displayId && i.displayId.toLowerCase().includes(q));
       const matchesCategory = opsCategory === 'ALL' || i.category?.name === opsCategory;
       const matchesSubCategory = opsSubCategory === 'ALL' || i.subCategory?.name === opsSubCategory;
       const hasStock = (i.stock || 0) > 0;
@@ -252,12 +258,41 @@ export default function AdminInventory() {
     return { regular, free };
   }, [loadingFilteredItems]);
 
+  const returnFilteredItems = React.useMemo(() => {
+    const q = returnSearch.toLowerCase();
+    return items.filter(i => {
+      const matchesSearch = i.name.toLowerCase().includes(q) ||
+        (i.barcode && i.barcode.toLowerCase().includes(q)) ||
+        (i.displayId && i.displayId.toLowerCase().includes(q));
+      const matchesCategory = returnCategory === 'ALL' || i.category?.name === returnCategory;
+      const matchesSubCategory = returnSubCategory === 'ALL' || i.subCategory?.name === returnSubCategory;
+      return matchesSearch && matchesCategory && matchesSubCategory;
+    });
+  }, [items, returnSearch, returnCategory, returnSubCategory]);
+
+  const groupedReturnItems = React.useMemo(() => {
+    const regular = [];
+    const free = [];
+    returnFilteredItems.forEach(i => {
+      if (i.isFree) free.push(i);
+      else regular.push(i);
+    });
+    return { regular, free };
+  }, [returnFilteredItems]);
+
   const hasInvalidQuantities = React.useMemo(() => {
     return Object.entries(stockQuantities).some(([pid, qty]) => {
       const prod = items.find(p => p.id === pid);
       return prod && (parseInt(qty) || 0) > (prod.stock || 0);
     });
   }, [stockQuantities, items]);
+
+  const hasInvalidReturnQuantities = React.useMemo(() => {
+    return Object.entries(stockQuantities).some(([pid, qty]) => {
+      const currentVehicleStock = vehicleInventoryMap[pid] || 0;
+      return (parseInt(qty) || 0) > currentVehicleStock;
+    });
+  }, [stockQuantities, vehicleInventoryMap]);
 
   const groupedRefills = React.useMemo(() => {
     const groups = {};
@@ -278,12 +313,12 @@ export default function AdminInventory() {
         groups[userId].latestDate = reqDate;
       }
     });
-    
+
     // Sort requests within each group by date (newest first)
     Object.values(groups).forEach(group => {
       group.requests.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     });
-    
+
     return Object.values(groups).sort((a, b) => b.latestDate - a.latestDate);
   }, [refillRequests]);
 
@@ -300,13 +335,13 @@ export default function AdminInventory() {
 
   useEffect(() => {
     if (activeTab === 'return') {
-       if (subTab === 'tracking') {
-         loadAllVehiclesStock();
-       }
-       if (subTab === 'refills') {
-         loadRefillRequests();
-         loadAllVehiclesStock();
-       }
+      if (subTab === 'tracking') {
+        loadAllVehiclesStock();
+      }
+      if (subTab === 'refills') {
+        loadRefillRequests();
+        loadAllVehiclesStock();
+      }
     }
   }, [activeTab, subTab, vehicles]);
 
@@ -328,7 +363,7 @@ export default function AdminInventory() {
         const res = await adminAPI.getVehicleInventory(v.id);
         stockRes.push({ id: v.id, data: res.data });
       }
-      
+
       const stockMap = {};
       stockRes.forEach(r => {
         stockMap[r.id] = r.data;
@@ -428,7 +463,7 @@ export default function AdminInventory() {
             const discountTypeKey = findKey('discount type');
             const gstKey = findKey('gst slab') || findKey('gst') || findKey('tax');
             const descriptionKey = findKey('description');
-            
+
             // New hierarchical keys
             const subCategoryKey = keys.find(k => k.toLowerCase().includes('sub category') || k.toLowerCase().includes('sub-category'));
             const categoryKey = keys.find(k => k.toLowerCase() === 'category' || k.toLowerCase() === 'main category');
@@ -528,7 +563,7 @@ export default function AdminInventory() {
           formData.append(key, newItem[key]);
         }
       });
-      
+
       // Enforce storeId isolation during creation
       const currentStoreId = storeFilterId || currentUser.storeId;
       if (currentStoreId) {
@@ -600,7 +635,7 @@ export default function AdminInventory() {
   };
 
   const generateBarcode = (isEdit = false) => {
-    const timestamp = Date.now().toString().slice(-8); 
+    const timestamp = Date.now().toString().slice(-8);
     const random = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     const code = timestamp + random;
     if (isEdit) {
@@ -729,16 +764,16 @@ export default function AdminInventory() {
     const actionItems = Object.entries(stockQuantities)
       .filter(([_, qty]) => qty > 0)
       .map(([productId, quantity]) => {
-         const itemDetails = items.find(i => i.id === productId);
-         return { 
-           productId, 
-           quantity: parseInt(quantity),
-           name: itemDetails?.name,
-           price: itemDetails?.price,
-           isFree: itemDetails?.isFree,
-           unitValue: itemDetails?.unitValue,
-           unitType: itemDetails?.unit?.type
-         };
+        const itemDetails = items.find(i => i.id === productId);
+        return {
+          productId,
+          quantity: parseInt(quantity),
+          name: itemDetails?.name,
+          price: itemDetails?.price,
+          isFree: itemDetails?.isFree,
+          unitValue: itemDetails?.unitValue,
+          unitType: itemDetails?.unit?.type
+        };
       });
 
     if (actionItems.length === 0) return toast.error('Please enter quantities');
@@ -803,7 +838,7 @@ export default function AdminInventory() {
 
   const handleAuditSave = async () => {
     if (!viewingVehicleId) return;
-    
+
     // items to update [{productId, quantity}]
     const auditItems = Object.entries(auditQuantities).map(([productId, quantity]) => ({
       productId,
@@ -811,8 +846,8 @@ export default function AdminInventory() {
     }));
 
     if (auditItems.length === 0) {
-       setIsAuditMode(false);
-       return;
+      setIsAuditMode(false);
+      return;
     }
 
     setIsSubmitting(true);
@@ -826,9 +861,9 @@ export default function AdminInventory() {
       const aRes = await adminAPI.getAuditHistory({ storeId: storeFilterId });
       setAuditHistory(aRes.data || []);
     } catch (error) {
-       console.error('Audit Save Error:', error);
-       toast.error('Failed to audit inventory');
-} finally {
+      console.error('Audit Save Error:', error);
+      toast.error('Failed to audit inventory');
+    } finally {
       setIsSubmitting(false);
     }
   };
@@ -837,7 +872,9 @@ export default function AdminInventory() {
 
   const filteredItems = React.useMemo(() => {
     return items.filter(item => {
-      const matchesSearch = item.name.toLowerCase().includes(masterSearch.toLowerCase());
+      const matchesSearch = item.name.toLowerCase().includes(masterSearch.toLowerCase()) ||
+        (item.barcode && item.barcode.toLowerCase().includes(masterSearch.toLowerCase())) ||
+        (item.displayId && item.displayId.toLowerCase().includes(masterSearch.toLowerCase()));
       const matchesCategory = masterCategory === 'ALL' || item.category?.name === masterCategory;
       const matchesSubCategory = masterSubCategory === 'ALL' || item.subCategory?.name === masterSubCategory;
       const matchesStatus = masterStatus === 'ALL' || item.status === masterStatus;
@@ -885,12 +922,12 @@ export default function AdminInventory() {
                 <h3 className={`text-[11px] font-black uppercase tracking-tight ${item.isFree ? 'text-emerald-950' : 'text-gray-900'}`}>{item.name}</h3>
                 {item.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{item.displayId}</span>}
                 <div className="flex items-center gap-1.5 ml-auto">
-                    <div className="flex flex-col items-end">
-                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">SOH</span>
-                      <span className={`text-[10px] font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
-                         {item.stock || 0}
-                      </span>
-                    </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Stock</span>
+                    <span className={`text-[10px] font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {item.stock || 0}
+                    </span>
+                  </div>
                 </div>
                 {item.unit && (
                   <span className="text-[9px] font-black text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded uppercase tracking-tighter">
@@ -996,7 +1033,7 @@ export default function AdminInventory() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-                    {itemsToRender.map((item) => {
+            {itemsToRender.map((item) => {
               const isSelected = selectedItems.includes(item.id);
               return (
                 <tr key={item.id} className={`hover:bg-gray-50/30 transition-colors group ${isSelected ? 'bg-emerald-50/10' : ''}`}>
@@ -1060,12 +1097,12 @@ export default function AdminInventory() {
                     </span>
                   </td>
                   <td className="px-6 py-4 text-center bg-emerald-50/10">
-                     <div className="flex flex-col items-center">
-                       <span className={`text-xs font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
-                          {item.stock || 0}
-                       </span>
-                       <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">SOH</span>
-                     </div>
+                    <div className="flex flex-col items-center">
+                      <span className={`text-xs font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
+                        {item.stock || 0}
+                      </span>
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">Stock</span>
+                    </div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-500 text-white')}`}>
@@ -1119,11 +1156,21 @@ export default function AdminInventory() {
             <Search size={18} className="text-gray-400 shrink-0" />
             <input
               type="text"
-              placeholder="Search items..."
+              placeholder="Search items by name or barcode..."
               className="w-full bg-transparent border-none focus:outline-none text-sm min-w-0"
               value={masterSearch}
               onChange={(e) => setMasterSearch(e.target.value)}
             />
+            <button
+              onClick={() => {
+                setScannerTarget('master');
+                setShowScanner(true);
+              }}
+              className="p-1.5 rounded-xl hover:bg-gray-50 text-gray-400 hover:text-blue-600 transition-all border border-transparent hover:border-gray-100 flex items-center justify-center shrink-0"
+              title="Scan Barcode to Search"
+            >
+              <Barcode size={18} />
+            </button>
             <div className="flex items-center gap-1.5 shrink-0 border-l border-gray-100 pl-2">
               <button
                 onClick={() => setMasterFreeOnly(!masterFreeOnly)}
@@ -1157,11 +1204,10 @@ export default function AdminInventory() {
           <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
             <button
               onClick={() => { setMasterCategory('ALL'); setMasterSubCategory('ALL'); }}
-              className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                masterCategory === 'ALL' 
-                ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+              className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${masterCategory === 'ALL'
+                ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20'
                 : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
-              }`}
+                }`}
             >
               All Items
             </button>
@@ -1169,11 +1215,10 @@ export default function AdminInventory() {
               <button
                 key={cat.id}
                 onClick={() => { setMasterCategory(cat.name); setMasterSubCategory('ALL'); }}
-                className={`flex items-center gap-2 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                  masterCategory === cat.name 
-                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
+                className={`flex items-center gap-2 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${masterCategory === cat.name
+                  ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20'
                   : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
-                }`}
+                  }`}
               >
                 {cat.name}
               </button>
@@ -1192,11 +1237,10 @@ export default function AdminInventory() {
               </div>
               <button
                 onClick={() => setMasterSubCategory('ALL')}
-                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                  masterSubCategory === 'ALL' 
-                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
+                className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${masterSubCategory === 'ALL'
+                  ? 'bg-emerald-500 border-emerald-500 text-white shadow-md'
                   : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
-                }`}
+                  }`}
               >
                 All {masterCategory}
               </button>
@@ -1209,11 +1253,10 @@ export default function AdminInventory() {
                   <button
                     key={sub.id}
                     onClick={() => setMasterSubCategory(sub.name)}
-                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                      masterSubCategory === sub.name 
-                      ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
+                    className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${masterSubCategory === sub.name
+                      ? 'bg-emerald-500 border-emerald-500 text-white shadow-md'
                       : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
-                    }`}
+                      }`}
                   >
                     {sub.name}
                   </button>
@@ -1314,8 +1357,8 @@ export default function AdminInventory() {
                       let startPage = Math.max(1, currentPage - 2);
                       let endPage = Math.min(totalPages, startPage + 4);
                       if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-                      
-                      for(let i = startPage; i <= endPage; i++) {
+
+                      for (let i = startPage; i <= endPage; i++) {
                         if (i > 0) {
                           pages.push(
                             <button
@@ -1465,15 +1508,25 @@ export default function AdminInventory() {
                 <ArrowUpCircle size={18} className="text-emerald-500" />
                 Stock Loading
               </h4>
-              <div className="w-full md:max-w-xs relative">
+              <div className="w-full md:max-w-md flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+                <Search size={16} className="text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search to load..."
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none"
+                  placeholder="Search by name or barcode..."
+                  className="w-full bg-transparent border-none outline-none text-sm"
                   value={opsSearch}
                   onChange={(e) => setOpsSearch(e.target.value)}
                 />
-                <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <button
+                  onClick={() => {
+                    setScannerTarget('ops');
+                    setShowScanner(true);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-emerald-600 transition-all"
+                  title="Scan Barcode"
+                >
+                  <Barcode size={16} />
+                </button>
               </div>
             </div>
 
@@ -1494,11 +1547,11 @@ export default function AdminInventory() {
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
                     {regularItems.map((item) => (
-                      <StockItemRow 
-                        key={`load-mob-${item.id}`} 
-                        item={item} 
-                        quantity={stockQuantities[item.id]} 
-                        onChange={handleQuantityChange} 
+                      <StockItemRow
+                        key={`load-mob-${item.id}`}
+                        item={item}
+                        quantity={stockQuantities[item.id]}
+                        onChange={handleQuantityChange}
                       />
                     ))}
                   </div>
@@ -1507,12 +1560,12 @@ export default function AdminInventory() {
                   <div className="space-y-3">
                     <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
                     {freeItems.map((item) => (
-                      <StockItemRow 
-                        key={`load-free-mob-${item.id}`} 
-                        item={item} 
-                        quantity={stockQuantities[item.id]} 
-                        onChange={handleQuantityChange} 
-                        isFree 
+                      <StockItemRow
+                        key={`load-free-mob-${item.id}`}
+                        item={item}
+                        quantity={stockQuantities[item.id]}
+                        onChange={handleQuantityChange}
+                        isFree
                       />
                     ))}
                   </div>
@@ -1559,7 +1612,7 @@ export default function AdminInventory() {
                       let startPage = Math.max(1, currentPage - 2);
                       let endPage = Math.min(totalPages, startPage + 4);
                       if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-                      for(let i = startPage; i <= endPage; i++) {
+                      for (let i = startPage; i <= endPage; i++) {
                         if (i > 0) {
                           pages.push(
                             <button
@@ -1600,7 +1653,7 @@ export default function AdminInventory() {
   };
 
   const renderReturn = () => {
-    const allFiltered = [...groupedLoadingItems.regular, ...groupedLoadingItems.free];
+    const allFiltered = [...groupedReturnItems.regular, ...groupedReturnItems.free];
     const totalPages = Math.ceil(allFiltered.length / itemsPerPage);
     const paginatedItemsFromAll = allFiltered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
@@ -1649,19 +1702,22 @@ export default function AdminInventory() {
                     <span className="text-[11px] font-black text-emerald-600">{item.stock || 0}</span>
                   </td>
                   <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                    <div className="flex justify-center">
+                    <div className="flex flex-col items-center justify-center gap-1">
                       <input
                         type="number"
                         placeholder="0"
                         min="0"
                         onWheel={(e) => e.target.blur()}
-                        className="w-20 bg-white border border-gray-200 rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-sm"
+                        className={`w-20 bg-white border ${qty > currentStock ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-sm`}
                         value={stockQuantities[item.id] || ''}
                         onChange={(e) => {
                           const val = Math.max(0, parseInt(e.target.value) || 0);
                           handleQuantityChange(item.id, val);
                         }}
                       />
+                      {qty > currentStock && (
+                        <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 text-right">
@@ -1709,15 +1765,25 @@ export default function AdminInventory() {
                 <ArrowDownCircle size={18} className="text-orange-500" />
                 Stock Return
               </h4>
-              <div className="w-full md:max-w-xs relative">
+              <div className="w-full md:max-w-md flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-orange-500/20 transition-all">
+                <Search size={16} className="text-gray-400" />
                 <input
                   type="text"
-                  placeholder="Search inventory..."
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-8 pr-3 py-2 text-sm focus:ring-2 focus:ring-orange-500/20 outline-none"
-                  value={opsSearch}
-                  onChange={(e) => setOpsSearch(e.target.value)}
+                  placeholder="Search by name or barcode..."
+                  className="w-full bg-transparent border-none outline-none text-sm"
+                  value={returnSearch}
+                  onChange={(e) => setReturnSearch(e.target.value)}
                 />
-                <Search size={16} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <button
+                  onClick={() => {
+                    setScannerTarget('returnOps');
+                    setShowScanner(true);
+                  }}
+                  className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-orange-600 transition-all"
+                  title="Scan Barcode"
+                >
+                  <Barcode size={16} />
+                </button>
               </div>
             </div>
 
@@ -1740,11 +1806,11 @@ export default function AdminInventory() {
                       <div className="space-y-3">
                         <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
                         {regularItems.map((item) => (
-                          <StockItemRow 
-                            key={`return-mob-${item.id}`} 
-                            item={item} 
-                            quantity={stockQuantities[item.id]} 
-                            onChange={handleQuantityChange} 
+                          <StockItemRow
+                            key={`return-mob-${item.id}`}
+                            item={item}
+                            quantity={stockQuantities[item.id]}
+                            onChange={handleQuantityChange}
                             currentStock={vehicleInventoryMap[item.id] || 0}
                             mode="return"
                           />
@@ -1755,11 +1821,11 @@ export default function AdminInventory() {
                       <div className="space-y-3 mt-4">
                         <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
                         {freeItems.map((item) => (
-                          <StockItemRow 
-                            key={`return-free-mob-${item.id}`} 
-                            item={item} 
-                            quantity={stockQuantities[item.id]} 
-                            onChange={handleQuantityChange} 
+                          <StockItemRow
+                            key={`return-free-mob-${item.id}`}
+                            item={item}
+                            quantity={stockQuantities[item.id]}
+                            onChange={handleQuantityChange}
                             currentStock={vehicleInventoryMap[item.id] || 0}
                             mode="return"
                             isFree
@@ -1768,7 +1834,7 @@ export default function AdminInventory() {
                       </div>
                     )}
                     {allFiltered.length === 0 && (
-                      <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{opsSearch}"</div>
+                      <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{returnSearch}"</div>
                     )}
                   </div>
 
@@ -1788,7 +1854,7 @@ export default function AdminInventory() {
                     )}
                     {allFiltered.length === 0 && (
                       <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                        <p className="text-sm font-bold text-gray-400">No items found matching "{opsSearch}"</p>
+                        <p className="text-sm font-bold text-gray-400">No items found matching "{returnSearch}"</p>
                       </div>
                     )}
                   </div>
@@ -1809,7 +1875,7 @@ export default function AdminInventory() {
                           let startPage = Math.max(1, currentPage - 2);
                           let endPage = Math.min(totalPages, startPage + 4);
                           if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-                          for(let i = startPage; i <= endPage; i++) {
+                          for (let i = startPage; i <= endPage; i++) {
                             if (i > 0) {
                               pages.push(
                                 <button
@@ -1843,11 +1909,11 @@ export default function AdminInventory() {
                 </div>
               )}
             </div>
-            
+
             <button
               onClick={() => handleStockAction('RETURN')}
-              disabled={!selectedVehicleId || isSubmitting}
-              className="w-full bg-orange-600 text-white font-black py-4 rounded-2xl shadow-xl shadow-orange-600/20 hover:bg-orange-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2"
+              disabled={!selectedVehicleId || isSubmitting || hasInvalidReturnQuantities}
+              className={`w-full ${hasInvalidReturnQuantities ? 'bg-gray-400' : 'bg-orange-600 hover:bg-orange-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-orange-600/20`}
             >
               {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Confirm & Submit Return'}
             </button>
@@ -1858,10 +1924,13 @@ export default function AdminInventory() {
   };
 
   const renderInventory = () => {
-    const filteredStock = warehouseStock.filter(s => 
-      s.product.name.toLowerCase().includes(warehouseSearch.toLowerCase()) &&
-      (warehouseCategory === 'ALL' || s.product.category?.name === warehouseCategory)
-    );
+    const filteredStock = warehouseStock.filter(s => {
+      const matchesSearch = s.product.name.toLowerCase().includes(warehouseSearch.toLowerCase()) ||
+        (s.product.barcode && s.product.barcode.toLowerCase().includes(warehouseSearch.toLowerCase())) ||
+        (s.product.displayId && s.product.displayId.toLowerCase().includes(warehouseSearch.toLowerCase()));
+      const matchesCategory = warehouseCategory === 'ALL' || s.product.category?.name === warehouseCategory;
+      return matchesSearch && matchesCategory;
+    });
 
     const totalValuation = filteredStock.reduce((acc, s) => acc + (s.quantity * (s.product.landingPrice || s.product.purchasePrice || s.product.price || 0)), 0);
 
@@ -1887,89 +1956,100 @@ export default function AdminInventory() {
           </div>
         ) : (
           <>
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-              <Package size={24} />
-            </div>
-            <div>
-              <h3 className="text-lg font-black text-gray-900 tracking-tight">Store Stock Inventory</h3>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live warehouse stock count & valuation</p>
-            </div>
-          </div>
-          <div className="flex-1 flex flex-col md:flex-row items-center gap-4">
-             <div className="flex-1 w-full relative">
-                
-             </div>
-             <div className="flex flex-col items-end bg-gray-50 px-6 py-3 rounded-[1.5rem] border border-gray-100 min-w-fit shadow-sm">
-               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total SOH Valuation</span>
-               <span className="text-xl font-black text-emerald-600 tracking-tighter">₹{totalValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-             </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
-          <div className="relative flex-shrink-0">
-            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search..."
-              value={warehouseSearch}
-              onChange={(e) => setWarehouseSearch(e.target.value)}
-              className="pl-8 pr-3 py-2.5 rounded-2xl text-[10px] font-bold text-gray-700 bg-white border border-gray-100 focus:border-emerald-300 focus:ring-1 focus:ring-emerald-200 outline-none w-36 transition-all"
-            />
-          </div>
-          <button
-            onClick={() => setWarehouseCategory('ALL')}
-            className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-              warehouseCategory === 'ALL' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
-            }`}
-          >
-            All Stock
-          </button>
-          {categories.map(cat => (
-            <button
-              key={cat.id}
-              onClick={() => setWarehouseCategory(cat.name)}
-              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                warehouseCategory === cat.name ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
-              }`}
-            >
-              {cat.name}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid grid-cols-1 gap-2">
-          {filteredStock.map((stock) => (
-            <div key={stock.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all group flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 min-w-0 flex-1">
-                <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors shrink-0">
-                  {stock.product.image ? (
-                    <img src={stock.product.image} className="w-full h-full object-cover rounded-xl" alt="" />
-                  ) : (
-                    <Grid size={18} />
-                  )}
-                </div>
-                <div className="flex flex-col min-w-0">
-                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
-                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{stock.product.category?.name || 'General'}</span>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-indigo-600/20 group-hover:scale-110 transition-transform">
+                    <Grid size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 tracking-tight">SOH Intelligence</h3>
+                    <div className="flex items-center gap-3 mt-1">
+                      <div className="flex items-center gap-1.5 bg-emerald-50 px-2.5 py-1 rounded-full border border-emerald-100">
+                        <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                        <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{warehouseStock.length} Active SKUs</span>
+                      </div>
+                      <div className="flex items-center gap-1.5 bg-blue-50 px-2.5 py-1 rounded-full border border-blue-100">
+                        <Package size={10} className="text-blue-500" />
+                        <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
+                          {warehouseStock.reduce((acc, s) => acc + s.quantity, 0)} Total Units
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
 
-              <div className="hidden sm:flex items-center gap-6 shrink-0">
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Buy</span>
-                  <span className="text-[10px] font-bold text-gray-600">₹{stock.product.landingPrice || 0}</span>
+              <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center justify-between group">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20 group-hover:scale-110 transition-transform">
+                    <Package size={24} />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-black text-gray-900 tracking-tight">Store Stock Inventory</h3>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Live Warehouse Valuation</p>
+                  </div>
                 </div>
-                <div className="flex flex-col items-center">
-                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Sale</span>
-                  <span className="text-[10px] font-bold text-gray-600">₹{stock.product.price || 0}</span>
+                <div className="flex flex-col items-end bg-gray-50 px-6 py-3 rounded-[1.5rem] border border-gray-100 shadow-inner">
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Valuation</span>
+                  <span className="text-xl font-black text-emerald-600 tracking-tighter">₹{totalValuation.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
                 </div>
               </div>
+            </div>
 
-              <div className="flex items-center gap-4 shrink-0">
-                <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 group-hover:border-emerald-100 transition-colors">
+            <div className="flex items-center gap-2 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth">
+              <div className="flex items-center gap-1.5 py-1">
+                <span className="px-3 py-1.5 bg-gray-50 text-gray-400 rounded-xl text-[10px] font-black uppercase tracking-widest border border-gray-100">Quick Filters</span>
+              </div>
+              <button
+                onClick={() => setWarehouseCategory('ALL')}
+                className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${warehouseCategory === 'ALL' ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+                  }`}
+              >
+                All Stock
+              </button>
+              {categories.map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => setWarehouseCategory(cat.name)}
+                  className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${warehouseCategory === cat.name ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+                    }`}
+                >
+                  {cat.name}
+                </button>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {filteredStock.map((stock) => (
+                <div key={stock.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all group flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors shrink-0">
+                      {stock.product.image ? (
+                        <img src={stock.product.image} className="w-full h-full object-cover rounded-xl" alt="" />
+                      ) : (
+                        <Grid size={18} />
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
+                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{stock.product.category?.name || 'General'}</span>
+                    </div>
+                  </div>
+
+                  <div className="hidden sm:flex items-center gap-6 shrink-0">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Buy</span>
+                      <span className="text-[10px] font-bold text-gray-600">₹{stock.product.landingPrice || 0}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Sale</span>
+                      <span className="text-[10px] font-bold text-gray-600">₹{stock.product.price || 0}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 shrink-0">
+                    {/* <div className="flex items-center gap-2 bg-gray-50 p-1.5 rounded-xl border border-gray-100 group-hover:border-emerald-100 transition-colors">
                   <input 
                     type="number" 
                     placeholder="New Qty"
@@ -1985,24 +2065,24 @@ export default function AdminInventory() {
                   >
                     {processingItems.has(stock.productId) ? <Loader2 size={12} className="animate-spin" /> : <RefreshCw size={12} strokeWidth={3} />}
                   </button>
-                </div>
+                </div> */}
 
-                <div className="flex flex-col items-end min-w-[3rem]">
-                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">SOH</span>
-                  <div className="flex items-baseline gap-1">
-                    <span className={`text-base font-black tracking-tighter ${stock.quantity > (stock.product.minStockAlert || 5) ? 'text-gray-950' : 'text-rose-600'}`}>
-                      {stock.quantity}
-                    </span>
+                    <div className="flex flex-col items-end min-w-[3rem]">
+                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Stock</span>
+                      <div className="flex items-baseline gap-1">
+                        <span className={`text-base font-black tracking-tighter ${stock.quantity > (stock.product.minStockAlert || 5) ? 'text-gray-950' : 'text-rose-600'}`}>
+                          {stock.quantity}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[4rem]">
+                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Valuation</span>
+                      <span className="text-xs font-black text-emerald-600 tracking-tight">₹{(stock.quantity * (stock.product.landingPrice || 0)).toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col items-end min-w-[4rem]">
-                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Valuation</span>
-                  <span className="text-xs font-black text-emerald-600 tracking-tight">₹{(stock.quantity * (stock.product.landingPrice || 0)).toLocaleString()}</span>
-                </div>
-              </div>
+              ))}
             </div>
-          ))}
-        </div>
           </>
         )}
       </div>
@@ -2025,8 +2105,15 @@ export default function AdminInventory() {
       if (!v) return null;
 
       const inventory = allVehiclesStock[v.id] || [];
-      const activeStock = inventory.filter(i => i.quantity > 0);
-      const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
+      const filteredActiveStock = inventory.filter(i => {
+        if (!i.quantity || i.quantity <= 0) return false;
+        const q = vehicleSearch.toLowerCase();
+        return !q ||
+          (i.product?.name?.toLowerCase() || "").includes(q) ||
+          (i.product?.barcode?.toLowerCase() || "").includes(q) ||
+          (i.product?.displayId?.toLowerCase() || "").includes(q);
+      });
+      const totalValue = filteredActiveStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
       const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
 
       return (
@@ -2069,7 +2156,7 @@ export default function AdminInventory() {
                     </span>
                   </div>
                 </div>
-                <button 
+                <button
                   onClick={() => { setSubTab('audits'); setViewingVehicleId(null); }}
                   className="text-[10px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
                 >
@@ -2081,19 +2168,39 @@ export default function AdminInventory() {
             <div className="space-y-4">
               <div className="flex items-center justify-between border-b border-gray-100 pb-3">
                 <h4 className="font-black text-gray-900 flex items-center gap-2 text-sm uppercase tracking-widest">
-                  <Package size={18} className="text-emerald-500" /> 
+                  <Package size={18} className="text-emerald-500" />
                   Loaded Inventory
                 </h4>
                 <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100 focus-within:bg-white focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all min-w-[200px] md:min-w-[300px]">
+                    <Search size={14} className="text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search items..."
+                      value={vehicleSearch}
+                      onChange={(e) => setVehicleSearch(e.target.value)}
+                      className="bg-transparent text-[10px] font-bold text-gray-700 focus:outline-none w-full"
+                    />
+                    <button
+                      onClick={() => {
+                        setScannerTarget('tracking');
+                        setShowScanner(true);
+                      }}
+                      className="p-1 rounded-lg hover:bg-white text-gray-400 hover:text-emerald-600 transition-all"
+                      title="Scan Barcode"
+                    >
+                      <Barcode size={14} />
+                    </button>
+                  </div>
                   {isAuditMode ? (
                     <>
-                      <button 
+                      <button
                         onClick={() => { setIsAuditMode(false); setAuditQuantities({}); }}
                         className="px-4 py-2 rounded-xl border border-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-wider hover:bg-gray-50 transition-colors"
                       >
                         Cancel
                       </button>
-                      <button 
+                      <button
                         onClick={handleAuditSave}
                         disabled={isSubmitting}
                         className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-all"
@@ -2102,14 +2209,14 @@ export default function AdminInventory() {
                       </button>
                     </>
                   ) : (
-                    <button 
+                    <button
                       onClick={() => {
                         setIsAuditMode(true);
                         const initial = {};
-                        activeStock.forEach(s => initial[s.productId] = s.quantity);
+                        filteredActiveStock.forEach(s => initial[s.productId] = s.quantity);
                         setAuditQuantities(initial);
                       }}
-                      className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-2"
+                      className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
                     >
                       <Pencil size={12} />
                       Audit Inventory
@@ -2117,7 +2224,7 @@ export default function AdminInventory() {
                   )}
                 </div>
               </div>
-              
+
               {isAuditMode && (
                 <div className="flex items-center gap-3 bg-emerald-50/50 p-4 rounded-[1.5rem] border border-emerald-100 animate-in slide-in-from-top-2 mb-2">
                   <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
@@ -2125,7 +2232,7 @@ export default function AdminInventory() {
                   </div>
                   <div className="flex flex-col flex-1">
                     <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-1">Audit Note / Remark</span>
-                    <input 
+                    <input
                       type="text"
                       placeholder="e.g. Stock mismatch correction, Route end audit..."
                       className="bg-transparent border-none outline-none text-sm font-black text-emerald-900 placeholder:text-emerald-300 w-full"
@@ -2136,8 +2243,8 @@ export default function AdminInventory() {
                   </div>
                 </div>
               )}
-              
-              {activeStock.length === 0 ? (
+
+              {filteredActiveStock.length === 0 ? (
                 <div className="text-center py-12 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
                   <Package size={32} className="mx-auto text-gray-300 mb-3" />
                   <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No active stock loaded</p>
@@ -2145,7 +2252,7 @@ export default function AdminInventory() {
               ) : (
                 <>
                   <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {activeStock.map(item => (
+                    {filteredActiveStock.map(item => (
                       <div key={`track-item-${item.id}`} className="flex items-center justify-between p-4 bg-gray-50 hover:bg-emerald-50/50 hover:border-emerald-100 transition-colors rounded-2xl border border-gray-100 group">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 shadow-sm flex items-center justify-center">
@@ -2161,22 +2268,21 @@ export default function AdminInventory() {
                             <div className="flex items-center gap-2">
                               <div className="flex flex-col items-center">
                                 <span className="text-[8px] font-black text-gray-400 uppercase mb-0.5">Audit</span>
-                                <input 
+                                <input
                                   type="number"
                                   min="0"
                                   onWheel={(e) => e.target.blur()}
                                   className="w-14 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-sm font-black text-emerald-700 outline-none text-right"
                                   value={auditQuantities[item.productId] ?? item.quantity}
-                                  onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: Math.max(0, parseInt(e.target.value) || 0)})}
+                                  onChange={(e) => setAuditQuantities({ ...auditQuantities, [item.productId]: Math.max(0, parseInt(e.target.value) || 0) })}
                                 />
                               </div>
                               <div className="flex flex-col items-center">
                                 <span className="text-[8px] font-black text-gray-400 uppercase mb-0.5">Diff</span>
-                                <div className={`w-12 py-1.5 rounded-lg text-center text-[10px] font-black border ${
-                                  (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                <div className={`w-12 py-1.5 rounded-lg text-center text-[10px] font-black border ${(item.quantity - (auditQuantities[item.productId] ?? item.quantity)) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                   (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) < 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                  'bg-gray-50 text-gray-400 border-gray-100'
-                                }`}>
+                                    'bg-gray-50 text-gray-400 border-gray-100'
+                                  }`}>
                                   {item.quantity - (auditQuantities[item.productId] ?? item.quantity)}
                                 </div>
                               </div>
@@ -2209,7 +2315,7 @@ export default function AdminInventory() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {activeStock.map((item) => {
+                        {filteredActiveStock.map((item) => {
                           const qty = isAuditMode ? (auditQuantities[item.productId] ?? item.quantity) : item.quantity;
                           const price = parseFloat(item.product?.price || 0);
                           const displayAmount = qty * price;
@@ -2234,21 +2340,20 @@ export default function AdminInventory() {
                               {isAuditMode && (
                                 <>
                                   <td className="px-6 py-4 border-r border-emerald-50 bg-emerald-50/10 text-center">
-                                    <input 
+                                    <input
                                       type="number"
                                       min="0"
                                       onWheel={(e) => e.target.blur()}
                                       className="w-16 bg-white border border-emerald-200 rounded-xl px-2 py-2 text-sm text-center font-black text-emerald-700 outline-none"
                                       value={auditQuantities[item.productId] ?? item.quantity}
-                                      onChange={(e) => setAuditQuantities({...auditQuantities, [item.productId]: Math.max(0, parseInt(e.target.value) || 0)})}
+                                      onChange={(e) => setAuditQuantities({ ...auditQuantities, [item.productId]: Math.max(0, parseInt(e.target.value) || 0) })}
                                     />
                                   </td>
                                   <td className="px-6 py-4 border-r border-rose-50 bg-rose-50/5 text-center">
-                                    <div className={`inline-flex items-center justify-center w-12 h-8 rounded-xl font-black text-xs border ${
-                                      (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
+                                    <div className={`inline-flex items-center justify-center w-12 h-8 rounded-xl font-black text-xs border ${(item.quantity - (auditQuantities[item.productId] ?? item.quantity)) > 0 ? 'bg-rose-50 text-rose-600 border-rose-100' :
                                       (item.quantity - (auditQuantities[item.productId] ?? item.quantity)) < 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                      'bg-indigo-50 text-indigo-400 border-indigo-100'
-                                    }`}>
+                                        'bg-indigo-50 text-indigo-400 border-indigo-100'
+                                      }`}>
                                       {item.quantity - (auditQuantities[item.productId] ?? item.quantity)}
                                     </div>
                                   </td>
@@ -2292,7 +2397,7 @@ export default function AdminInventory() {
                 const lastAudit = auditHistory.find(a => a.vehicleId === v.id);
 
                 return (
-                  <tr 
+                  <tr
                     key={`track-row-list-${v.id}`}
                     onClick={() => setViewingVehicleId(v.id)}
                     className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
@@ -2368,7 +2473,7 @@ export default function AdminInventory() {
                   <div className="flex flex-col items-end">
                     <span className="text-[9px] font-black uppercase text-indigo-600/70 tracking-widest">Last Audit</span>
                     <span className="text-sm font-black text-indigo-700 leading-none mt-1">
-                       {lastAudit ? new Date(lastAudit.createdAt).toLocaleDateString() : 'Never'}
+                      {lastAudit ? new Date(lastAudit.createdAt).toLocaleDateString() : 'Never'}
                     </span>
                   </div>
                 </div>
@@ -2387,8 +2492,9 @@ export default function AdminInventory() {
   const renderOpeningStock = () => {
     const filteredOpeningItems = items.filter(item => {
       const search = openingSearch.toLowerCase();
-      return item.name.toLowerCase().includes(search) || 
-             (item.displayId && item.displayId.toLowerCase().includes(search));
+      return item.name.toLowerCase().includes(search) ||
+        (item.displayId && item.displayId.toLowerCase().includes(search)) ||
+        (item.barcode && item.barcode.toLowerCase().includes(search));
     });
 
     const totalOpeningPages = Math.ceil(filteredOpeningItems.length / itemsPerPage);
@@ -2400,40 +2506,48 @@ export default function AdminInventory() {
     return (
       <div className="space-y-6 sm:px-2">
         <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
-           <div className="flex items-center gap-4">
-              <div className="w-14 h-14 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
-                 <ClipboardList size={28} />
+          <div className="flex items-center gap-4">
+            <div className="w-14 h-14 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
+              <ClipboardList size={28} />
+            </div>
+            <div className="flex flex-col">
+              <h2 className="text-xl font-black text-gray-900 tracking-tight">Opening Stock Initialization</h2>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Master Inventory Setup</span>
+                <span className="w-1 h-1 rounded-full bg-gray-300" />
+                <span className="text-[10px] font-bold text-gray-400">Set your starting balances</span>
               </div>
-              <div className="flex flex-col">
-                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Opening Stock Initialization</h2>
-                 <div className="flex items-center gap-2 mt-0.5">
-                    <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Master Inventory Setup</span>
-                    <span className="w-1 h-1 rounded-full bg-gray-300" />
-                    <span className="text-[10px] font-bold text-gray-400">Set your starting balances</span>
-                 </div>
-              </div>
-           </div>
-           
-           <div className="flex flex-col sm:flex-row items-center gap-4">
-              <div className="relative group w-full sm:w-64">
-                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                  <Search size={16} className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
-                </div>
-                <input
-                  type="text"
-                  placeholder="Search products..."
-                  value={openingSearch}
-                  onChange={(e) => { setOpeningSearch(e.target.value); setCurrentPage(1); }}
-                  className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none"
-                />
-              </div>
-              <div className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2 whitespace-nowrap">
-                 <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] font-black uppercase tracking-widest">Live Connectivity</span>
-              </div>
-           </div>
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row items-center gap-4">
+            <div className="w-full sm:w-72 flex items-center gap-2 bg-gray-50 border border-transparent rounded-2xl focus-within:bg-white focus-within:ring-4 focus-within:ring-indigo-500/10 focus-within:border-indigo-500 transition-all px-4">
+              <Search size={16} className="text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search by name or barcode..."
+                value={openingSearch}
+                onChange={(e) => { setOpeningSearch(e.target.value); setCurrentPage(1); }}
+                className="block w-full py-3 bg-transparent text-xs font-bold text-gray-900 outline-none"
+              />
+              <button
+                onClick={() => {
+                  setScannerTarget('opening');
+                  setShowScanner(true);
+                }}
+                className="p-1.5 rounded-xl text-gray-300 hover:text-indigo-600 transition-all shrink-0"
+                title="Scan Barcode"
+              >
+                <Barcode size={16} />
+              </button>
+              Stock            </div>
+            <div className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2 whitespace-nowrap">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="text-[10px] font-black uppercase tracking-widest">Live Connectivity</span>
+            </div>
+          </div>
         </div>
-        
+
         <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
@@ -2449,55 +2563,55 @@ export default function AdminInventory() {
               <tbody className="divide-y divide-gray-50/50">
                 {paginatedItems.map(item => (
                   <tr key={`opening-${item.id}`} className="hover:bg-gray-50/30 transition-all group">
-                     <td className="px-8 py-5">
-                        <div className="flex items-center gap-4">
-                           <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
-                              {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package size={18} />}
-                           </div>
-                           <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-800 leading-tight">{item.name}</span>
-                              <span className="text-[10px] font-bold text-gray-400">ID: {item.displayId || item.id.substring(0,8)}</span>
-                           </div>
+                    <td className="px-8 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center text-gray-400 overflow-hidden shadow-inner group-hover:scale-110 transition-transform">
+                          {item.image ? <img src={item.image} className="w-full h-full object-cover" /> : <Package size={18} />}
                         </div>
-                     </td>
-                     <td className="px-6 py-5 text-center">
-                        <span className="px-3 py-1 bg-gray-50 text-gray-500 rounded-xl text-[9px] font-black uppercase tracking-wider border border-gray-100">{item.category?.name}</span>
-                     </td>
-                     <td className="px-6 py-5 text-center">
-                        <div className="flex flex-col items-center">
-                          <span className="text-sm font-black text-gray-700">{item.stock || 0}</span>
-                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">In Warehouse</span>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black text-gray-800 leading-tight">{item.name}</span>
+                          <span className="text-[10px] font-bold text-gray-400">ID: {item.displayId || item.id.substring(0, 8)}</span>
                         </div>
-                     </td>
-                     <td className="px-6 py-5 text-center bg-indigo-50/10">
-                        <div className="flex justify-center">
-                          <div className="relative">
-                            <input 
-                               type="number"
-                               min="0"
-                               className="w-28 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-center font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm group-hover:shadow-md"
-                               placeholder="0"
-                               value={stockInputs[item.id] || ''}
-                               onChange={(e) => {
-                                 const val = e.target.value;
-                                 if (val === '' || parseInt(val) >= 0) {
-                                   setStockInputs(p => ({ ...p, [item.id]: val }));
-                                 }
-                               }}
-                            />
-                          </div>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <span className="px-3 py-1 bg-gray-50 text-gray-500 rounded-xl text-[9px] font-black uppercase tracking-wider border border-gray-100">{item.category?.name}</span>
+                    </td>
+                    <td className="px-6 py-5 text-center">
+                      <div className="flex flex-col items-center">
+                        <span className="text-sm font-black text-gray-700">{item.stock || 0}</span>
+                        <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">In Warehouse</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-5 text-center bg-indigo-50/10">
+                      <div className="flex justify-center">
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-28 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-center font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm group-hover:shadow-md"
+                            placeholder="0"
+                            value={stockInputs[item.id] || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || parseInt(val) >= 0) {
+                                setStockInputs(p => ({ ...p, [item.id]: val }));
+                              }
+                            }}
+                          />
                         </div>
-                     </td>
-                     <td className="px-8 py-5 text-right">
-                        <button 
-                           onClick={() => handleUpdateStock(item.id, stockInputs[item.id], 'set')}
-                           disabled={processingItems.has(item.id) || !stockInputs[item.id]}
-                           className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-30 flex items-center gap-2 ml-auto"
-                        >
-                           {processingItems.has(item.id) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} strokeWidth={3} />}
-                           Initialize
-                        </button>
-                     </td>
+                      </div>
+                    </td>
+                    <td className="px-8 py-5 text-right">
+                      <button
+                        onClick={() => handleUpdateStock(item.id, stockInputs[item.id], 'set')}
+                        disabled={processingItems.has(item.id) || !stockInputs[item.id]}
+                        className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-30 flex items-center gap-2 ml-auto"
+                      >
+                        {processingItems.has(item.id) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle size={14} strokeWidth={3} />}
+                        Initialize
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -2506,8 +2620,8 @@ export default function AdminInventory() {
 
           {filteredOpeningItems.length === 0 && (
             <div className="py-20 text-center flex flex-col items-center">
-               <Package size={48} className="text-gray-200 mb-4" />
-               <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No products found matching your search</p>
+              <Package size={48} className="text-gray-200 mb-4" />
+              <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No products found matching your search</p>
             </div>
           )}
 
@@ -2530,8 +2644,8 @@ export default function AdminInventory() {
                   let startPage = Math.max(1, currentPage - 2);
                   let endPage = Math.min(totalOpeningPages, startPage + 4);
                   if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-                  
-                  for(let i = startPage; i <= endPage; i++) {
+
+                  for (let i = startPage; i <= endPage; i++) {
                     if (i > 0) {
                       pages.push(
                         <button
@@ -2562,6 +2676,109 @@ export default function AdminInventory() {
   };
 
   const renderAuditHistory = () => {
+    if (selectedAuditId) {
+      const audit = auditHistory.find(a => a.id === selectedAuditId);
+      if (!audit) {
+        setSelectedAuditId(null);
+        return null;
+      }
+
+      return (
+        <div className="space-y-6 animate-in slide-in-from-right duration-500">
+          {/* Detailed View Header */}
+          <div className="flex items-center justify-between bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm mb-6">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setSelectedAuditId(null)}
+                className="p-3 bg-gray-50 hover:bg-white hover:shadow-sm rounded-2xl text-gray-400 hover:text-indigo-600 transition-all border border-transparent hover:border-gray-100 active:scale-90"
+              >
+                <ArrowLeft size={24} strokeWidth={3} />
+              </button>
+              <div className="w-12 h-12 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
+                <CheckSquare size={24} strokeWidth={3} />
+              </div>
+              <div className="flex flex-col">
+                <h3 className="text-xl font-black text-gray-900 uppercase leading-none mb-1">Audit Details</h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">{audit.vehicle?.vehicleNumber} • {audit.vehicle?.vehicleName || 'General Vehicle'}</p>
+              </div>
+            </div>
+            <div className="hidden sm:flex flex-col items-end">
+              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Adjustment Date</span>
+              <span className="text-sm font-black text-indigo-600">{new Date(audit.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}</span>
+            </div>
+          </div>
+
+          {/* Detailed View Body */}
+          <div className="bg-white p-8 rounded-[3rem] border border-gray-100 shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-2 h-full bg-indigo-600"></div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-10 pb-8 border-b border-gray-50">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><FileText size={12} className="text-indigo-400" /> Admin User</span>
+                <span className="text-sm font-black text-gray-800">{audit.user?.name}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Truck size={12} className="text-indigo-400" /> Vehicle Type</span>
+                <span className="text-sm font-black text-gray-800">{audit.vehicle?.vehicleName || 'Standard Load'}</span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><RefreshCw size={12} className="text-indigo-400" /> Timestamp</span>
+                <span className="text-sm font-black text-gray-800">
+                  {new Date(audit.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit', hour12: true })}
+                </span>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5"><Package size={12} className="text-indigo-400" /> Items Changed</span>
+                <span className="text-sm font-black text-gray-800">{audit.items.length} Products</span>
+              </div>
+              <div className="flex flex-col col-span-full mt-4 bg-indigo-50/30 p-5 rounded-2xl border border-indigo-100/50">
+                <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Gift size={12} /> Auditor's Remark</span>
+                <span className="text-sm font-black text-indigo-950 italic leading-relaxed">"{audit.remark || 'No session remarks provided for this adjustment.'}"</span>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Adjusted Product</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">System Qty</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-indigo-600 uppercase tracking-widest text-center">Audited Qty</th>
+                    <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Variance</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {audit.items.map((item) => {
+                    const diff = (item.newQuantity || 0) - (item.oldQuantity || 0);
+                    return (
+                      <tr key={item.id} className="hover:bg-indigo-50/10 transition-colors group">
+                        <td className="px-6 py-4">
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black text-gray-800 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-none mb-1">{item.product?.name}</span>
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">{item.product?.category?.name || 'General'}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-sm font-black text-gray-400 text-center">{item.oldQuantity}</td>
+                        <td className="px-6 py-4 text-sm font-black text-indigo-600 text-center bg-indigo-50/5 font-mono">{item.newQuantity}</td>
+                        <td className="px-6 py-4 text-right">
+                          <span className={`inline-flex items-center justify-center min-w-[60px] px-3 py-1 rounded-xl text-[10px] font-black shadow-sm border ${diff > 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                            diff < 0 ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                              'bg-gray-100 text-gray-400 border-gray-200'
+                            }`}>
+                            {diff > 0 ? `+${diff}` : diff === 0 ? 'FIXED' : diff}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="space-y-6 animate-in fade-in slide-in-from-bottom-5 duration-500">
         <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden">
@@ -2572,26 +2789,26 @@ export default function AdminInventory() {
                 <CheckSquare size={32} />
               </div>
               <div>
-                <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none mb-2 uppercase">Audit Logs</h3>
+                <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none mb-2 uppercase">Audit History</h3>
                 <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                   <Package size={14} className="text-indigo-400" />
-                  Historical inventory adjustments tracking
+                  Select a record to view detailed adjustments
                 </p>
               </div>
             </div>
             <div className="flex items-center gap-4 w-full md:w-auto">
               <div className="relative flex-1 md:w-64">
                 <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
-                <input 
-                  type="text" 
-                  placeholder="Search Vehicle or Admin..."
+                <input
+                  type="text"
+                  placeholder="Search logs..."
                   className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all shadow-inner"
                   value={auditSearch}
                   onChange={(e) => setAuditSearch(e.target.value)}
                 />
               </div>
-              <button 
-                onClick={fetchData} 
+              <button
+                onClick={fetchData}
                 disabled={loading}
                 className="p-3 bg-gray-50 hover:bg-indigo-50 rounded-2xl text-gray-400 hover:text-indigo-600 transition-all border border-transparent hover:border-indigo-100 shadow-sm"
               >
@@ -2601,9 +2818,9 @@ export default function AdminInventory() {
           </div>
 
           {loadingAudit ? (
-            <div className="space-y-6">
-              {[...Array(3)].map((_, i) => (
-                <div key={i} className="h-48 bg-white border border-gray-100 rounded-[2.5rem] shadow-sm animate-pulse" />
+            <div className="space-y-4">
+              {[...Array(6)].map((_, i) => (
+                <div key={i} className="h-20 bg-white border border-gray-50 rounded-2xl animate-pulse" />
               ))}
             </div>
           ) : auditHistory.length === 0 ? (
@@ -2612,103 +2829,63 @@ export default function AdminInventory() {
                 <CheckSquare size={40} className="text-gray-200" />
               </div>
               <p className="text-lg font-black text-gray-400 uppercase tracking-[0.2em]">No audit records found</p>
-              <p className="text-sm text-gray-300 mt-2">Audit history will appear here once inventory adjustments are made.</p>
             </div>
           ) : (
-            <div className="space-y-8">
-              {auditHistory
-                .filter(a => 
-                  a.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase()) || 
-                  a.user?.name?.toLowerCase().includes(auditSearch.toLowerCase())
-                )
-                .map((audit) => (
-                  <div key={audit.id} className="border border-gray-100 rounded-[2.5rem] overflow-hidden bg-white shadow-lg shadow-gray-100/50 hover:shadow-xl hover:shadow-indigo-500/5 transition-all border-l-[6px] border-l-indigo-600">
-                  <div className="bg-gray-50/50 p-6 border-b border-gray-100 flex flex-wrap items-center justify-between gap-6">
-                    <div className="flex items-center gap-5">
-                      <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
-                        <Truck size={28} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-lg font-black text-gray-900 leading-none mb-1">{audit.vehicle?.vehicleNumber}</span>
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded border border-indigo-100">
-                            {audit.vehicle?.vehicleName || 'Vehicle'}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 md:grid-cols-3 gap-8">
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5 flex items-center gap-1.5">
-                          Admin User
-                        </span>
-                        <span className="text-sm font-black text-gray-800">{audit.user?.name}</span>
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1.5">
-                          Timestamp
-                        </span>
-                        <span className="text-sm font-black text-gray-800">
-                          {new Date(audit.createdAt).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })}
-                          <span className="text-gray-400 font-bold ml-2">@ {new Date(audit.createdAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}</span>
-                        </span>
-                      </div>
-                      {audit.remark && (
-                        <div className="hidden md:flex flex-col">
-                          <span className="text-[10px] font-black text-indigo-500 uppercase tracking-widest mb-1.5">Remark</span>
-                          <span className="text-sm font-black text-gray-600 italic">"{audit.remark}"</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="p-4">
-                    <div className="bg-white rounded-3xl border border-gray-50 overflow-hidden">
-                      <table className="w-full text-left">
-                        <thead>
-                          <tr className="bg-gray-50/30">
-                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Adjustment</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">System Qty</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-indigo-500 uppercase tracking-widest text-center">Audited Qty</th>
-                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Variance</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {audit.items.map((item) => {
-                            const diff = item.newQuantity - item.oldQuantity;
-                            return (
-                              <tr key={item.id} className="hover:bg-indigo-50/10 transition-colors group">
-                                <td className="px-6 py-4">
-                                  <div className="flex flex-col">
-                                    <span className="text-sm font-black text-gray-800 group-hover:text-indigo-600 transition-colors">{item.product?.name}</span>
-                                    {item.product?.unit && (
-                                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter mt-0.5">
-                                        Packing: {item.product.unitValue} {item.product.unit.type}
-                                      </span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="px-6 py-4 text-sm font-black text-gray-400 text-center">{item.oldQuantity}</td>
-                                <td className="px-6 py-4 text-sm font-black text-indigo-600 text-center bg-indigo-50/5">{item.newQuantity}</td>
-                                <td className="px-6 py-4 text-right">
-                                  <span className={`inline-flex items-center justify-center min-w-[50px] px-3 py-1 rounded-xl text-[10px] font-black shadow-sm border ${
-                                    diff > 0 ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                    diff < 0 ? 'bg-rose-50 text-rose-600 border-rose-100' : 
-                                    'bg-gray-50 text-gray-400 border-gray-100'
-                                  }`}>
-                                    {diff > 0 ? `+${diff}` : diff === 0 ? 'NO CHANGE' : diff}
-                                  </span>
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              ))}
+            <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-gray-50/50">
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vehicle Name / Type</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Admin User</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Timestamp</th>
+                    <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right pr-12">Remark</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50 text-[11px] font-black">
+                  {auditHistory
+                    .filter(a =>
+                      a.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                      a.vehicle?.vehicleName?.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                      a.user?.name?.toLowerCase().includes(auditSearch.toLowerCase())
+                    )
+                    .map((audit) => (
+                      <tr
+                        key={audit.id}
+                        onClick={() => setSelectedAuditId(audit.id)}
+                        className="hover:bg-indigo-50/30 transition-all cursor-pointer group"
+                      >
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-4">
+                            <div className="w-10 h-10 bg-indigo-50 text-indigo-600 group-hover:bg-indigo-600 group-hover:text-white rounded-xl flex items-center justify-center transition-all shadow-inner">
+                              <Truck size={18} />
+                            </div>
+                            <div className="flex flex-col">
+                              <span className="text-gray-900 group-hover:text-indigo-600 uppercase tracking-tight transition-colors">{audit.vehicle?.vehicleNumber}</span>
+                              <span className="text-[9px] text-gray-400 uppercase tracking-widest">{audit.vehicle?.vehicleName || 'Regular Load'}</span>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-gray-700 bg-gray-50 px-3 py-1 rounded-lg border border-gray-100">{audit.user?.name}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <div className="flex flex-col">
+                            <span className="text-gray-800">{new Date(audit.createdAt).toLocaleDateString()}</span>
+                            <span className="text-[9px] text-gray-400 uppercase tracking-tighter">{new Date(audit.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 text-right pr-6">
+                          <div className="flex items-center justify-end gap-3">
+                            <span className="text-gray-400 italic font-medium truncate max-w-[150px]">{audit.remark || 'N/A'}</span>
+                            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-400 group-hover:translate-x-1 transition-all">
+                              <ArrowLeft className="rotate-180" size={12} strokeWidth={3} />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
@@ -2717,7 +2894,7 @@ export default function AdminInventory() {
   };
 
   const toggleRefillItemSelection = (itemId) => {
-    setUnselectedRefillItems(prev => 
+    setUnselectedRefillItems(prev =>
       prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]
     );
   };
@@ -2726,14 +2903,14 @@ export default function AdminInventory() {
     try {
       setIsSubmitting(true);
       const approvedItemIds = allItems.filter(i => !unselectedRefillItems.includes(i.id)).map(i => i.id);
-      
+
       if (approvedItemIds.length === 0) {
         toast.error('Please select at least one item to approve, or reject the entire session.');
         setIsSubmitting(false);
         return;
       }
 
-      await adminAPI.approveRefillRequest(id, { 
+      await adminAPI.approveRefillRequest(id, {
         approvedItemIds,
         quantities: editedQuantities,
         remarks: itemRemarks
@@ -2755,7 +2932,7 @@ export default function AdminInventory() {
   const handleApproveSingleItem = async (reqId, itemId) => {
     try {
       setProcessingItems(prev => new Set(prev).add(itemId));
-      await adminAPI.approveRefillRequest(reqId, { 
+      await adminAPI.approveRefillRequest(reqId, {
         approvedItemIds: [itemId],
         quantities: editedQuantities,
         remarks: itemRemarks
@@ -2810,215 +2987,213 @@ export default function AdminInventory() {
     if (activeRefillGroup) {
       const group = activeRefillGroup;
       const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
-      
+
       return (
         <div className="space-y-8 animate-in slide-in-from-bottom-4 duration-500">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-             <div className="flex items-center gap-6">
-                <button 
-                  onClick={() => setViewingAgentId(null)}
-                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-500 hover:border-emerald-100 transition-all active:scale-90 shadow-sm"
-                >
-                   <X size={20} />
-                </button>
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-emerald-600/20">
-                    {group.user?.name?.[0] || '?'}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-black text-gray-900 tracking-tight">{group.user?.name || 'Unknown Agent'}</h3>
-                    <div className="flex items-center gap-2">
-                       <Truck size={14} className="text-emerald-400" />
-                       <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
-                    </div>
+            <div className="flex items-center gap-6">
+              <button
+                onClick={() => setViewingAgentId(null)}
+                className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-500 hover:border-emerald-100 transition-all active:scale-90 shadow-sm"
+              >
+                <X size={20} />
+              </button>
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center text-white font-black text-2xl shadow-xl shadow-emerald-600/20">
+                  {group.user?.name?.[0] || '?'}
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight">{group.user?.name || 'Unknown Agent'}</h3>
+                  <div className="flex items-center gap-2">
+                    <Truck size={14} className="text-emerald-400" />
+                    <span className="text-xs font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
                   </div>
                 </div>
-             </div>
-             <div className="flex items-center gap-3 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
-                <div className="flex flex-col">
-                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Sessions</span>
-                   <span className="text-lg font-black text-emerald-950">{group.requests.length}</span>
+              </div>
+            </div>
+            <div className="flex items-center gap-3 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Sessions</span>
+                <span className="text-lg font-black text-emerald-950">{group.requests.length}</span>
+              </div>
+              {pendingCount > 0 && (
+                <div className="ml-4 flex flex-col items-end">
+                  <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Action Required</span>
+                  <span className="text-lg font-black text-amber-500">{pendingCount} Pending</span>
                 </div>
-                {pendingCount > 0 && (
-                  <div className="ml-4 flex flex-col items-end">
-                    <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Action Required</span>
-                    <span className="text-lg font-black text-amber-500">{pendingCount} Pending</span>
-                  </div>
-                )}
-             </div>
+              )}
+            </div>
           </div>
 
           {/* Refill Timeline */}
           <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
-             <div className="flex items-center gap-3 mb-8 px-2">
-                <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
-                <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Refill Timeline</h4>
-             </div>
+            <div className="flex items-center gap-3 mb-8 px-2">
+              <div className="w-1.5 h-6 bg-emerald-500 rounded-full" />
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-wider">Refill Timeline</h4>
+            </div>
 
-             <div className="space-y-12 md:space-y-8 relative md:before:absolute md:before:left-[31px] md:before:top-2 md:before:bottom-2 md:before:w-0.5 md:before:bg-gradient-to-b md:before:from-emerald-100 md:before:via-gray-100 md:before:to-gray-50">
-               {group.requests.map((req) => (
-                  <div key={req.id} className="relative pl-0 md:pl-16 group/session">
-                    {/* Time Indicator Circle (Desktop Only) */}
-                    <div className={`hidden md:block absolute left-[24px] top-1.5 w-4 h-4 rounded-full border-4 border-white ring-2 ring-offset-2 transition-all group-hover/session:scale-125 ${
-                      req.status === 'PENDING' ? 'ring-amber-400 bg-amber-400' : 
-                      req.status === 'APPROVED' ? 'ring-emerald-400 bg-emerald-400' : 'ring-red-400 bg-red-400'
+            <div className="space-y-12 md:space-y-8 relative md:before:absolute md:before:left-[31px] md:before:top-2 md:before:bottom-2 md:before:w-0.5 md:before:bg-gradient-to-b md:before:from-emerald-100 md:before:via-gray-100 md:before:to-gray-50">
+              {group.requests.map((req) => (
+                <div key={req.id} className="relative pl-0 md:pl-16 group/session">
+                  {/* Time Indicator Circle (Desktop Only) */}
+                  <div className={`hidden md:block absolute left-[24px] top-1.5 w-4 h-4 rounded-full border-4 border-white ring-2 ring-offset-2 transition-all group-hover/session:scale-125 ${req.status === 'PENDING' ? 'ring-amber-400 bg-amber-400' :
+                    req.status === 'APPROVED' ? 'ring-emerald-400 bg-emerald-400' : 'ring-red-400 bg-red-400'
                     }`} />
-                    
-                    <div className="flex flex-col gap-4">
-                      {/* Session Metadata */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                        <div className="flex items-center gap-4">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100 w-fit">
-                              {new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
-                            </span>
-                            <span className="text-xl font-black text-emerald-950 font-mono tracking-tighter mt-1">
-                              {new Date(req.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
-                            </span>
-                          </div>
-                          <div className={`px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest ${
-                            req.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm shadow-amber-500/10' :
-                            req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+
+                  <div className="flex flex-col gap-4">
+                    {/* Session Metadata */}
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-4">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-gray-400 uppercase tracking-widest bg-gray-50 px-2 py-0.5 rounded-lg border border-gray-100 w-fit">
+                            {new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric' })}
+                          </span>
+                          <span className="text-xl font-black text-emerald-950 font-mono tracking-tighter mt-1">
+                            {new Date(req.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
+                          </span>
+                        </div>
+                        <div className={`px-3 py-1.5 rounded-xl border text-[10px] font-black uppercase tracking-widest ${req.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100 shadow-sm shadow-amber-500/10' :
+                          req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
                             'bg-red-50 text-red-600 border-red-100'
                           }`}>
-                            {req.status}
-                          </div>
+                          {req.status}
                         </div>
                       </div>
+                    </div>
 
-                      {/* Items List */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                        {req.items.map(item => {
-                          const prod = items.find(p => p.id === item.productId);
-                          let excessBadge = null;
-                          if (req.status === 'PENDING') {
-                            const vehicleInventory = allVehiclesStock[req.vehicleId] || [];
-                            const stockItem = vehicleInventory.find(i => i.productId === item.productId);
-                            
-                            const targetCapacity = stockItem ? Math.max(stockItem.openingQuantity || 0, stockItem.quantity) : 0;
-                            const currentQty = stockItem ? stockItem.quantity : 0;
-                            const shortfall = targetCapacity - currentQty;
-                            const excess = item.quantity - shortfall;
+                    {/* Items List */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {req.items.map(item => {
+                        const prod = items.find(p => p.id === item.productId);
+                        let excessBadge = null;
+                        if (req.status === 'PENDING') {
+                          const vehicleInventory = allVehiclesStock[req.vehicleId] || [];
+                          const stockItem = vehicleInventory.find(i => i.productId === item.productId);
 
-                            if (excess > 0) {
-                              excessBadge = (
-                                <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-lg shadow-lg shadow-amber-500/30 ring-2 ring-white flex items-center gap-1 z-10 animate-in zoom-in duration-300">
-                                  <ArrowUpCircle size={10} strokeWidth={3} />
-                                  +{excess}
-                                </div>
-                              );
-                            }
+                          const targetCapacity = stockItem ? Math.max(stockItem.openingQuantity || 0, stockItem.quantity) : 0;
+                          const currentQty = stockItem ? stockItem.quantity : 0;
+                          const shortfall = targetCapacity - currentQty;
+                          const excess = item.quantity - shortfall;
+
+                          if (excess > 0) {
+                            excessBadge = (
+                              <div className="absolute -top-2 -right-2 bg-amber-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded-lg shadow-lg shadow-amber-500/30 ring-2 ring-white flex items-center gap-1 z-10 animate-in zoom-in duration-300">
+                                <ArrowUpCircle size={10} strokeWidth={3} />
+                                +{excess}
+                              </div>
+                            );
                           }
+                        }
 
-                          const isSelected = !unselectedRefillItems.includes(item.id);
-                          return (
-                            <div key={item.id} className={`bg-white p-3.5 rounded-[1.5rem] border transition-all duration-300 ${!isSelected ? 'border-gray-100 opacity-40 grayscale' : 'border-indigo-100 shadow-sm'}`}>
-                              {/* Integrated Top: Info + Toggle */}
-                              <div className="flex items-center gap-3 mb-2.5">
+                        const isSelected = !unselectedRefillItems.includes(item.id);
+                        return (
+                          <div key={item.id} className={`bg-white p-3.5 rounded-[1.5rem] border transition-all duration-300 ${!isSelected ? 'border-gray-100 opacity-40 grayscale' : 'border-indigo-100 shadow-sm'}`}>
+                            {/* Integrated Top: Info + Toggle */}
+                            <div className="flex items-center gap-3 mb-2.5">
+                              {req.status === 'PENDING' && (
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
+                                  className={`shrink-0 transition-all ${isSelected ? 'text-indigo-600' : 'text-gray-300'}`}
+                                >
+                                  {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                                </button>
+                              )}
+                              <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 relative ${isSelected ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                                <Package size={16} />
+                                {excessBadge}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <span className="text-[13px] font-black text-gray-900 leading-none truncate block">{item.product?.name}</span>
                                 {req.status === 'PENDING' && (
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
-                                    className={`shrink-0 transition-all ${isSelected ? 'text-indigo-600' : 'text-gray-300'}`}
-                                  >
-                                    {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
-                                  </button>
+                                  <div className="flex items-center gap-1.5 mt-1">
+                                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Store:</span>
+                                    <span className={`text-[10px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                                      {prod?.stock || 0}
+                                    </span>
+                                  </div>
                                 )}
-                                <div className={`w-9 h-9 rounded-xl flex items-center justify-center border shrink-0 relative ${isSelected ? 'bg-indigo-50 text-indigo-600 border-indigo-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                                  <Package size={16} />
-                                  {excessBadge}
+                              </div>
+                            </div>
+
+                            {/* Compact Control Row */}
+                            {req.status === 'PENDING' && isSelected ? (
+                              <div className="flex items-center gap-2">
+                                {/* Qty Adj */}
+                                <div className="flex-1 flex items-center justify-between bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
+                                  <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1) }))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
+                                  <input
+                                    type="number"
+                                    value={editedQuantities[item.id] ?? item.quantity}
+                                    onChange={(e) => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                    className="w-8 text-center bg-transparent font-black text-xs text-indigo-600 outline-none"
+                                  />
+                                  <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: (editedQuantities[item.id] ?? item.quantity) + 1 }))} className="p-1 text-indigo-600"><Plus size={14} /></button>
                                 </div>
-                                <div className="flex-1 min-w-0">
-                                  <span className="text-[13px] font-black text-gray-900 leading-none truncate block">{item.product?.name}</span>
-                                  {req.status === 'PENDING' && (
-                                    <div className="flex items-center gap-1.5 mt-1">
-                                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Store:</span>
-                                      <span className={`text-[10px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
-                                        {prod?.stock || 0}
-                                      </span>
-                                    </div>
-                                  )}
+
+                                {/* Quick Actions */}
+                                <div className="flex gap-1.5 shrink-0">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
+                                    disabled={processingItems.has(item.id)}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 border border-rose-100 disabled:opacity-50"
+                                  >
+                                    {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <X size={16} strokeWidth={3} />}
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
+                                    disabled={processingItems.has(item.id) || (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0)}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-xl ${(editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'} disabled:opacity-50 transition-all`}
+                                  >
+                                    {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
+                                  </button>
                                 </div>
                               </div>
-
-                              {/* Compact Control Row */}
-                              {req.status === 'PENDING' && isSelected ? (
-                                <div className="flex items-center gap-2">
-                                  {/* Qty Adj */}
-                                  <div className="flex-1 flex items-center justify-between bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
-                                    <button onClick={() => setEditedQuantities(p => ({...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1)}))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
-                                    <input 
-                                      type="number" 
-                                      value={editedQuantities[item.id] ?? item.quantity} 
-                                      onChange={(e) => setEditedQuantities(p => ({...p, [item.id]: Math.max(0, parseInt(e.target.value) || 0)}))}
-                                      className="w-8 text-center bg-transparent font-black text-xs text-indigo-600 outline-none" 
-                                    />
-                                    <button onClick={() => setEditedQuantities(p => ({...p, [item.id]: (editedQuantities[item.id] ?? item.quantity) + 1}))} className="p-1 text-indigo-600"><Plus size={14} /></button>
-                                  </div>
-                                  
-                                  {/* Quick Actions */}
-                                  <div className="flex gap-1.5 shrink-0">
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
-                                      disabled={processingItems.has(item.id)}
-                                      className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 border border-rose-100 disabled:opacity-50"
-                                    >
-                                      {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <X size={16} strokeWidth={3} />}
-                                    </button>
-                                    <button
-                                      onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
-                                      disabled={processingItems.has(item.id) || (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0)}
-                                      className={`w-10 h-10 flex items-center justify-center rounded-xl ${ (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'} disabled:opacity-50 transition-all`}
-                                    >
-                                      {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
-                                    </button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center justify-between bg-gray-50/50 rounded-xl px-3 py-2 mt-1">
-                                   <span className="text-[9px] font-black text-gray-400 uppercase">Final Approval</span>
-                                   <span className="text-xs font-black text-emerald-600">{item.quantity} pcs</span>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
-                      </div>
-
-                      {/* Action Controls */}
-                      {req.status === 'PENDING' && (
-                        <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 mt-2">
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }} 
-                            disabled={isSubmitting} 
-                            className="w-full sm:w-auto px-6 py-4 sm:py-2.5 rounded-2xl bg-white border border-red-200 text-red-600 font-black text-[10px] uppercase tracking-widest hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
-                          >
-                            <X size={16} strokeWidth={3} />
-                            Reject Session
-                          </button>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id, req.items); }} 
-                            disabled={isSubmitting || req.items.some(item => {
-                              if (unselectedRefillItems.includes(item.id)) return false;
-                              const prod = items.find(p => p.id === item.productId);
-                              const qty = editedQuantities[item.id] ?? item.quantity;
-                              return prod && qty > (prod.stock || 0);
-                            })} 
-                            className={`w-full sm:w-auto px-10 py-4 sm:py-2.5 ${req.items.some(item => {
-                              if (unselectedRefillItems.includes(item.id)) return false;
-                              const prod = items.find(p => p.id === item.productId);
-                              const qty = editedQuantities[item.id] ?? item.quantity;
-                              return prod && qty > (prod.stock || 0);
-                            }) ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20'} text-white font-black text-[10px] uppercase tracking-widest rounded-2xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
-                          >
-                            {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
-                            Approve Refill
-                          </button>
-                        </div>
-                      )}
+                            ) : (
+                              <div className="flex items-center justify-between bg-gray-50/50 rounded-xl px-3 py-2 mt-1">
+                                <span className="text-[9px] font-black text-gray-400 uppercase">Final Approval</span>
+                                <span className="text-xs font-black text-emerald-600">{item.quantity} pcs</span>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
+
+                    {/* Action Controls */}
+                    {req.status === 'PENDING' && (
+                      <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 mt-2">
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }}
+                          disabled={isSubmitting}
+                          className="w-full sm:w-auto px-6 py-4 sm:py-2.5 rounded-2xl bg-white border border-red-200 text-red-600 font-black text-[10px] uppercase tracking-widest hover:bg-red-50 active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          <X size={16} strokeWidth={3} />
+                          Reject Session
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleApproveRefill(req.id, req.items); }}
+                          disabled={isSubmitting || req.items.some(item => {
+                            if (unselectedRefillItems.includes(item.id)) return false;
+                            const prod = items.find(p => p.id === item.productId);
+                            const qty = editedQuantities[item.id] ?? item.quantity;
+                            return prod && qty > (prod.stock || 0);
+                          })}
+                          className={`w-full sm:w-auto px-10 py-4 sm:py-2.5 ${req.items.some(item => {
+                            if (unselectedRefillItems.includes(item.id)) return false;
+                            const prod = items.find(p => p.id === item.productId);
+                            const qty = editedQuantities[item.id] ?? item.quantity;
+                            return prod && qty > (prod.stock || 0);
+                          }) ? 'bg-gray-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700 shadow-xl shadow-emerald-500/20'} text-white font-black text-[10px] uppercase tracking-widest rounded-2xl active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2`}
+                        >
+                          {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <Package size={16} />}
+                          Approve Refill
+                        </button>
+                      </div>
+                    )}
                   </div>
-               ))}
-             </div>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       );
@@ -3029,9 +3204,9 @@ export default function AdminInventory() {
         {/* Skeleton Loading State */}
         {loadingRefills ? (
           <div className="space-y-4">
-             {[...Array(4)].map((_, i) => (
-               <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" />
-             ))}
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" />
+            ))}
           </div>
         ) : groupedRefills.length === 0 ? (
           <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
@@ -3054,46 +3229,46 @@ export default function AdminInventory() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {groupedRefills
-                  .filter(g => 
-                    g.user?.name?.toLowerCase().includes(auditSearch.toLowerCase()) || 
-                    g.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase())
-                  )
-                  .map(group => {
-                    const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
-                    return (
-                      <tr 
-                        key={group.user?.id || 'unknown'} 
-                        onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
-                        className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center font-black text-xl transition-all shadow-inner">
-                              {group.user?.name?.[0] || '?'}
+                    .filter(g =>
+                      g.user?.name?.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                      g.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase())
+                    )
+                    .map(group => {
+                      const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+                      return (
+                        <tr
+                          key={group.user?.id || 'unknown'}
+                          onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                          className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
+                        >
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center font-black text-xl transition-all shadow-inner">
+                                {group.user?.name?.[0] || '?'}
+                              </div>
+                              <div className="flex flex-col">
+                                <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{group.user?.name || 'Unknown Agent'}</span>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                              </div>
                             </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{group.user?.name || 'Unknown Agent'}</span>
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className="text-sm font-black text-gray-700">{group.requests.length} Sessions</span>
+                          </td>
+                          <td className="px-6 py-4 text-center">
+                            <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${pendingCount > 0 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                              {pendingCount > 0 ? `${pendingCount} Action Required` : 'Verified'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex items-center justify-end gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest transition-colors">
+                              Manage Refills
+                              <ArrowLeft className="rotate-180" size={14} strokeWidth={3} />
                             </div>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-sm font-black text-gray-700">{group.requests.length} Sessions</span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${pendingCount > 0 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                            {pendingCount > 0 ? `${pendingCount} Action Required` : 'Verified'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest transition-colors">
-                            Manage Refills
-                            <ArrowLeft className="rotate-180" size={14} strokeWidth={3} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -3104,8 +3279,8 @@ export default function AdminInventory() {
                 const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
 
                 return (
-                  <div 
-                    key={group.user?.id || 'unknown'} 
+                  <div
+                    key={group.user?.id || 'unknown'}
                     onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
                     className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
                   >
@@ -3130,14 +3305,14 @@ export default function AdminInventory() {
 
                     <div className="grid grid-cols-2 gap-3 mt-1">
                       <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
-                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
-                         <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
+                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
+                        <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
                       </div>
                       <div className={`${pendingCount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-3 border`}>
-                         <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
-                         <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                           {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
-                         </span>
+                        <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
+                        <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                          {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
+                        </span>
                       </div>
                     </div>
 
@@ -3226,7 +3401,7 @@ export default function AdminInventory() {
                 </div>
                 <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">Product Identity</span>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="group">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-emerald-600 transition-colors">Item Display Name</label>
@@ -3543,7 +3718,7 @@ export default function AdminInventory() {
                     className="hidden"
                     onChange={handleFileChange}
                   />
-                  <div 
+                  <div
                     onClick={() => document.getElementById('image-input').click()}
                     className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-emerald-500 hover:bg-emerald-50 group shadow-inner"
                   >
@@ -3566,7 +3741,7 @@ export default function AdminInventory() {
                 <div className={`p-5 rounded-[2rem] border-2 transition-all duration-300 flex flex-col gap-4 ${newItem.isFree ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50/30 border-gray-100'}`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div 
+                      <div
                         onClick={() => setNewItem({ ...newItem, isFree: !newItem.isFree })}
                         className={`w-12 h-7 rounded-full relative transition-colors cursor-pointer ${newItem.isFree ? 'bg-emerald-500' : 'bg-gray-200'}`}
                       >
@@ -3578,7 +3753,7 @@ export default function AdminInventory() {
                     </div>
                     {newItem.isFree && <Gift size={18} className="text-emerald-500 animate-bounce" />}
                   </div>
-                  
+
                   {newItem.isFree && (
                     <div className="space-y-1.5 animate-in slide-in-from-top-2 duration-200">
                       <label className="text-[9px] font-black text-emerald-600 uppercase tracking-widest ml-1">Minimum Shop Amount (₹)</label>
@@ -3633,8 +3808,8 @@ export default function AdminInventory() {
               {/* Mobile Back Button */}
               <div className="lg:hidden">
                 {modalTab !== 'info' && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setModalTab(modalTab === 'final' ? 'price' : 'info')}
                     className="text-[10px] font-black uppercase tracking-widest text-gray-400 flex items-center gap-1.5 px-4 py-3"
                   >
@@ -3648,8 +3823,8 @@ export default function AdminInventory() {
               {/* Mobile Guided Navigation */}
               <div className="flex-1 lg:hidden">
                 {modalTab === 'info' && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setModalTab('price')}
                     className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
                   >
@@ -3657,8 +3832,8 @@ export default function AdminInventory() {
                   </button>
                 )}
                 {modalTab === 'price' && (
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setModalTab('final')}
                     className="w-full bg-emerald-600 text-white px-6 py-4 rounded-[1.5rem] font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20"
                   >
@@ -3747,7 +3922,7 @@ export default function AdminInventory() {
                 </div>
                 <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">General Information</span>
               </div>
-              
+
               <div className="space-y-4">
                 <div className="group">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 mb-1 block group-focus-within:text-indigo-600 transition-colors">Item Display Name</label>
@@ -4014,7 +4189,7 @@ export default function AdminInventory() {
 
                 <div className="bg-indigo-950 rounded-3xl p-6 flex flex-col gap-4 shadow-2xl shadow-indigo-900/20 relative overflow-hidden group">
                   <div className="absolute top-0 right-0 p-4 opacity-10">
-                     <div className="text-white text-6xl font-black">₹</div>
+                    <div className="text-white text-6xl font-black">₹</div>
                   </div>
                   <div className="flex justify-between items-start relative z-10">
                     <div className="flex flex-col">
@@ -4029,13 +4204,13 @@ export default function AdminInventory() {
                     <div className="flex flex-col">
                       <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Tax Component</span>
                       <span className="text-sm font-black text-indigo-200">
-                         ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) - (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100))).toFixed(2) : '0.00'}
+                        ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) - (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100))).toFixed(2) : '0.00'}
                       </span>
                     </div>
                     <div className="flex flex-col text-right">
                       <span className="text-[8px] font-black text-indigo-400/40 uppercase tracking-widest">Net Revenue</span>
                       <span className="text-sm font-black text-indigo-200">
-                         ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100)).toFixed(2) : '0.00'}
+                        ₹{editItem.price && editItem.gst ? (parseFloat(editItem.price) / (1 + parseFloat(editItem.gst) / 100)).toFixed(2) : '0.00'}
                       </span>
                     </div>
                   </div>
@@ -4061,7 +4236,7 @@ export default function AdminInventory() {
                     className="hidden"
                     onChange={(e) => handleFileChange(e, true)}
                   />
-                  <div 
+                  <div
                     onClick={() => document.getElementById('edit-image-input').click()}
                     className="w-full aspect-[4/3] rounded-[2.5rem] border-4 border-dashed border-gray-100 bg-gray-50 flex flex-col items-center justify-center cursor-pointer overflow-hidden transition-all hover:border-indigo-500 hover:bg-indigo-50 group shadow-inner"
                   >
@@ -4076,10 +4251,10 @@ export default function AdminInventory() {
                       </>
                     )}
                     <div className="absolute inset-0 bg-indigo-600/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center bg-blur-sm">
-                       <div className="flex flex-col items-center gap-2">
-                          <Plus className="text-white" size={32} />
-                          <span className="text-white text-[10px] font-black uppercase tracking-widest">Change Image</span>
-                       </div>
+                      <div className="flex flex-col items-center gap-2">
+                        <Plus className="text-white" size={32} />
+                        <span className="text-white text-[10px] font-black uppercase tracking-widest">Change Image</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -4101,7 +4276,7 @@ export default function AdminInventory() {
                         </>
                       )}
                     </button>
-                    
+
                     <button
                       type="button"
                       onClick={() => handleDeleteItem(editItem)}
@@ -4115,8 +4290,8 @@ export default function AdminInventory() {
 
                   <div className="hidden sm:flex items-center gap-4 mt-6 pt-6 border-t border-orange-100/30">
                     <div className="text-xs font-black text-gray-900 uppercase tracking-tight flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-100 shadow-sm">
-                       <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                       Production Record
+                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                      Production Record
                     </div>
                   </div>
                 </div>
@@ -4134,376 +4309,401 @@ export default function AdminInventory() {
       {isEditView && renderEditItemView()}
       {!isCreateView && !isEditView && (
         <div className="space-y-6">
-      <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">
-            {activeTab === 'inventory' ? 'SOH Intelligence Dashboard' : 'Inventory Management'}
-          </h2>
-          <div className="flex items-center gap-2">
-            {activeTab === 'inventory' ? (
-              <div className="flex items-center gap-3 mt-1">
-                <div className="flex items-center gap-1.5 bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 shadow-sm">
-                   <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                   <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{warehouseStock.length} Active SKUs</span>
-                </div>
-                <div className="flex items-center gap-1.5 bg-blue-50 px-3 py-1 rounded-full border border-blue-100 shadow-sm">
-                   <Package size={10} className="text-blue-500" />
-                   <span className="text-[10px] font-black text-blue-700 uppercase tracking-widest">
-                     {warehouseStock.reduce((acc, s) => acc + s.quantity, 0)} Total Units
-                   </span>
-                </div>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-bold text-gray-900">
+                {activeTab === 'inventory' ? '' : 'Inventory Management'}
+              </h2>
+              <div className="flex items-center gap-2">
+                {activeTab === 'inventory' ? (
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="flex-1 min-w-[350px] md:min-w-[500px] flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm transition-all focus-within:ring-2 focus-within:ring-emerald-500/20">
+                      <Search size={14} className="text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search stock by name or barcode..."
+                        value={warehouseSearch}
+                        onChange={(e) => setWarehouseSearch(e.target.value)}
+                        className="bg-transparent text-[10px] font-bold text-gray-700 focus:outline-none w-full"
+                      />
+                      <button
+                        onClick={() => {
+                          setScannerTarget('warehouse');
+                          setShowScanner(true);
+                        }}
+                        className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-blue-600 transition-all"
+                        title="Scan Barcode"
+                      >
+                        <Barcode size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
+                )}
+                {isTenantRoute && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <select
+                      value={storeFilterId || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSearchParams({ storeId: e.target.value });
+                        } else {
+                          setSearchParams({});
+                        }
+                      }}
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.25rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1rem'
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
               </div>
-            ) : (
-              <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
-            )}
-            {isTenantRoute && (
-              <>
-                <span className="text-gray-300">•</span>
-                <select
-                  value={storeFilterId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSearchParams({ storeId: e.target.value });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
-                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.25rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
-                >
-                  <option value="">All Branches</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-          </div>
-        </div>
-        {activeTab === 'master' && (
-          <div className="flex gap-2">
-            <input
-              type="file"
-              id="excel-upload"
-              accept=".xlsx, .xls, .csv"
-              className="hidden"
-              onChange={handleExcelUpload}
-              disabled={isUploading}
-            />
-            <input
-              type="file"
-              id="zip-upload"
-              accept=".zip"
-              className="hidden"
-              onChange={handleZipUpload}
-              disabled={isUploading}
-            />
-            {can('INVENTORY', 'CREATE') && (
-              <button
-                onClick={() => setShowBulkUploadModal(true)}
-                disabled={isUploading}
-                className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
-                title="Bulk Upload Excel"
-              >
-                {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
-                <span className="hidden md:block">Bulk Upload</span>
-              </button>
-            )}
-            {can('INVENTORY', 'CREATE') && (
-              <button
-                onClick={() => setShowZipImportModal(true)}
-                disabled={isUploading}
-                className="bg-orange-50 text-orange-600 p-3 rounded-xl border border-orange-100 shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-2 font-bold text-sm"
-                title="Import ZIP (Excel + Images)"
-              >
-                {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Package size={24} />}
-                <span className="hidden md:block">Zip Import</span>
-              </button>
-            )}
-            {can('INVENTORY', 'CREATE') && (
-              <button
-                onClick={() => { setIsCreateView(true); setModalTab('info'); }}
-                className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
-                title="Add New Registry Item"
-              >
-                <Plus size={24} />
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
-      {/* Main tab navigation removed for sidebar dropdown */}
-
-      {/* Sub-tab navigation removed for sidebar dropdown */}
-
-      {activeTab === 'master' && renderMaster()}
-      {activeTab === 'inventory' && renderInventory()}
-      {activeTab === 'return' && (
-        <>
-          {/* Sub-tab Category Filter (Visible for relevant operational subtabs) */}
-          {['loading', 'return'].includes(subTab) && (
-            <div className="space-y-4 mb-8">
-              <div className="relative group">
-                <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+            </div>
+            {activeTab === 'master' && (
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  id="excel-upload"
+                  accept=".xlsx, .xls, .csv"
+                  className="hidden"
+                  onChange={handleExcelUpload}
+                  disabled={isUploading}
+                />
+                <input
+                  type="file"
+                  id="zip-upload"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={handleZipUpload}
+                  disabled={isUploading}
+                />
+                {can('INVENTORY', 'CREATE') && (
                   <button
-                    onClick={() => { setOpsCategory('ALL'); setOpsSubCategory('ALL'); }}
-                    className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                      opsCategory === 'ALL' 
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
-                      : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
-                    }`}
+                    onClick={() => setShowBulkUploadModal(true)}
+                    disabled={isUploading}
+                    className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                    title="Bulk Upload Excel"
                   >
-                    All Items
+                    {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
+                    <span className="hidden md:block">Bulk Upload</span>
                   </button>
-                  {categories.map((cat) => (
-                    <button
-                      key={`subcat-filter-${cat.id}`}
-                      onClick={() => { setOpsCategory(cat.name); setOpsSubCategory('ALL'); }}
-                      className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${
-                        opsCategory === cat.name 
-                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20' 
-                        : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
-                      }`}
-                    >
-                      {cat.name}
-                    </button>
-                  ))}
-                </div>
+                )}
+                {can('INVENTORY', 'CREATE') && (
+                  <button
+                    onClick={() => setShowZipImportModal(true)}
+                    disabled={isUploading}
+                    className="bg-orange-50 text-orange-600 p-3 rounded-xl border border-orange-100 shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                    title="Import ZIP (Excel + Images)"
+                  >
+                    {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Package size={24} />}
+                    <span className="hidden md:block">Zip Import</span>
+                  </button>
+                )}
+                {can('INVENTORY', 'CREATE') && (
+                  <button
+                    onClick={() => { setIsCreateView(true); setModalTab('info'); }}
+                    className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
+                    title="Add New Registry Item"
+                  >
+                    <Plus size={24} />
+                  </button>
+                )}
               </div>
+            )}
+          </div>
 
-              {/* Hierarchical Sub-Category Filter */}
-              {opsCategory !== 'ALL' && (
-                <div className="animate-in slide-in-from-top-1 duration-200">
-                  <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
-                    <button
-                      onClick={() => setOpsSubCategory('ALL')}
-                      className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                        opsSubCategory === 'ALL' 
-                        ? 'bg-emerald-500 border-emerald-500 text-white' 
-                        : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
-                      }`}
-                    >
-                      All {opsCategory}
-                    </button>
-                    {subCategories
-                      .filter(sub => {
-                        const parentCat = categories.find(c => c.name === opsCategory);
-                        return sub.categoryId === parentCat?.id;
-                      })
-                      .map((sub) => (
-                        <button
-                          key={`subtab-subcat-${sub.id}`}
-                          onClick={() => setOpsSubCategory(sub.name)}
-                          className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${
-                            opsSubCategory === sub.name 
-                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-md' 
-                            : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+          {/* Main tab navigation removed for sidebar dropdown */}
+
+          {/* Sub-tab navigation removed for sidebar dropdown */}
+
+          {activeTab === 'master' && renderMaster()}
+          {activeTab === 'inventory' && renderInventory()}
+          {activeTab === 'return' && (
+            <>
+              {/* Sub-tab Category Filter (Visible for relevant operational subtabs) */}
+              {['loading', 'return'].includes(subTab) && (
+                <div className="space-y-4 mb-8">
+                  <div className="relative group">
+                    <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                      <button
+                        onClick={() => {
+                          if (subTab === 'loading') { setOpsCategory('ALL'); setOpsSubCategory('ALL'); }
+                          else { setReturnCategory('ALL'); setReturnSubCategory('ALL'); }
+                        }}
+                        className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${(subTab === 'loading' ? opsCategory : returnCategory) === 'ALL'
+                          ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                          : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
                           }`}
+                      >
+                        All Items
+                      </button>
+                      {categories.map((cat) => (
+                        <button
+                          key={`subcat-filter-${cat.id}`}
+                          onClick={() => {
+                            if (subTab === 'loading') { setOpsCategory(cat.name); setOpsSubCategory('ALL'); }
+                            else { setReturnCategory(cat.name); setReturnSubCategory('ALL'); }
+                          }}
+                          className={`whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${(subTab === 'loading' ? opsCategory : returnCategory) === cat.name
+                            ? 'bg-emerald-600 border-emerald-600 text-white shadow-lg shadow-emerald-500/20'
+                            : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200 hover:text-emerald-600'
+                            }`}
                         >
-                          {sub.name}
+                          {cat.name}
                         </button>
                       ))}
+                    </div>
                   </div>
+
+                  {/* Hierarchical Sub-Category Filter */}
+                  {(subTab === 'loading' ? opsCategory : returnCategory) !== 'ALL' && (
+                    <div className="animate-in slide-in-from-top-1 duration-200">
+                      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
+                        <button
+                          onClick={() => {
+                            if (subTab === 'loading') setOpsSubCategory('ALL');
+                            else setReturnSubCategory('ALL');
+                          }}
+                          className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${(subTab === 'loading' ? opsSubCategory : returnSubCategory) === 'ALL'
+                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                            : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+                            }`}
+                        >
+                          All {subTab === 'loading' ? opsCategory : returnCategory}
+                        </button>
+                        {subCategories
+                          .filter(sub => {
+                            const parentCat = categories.find(c => c.name === (subTab === 'loading' ? opsCategory : returnCategory));
+                            return sub.categoryId === parentCat?.id;
+                          })
+                          .map((sub) => (
+                            <button
+                              key={`subtab-subcat-${sub.id}`}
+                              onClick={() => {
+                                if (subTab === 'loading') setOpsSubCategory(sub.name);
+                                else setReturnSubCategory(sub.name);
+                              }}
+                              className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${(subTab === 'loading' ? opsSubCategory : returnSubCategory) === sub.name
+                                ? 'bg-emerald-500 border-emerald-500 text-white shadow-md'
+                                : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
+                                }`}
+                            >
+                              {sub.name}
+                            </button>
+                          ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
+
+              {subTab === 'loading' && renderLoading()}
+              {subTab === 'return' && renderReturn()}
+              {subTab === 'tracking' && renderTracking()}
+              {subTab === 'refills' && renderRefills()}
+              {subTab === 'audits' && renderAuditHistory()}
+              {subTab === 'opening' && renderOpeningStock()}
+            </>
+          )}
+
+          {/* Bulk Upload Modal */}
+          {showBulkUploadModal && (
+            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <FileText className="text-emerald-500" />
+                    Bulk Upload
+                  </h3>
+                  <button
+                    onClick={() => setShowBulkUploadModal(false)}
+                    className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <div
+                    onClick={() => document.getElementById('excel-upload').click()}
+                    className="w-full border-2 border-dashed border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
+                    style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
+                  >
+                    <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform">
+                      {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ArrowUpCircle size={28} />}
+                    </div>
+                    <span className="font-bold text-emerald-800 text-sm">Upload Excel File</span>
+                    <span className="text-xs text-emerald-600/70 mt-1 font-medium select-none">Click to browse your files</span>
+                  </div>
+
+                  <div className="relative flex items-center py-2">
+                    <div className="flex-grow border-t border-gray-100"></div>
+                    <span className="flex-shrink-0 mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or</span>
+                    <div className="flex-grow border-t border-gray-100"></div>
+                  </div>
+
+                  <button
+                    onClick={handleDownloadSample}
+                    className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
+                  >
+                    <ArrowDownCircle size={18} className="text-gray-500" />
+                    Download Sample Excel
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
-          {subTab === 'loading' && renderLoading()}
-          {subTab === 'return' && renderReturn()}
-          {subTab === 'tracking' && renderTracking()}
-          {subTab === 'refills' && renderRefills()}
-          {subTab === 'audits' && renderAuditHistory()}
-          {subTab === 'opening' && renderOpeningStock()}
-        </>
-      )}
-
-      {/* Bulk Upload Modal */}
-      {showBulkUploadModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <FileText className="text-emerald-500" />
-                Bulk Upload
-              </h3>
-              <button
-                onClick={() => setShowBulkUploadModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div
-                onClick={() => document.getElementById('excel-upload').click()}
-                className="w-full border-2 border-dashed border-emerald-200 bg-emerald-50/50 hover:bg-emerald-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
-                style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
-              >
-                <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3 text-emerald-600 group-hover:scale-110 transition-transform">
-                  {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ArrowUpCircle size={28} />}
+          {/* Zip Import Modal */}
+          {showZipImportModal && (
+            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
+                <div className="flex items-center justify-between mb-6">
+                  <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+                    <Package className="text-orange-500" />
+                    ZIP Import
+                  </h3>
+                  <button
+                    onClick={() => setShowZipImportModal(false)}
+                    className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
+                  >
+                    <X size={18} />
+                  </button>
                 </div>
-                <span className="font-bold text-emerald-800 text-sm">Upload Excel File</span>
-                <span className="text-xs text-emerald-600/70 mt-1 font-medium select-none">Click to browse your files</span>
-              </div>
 
-              <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-100"></div>
-                <span className="flex-shrink-0 mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or</span>
-                <div className="flex-grow border-t border-gray-100"></div>
-              </div>
-
-              <button
-                onClick={handleDownloadSample}
-                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
-              >
-                <ArrowDownCircle size={18} className="text-gray-500" />
-                Download Sample Excel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Zip Import Modal */}
-      {showZipImportModal && (
-        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-sm rounded-[2rem] p-6 shadow-2xl animate-in slide-in-from-bottom duration-300">
-            <div className="flex items-center justify-between mb-6">
-              <h3 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Package className="text-orange-500" />
-                ZIP Import
-              </h3>
-              <button
-                onClick={() => setShowZipImportModal(false)}
-                className="p-1 hover:bg-gray-100 rounded-full text-gray-400"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="space-y-4">
-              <div
-                onClick={() => document.getElementById('zip-upload').click()}
-                className="w-full border-2 border-dashed border-orange-200 bg-orange-50/50 hover:bg-orange-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
-                style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
-              >
-                <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3 text-orange-600 group-hover:scale-110 transition-transform">
-                  {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ArrowUpCircle size={28} />}
-                </div>
-                <span className="font-bold text-orange-800 text-sm">Upload ZIP File</span>
-                <span className="text-xs text-orange-600/70 mt-1 font-medium select-none text-center">Contains Excel + Images Folder</span>
-              </div>
-
-              <div className="relative flex items-center py-2">
-                <div className="flex-grow border-t border-gray-100"></div>
-                <span className="flex-shrink-0 mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or</span>
-                <div className="flex-grow border-t border-gray-100"></div>
-              </div>
-
-              <button
-                onClick={handleDownloadSample}
-                className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
-              >
-                <ArrowDownCircle size={18} className="text-gray-500" />
-                Download Zip Template
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Load Confirmation Modal */}
-      {showLoadConfirmModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl animate-in fade-in duration-200 flex flex-col max-h-[85vh]">
-            <div className="p-5 border-b border-gray-100 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
-                  <ArrowUpCircle size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900 tracking-tight leading-none">Confirm Loading</h3>
-                  <span className="text-xs text-gray-500 font-medium">Please review before confirming</span>
-                </div>
-              </div>
-              <button
-                onClick={() => setShowLoadConfirmModal(false)}
-                className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
-                disabled={isSubmitting}
-              >
-                <X size={18} />
-              </button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto space-y-3 bg-gray-50/50">
-              {pendingLoadItems.map((item, idx) => {
-                const totalValue = item.quantity * (item.price || 0);
-                return (
-                  <div key={idx} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${item.isFree ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-50 text-gray-400'}`}>
-                        <Package size={16} />
-                      </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-800 leading-tight">{item.name}</span>
-                        {item.unitValue && item.unitType && (
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{item.unitValue} {item.unitType}</span>
-                        )}
-                        {!item.isFree && <span className="text-[10px] text-gray-500 mt-0.5">Rate: ₹{item.price}</span>}
-                        {item.isFree && <span className="text-[10px] font-bold text-emerald-500 mt-0.5">Free Item</span>}
-                      </div>
+                <div className="space-y-4">
+                  <div
+                    onClick={() => document.getElementById('zip-upload').click()}
+                    className="w-full border-2 border-dashed border-orange-200 bg-orange-50/50 hover:bg-orange-50 rounded-[1.5rem] p-6 flex flex-col items-center justify-center cursor-pointer transition-colors group"
+                    style={{ pointerEvents: isUploading ? 'none' : 'auto' }}
+                  >
+                    <div className="w-14 h-14 bg-white rounded-2xl shadow-sm flex items-center justify-center mb-3 text-orange-600 group-hover:scale-110 transition-transform">
+                      {isUploading ? <Loader2 size={24} className="animate-spin" /> : <ArrowUpCircle size={28} />}
                     </div>
-                    <div className="flex flex-col items-end">
-                      <span className="text-lg font-black text-emerald-600">{item.quantity}</span>
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
-                      {!item.isFree && <span className="text-xs font-bold text-gray-600 mt-1 block">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>}
+                    <span className="font-bold text-orange-800 text-sm">Upload ZIP File</span>
+                    <span className="text-xs text-orange-600/70 mt-1 font-medium select-none text-center">Contains Excel + Images Folder</span>
+                  </div>
+
+                  <div className="relative flex items-center py-2">
+                    <div className="flex-grow border-t border-gray-100"></div>
+                    <span className="flex-shrink-0 mx-4 text-[10px] font-black text-gray-300 uppercase tracking-widest">Or</span>
+                    <div className="flex-grow border-t border-gray-100"></div>
+                  </div>
+
+                  <button
+                    onClick={handleDownloadSample}
+                    className="w-full bg-gray-50 hover:bg-gray-100 text-gray-700 font-bold py-4 rounded-[1.5rem] flex items-center justify-center gap-2 transition-colors border border-gray-200 text-sm"
+                  >
+                    <ArrowDownCircle size={18} className="text-gray-500" />
+                    Download Zip Template
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Load Confirmation Modal */}
+          {showLoadConfirmModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+              <div className="bg-white w-full max-w-lg rounded-3xl shadow-2xl animate-in fade-in duration-200 flex flex-col max-h-[85vh]">
+                <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center text-emerald-600">
+                      <ArrowUpCircle size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-bold text-gray-900 tracking-tight leading-none">Confirm Loading</h3>
+                      <span className="text-xs text-gray-500 font-medium">Please review before confirming</span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
-            
-            <div className="p-5 border-t border-gray-100 bg-white rounded-b-3xl">
-              <div className="flex justify-between items-center mb-4 px-2">
-                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Items: <span className="text-gray-900">{pendingLoadItems.length}</span></span>
-                <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Value: <span className="text-emerald-600">₹{pendingLoadItems.reduce((acc, item) => acc + (item.quantity * (item.price || 0)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></span>
+                  <button
+                    onClick={() => setShowLoadConfirmModal(false)}
+                    className="p-2 bg-gray-50 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+                    disabled={isSubmitting}
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="p-5 overflow-y-auto space-y-3 bg-gray-50/50">
+                  {pendingLoadItems.map((item, idx) => {
+                    const totalValue = item.quantity * (item.price || 0);
+                    return (
+                      <div key={idx} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${item.isFree ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-50 text-gray-400'}`}>
+                            <Package size={16} />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-bold text-gray-800 leading-tight">{item.name}</span>
+                            {item.unitValue && item.unitType && (
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{item.unitValue} {item.unitType}</span>
+                            )}
+                            {!item.isFree && <span className="text-[10px] text-gray-500 mt-0.5">Rate: ₹{item.price}</span>}
+                            {item.isFree && <span className="text-[10px] font-bold text-emerald-500 mt-0.5">Free Item</span>}
+                          </div>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-lg font-black text-emerald-600">{item.quantity}</span>
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Qty</span>
+                          {!item.isFree && <span className="text-xs font-bold text-gray-600 mt-1 block">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="p-5 border-t border-gray-100 bg-white rounded-b-3xl">
+                  <div className="flex justify-between items-center mb-4 px-2">
+                    <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Items: <span className="text-gray-900">{pendingLoadItems.length}</span></span>
+                    <span className="text-sm font-bold text-gray-400 uppercase tracking-widest">Total Value: <span className="text-emerald-600">₹{pendingLoadItems.reduce((acc, item) => acc + (item.quantity * (item.price || 0)), 0).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></span>
+                  </div>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setShowLoadConfirmModal(false)}
+                      disabled={isSubmitting}
+                      className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleConfirmLoad}
+                      disabled={isSubmitting}
+                      className="flex-[2] py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                    >
+                      {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Confirm Loading'}
+                    </button>
+                  </div>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <button
-                  onClick={() => setShowLoadConfirmModal(false)}
-                  disabled={isSubmitting}
-                  className="flex-1 py-3 px-4 rounded-xl font-bold text-gray-500 border border-gray-200 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={handleConfirmLoad}
-                  disabled={isSubmitting}
-                  className="flex-[2] py-3 px-4 bg-emerald-600 text-white font-bold rounded-xl shadow-lg shadow-emerald-500/20 hover:bg-emerald-700 transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Confirm Loading'}
-                </button>
-              </div>
             </div>
-          </div>
-        </div>
-      )}
+          )}
         </div>
       )}
       {showScanner && (
-        <BarcodeScannerOverlay 
+        <BarcodeScannerOverlay
           onScan={(code) => {
             if (scannerTarget === 'create') setNewItem(prev => ({ ...prev, barcode: code }));
+            else if (scannerTarget === 'master') setMasterSearch(code);
+            else if (scannerTarget === 'warehouse') setWarehouseSearch(code);
+            else if (scannerTarget === 'ops') setOpsSearch(code);
+            else if (scannerTarget === 'returnOps') setReturnSearch(code);
+            else if (scannerTarget === 'opening') setOpeningSearch(code);
+            else if (scannerTarget === 'tracking') setVehicleSearch(code);
             else setEditItem(prev => ({ ...prev, barcode: code }));
             toast.success("Barcode Scanned!");
+            setShowScanner(false);
           }}
           onClose={() => setShowScanner(false)}
         />
@@ -4521,7 +4721,7 @@ const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStoc
   const qty = parseFloat(quantity) || 0;
   const price = parseFloat(item.price) || 0;
   const isReturn = mode === 'return';
-  
+
   const displayAmount = qty * price;
   const stockAmount = (parseFloat(currentStock) || 0) * price;
 
@@ -4536,10 +4736,10 @@ const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStoc
             </span>
           )}
           {isReturn ? (
-             <div className="flex gap-4">
-               <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600 font-mono">In Vehicle: {currentStock || 0}</span>
-               <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">₹{stockAmount.toFixed(2)}</span>
-             </div>
+            <div className="flex gap-4">
+              <span className="text-[10px] text-gray-400 font-bold uppercase transition-colors group-hover:text-blue-600 font-mono">In Vehicle: {currentStock || 0}</span>
+              <span className="text-[10px] text-blue-400 font-bold uppercase tracking-tighter">₹{stockAmount.toFixed(2)}</span>
+            </div>
           ) : (
             qty > 0 && (
               <span className="text-[10px] font-bold text-emerald-600 animate-in slide-in-from-left-1 duration-200">Value: ₹{displayAmount.toFixed(2)}</span>
@@ -4547,33 +4747,24 @@ const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStoc
           )}
         </div>
       </div>
-      
-      <div className="flex items-center gap-3">
-        {isReturn && qty > 0 && (
-           <div className="flex flex-col items-end mr-1 animate-in fade-in slide-in-from-right-1 duration-200">
-             <span className="text-[8px] font-black text-orange-400 uppercase tracking-tighter">Return Value</span>
-             <span className="text-[10px] font-bold text-orange-600">₹{displayAmount.toFixed(2)}</span>
-           </div>
-        )}
-        {!isReturn && (
-          <div className="flex flex-col items-end mr-1">
-            <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Rate</span>
-            <span className="text-[10px] font-bold text-gray-500">₹{price}</span>
-          </div>
-        )}
+
+      <div className="flex flex-col items-center gap-1">
         <input
           type="number"
           placeholder="0"
           step="any"
           min="0"
           onWheel={(e) => e.target.blur()}
-          className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300'}`}
+          className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${qty > (currentStock || 0) && isReturn ? 'border-rose-500 ring-2 ring-rose-500/20' : (isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300')}`}
           value={quantity || ''}
           onChange={(e) => {
             const val = Math.max(0, parseFloat(e.target.value) || 0);
             onChange(item.id, val);
           }}
         />
+        {isReturn && qty > (currentStock || 0) && (
+          <span className="text-[7px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
+        )}
       </div>
     </div>
   );
