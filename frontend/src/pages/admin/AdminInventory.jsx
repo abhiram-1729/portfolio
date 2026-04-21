@@ -13,6 +13,7 @@ import * as XLSX from 'xlsx';
 export default function AdminInventory() {
   const [activeTab, setActiveTab] = useState('master');
   const [searchQuery, setSearchQuery] = useState('');
+  const [trackingSearch, setTrackingSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filterCategory, setFilterCategory] = useState('ALL');
   const [filterSubCategory, setFilterSubCategory] = useState('ALL');
@@ -1766,9 +1767,23 @@ export default function AdminInventory() {
                   <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 w-fit">{v.vehicleNumber}</span>
                 </div>
               </div>
-              <div className="flex flex-col items-end bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-inner">
-                <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Stock Value</span>
-                <span className="text-2xl font-black text-blue-900 tracking-tighter">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+              <div className="flex items-center gap-4">
+                <div className="relative group w-full sm:w-64">
+                  <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                    <Search size={16} className="text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Search stock..."
+                    value={trackingSearch}
+                    onChange={(e) => setTrackingSearch(e.target.value)}
+                    className="block w-full pl-11 pr-4 py-2.5 bg-gray-50 border border-transparent rounded-2xl text-[10px] font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none uppercase tracking-widest"
+                  />
+                </div>
+                <div className="flex flex-col items-end bg-blue-50/50 p-4 rounded-2xl border border-blue-100 shadow-inner">
+                  <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-1">Total Stock Value</span>
+                  <span className="text-2xl font-black text-blue-900 tracking-tighter">₹{totalValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
+                </div>
               </div>
             </div>
 
@@ -1926,7 +1941,10 @@ export default function AdminInventory() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
-                        {activeStock.map((item) => {
+                        {activeStock.filter(item => 
+                          (item.product?.name || '').toLowerCase().includes(trackingSearch.toLowerCase()) ||
+                          (item.product?.displayId || '').toLowerCase().includes(trackingSearch.toLowerCase())
+                        ).map((item) => {
                           const qty = isAuditMode ? (auditQuantities[item.productId] ?? item.quantity) : item.quantity;
                           const price = parseFloat(item.product?.price || 0);
                           const displayAmount = qty * price;
@@ -1988,8 +2006,43 @@ export default function AdminInventory() {
       );
     }
 
+    const filteredVehicles = vehicles.filter(v => {
+      const search = trackingSearch.toLowerCase();
+      const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name.toLowerCase() : 'unassigned';
+      return v.vehicleNumber.toLowerCase().includes(search) || agentStr.includes(search);
+    });
+
     return (
       <div className="space-y-6 animate-in fade-in duration-300">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6 mb-2">
+           <div className="flex items-center gap-4">
+              <div className="w-14 h-14 bg-emerald-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-emerald-600/20">
+                 <Truck size={28} />
+              </div>
+              <div className="flex flex-col">
+                 <h2 className="text-xl font-black text-gray-900 tracking-tight">Vehicle Stock Tracking</h2>
+                 <div className="flex items-center gap-2 mt-0.5">
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Real-time Fleet Inventory</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-300" />
+                    <span className="text-[10px] font-bold text-gray-400">Total {vehicles.length} Vehicles</span>
+                 </div>
+              </div>
+           </div>
+           
+           <div className="relative group w-full md:w-80">
+              <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                <Search size={16} className="text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+              </div>
+              <input
+                type="text"
+                placeholder="Search Agent or Vehicle #..."
+                value={trackingSearch}
+                onChange={(e) => setTrackingSearch(e.target.value)}
+                className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all outline-none uppercase tracking-widest"
+              />
+           </div>
+        </div>
+
         <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -2001,7 +2054,7 @@ export default function AdminInventory() {
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
-              {vehicles.map(v => {
+              {filteredVehicles.map(v => {
                 const inventory = allVehiclesStock[v.id] || [];
                 const activeStock = inventory.filter(i => i.quantity > 0);
                 const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
