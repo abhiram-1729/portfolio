@@ -22,6 +22,7 @@ export default function AdminInventory() {
   const [categorySearch, setCategorySearch] = useState('');
   const [subCategorySearch, setSubCategorySearch] = useState('');
   const [opsSearch, setOpsSearch] = useState('');
+  const [openingSearch, setOpeningSearch] = useState('');
   
   const [showFilters, setShowFilters] = useState(false);
   const [masterCategory, setMasterCategory] = useState('ALL');
@@ -97,8 +98,8 @@ export default function AdminInventory() {
   const [stockInputs, setStockInputs] = useState({}); // { productId: quantity }
 
   const handleUpdateStock = async (productId, quantity, mode = 'set') => {
-    if (quantity === undefined || quantity === '' || isNaN(quantity)) {
-      toast.error('Please enter a valid quantity');
+    if (quantity === undefined || quantity === '' || isNaN(quantity) || parseInt(quantity) < 0) {
+      toast.error('Please enter a valid positive quantity');
       return;
     }
 
@@ -2384,9 +2385,21 @@ export default function AdminInventory() {
   };
 
   const renderOpeningStock = () => {
+    const filteredOpeningItems = items.filter(item => {
+      const search = openingSearch.toLowerCase();
+      return item.name.toLowerCase().includes(search) || 
+             (item.displayId && item.displayId.toLowerCase().includes(search));
+    });
+
+    const totalOpeningPages = Math.ceil(filteredOpeningItems.length / itemsPerPage);
+    const paginatedItems = filteredOpeningItems.slice(
+      (currentPage - 1) * itemsPerPage,
+      currentPage * itemsPerPage
+    );
+
     return (
       <div className="space-y-6 sm:px-2">
-        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6">
            <div className="flex items-center gap-4">
               <div className="w-14 h-14 bg-indigo-600 rounded-3xl flex items-center justify-center text-white shadow-xl shadow-indigo-600/20">
                  <ClipboardList size={28} />
@@ -2400,10 +2413,23 @@ export default function AdminInventory() {
                  </div>
               </div>
            </div>
-           <div className="flex items-center gap-3">
-              <div className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2">
+           
+           <div className="flex flex-col sm:flex-row items-center gap-4">
+              <div className="relative group w-full sm:w-64">
+                <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+                  <Search size={16} className="text-gray-400 group-focus-within:text-indigo-500 transition-colors" />
+                </div>
+                <input
+                  type="text"
+                  placeholder="Search products..."
+                  value={openingSearch}
+                  onChange={(e) => { setOpeningSearch(e.target.value); setCurrentPage(1); }}
+                  className="block w-full pl-11 pr-4 py-3 bg-gray-50 border border-transparent rounded-2xl text-xs font-bold text-gray-900 focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 transition-all outline-none"
+                />
+              </div>
+              <div className="px-4 py-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 flex items-center gap-2 whitespace-nowrap">
                  <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                 <span className="text-[10px] font-black uppercase tracking-widest">Live Store Connectivity Active</span>
+                 <span className="text-[10px] font-black uppercase tracking-widest">Live Connectivity</span>
               </div>
            </div>
         </div>
@@ -2421,7 +2447,7 @@ export default function AdminInventory() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50/50">
-                {items.map(item => (
+                {paginatedItems.map(item => (
                   <tr key={`opening-${item.id}`} className="hover:bg-gray-50/30 transition-all group">
                      <td className="px-8 py-5">
                         <div className="flex items-center gap-4">
@@ -2448,10 +2474,16 @@ export default function AdminInventory() {
                           <div className="relative">
                             <input 
                                type="number"
+                               min="0"
                                className="w-28 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-center font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm group-hover:shadow-md"
-                               placeholder="Enter Qty"
+                               placeholder="0"
                                value={stockInputs[item.id] || ''}
-                               onChange={(e) => setStockInputs(p => ({ ...p, [item.id]: e.target.value }))}
+                               onChange={(e) => {
+                                 const val = e.target.value;
+                                 if (val === '' || parseInt(val) >= 0) {
+                                   setStockInputs(p => ({ ...p, [item.id]: val }));
+                                 }
+                               }}
                             />
                           </div>
                         </div>
@@ -2471,10 +2503,57 @@ export default function AdminInventory() {
               </tbody>
             </table>
           </div>
-          {items.length === 0 && (
+
+          {filteredOpeningItems.length === 0 && (
             <div className="py-20 text-center flex flex-col items-center">
                <Package size={48} className="text-gray-200 mb-4" />
-               <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No products available to initialize</p>
+               <p className="text-sm font-black text-gray-400 uppercase tracking-widest">No products found matching your search</p>
+            </div>
+          )}
+
+          {/* Pagination */}
+          {totalOpeningPages > 1 && (
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 py-8 px-8 border-t border-gray-50 bg-gray-50/20">
+              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Showing {Math.min(filteredOpeningItems.length, (currentPage - 1) * itemsPerPage + 1)} to {Math.min(filteredOpeningItems.length, currentPage * itemsPerPage)} of {filteredOpeningItems.length} Products
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                >
+                  <ArrowLeft size={14} /> Previous
+                </button>
+                {(() => {
+                  let pages = [];
+                  let startPage = Math.max(1, currentPage - 2);
+                  let endPage = Math.min(totalOpeningPages, startPage + 4);
+                  if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+                  
+                  for(let i = startPage; i <= endPage; i++) {
+                    if (i > 0) {
+                      pages.push(
+                        <button
+                          key={i}
+                          onClick={() => { setCurrentPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                          className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${currentPage === i ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-500/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-indigo-200'}`}
+                        >
+                          {i}
+                        </button>
+                      );
+                    }
+                  }
+                  return pages;
+                })()}
+                <button
+                  disabled={currentPage === totalOpeningPages}
+                  onClick={() => { setCurrentPage(p => Math.min(totalOpeningPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                >
+                  Next <ArrowLeft size={14} className="rotate-180" />
+                </button>
+              </div>
             </div>
           )}
         </div>
