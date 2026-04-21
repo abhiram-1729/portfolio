@@ -914,6 +914,17 @@ export const auditVehicleStock = async (req, res) => {
       return res.status(400).json({ message: 'Invalid items data' });
     }
 
+    console.log('Starting Optimized Audit for vehicle:', id);
+    
+    // Pre-fetch all current stocks to avoid N+1 queries in transaction
+    const existingStocks = await prisma.vehicleStock.findMany({
+      where: { 
+        vehicleId: id,
+        productId: { in: items.map(i => i.productId) }
+      }
+    });
+    const stockMap = new Map(existingStocks.map(s => [s.productId, s.quantity]));
+
     await prisma.$transaction(async (tx) => {
       // 1. Create a parent Audit record
       const audit = await tx.stockAudit.create({
@@ -927,19 +938,16 @@ export const auditVehicleStock = async (req, res) => {
       });
 
       for (const item of items) {
-        const q = parseFloat(item.quantity);
-        
-        // Get current stock for historical record
-        const currentStock = await tx.vehicleStock.findUnique({
-          where: { vehicleId_productId: { vehicleId: id, productId: item.productId } }
-        });
+        const q = Math.floor(parseFloat(item.quantity) || 0);
+        const oldQty = stockMap.get(item.productId) || 0;
 
         // 2. Create Audit Item
         await tx.stockAuditItem.create({
           data: {
+            tenantId: req.user.tenantId,
             auditId: audit.id,
             productId: item.productId,
-            oldQuantity: currentStock?.quantity || 0,
+            oldQuantity: oldQty,
             newQuantity: q
           }
         });
@@ -977,9 +985,10 @@ export const auditVehicleStock = async (req, res) => {
         });
       }
     }, {
-      maxWait: 20000, // Wait up to 20s to acquire connection
-      timeout: 60000  // Allow up to 60s for the entire audit to process
+      maxWait: 30000, 
+      timeout: 120000 // 2 minutes for large audits
     });
+    console.log('Prisma Transaction committed successfully.');
 
     // Find the user assigned to this vehicle to track as targetUserId
     const assignedUser = await prisma.user.findFirst({

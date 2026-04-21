@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, ScanBarcode } from 'lucide-react';
+import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, ScanBarcode, ClipboardList, CheckCircle } from 'lucide-react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
@@ -737,7 +737,8 @@ export default function AdminInventory() {
       setAuditHistory(aRes.data || []);
     } catch (error) {
        console.error('Audit Save Error:', error);
-       toast.error('Failed to audit inventory');
+       const serverError = error.response?.data?.error || error.response?.data?.message;
+       toast.error(serverError ? `Audit failed: ${serverError}` : 'Failed to audit inventory');
     } finally {
       setIsSubmitting(false);
     }
