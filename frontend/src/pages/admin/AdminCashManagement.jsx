@@ -363,7 +363,7 @@ export default function AdminCashManagement() {
   const handleCloseStoreRegister = async () => {
     const expected = storeRegisterData?.liveMetrics?.availableCash || 0;
     const diff = storeDenomData.amount - expected;
-    
+
     if (Math.abs(diff) > 0.01 && !storeDenomData.remarks) {
       return toast.error('Mandatory description required for variance');
     }
@@ -378,7 +378,7 @@ export default function AdminCashManagement() {
           actualClosingCash: storeDenomData.amount,
           denominations: storeDenomData.denominations,
           remarks: storeDenomData.remarks,
-          isClosingUpdate: true 
+          isClosingUpdate: true
         });
       } else {
         await closeStoreCashRegister({
@@ -1081,15 +1081,15 @@ export default function AdminCashManagement() {
                               </div>
                             ))}
                           </div>
-                          
+
                           <div className="flex items-center justify-between p-3 bg-white border border-orange-100 rounded-2xl shadow-sm">
-                             <div>
-                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Cash: ₹{(s1?.closing?.expectedCash || 0).toFixed(2)}</span>
-                                <span className="text-xs font-black text-orange-700 uppercase">Input Counted: ₹{reviewEditData.actualCash.toFixed(2)}</span>
-                             </div>
-                             <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.actualCash - s1.closing.expectedCash) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                {Math.abs(reviewEditData.actualCash - s1.closing.expectedCash) <= 0.01 ? 'MATCHED' : (reviewEditData.actualCash - s1.closing.expectedCash) > 0 ? `+₹${(reviewEditData.actualCash - s1.closing.expectedCash).toFixed(2)}` : `-₹${Math.abs(reviewEditData.actualCash - s1.closing.expectedCash).toFixed(2)}`}
-                             </div>
+                            <div>
+                              <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Cash: ₹{(s1?.closing?.expectedCash || 0).toFixed(2)}</span>
+                              <span className="text-xs font-black text-orange-700 uppercase">Input Counted: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+                            </div>
+                            <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.actualCash - s1.closing.expectedCash) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                              {Math.abs(reviewEditData.actualCash - s1.closing.expectedCash) <= 0.01 ? 'MATCHED' : (reviewEditData.actualCash - s1.closing.expectedCash) > 0 ? `+₹${(reviewEditData.actualCash - s1.closing.expectedCash).toFixed(2)}` : `-₹${Math.abs(reviewEditData.actualCash - s1.closing.expectedCash).toFixed(2)}`}
+                            </div>
                           </div>
 
                           <button
@@ -1129,13 +1129,13 @@ export default function AdminCashManagement() {
                           </div>
 
                           <div className="flex items-center justify-between p-3 bg-white border border-orange-100 rounded-2xl shadow-sm">
-                             <div>
-                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected UPI: ₹{(s1?.closing?.upiSales || 0).toFixed(2)}</span>
-                                <span className="text-xs font-black text-orange-700 uppercase">Input Adjusted: ₹{reviewEditData.upiSales.toFixed(2)}</span>
-                             </div>
-                             <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.upiSales - s1.closing.upiSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                                {Math.abs(reviewEditData.upiSales - s1.closing.upiSales) <= 0.01 ? 'MATCHED' : (reviewEditData.upiSales - s1.closing.upiSales) > 0 ? `+₹${(reviewEditData.upiSales - s1.closing.upiSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.upiSales - s1.closing.upiSales).toFixed(2)}`}
-                             </div>
+                            <div>
+                              <span className="text-[9px] font-black text-gray-400 uppercase block">Expected UPI: ₹{(s1?.closing?.upiSales || 0).toFixed(2)}</span>
+                              <span className="text-xs font-black text-orange-700 uppercase">Input Adjusted: ₹{reviewEditData.upiSales.toFixed(2)}</span>
+                            </div>
+                            <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.upiSales - s1.closing.upiSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                              {Math.abs(reviewEditData.upiSales - s1.closing.upiSales) <= 0.01 ? 'MATCHED' : (reviewEditData.upiSales - s1.closing.upiSales) > 0 ? `+₹${(reviewEditData.upiSales - s1.closing.upiSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.upiSales - s1.closing.upiSales).toFixed(2)}`}
+                            </div>
                           </div>
 
                           <button
@@ -1175,13 +1175,13 @@ export default function AdminCashManagement() {
                           </div>
 
                           <div className="flex items-center justify-between p-3 bg-white border border-blue-100 rounded-2xl shadow-sm">
-                             <div>
-                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Card: ₹{(s1?.closing?.cardSales || 0).toFixed(2)}</span>
-                                <span className="text-xs font-black text-blue-700 uppercase">Input Adjusted: ₹{reviewEditData.cardSales.toFixed(2)}</span>
-                             </div>
-                             <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.cardSales - s1.closing.cardSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                {Math.abs(reviewEditData.cardSales - s1.closing.cardSales) <= 0.01 ? 'MATCHED' : (reviewEditData.cardSales - s1.closing.cardSales) > 0 ? `+₹${(reviewEditData.cardSales - s1.closing.cardSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.cardSales - s1.closing.cardSales).toFixed(2)}`}
-                             </div>
+                            <div>
+                              <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Card: ₹{(s1?.closing?.cardSales || 0).toFixed(2)}</span>
+                              <span className="text-xs font-black text-blue-700 uppercase">Input Adjusted: ₹{reviewEditData.cardSales.toFixed(2)}</span>
+                            </div>
+                            <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.cardSales - s1.closing.cardSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                              {Math.abs(reviewEditData.cardSales - s1.closing.cardSales) <= 0.01 ? 'MATCHED' : (reviewEditData.cardSales - s1.closing.cardSales) > 0 ? `+₹${(reviewEditData.cardSales - s1.closing.cardSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.cardSales - s1.closing.cardSales).toFixed(2)}`}
+                            </div>
                           </div>
 
                           <button
@@ -1201,32 +1201,32 @@ export default function AdminCashManagement() {
                           value={reviewEditData.remark}
                           onChange={(e) => setReviewEditData({ ...reviewEditData, remark: e.target.value })}
                         />
-                        
+
                         <div className="grid grid-cols-2 gap-2">
-                           <button
-                             onClick={() => setIsReviewEditing(null)}
-                             className="py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all font-bold"
-                           >
-                             Discard
-                           </button>
-                           <button
-                             onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', {
-                               actualCash: reviewEditData.actualCash,
-                               upiSales: reviewEditData.upiSales,
-                               cardSales: reviewEditData.cardSales,
-                               denominations: reviewEditData.denominations,
-                               remark: reviewEditData.remark
-                             })}
-                             disabled={isSubmitting}
-                             className="bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
-                           >
-                             {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
-                               <>
-                                 <CheckCircle2 size={14} />
-                                 Approve Shift
-                               </>
-                             )}
-                           </button>
+                          <button
+                            onClick={() => setIsReviewEditing(null)}
+                            className="py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all font-bold"
+                          >
+                            Discard
+                          </button>
+                          <button
+                            onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', {
+                              actualCash: reviewEditData.actualCash,
+                              upiSales: reviewEditData.upiSales,
+                              cardSales: reviewEditData.cardSales,
+                              denominations: reviewEditData.denominations,
+                              remark: reviewEditData.remark
+                            })}
+                            disabled={isSubmitting}
+                            className="bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                          >
+                            {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
+                              <>
+                                <CheckCircle2 size={14} />
+                                Approve Shift
+                              </>
+                            )}
+                          </button>
                         </div>
                       </div>
                     </div>
@@ -1247,23 +1247,23 @@ export default function AdminCashManagement() {
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
                           <div className="flex items-center gap-2">
-                             {Math.abs(s1.closing.upiSales - (viewingSummary.dailySales?.totalUpi || 0)) > 0.01 && (
-                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.upiSales > (viewingSummary.dailySales?.totalUpi || 0) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                                 {s1.closing.upiSales > (viewingSummary.dailySales?.totalUpi || 0) ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.upiSales - (viewingSummary.dailySales?.totalUpi || 0)).toFixed(2)}
-                               </span>
-                             )}
-                             <span className="text-sm font-black text-orange-600">₹{(s1.closing.upiSales || 0).toFixed(2)}</span>
+                            {Math.abs(s1.closing.upiSales - (viewingSummary.dailySales?.totalUpi || 0)) > 0.01 && (
+                              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.upiSales > (viewingSummary.dailySales?.totalUpi || 0) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {s1.closing.upiSales > (viewingSummary.dailySales?.totalUpi || 0) ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.upiSales - (viewingSummary.dailySales?.totalUpi || 0)).toFixed(2)}
+                              </span>
+                            )}
+                            <span className="text-sm font-black text-orange-600">₹{(s1.closing.upiSales || 0).toFixed(2)}</span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
                           <div className="flex items-center gap-2">
-                             {Math.abs(s1.closing.cardSales - (viewingSummary.dailySales?.totalCard || 0)) > 0.01 && (
-                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.cardSales > (viewingSummary.dailySales?.totalCard || 0) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                                 {s1.closing.cardSales > (viewingSummary.dailySales?.totalCard || 0) ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.cardSales - (viewingSummary.dailySales?.totalCard || 0)).toFixed(2)}
-                               </span>
-                             )}
-                             <span className="text-sm font-black text-blue-600">₹{(s1.closing.cardSales || 0).toFixed(2)}</span>
+                            {Math.abs(s1.closing.cardSales - (viewingSummary.dailySales?.totalCard || 0)) > 0.01 && (
+                              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.cardSales > (viewingSummary.dailySales?.totalCard || 0) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {s1.closing.cardSales > (viewingSummary.dailySales?.totalCard || 0) ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.cardSales - (viewingSummary.dailySales?.totalCard || 0)).toFixed(2)}
+                              </span>
+                            )}
+                            <span className="text-sm font-black text-blue-600">₹{(s1.closing.cardSales || 0).toFixed(2)}</span>
                           </div>
                         </div>
                         <div className="flex justify-between items-center">
@@ -1393,15 +1393,15 @@ export default function AdminCashManagement() {
                                   </div>
                                 ))}
                               </div>
-                              
+
                               <div className="flex items-center justify-between p-3 bg-white border border-indigo-100 rounded-2xl shadow-sm">
-                                 <div>
-                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Cash: ₹{(s2?.closing?.expectedCash || 0).toFixed(2)}</span>
-                                    <span className="text-xs font-black text-indigo-700 uppercase">Input Counted: ₹{reviewEditData.actualCash.toFixed(2)}</span>
-                                 </div>
-                                 <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.actualCash - s2.closing.expectedCash) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                    {Math.abs(reviewEditData.actualCash - s2.closing.expectedCash) <= 0.01 ? 'MATCHED' : (reviewEditData.actualCash - s2.closing.expectedCash) > 0 ? `+₹${(reviewEditData.actualCash - s2.closing.expectedCash).toFixed(2)}` : `-₹${Math.abs(reviewEditData.actualCash - s2.closing.expectedCash).toFixed(2)}`}
-                                 </div>
+                                <div>
+                                  <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Cash: ₹{(s2?.closing?.expectedCash || 0).toFixed(2)}</span>
+                                  <span className="text-xs font-black text-indigo-700 uppercase">Input Counted: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+                                </div>
+                                <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.actualCash - s2.closing.expectedCash) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                  {Math.abs(reviewEditData.actualCash - s2.closing.expectedCash) <= 0.01 ? 'MATCHED' : (reviewEditData.actualCash - s2.closing.expectedCash) > 0 ? `+₹${(reviewEditData.actualCash - s2.closing.expectedCash).toFixed(2)}` : `-₹${Math.abs(reviewEditData.actualCash - s2.closing.expectedCash).toFixed(2)}`}
+                                </div>
                               </div>
 
                               <button
@@ -1441,13 +1441,13 @@ export default function AdminCashManagement() {
                               </div>
 
                               <div className="flex items-center justify-between p-3 bg-white border border-indigo-100 rounded-2xl shadow-sm">
-                                 <div>
-                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected UPI: ₹{(s2?.closing?.upiSales || 0).toFixed(2)}</span>
-                                    <span className="text-xs font-black text-indigo-700 uppercase">Input Adjusted: ₹{reviewEditData.upiSales.toFixed(2)}</span>
-                                 </div>
-                                 <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.upiSales - s2.closing.upiSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
-                                    {Math.abs(reviewEditData.upiSales - s2.closing.upiSales) <= 0.01 ? 'MATCHED' : (reviewEditData.upiSales - s2.closing.upiSales) > 0 ? `+₹${(reviewEditData.upiSales - s2.closing.upiSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.upiSales - s2.closing.upiSales).toFixed(2)}`}
-                                 </div>
+                                <div>
+                                  <span className="text-[9px] font-black text-gray-400 uppercase block">Expected UPI: ₹{(s2?.closing?.upiSales || 0).toFixed(2)}</span>
+                                  <span className="text-xs font-black text-indigo-700 uppercase">Input Adjusted: ₹{reviewEditData.upiSales.toFixed(2)}</span>
+                                </div>
+                                <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.upiSales - s2.closing.upiSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                  {Math.abs(reviewEditData.upiSales - s2.closing.upiSales) <= 0.01 ? 'MATCHED' : (reviewEditData.upiSales - s2.closing.upiSales) > 0 ? `+₹${(reviewEditData.upiSales - s2.closing.upiSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.upiSales - s2.closing.upiSales).toFixed(2)}`}
+                                </div>
                               </div>
 
                               <button
@@ -1487,13 +1487,13 @@ export default function AdminCashManagement() {
                               </div>
 
                               <div className="flex items-center justify-between p-3 bg-white border border-blue-100 rounded-2xl shadow-sm">
-                                 <div>
-                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Card: ₹{(s2?.closing?.cardSales || 0).toFixed(2)}</span>
-                                    <span className="text-xs font-black text-blue-700 uppercase">Input Adjusted: ₹{reviewEditData.cardSales.toFixed(2)}</span>
-                                 </div>
-                                 <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.cardSales - s2.closing.cardSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
-                                    {Math.abs(reviewEditData.cardSales - s2.closing.cardSales) <= 0.01 ? 'MATCHED' : (reviewEditData.cardSales - s2.closing.cardSales) > 0 ? `+₹${(reviewEditData.cardSales - s2.closing.cardSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.cardSales - s2.closing.cardSales).toFixed(2)}`}
-                                 </div>
+                                <div>
+                                  <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Card: ₹{(s2?.closing?.cardSales || 0).toFixed(2)}</span>
+                                  <span className="text-xs font-black text-blue-700 uppercase">Input Adjusted: ₹{reviewEditData.cardSales.toFixed(2)}</span>
+                                </div>
+                                <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.cardSales - s2.closing.cardSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                  {Math.abs(reviewEditData.cardSales - s2.closing.cardSales) <= 0.01 ? 'MATCHED' : (reviewEditData.cardSales - s2.closing.cardSales) > 0 ? `+₹${(reviewEditData.cardSales - s2.closing.cardSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.cardSales - s2.closing.cardSales).toFixed(2)}`}
+                                </div>
                               </div>
 
                               <button
@@ -1513,70 +1513,70 @@ export default function AdminCashManagement() {
                               value={reviewEditData.remark}
                               onChange={(e) => setReviewEditData({ ...reviewEditData, remark: e.target.value })}
                             />
-                            
+
                             <div className="grid grid-cols-2 gap-2">
-                               <button
-                               className="py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all font-bold"
-                             >
-                               Discard
-                             </button>
-                             <button
-                               onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', {
-                                 actualCash: reviewEditData.actualCash,
-                                 upiSales: reviewEditData.upiSales,
-                                 cardSales: reviewEditData.cardSales,
-                                 denominations: reviewEditData.denominations,
-                                 remark: reviewEditData.remark
-                               })}
-                               disabled={isSubmitting}
-                               className="bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
-                             >
-                               {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
-                                 <>
-                                   <CheckCircle2 size={14} />
-                                   Approve Shift
-                                 </>
-                               )}
-                             </button>
+                              <button
+                                className="py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all font-bold"
+                              >
+                                Discard
+                              </button>
+                              <button
+                                onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', {
+                                  actualCash: reviewEditData.actualCash,
+                                  upiSales: reviewEditData.upiSales,
+                                  cardSales: reviewEditData.cardSales,
+                                  denominations: reviewEditData.denominations,
+                                  remark: reviewEditData.remark
+                                })}
+                                disabled={isSubmitting}
+                                className="bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                              >
+                                {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
+                                  <>
+                                    <CheckCircle2 size={14} />
+                                    Approve Shift
+                                  </>
+                                )}
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
-                            <div className="flex items-center gap-2">
-                               {Math.abs(s2.closing.actualCash - s2.closing.expectedCash) > 0.01 && (
-                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.actualCash > s2.closing.expectedCash ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                                   {s2.closing.actualCash > s2.closing.expectedCash ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.actualCash - s2.closing.expectedCash).toFixed(2)}
-                                 </span>
-                               )}
-                               <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toFixed(2)}</span>
+                      ) : (
+                        <>
+                          <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
+                              <div className="flex items-center gap-2">
+                                {Math.abs(s2.closing.actualCash - s2.closing.expectedCash) > 0.01 && (
+                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.actualCash > s2.closing.expectedCash ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    {s2.closing.actualCash > s2.closing.expectedCash ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.actualCash - s2.closing.expectedCash).toFixed(2)}
+                                  </span>
+                                )}
+                                <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toFixed(2)}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
-                            <div className="flex items-center gap-2">
-                               {Math.abs(s2.closing.upiSales - ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0))) > 0.01 && (
-                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.upiSales > ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0)) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                                   {s2.closing.upiSales > ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0)) ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.upiSales - ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0))).toFixed(2)}
-                                 </span>
-                               )}
-                               <span className="text-sm font-black text-orange-600">₹{(s2.closing.upiSales || 0).toFixed(2)}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
+                              <div className="flex items-center gap-2">
+                                {Math.abs(s2.closing.upiSales - ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0))) > 0.01 && (
+                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.upiSales > ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0)) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    {s2.closing.upiSales > ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0)) ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.upiSales - ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0))).toFixed(2)}
+                                  </span>
+                                )}
+                                <span className="text-sm font-black text-orange-600">₹{(s2.closing.upiSales || 0).toFixed(2)}</span>
+                              </div>
                             </div>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
-                            <div className="flex items-center gap-2">
-                               {Math.abs(s2.closing.cardSales - ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0))) > 0.01 && (
-                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.cardSales > ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0)) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
-                                   {s2.closing.cardSales > ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0)) ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.cardSales - ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0))).toFixed(2)}
-                                 </span>
-                               )}
-                               <span className="text-sm font-black text-blue-600">₹{(s2.closing.cardSales || 0).toFixed(2)}</span>
+                            <div className="flex justify-between items-center">
+                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
+                              <div className="flex items-center gap-2">
+                                {Math.abs(s2.closing.cardSales - ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0))) > 0.01 && (
+                                  <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.cardSales > ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0)) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    {s2.closing.cardSales > ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0)) ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.cardSales - ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0))).toFixed(2)}
+                                  </span>
+                                )}
+                                <span className="text-sm font-black text-blue-600">₹{(s2.closing.cardSales || 0).toFixed(2)}</span>
+                              </div>
                             </div>
-                          </div>
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expenses</span>
                               <span className="text-sm font-black text-rose-500">-₹{(s2.closing.expenses || 0).toFixed(2)}</span>
@@ -2947,18 +2947,18 @@ export default function AdminCashManagement() {
                                       </div>
                                       <div className="flex flex-col">
                                         <span className="text-xs font-black text-gray-800 block leading-tight">{entry.label}</span>
-                                      {entry.type === 'CLOSING' && entry.metadata?.closingRemarks && (
-                                        <span className="text-[9px] font-bold text-rose-500 mt-1.5 block italic leading-tight bg-rose-50/50 p-1.5 rounded-lg border border-rose-100/50">
-                                          " {entry.metadata.closingRemarks} "
-                                        </span>
-                                      )}
+                                        {entry.type === 'CLOSING' && entry.metadata?.closingRemarks && (
+                                          <span className="text-[9px] font-bold text-rose-500 mt-1.5 block italic leading-tight bg-rose-50/50 p-1.5 rounded-lg border border-rose-100/50">
+                                            " {entry.metadata.closingRemarks} "
+                                          </span>
+                                        )}
                                         <div className="flex items-center gap-1.5 mt-1">
                                           <span className={`text-[8px] font-black uppercase tracking-widest ${cfg.text} opacity-70`}>{cfg.badge}</span>
                                           {entry.type === 'STORE_SALE' && entry.metadata?.paymentMode && (
                                             <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-widest border shadow-sm ${entry.metadata.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                entry.metadata.paymentMode === 'UPI' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                                  entry.metadata.paymentMode === 'CARD' ? 'bg-blue-50 text-blue-600 border-blue-100' :
-                                                    'bg-amber-50 text-amber-600 border-amber-100'
+                                              entry.metadata.paymentMode === 'UPI' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                entry.metadata.paymentMode === 'CARD' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                  'bg-amber-50 text-amber-600 border-amber-100'
                                               }`}>
                                               {entry.metadata.paymentMode === 'CASH_UPI' ? 'Hybrid (Split)' : entry.metadata.paymentMode}
                                             </span>
@@ -3863,11 +3863,10 @@ export default function AdminCashManagement() {
                   </div>
                   <textarea
                     rows={2}
-                    className={`w-full bg-gray-50 border rounded-xl px-4 py-3 text-sm font-bold text-gray-700 transition-all outline-none resize-none placeholder:text-gray-300 ${
-                      Math.abs(storeDenomData.amount - (storeRegisterData?.liveMetrics?.availableCash || 0)) > 0.01 && !storeDenomData.remarks
+                    className={`w-full bg-gray-50 border rounded-xl px-4 py-3 text-sm font-bold text-gray-700 transition-all outline-none resize-none placeholder:text-gray-300 ${Math.abs(storeDenomData.amount - (storeRegisterData?.liveMetrics?.availableCash || 0)) > 0.01 && !storeDenomData.remarks
                         ? 'border-rose-200 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500'
                         : 'border-gray-100 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500'
-                    }`}
+                      }`}
                     placeholder="Enter reason for variance or closing notes..."
                     value={storeDenomData.remarks}
                     onChange={(e) => setStoreDenomData({ ...storeDenomData, remarks: e.target.value })}
@@ -4033,7 +4032,7 @@ export default function AdminCashManagement() {
                   <h4 className="text-2xl font-black tracking-tight">₹{(depositData.amount || 0).toFixed(2)}</h4>
                 </div>
               </div>
-
+              {/* llsks */}
               <button
                 type="submit"
                 disabled={isSubmitting || depositData.amount <= 0 || !depositData.description}
