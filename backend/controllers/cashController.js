@@ -393,7 +393,7 @@ export const submitClosingCash = async (req, res, next) => {
                 message: `Shift ${shift} closing mismatch of ₹${difference}.`,
                 type: 'cash',
                 priority: Math.abs(difference) >= 1000 ? 'high' : 'medium',
-                metadata: { vehicleId, difference, actualCash, expectedCash, shift }
+                metadata: { vehicleId, difference, actualCash: finalActual, expectedCash: finalExpected, shift }
             });
         }
     } catch (error) {
@@ -643,21 +643,31 @@ export const getAdminCashSummary = async (req, res, next) => {
             let s1Live = { cashSales: 0, upiSales: 0, cardSales: 0, expenses: 0, expected: 0 };
             let s2Live = { cashSales: 0, upiSales: 0, cardSales: 0, expenses: 0, expected: 0 };
 
-            if (o1 && !c1) {
-                s1Live.cashSales = totalRealtimeCashSales;
-                s1Live.upiSales = totalRealtimeUpiSales;
-                s1Live.cardSales = totalRealtimeCardSales;
-                s1Live.expenses = totalRealtimeExpenses;
-                s1Live.expected = o1.totalOpeningCash + s1Live.cashSales - s1Live.expenses;
-            } else if (c1) {
+            // Shift 1: If closed, we keep the expectation that was stored in c1.expectedCash
+            // Note: Currently we don't have totalRealtimeSplit, so we rely on c1's records for expectations
+            if (c1) {
                 s1Live.cashSales = c1.cashSales;
                 s1Live.upiSales = c1.upiSales;
                 s1Live.cardSales = c1.cardSales;
                 s1Live.expenses = c1.expenses;
                 s1Live.expected = c1.expectedCash;
+                // We add a specific field for original system expectations if we had them
+            } else {
+                s1Live.cashSales = totalRealtimeCashSales;
+                s1Live.upiSales = totalRealtimeUpiSales;
+                s1Live.cardSales = totalRealtimeCardSales;
+                s1Live.expenses = totalRealtimeExpenses;
+                s1Live.expected = o1 ? (o1.totalOpeningCash + s1Live.cashSales - s1Live.expenses) : 0;
             }
 
-            if (o2 && !c2) {
+            // Shift 2: 
+            if (c2) {
+                s2Live.cashSales = c2.cashSales;
+                s2Live.upiSales = c2.upiSales;
+                s2Live.cardSales = c2.cardSales;
+                s2Live.expenses = c2.expenses;
+                s2Live.expected = c2.expectedCash;
+            } else if (o2) {
                 const s1AccountedSales = c1?.cashSales || 0;
                 const s1AccountedUpi = c1?.upiSales || 0;
                 const s1AccountedCard = c1?.cardSales || 0;
@@ -668,12 +678,6 @@ export const getAdminCashSummary = async (req, res, next) => {
                 s2Live.cardSales = Math.max(0, totalRealtimeCardSales - s1AccountedCard);
                 s2Live.expenses = Math.max(0, totalRealtimeExpenses - s1AccountedExpenses);
                 s2Live.expected = o2.totalOpeningCash + s2Live.cashSales - s2Live.expenses;
-            } else if (c2) {
-                s2Live.cashSales = c2.cashSales;
-                s2Live.upiSales = c2.upiSales;
-                s2Live.cardSales = c2.cardSales;
-                s2Live.expenses = c2.expenses;
-                s2Live.expected = c2.expectedCash;
             }
 
             return {
@@ -1333,23 +1337,48 @@ export const getStoreCashRegister = async (req, res, next) => {
         const receivedIn = allDeposits._sum.amount || 0;
         const bankTransferred = allBankDeposits._sum.amount || 0;
 
-        // Fetch Direct Store POS Sales (Cash Only)
-        const storeSalesCash = await prisma.order.findMany({
+        // Fetch ALL Direct Store POS Sales (in-store only, excludes agent route orders)
+        const allStoreSales = await prisma.order.findMany({
             where: {
                 storeId,
+                vehicleId: null,  // Only direct POS sales, not agent vehicle orders
                 createdAt: {
                     gte: new Date(`${date}T00:00:00.000Z`),
                     lte: new Date(`${date}T23:59:59.999Z`)
                 },
-                paymentMode: { in: ['CASH', 'CASH_UPI'] },
                 status: { in: ['PAID', 'COMPLETED'] }
-            }
+            },
+            select: { paymentMode: true, totalAmount: true, cashAmount: true, upiAmount: true }
         });
 
-        const totalStoreSalesCash = storeSalesCash.reduce((sum, order) => {
-            if (order.paymentMode === 'CASH') return sum + order.totalAmount;
-            return sum + (order.cashAmount || 0);
+        const totalStoreSalesCash = allStoreSales.reduce((sum, o) => {
+            if (o.paymentMode === 'CASH') return sum + o.totalAmount;
+            if (o.paymentMode === 'CASH_UPI') return sum + (o.cashAmount || 0);
+            return sum;
         }, 0);
+
+        const totalStoreSalesUPI = allStoreSales.reduce((sum, o) => {
+            if (o.paymentMode === 'UPI') return sum + o.totalAmount;
+            if (o.paymentMode === 'CASH_UPI') return sum + (o.upiAmount || 0);
+            return sum;
+        }, 0);
+
+        const totalStoreSalesCard = allStoreSales.reduce((sum, o) => {
+            if (o.paymentMode === 'CARD') return sum + o.totalAmount;
+            return sum;
+        }, 0);
+
+        const totalStoreSalesHybrid = allStoreSales.reduce((sum, o) => {
+            if (o.paymentMode === 'CASH_UPI') return sum + o.totalAmount;
+            return sum;
+        }, 0);
+
+        const totalStoreSalesCount = {
+            CASH: allStoreSales.filter(o => o.paymentMode === 'CASH').length,
+            UPI: allStoreSales.filter(o => o.paymentMode === 'UPI').length,
+            CARD: allStoreSales.filter(o => o.paymentMode === 'CARD').length,
+            HYBRID: allStoreSales.filter(o => o.paymentMode === 'CASH_UPI').length,
+        };
 
         let totalStoreCash = 0;
         let safeBalance = 0;
@@ -1381,10 +1410,14 @@ export const getStoreCashRegister = async (req, res, next) => {
                 receivedIn,
                 bankTransferred,
                 totalStoreSalesCash,
+                totalStoreSalesUPI,
+                totalStoreSalesCard,
+                totalStoreSalesHybrid,
+                totalStoreSalesCount,
                 totalStoreCash: parseFloat(totalStoreCash.toFixed(2)),
                 safeBalance: parseFloat(safeBalance.toFixed(2)),
                 availableCash: parseFloat(availableCash.toFixed(2)),
-                liveExpected: parseFloat(totalStoreCash.toFixed(2)) // backward compatibility
+                liveExpected: parseFloat(totalStoreCash.toFixed(2))
             }
         });
 
@@ -1464,6 +1497,7 @@ export const getStoreCashLedger = async (req, res, next) => {
         const storeSales = await prisma.order.findMany({
             where: {
                 storeId,
+                vehicleId: null,
                 createdAt: {
                     gte: new Date(`${date}T00:00:00.000Z`),
                     lte: new Date(`${date}T23:59:59.999Z`)
@@ -1583,33 +1617,23 @@ export const getStoreCashLedger = async (req, res, next) => {
         });
         entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-        // Compute running balance (before/after for each entry)
+        // Compute running balance — tracks Available Cash at Counter
         const ledger = entries.map(entry => {
             const before = runningBalance;
-            if (['IN', 'IN_FROM_SAFE'].includes(entry.direction)) {
-                // For Total Store Balance, movements between Safe and Counter are internal
-                // But wait, direction IN/OUT should represent Total Store Cash impact
-                // SAFE_MOVEMENT doesn't change Total Cash.
-                if (entry.type !== 'SAFE_MOVEMENT') {
-                    runningBalance += (['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? entry.amount : -entry.amount);
-                }
-            } else if (['OUT', 'OUT_TO_SAFE'].includes(entry.direction)) {
-                if (entry.type !== 'SAFE_MOVEMENT') {
-                    runningBalance -= entry.amount;
-                }
-            } 
-            // Wait, this is getting complex. Let's simplify:
-            // Total Cash = Opening - AgentOut + AgentIn - BankTransfer
-            // Safe Cash = (SafeMove Deposit) - (SafeMove Withdraw) - (BankTransfer)
-            // Available = Total - Safe
-            
-            // Let's just track Total Store Balance in the ledger list first
-            if (entry.type !== 'SAFE_MOVEMENT') {
-                const amountToApply = entry.type === 'STORE_SALE' ? (entry.cashImpact || 0) : entry.amount;
-                if (entry.direction === 'IN') runningBalance += amountToApply;
-                else if (entry.direction === 'OUT') runningBalance -= amountToApply;
+
+            if (entry.type === 'SAFE_MOVEMENT') {
+                // Moving to safe REDUCES counter cash; withdrawing FROM safe ADDS to counter cash
+                if (entry.direction === 'OUT_TO_SAFE') runningBalance -= entry.amount;
+                else if (entry.direction === 'IN_FROM_SAFE') runningBalance += entry.amount;
+            } else if (entry.type === 'STORE_SALE') {
+                // Only the cash portion of a POS sale enters the counter
+                runningBalance += (entry.cashImpact || 0);
+            } else if (entry.direction === 'IN') {
+                runningBalance += entry.amount;
+            } else if (entry.direction === 'OUT') {
+                runningBalance -= entry.amount;
             }
-            
+
             return {
                 ...entry,
                 balanceBefore: parseFloat(before.toFixed(2)),
@@ -1633,7 +1657,8 @@ export const getStoreCashLedger = async (req, res, next) => {
                     expectedClosingCash: storeRegister.expectedClosingCash,
                     actualClosingCash: storeRegister.actualClosingCash,
                     closingDifference: storeRegister.closingDifference,
-                    denominations: storeRegister.closingDenominations
+                    denominations: storeRegister.closingDenominations,
+                    closingRemarks: storeRegister.closingRemarks
                 },
                 balanceBefore: parseFloat(runningBalance.toFixed(2)),
                 balanceAfter: parseFloat(runningBalance.toFixed(2))
@@ -1704,11 +1729,31 @@ export const createSafeTransaction = async (req, res, next) => {
         const movedToSafe = allSafeDeposits._sum.amount || 0;
         const withdrawnFromSafe = allSafeWithdrawals._sum.amount || 0;
 
-        const totalStoreCash = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+        // Add POS Sales (CASH part — in-store only)
+        const storeSales = await prisma.order.findMany({
+            where: {
+                storeId,
+                vehicleId: null,
+                createdAt: {
+                    gte: new Date(`${date}T00:00:00.000Z`),
+                    lte: new Date(`${date}T23:59:59.999Z`)
+                },
+                status: { in: ['PAID', 'COMPLETED'] }
+            },
+            select: { paymentMode: true, totalAmount: true, cashAmount: true }
+        });
+
+        const totalPOSCash = storeSales.reduce((sum, o) => {
+            const cash = o.paymentMode === 'CASH' ? o.totalAmount : (o.cashAmount || 0);
+            return sum + cash;
+        }, 0);
+
+        // Standard Calculation
+        const totalStoreCash = storeRegister.openingCash + totalPOSCash + receivedIn - assignedOut - bankTransferred;
         const safeBalance = movedToSafe - withdrawnFromSafe - bankTransferred;
         const availableCash = totalStoreCash - safeBalance;
 
-        if (type === 'DEPOSIT' && amount > availableCash) {
+        if (type === 'DEPOSIT' && amount > (availableCash + 0.01)) {
             res.status(400);
             throw new Error(`Limit Exceeded: The movement amount exceeds the available cash on hand (Current Max: ₹${Math.max(0, availableCash).toFixed(2)})`);
         }
@@ -1776,7 +1821,7 @@ export const openStoreCashRegister = async (req, res, next) => {
 // @access  Admin
 export const closeStoreCashRegister = async (req, res, next) => {
     try {
-        const { date, actualClosingCash, denominations } = req.body;
+        const { date, actualClosingCash, denominations, remarks } = req.body;
         const storeId = req.user.storeId;
 
         if (!storeId || !date || actualClosingCash === undefined || !denominations) {
@@ -1799,6 +1844,7 @@ export const closeStoreCashRegister = async (req, res, next) => {
             throw new Error('Store Cash Register is already closed for this date');
         }
 
+        // Accumulate all factors for Available Cash (Counter Cash)
         const allOpening = await prisma.openingCash.aggregate({
             where: { storeId, date },
             _sum: { totalOpeningCash: true }
@@ -1814,10 +1860,31 @@ export const closeStoreCashRegister = async (req, res, next) => {
             _sum: { amount: true }
         });
 
+        // POS Cash Sales (in-store only)
+        const storeSales = await prisma.order.findMany({
+            where: {
+                storeId,
+                vehicleId: null,
+                createdAt: {
+                    gte: new Date(`${date}T00:00:00.000Z`),
+                    lte: new Date(`${date}T23:59:59.999Z`)
+                },
+                status: { in: ['PAID', 'COMPLETED'] }
+            },
+            select: { paymentMode: true, totalAmount: true, cashAmount: true }
+        });
+
+        const totalPOSCash = storeSales.reduce((sum, o) => {
+            const cash = o.paymentMode === 'CASH' ? o.totalAmount : (o.cashAmount || 0);
+            return sum + cash;
+        }, 0);
+
         const assignedOut = allOpening._sum.totalOpeningCash || 0;
         const receivedIn = allDeposits._sum.amount || 0;
         const bankTransferred = allBankDeposits._sum.amount || 0;
-        const liveExpected = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+        
+        // Expected Available Cash = Opening + POS_Cash + Agent_Deposits - Agent_Deployments - Bank_Transfers
+        const liveExpected = storeRegister.openingCash + totalPOSCash + receivedIn - assignedOut - bankTransferred;
 
         const closingDifference = actualClosingCash - liveExpected;
 
@@ -1828,6 +1895,7 @@ export const closeStoreCashRegister = async (req, res, next) => {
                 actualClosingCash,
                 closingDifference,
                 closingDenominations: denominations,
+                closingRemarks: remarks,
                 closedById: req.user.id,
                 status: 'CLOSED'
             }

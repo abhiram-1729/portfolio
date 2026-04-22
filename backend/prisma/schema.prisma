@@ -645,6 +645,7 @@ model StoreCashRegister {
   actualClosingCash    Float?
   closingDifference    Float?
   closingDenominations Json?
+  closingRemarks       String?
   
   openedById           String?
   closedById           String?

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, Info, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText, ExternalLink, ShoppingCart, Package, Smartphone, Zap } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, Check, CheckCircle2, AlertCircle, AlertTriangle, Clock, Info, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText, ExternalLink, ShoppingCart, Package, Smartphone, Zap, BarChart3, CreditCard } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -66,6 +66,9 @@ export default function AdminCashManagement() {
     denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 },
     remark: ''
   });
+  const [activeCorrectionTab, setActiveCorrectionTab] = useState('CASH'); // 'CASH', 'UPI', 'CARD'
+  const [appliedParts, setAppliedParts] = useState({ CASH: false, UPI: false, CARD: false });
+
 
   const [showUnapprovedWarning, setShowUnapprovedWarning] = useState(false);
   const [unapprovedInfo, setUnapprovedInfo] = useState({ count: 0, shift: 1 });
@@ -87,6 +90,7 @@ export default function AdminCashManagement() {
   const [showCloseStoreModal, setShowCloseStoreModal] = useState(false);
   const [storeDenomData, setStoreDenomData] = useState({
     amount: 0,
+    remarks: '',
     denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
   });
 
@@ -137,6 +141,7 @@ export default function AdminCashManagement() {
       const newDenoms = { ...reviewEditData.denominations, [denom]: qty };
       const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
       setReviewEditData({ ...reviewEditData, denominations: newDenoms, actualCash: total });
+      setAppliedParts(prev => ({ ...prev, CASH: false }));
     } else if (type === 'store') {
       const newDenoms = { ...storeDenomData.denominations, [denom]: qty };
       const total = Object.entries(newDenoms).reduce((sum, [d, q]) => sum + (parseInt(d) * q), 0);
@@ -211,10 +216,10 @@ export default function AdminCashManagement() {
 
   // Lazy-load ledger when tab is active
   useEffect(() => {
-    if (['ledger', 'store_sales'].includes(activeTab)) {
+    if (activeTab === 'ledger') {
       fetchLedger();
     }
-  }, [activeTab, date]);
+  }, [date, activeTab]);
 
   // 🆕 Reset Modal Step & Automate Auto-fill from yesterday
   useEffect(() => {
@@ -356,7 +361,14 @@ export default function AdminCashManagement() {
   };
 
   const handleCloseStoreRegister = async () => {
-    if (storeDenomData.amount <= 0 && storeRegisterData?.liveMetrics?.liveExpected > 0) return toast.error('Enter valid denominations');
+    const expected = storeRegisterData?.liveMetrics?.availableCash || 0;
+    const diff = storeDenomData.amount - expected;
+    
+    if (Math.abs(diff) > 0.01 && !storeDenomData.remarks) {
+      return toast.error('Mandatory description required for variance');
+    }
+
+    if (storeDenomData.amount <= 0 && expected > 0) return toast.error('Enter valid denominations');
     setIsSubmitting(true);
     try {
       if (storeRegisterData?.storeRegister?.status === 'CLOSED') {
@@ -365,19 +377,22 @@ export default function AdminCashManagement() {
           date,
           actualClosingCash: storeDenomData.amount,
           denominations: storeDenomData.denominations,
-          isClosingUpdate: true // hint for backend if needed
+          remarks: storeDenomData.remarks,
+          isClosingUpdate: true 
         });
       } else {
         await closeStoreCashRegister({
           date,
           actualClosingCash: storeDenomData.amount,
-          denominations: storeDenomData.denominations
+          denominations: storeDenomData.denominations,
+          remarks: storeDenomData.remarks
         });
       }
       toast.success(storeRegisterData?.storeRegister?.status === 'CLOSED' ? 'Store Closing Cash updated' : 'Store Cash Register closed successfully');
       setShowCloseStoreModal(false);
       setStoreDenomData({
         amount: 0,
+        remarks: '',
         denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
       });
       fetchStoreRegister();
@@ -1037,78 +1052,182 @@ export default function AdminCashManagement() {
                         <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Correction Mode</span>
                         <button onClick={() => setIsReviewEditing(null)} className="text-orange-400 hover:text-orange-600"><X size={16} /></button>
                       </div>
-                      <div className="grid grid-cols-3 gap-2">
-                        {denominationsList.map(denom => (
-                          <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-orange-100 shadow-sm">
-                            <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
-                            <input
-                              type="number"
-                              className="w-full text-xs font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
-                              value={reviewEditData.denominations[denom] || ''}
-                              onChange={(e) => handleDenominationChange(e.target.value, denom, 'review')}
-                              placeholder="0"
-                            />
-                          </div>
+
+                      <div className="flex gap-1.5 bg-white/50 p-1 rounded-2xl border border-orange-100 shadow-sm">
+                        {['CASH', 'UPI', 'CARD'].map(tab => (
+                          <button
+                            key={tab}
+                            onClick={() => setActiveCorrectionTab(tab)}
+                            className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeCorrectionTab === tab ? 'bg-orange-600 text-white shadow-md shadow-orange-600/20' : 'text-orange-400 hover:bg-orange-100'}`}
+                          >
+                            {tab}
+                          </button>
                         ))}
                       </div>
-                      <div className="grid grid-cols-2 gap-3 pt-2">
-                        <div className="bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
-                          <span className="text-[8px] font-black text-orange-500 uppercase block mb-0.5">Correct UPI</span>
-                          <input
-                            type="number"
-                            className="w-full text-sm font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
-                            value={reviewEditData.upiSales}
-                            onChange={(e) => setReviewEditData({ ...reviewEditData, upiSales: parseFloat(e.target.value) || 0 })}
-                          />
-                        </div>
-                        <div className="bg-white p-3 rounded-xl border border-orange-100 shadow-sm">
-                          <span className="text-[8px] font-black text-blue-500 uppercase block mb-0.5">Correct Card</span>
-                          <input
-                            type="number"
-                            className="w-full text-sm font-black text-blue-700 bg-transparent border-none p-0 focus:ring-0"
-                            value={reviewEditData.cardSales}
-                            onChange={(e) => setReviewEditData({ ...reviewEditData, cardSales: parseFloat(e.target.value) || 0 })}
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-3 pt-3 border-t border-orange-200">
-                        {(() => {
-                          const originalExpected = s1?.closing?.expectedCash || 0;
-                          const originalUpi = s1?.closing?.upiSales || 0;
-                          const originalCard = s1?.closing?.cardSales || 0;
-                          const liveExpected = originalExpected - ((reviewEditData.upiSales || 0) - originalUpi) - ((reviewEditData.cardSales || 0) - originalCard);
-                          const liveDiff = reviewEditData.actualCash - liveExpected;
-                          return (
-                            <div className="flex items-center justify-between px-1 bg-white p-2 rounded-xl border border-orange-100 shadow-sm">
-                              <div>
-                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected: ₹{liveExpected.toFixed(2)}</span>
-                                <span className="text-xs font-black text-orange-700 uppercase">Input: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+
+                      {activeCorrectionTab === 'CASH' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="grid grid-cols-3 gap-2">
+                            {denominationsList.map(denom => (
+                              <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-orange-100 shadow-sm">
+                                <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
+                                <input
+                                  type="number"
+                                  className="w-full text-xs font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
+                                  value={reviewEditData.denominations[denom] || ''}
+                                  onChange={(e) => handleDenominationChange(e.target.value, denom, 'review')}
+                                  placeholder="0"
+                                />
                               </div>
-                              <div className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(liveDiff) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                {Math.abs(liveDiff) <= 0.01 ? 'MATCHED ✓' : liveDiff > 0 ? `Extra: ₹${liveDiff.toFixed(2)}` : `Short: ₹${Math.abs(liveDiff).toFixed(2)}`}
+                            ))}
+                          </div>
+                          
+                          <div className="flex items-center justify-between p-3 bg-white border border-orange-100 rounded-2xl shadow-sm">
+                             <div>
+                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Cash: ₹{(s1?.closing?.expectedCash || 0).toFixed(2)}</span>
+                                <span className="text-xs font-black text-orange-700 uppercase">Input Counted: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+                             </div>
+                             <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.actualCash - s1.closing.expectedCash) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {Math.abs(reviewEditData.actualCash - s1.closing.expectedCash) <= 0.01 ? 'MATCHED' : (reviewEditData.actualCash - s1.closing.expectedCash) > 0 ? `+₹${(reviewEditData.actualCash - s1.closing.expectedCash).toFixed(2)}` : `-₹${Math.abs(reviewEditData.actualCash - s1.closing.expectedCash).toFixed(2)}`}
+                             </div>
+                          </div>
+
+                          <button
+                            onClick={() => setAppliedParts({ ...appliedParts, CASH: true })}
+                            className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${appliedParts.CASH ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-orange-600 text-white hover:bg-orange-700'}`}
+                          >
+                            {appliedParts.CASH ? <Check size={14} /> : null}
+                            {appliedParts.CASH ? 'Applied' : 'Apply Cash Correction'}
+                          </button>
+                        </div>
+                      )}
+
+                      {activeCorrectionTab === 'UPI' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="bg-white p-5 rounded-2xl border border-orange-100 shadow-sm space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-orange-50 rounded-xl flex items-center justify-center text-orange-500">
+                                <Smartphone size={20} />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black text-orange-500 uppercase tracking-widest">Correct UPI Sales</p>
+                                <p className="text-[8px] font-bold text-gray-400">Current System Val: ₹{(s1?.closing?.upiSales || 0).toFixed(2)}</p>
                               </div>
                             </div>
-                          );
-                        })()}
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-orange-300">₹</span>
+                              <input
+                                type="number"
+                                className="w-full bg-orange-50/50 border border-orange-100 pl-8 pr-4 py-3 text-lg font-black text-orange-700 rounded-xl focus:ring-4 focus:ring-orange-500/10 focus:border-orange-500 outline-none transition-all"
+                                value={reviewEditData.upiSales}
+                                onChange={(e) => {
+                                  setReviewEditData({ ...reviewEditData, upiSales: parseFloat(e.target.value) || 0 });
+                                  setAppliedParts({ ...appliedParts, UPI: false });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between p-3 bg-white border border-orange-100 rounded-2xl shadow-sm">
+                             <div>
+                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected UPI: ₹{(s1?.closing?.upiSales || 0).toFixed(2)}</span>
+                                <span className="text-xs font-black text-orange-700 uppercase">Input Adjusted: ₹{reviewEditData.upiSales.toFixed(2)}</span>
+                             </div>
+                             <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.upiSales - s1.closing.upiSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                {Math.abs(reviewEditData.upiSales - s1.closing.upiSales) <= 0.01 ? 'MATCHED' : (reviewEditData.upiSales - s1.closing.upiSales) > 0 ? `+₹${(reviewEditData.upiSales - s1.closing.upiSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.upiSales - s1.closing.upiSales).toFixed(2)}`}
+                             </div>
+                          </div>
+
+                          <button
+                            onClick={() => setAppliedParts({ ...appliedParts, UPI: true })}
+                            className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${appliedParts.UPI ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-orange-600 text-white hover:bg-orange-700'}`}
+                          >
+                            {appliedParts.UPI ? <Check size={14} /> : null}
+                            {appliedParts.UPI ? 'Applied' : 'Apply UPI Correction'}
+                          </button>
+                        </div>
+                      )}
+
+                      {activeCorrectionTab === 'CARD' && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                          <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm space-y-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
+                                <Building2 size={20} />
+                              </div>
+                              <div>
+                                <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Correct Card Sales</p>
+                                <p className="text-[8px] font-bold text-gray-400">Current System Val: ₹{(s1?.closing?.cardSales || 0).toFixed(2)}</p>
+                              </div>
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-blue-300">₹</span>
+                              <input
+                                type="number"
+                                className="w-full bg-blue-50/50 border border-blue-100 pl-8 pr-4 py-3 text-lg font-black text-blue-700 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                value={reviewEditData.cardSales}
+                                onChange={(e) => {
+                                  setReviewEditData({ ...reviewEditData, cardSales: parseFloat(e.target.value) || 0 });
+                                  setAppliedParts({ ...appliedParts, CARD: false });
+                                }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between p-3 bg-white border border-blue-100 rounded-2xl shadow-sm">
+                             <div>
+                                <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Card: ₹{(s1?.closing?.cardSales || 0).toFixed(2)}</span>
+                                <span className="text-xs font-black text-blue-700 uppercase">Input Adjusted: ₹{reviewEditData.cardSales.toFixed(2)}</span>
+                             </div>
+                             <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.cardSales - s1.closing.cardSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                {Math.abs(reviewEditData.cardSales - s1.closing.cardSales) <= 0.01 ? 'MATCHED' : (reviewEditData.cardSales - s1.closing.cardSales) > 0 ? `+₹${(reviewEditData.cardSales - s1.closing.cardSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.cardSales - s1.closing.cardSales).toFixed(2)}`}
+                             </div>
+                          </div>
+
+                          <button
+                            onClick={() => setAppliedParts({ ...appliedParts, CARD: true })}
+                            className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${appliedParts.CARD ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                          >
+                            {appliedParts.CARD ? <Check size={14} /> : null}
+                            {appliedParts.CARD ? 'Applied' : 'Apply Card Correction'}
+                          </button>
+                        </div>
+                      )}
+
+                      <div className="space-y-3 pt-3 border-t border-orange-200">
                         <input
                           className="w-full bg-white border border-orange-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-orange-200"
                           placeholder="Admin reason for correction..."
                           value={reviewEditData.remark}
                           onChange={(e) => setReviewEditData({ ...reviewEditData, remark: e.target.value })}
                         />
-                        <button
-                          onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', {
-                            actualCash: reviewEditData.actualCash,
-                            upiSales: reviewEditData.upiSales,
-                            cardSales: reviewEditData.cardSales,
-                            denominations: reviewEditData.denominations,
-                            remark: reviewEditData.remark
-                          })}
-                          disabled={isSubmitting}
-                          className="w-full bg-orange-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-orange-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-orange-600/20"
-                        >
-                          {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Save Corrections & Approve'}
-                        </button>
+                        
+                        <div className="grid grid-cols-2 gap-2">
+                           <button
+                             onClick={() => setIsReviewEditing(null)}
+                             className="py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all font-bold"
+                           >
+                             Discard
+                           </button>
+                           <button
+                             onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED', {
+                               actualCash: reviewEditData.actualCash,
+                               upiSales: reviewEditData.upiSales,
+                               cardSales: reviewEditData.cardSales,
+                               denominations: reviewEditData.denominations,
+                               remark: reviewEditData.remark
+                             })}
+                             disabled={isSubmitting}
+                             className="bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                           >
+                             {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
+                               <>
+                                 <CheckCircle2 size={14} />
+                                 Approve Shift
+                               </>
+                             )}
+                           </button>
+                        </div>
                       </div>
                     </div>
                   ) : (
@@ -1116,15 +1235,36 @@ export default function AdminCashManagement() {
                       <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
-                          <span className="text-sm font-black text-emerald-600">₹{(s1.closing.cashSales || 0).toFixed(2)}</span>
+                          <div className="flex items-center gap-2">
+                            {Math.abs(s1.closing.actualCash - s1.closing.expectedCash) > 0.01 && (
+                              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.actualCash > s1.closing.expectedCash ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                {s1.closing.actualCash > s1.closing.expectedCash ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.actualCash - s1.closing.expectedCash).toFixed(2)}
+                              </span>
+                            )}
+                            <span className="text-sm font-black text-emerald-600">₹{(s1.closing.cashSales || 0).toFixed(2)}</span>
+                          </div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
-                          <span className="text-sm font-black text-orange-600">₹{(s1.closing.upiSales || 0).toFixed(2)}</span>
+                          <div className="flex items-center gap-2">
+                             {Math.abs(s1.closing.upiSales - (viewingSummary.dailySales?.totalUpi || 0)) > 0.01 && (
+                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.upiSales > (viewingSummary.dailySales?.totalUpi || 0) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                 {s1.closing.upiSales > (viewingSummary.dailySales?.totalUpi || 0) ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.upiSales - (viewingSummary.dailySales?.totalUpi || 0)).toFixed(2)}
+                               </span>
+                             )}
+                             <span className="text-sm font-black text-orange-600">₹{(s1.closing.upiSales || 0).toFixed(2)}</span>
+                          </div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
-                          <span className="text-sm font-black text-blue-600">₹{(s1.closing.cardSales || 0).toFixed(2)}</span>
+                          <div className="flex items-center gap-2">
+                             {Math.abs(s1.closing.cardSales - (viewingSummary.dailySales?.totalCard || 0)) > 0.01 && (
+                               <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s1.closing.cardSales > (viewingSummary.dailySales?.totalCard || 0) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                 {s1.closing.cardSales > (viewingSummary.dailySales?.totalCard || 0) ? 'Extra' : 'Short'}: ₹{Math.abs(s1.closing.cardSales - (viewingSummary.dailySales?.totalCard || 0)).toFixed(2)}
+                               </span>
+                             )}
+                             <span className="text-sm font-black text-blue-600">₹{(s1.closing.cardSales || 0).toFixed(2)}</span>
+                          </div>
                         </div>
                         <div className="flex justify-between items-center">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expenses</span>
@@ -1153,6 +1293,8 @@ export default function AdminCashManagement() {
                         <button
                           onClick={() => {
                             setIsReviewEditing(1);
+                            setActiveCorrectionTab('CASH');
+                            setAppliedParts({ CASH: false, UPI: false, CARD: false });
                             setReviewEditData({
                               actualCash: s1.closing.actualCash,
                               upiSales: s1.closing.upiSales,
@@ -1222,95 +1364,219 @@ export default function AdminCashManagement() {
                             <span className="text-[10px] font-black text-indigo-600 uppercase tracking-widest">Correction Mode</span>
                             <button onClick={() => setIsReviewEditing(null)} className="text-indigo-400 hover:text-indigo-600"><X size={16} /></button>
                           </div>
-                          <div className="grid grid-cols-3 gap-2">
-                            {denominationsList.map(denom => (
-                              <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-indigo-100 shadow-sm">
-                                <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
-                                <input
-                                  type="number"
-                                  className="w-full text-xs font-black text-indigo-700 bg-transparent border-none p-0 focus:ring-0"
-                                  value={reviewEditData.denominations[denom] || ''}
-                                  onChange={(e) => handleDenominationChange(e.target.value, denom, 'review')}
-                                  placeholder="0"
-                                />
-                              </div>
+
+                          <div className="flex gap-1.5 bg-white/50 p-1 rounded-2xl border border-indigo-100 shadow-sm">
+                            {['CASH', 'UPI', 'CARD'].map(tab => (
+                              <button
+                                key={tab}
+                                onClick={() => setActiveCorrectionTab(tab)}
+                                className={`flex-1 py-2.5 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all ${activeCorrectionTab === tab ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/20' : 'text-indigo-400 hover:bg-indigo-100'}`}
+                              >
+                                {tab}
+                              </button>
                             ))}
                           </div>
-                          <div className="grid grid-cols-2 gap-3 pt-2">
-                            <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
-                              <span className="text-[8px] font-black text-orange-500 uppercase block mb-0.5">Correct UPI</span>
-                              <input
-                                type="number"
-                                className="w-full text-sm font-black text-orange-700 bg-transparent border-none p-0 focus:ring-0"
-                                value={reviewEditData.upiSales}
-                                onChange={(e) => setReviewEditData({ ...reviewEditData, upiSales: parseFloat(e.target.value) || 0 })}
-                              />
-                            </div>
-                            <div className="bg-white p-3 rounded-xl border border-indigo-100 shadow-sm">
-                              <span className="text-[8px] font-black text-blue-500 uppercase block mb-0.5">Correct Card</span>
-                              <input
-                                type="number"
-                                className="w-full text-sm font-black text-blue-700 bg-transparent border-none p-0 focus:ring-0"
-                                value={reviewEditData.cardSales}
-                                onChange={(e) => setReviewEditData({ ...reviewEditData, cardSales: parseFloat(e.target.value) || 0 })}
-                              />
-                            </div>
-                          </div>
-                          <div className="space-y-3 pt-3 border-t border-indigo-200">
-                            {(() => {
-                              const originalExpected = s2?.closing?.expectedCash || 0;
-                              const originalUpi = s2?.closing?.upiSales || 0;
-                              const originalCard = s2?.closing?.cardSales || 0;
-                              const liveExpected = originalExpected - ((reviewEditData.upiSales || 0) - originalUpi) - ((reviewEditData.cardSales || 0) - originalCard);
-                              const liveDiff = reviewEditData.actualCash - liveExpected;
-                              return (
-                                <div className="flex items-center justify-between px-1 bg-white p-2 rounded-xl border border-indigo-100 shadow-sm">
-                                  <div>
-                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected: ₹{liveExpected.toFixed(2)}</span>
-                                    <span className="text-xs font-black text-indigo-700 uppercase">Input: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+
+                          {activeCorrectionTab === 'CASH' && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <div className="grid grid-cols-3 gap-2">
+                                {denominationsList.map(denom => (
+                                  <div key={denom} className="flex flex-col gap-1 bg-white p-2.5 rounded-xl border border-indigo-100 shadow-sm">
+                                    <span className="text-[8px] font-black text-gray-400">₹{denom}</span>
+                                    <input
+                                      type="number"
+                                      className="w-full text-xs font-black text-indigo-700 bg-transparent border-none p-0 focus:ring-0"
+                                      value={reviewEditData.denominations[denom] || ''}
+                                      onChange={(e) => handleDenominationChange(e.target.value, denom, 'review')}
+                                      placeholder="0"
+                                    />
                                   </div>
-                                  <div className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(liveDiff) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                    {Math.abs(liveDiff) <= 0.01 ? 'MATCHED ✓' : liveDiff > 0 ? `Extra: ₹${liveDiff.toFixed(2)}` : `Short: ₹${Math.abs(liveDiff).toFixed(2)}`}
+                                ))}
+                              </div>
+                              
+                              <div className="flex items-center justify-between p-3 bg-white border border-indigo-100 rounded-2xl shadow-sm">
+                                 <div>
+                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Cash: ₹{(s2?.closing?.expectedCash || 0).toFixed(2)}</span>
+                                    <span className="text-xs font-black text-indigo-700 uppercase">Input Counted: ₹{reviewEditData.actualCash.toFixed(2)}</span>
+                                 </div>
+                                 <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.actualCash - s2.closing.expectedCash) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                                    {Math.abs(reviewEditData.actualCash - s2.closing.expectedCash) <= 0.01 ? 'MATCHED' : (reviewEditData.actualCash - s2.closing.expectedCash) > 0 ? `+₹${(reviewEditData.actualCash - s2.closing.expectedCash).toFixed(2)}` : `-₹${Math.abs(reviewEditData.actualCash - s2.closing.expectedCash).toFixed(2)}`}
+                                 </div>
+                              </div>
+
+                              <button
+                                onClick={() => setAppliedParts({ ...appliedParts, CASH: true })}
+                                className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${appliedParts.CASH ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-indigo-600 text-white hover:bg-indigo-700'}`}
+                              >
+                                {appliedParts.CASH ? <Check size={14} /> : null}
+                                {appliedParts.CASH ? 'Applied' : 'Apply Cash Correction'}
+                              </button>
+                            </div>
+                          )}
+
+                          {activeCorrectionTab === 'UPI' && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <div className="bg-white p-5 rounded-2xl border border-indigo-100 shadow-sm space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-500">
+                                    <Smartphone size={20} />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black text-indigo-500 uppercase tracking-widest">Correct UPI Sales</p>
+                                    <p className="text-[8px] font-bold text-gray-400">Current System Val: ₹{(s2?.closing?.upiSales || 0).toFixed(2)}</p>
                                   </div>
                                 </div>
-                              );
-                            })()}
+                                <div className="relative">
+                                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-indigo-300">₹</span>
+                                  <input
+                                    type="number"
+                                    className="w-full bg-indigo-50/50 border border-indigo-100 pl-8 pr-4 py-3 text-lg font-black text-indigo-700 rounded-xl focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
+                                    value={reviewEditData.upiSales}
+                                    onChange={(e) => {
+                                      setReviewEditData({ ...reviewEditData, upiSales: parseFloat(e.target.value) || 0 });
+                                      setAppliedParts({ ...appliedParts, UPI: false });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between p-3 bg-white border border-indigo-100 rounded-2xl shadow-sm">
+                                 <div>
+                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected UPI: ₹{(s2?.closing?.upiSales || 0).toFixed(2)}</span>
+                                    <span className="text-xs font-black text-indigo-700 uppercase">Input Adjusted: ₹{reviewEditData.upiSales.toFixed(2)}</span>
+                                 </div>
+                                 <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.upiSales - s2.closing.upiSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-blue-50 text-blue-600'}`}>
+                                    {Math.abs(reviewEditData.upiSales - s2.closing.upiSales) <= 0.01 ? 'MATCHED' : (reviewEditData.upiSales - s2.closing.upiSales) > 0 ? `+₹${(reviewEditData.upiSales - s2.closing.upiSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.upiSales - s2.closing.upiSales).toFixed(2)}`}
+                                 </div>
+                              </div>
+
+                              <button
+                                onClick={() => setAppliedParts({ ...appliedParts, UPI: true })}
+                                className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${appliedParts.UPI ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-orange-600 text-white hover:bg-orange-700'}`}
+                              >
+                                {appliedParts.UPI ? <Check size={14} /> : null}
+                                {appliedParts.UPI ? 'Applied' : 'Apply UPI Correction'}
+                              </button>
+                            </div>
+                          )}
+
+                          {activeCorrectionTab === 'CARD' && (
+                            <div className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+                              <div className="bg-white p-5 rounded-2xl border border-blue-100 shadow-sm space-y-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-500">
+                                    <Building2 size={20} />
+                                  </div>
+                                  <div>
+                                    <p className="text-[10px] font-black text-blue-500 uppercase tracking-widest">Correct Card Sales</p>
+                                    <p className="text-[8px] font-bold text-gray-400">Current System Val: ₹{(s2?.closing?.cardSales || 0).toFixed(2)}</p>
+                                  </div>
+                                </div>
+                                <div className="relative">
+                                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-black text-blue-300">₹</span>
+                                  <input
+                                    type="number"
+                                    className="w-full bg-blue-50/50 border border-blue-100 pl-8 pr-4 py-3 text-lg font-black text-blue-700 rounded-xl focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                                    value={reviewEditData.cardSales}
+                                    onChange={(e) => {
+                                      setReviewEditData({ ...reviewEditData, cardSales: parseFloat(e.target.value) || 0 });
+                                      setAppliedParts({ ...appliedParts, CARD: false });
+                                    }}
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="flex items-center justify-between p-3 bg-white border border-blue-100 rounded-2xl shadow-sm">
+                                 <div>
+                                    <span className="text-[9px] font-black text-gray-400 uppercase block">Expected Card: ₹{(s2?.closing?.cardSales || 0).toFixed(2)}</span>
+                                    <span className="text-xs font-black text-blue-700 uppercase">Input Adjusted: ₹{reviewEditData.cardSales.toFixed(2)}</span>
+                                 </div>
+                                 <div className={`px-2.5 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-tighter ${Math.abs(reviewEditData.cardSales - s2.closing.cardSales) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-indigo-50 text-indigo-600'}`}>
+                                    {Math.abs(reviewEditData.cardSales - s2.closing.cardSales) <= 0.01 ? 'MATCHED' : (reviewEditData.cardSales - s2.closing.cardSales) > 0 ? `+₹${(reviewEditData.cardSales - s2.closing.cardSales).toFixed(2)}` : `-₹${Math.abs(reviewEditData.cardSales - s2.closing.cardSales).toFixed(2)}`}
+                                 </div>
+                              </div>
+
+                              <button
+                                onClick={() => setAppliedParts({ ...appliedParts, CARD: true })}
+                                className={`w-full py-3 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-2 ${appliedParts.CARD ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/20' : 'bg-blue-600 text-white hover:bg-blue-700'}`}
+                              >
+                                {appliedParts.CARD ? <Check size={14} /> : null}
+                                {appliedParts.CARD ? 'Applied' : 'Apply Card Correction'}
+                              </button>
+                            </div>
+                          )}
+
+                          <div className="space-y-3 pt-3 border-t border-indigo-200">
                             <input
                               className="w-full bg-white border border-indigo-100 p-3 text-sm rounded-xl outline-none focus:ring-2 focus:ring-indigo-200"
                               placeholder="Admin reason for correction..."
                               value={reviewEditData.remark}
                               onChange={(e) => setReviewEditData({ ...reviewEditData, remark: e.target.value })}
                             />
-                            <button
-                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', {
-                                actualCash: reviewEditData.actualCash,
-                                upiSales: reviewEditData.upiSales,
-                                cardSales: reviewEditData.cardSales,
-                                denominations: reviewEditData.denominations,
-                                remark: reviewEditData.remark
-                              })}
-                              disabled={isSubmitting}
-                              className="w-full bg-indigo-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20"
-                            >
-                              {isSubmitting ? <Loader2 className="animate-spin" size={16} /> : 'Save Corrections & Approve'}
-                            </button>
+                            
+                            <div className="grid grid-cols-2 gap-2">
+                               <button
+                               className="py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-500 bg-gray-100 hover:bg-gray-200 transition-all font-bold"
+                             >
+                               Discard
+                             </button>
+                             <button
+                               onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED', {
+                                 actualCash: reviewEditData.actualCash,
+                                 upiSales: reviewEditData.upiSales,
+                                 cardSales: reviewEditData.cardSales,
+                                 denominations: reviewEditData.denominations,
+                                 remark: reviewEditData.remark
+                               })}
+                               disabled={isSubmitting}
+                               className="bg-emerald-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2"
+                             >
+                               {isSubmitting ? <Loader2 className="animate-spin" size={14} /> : (
+                                 <>
+                                   <CheckCircle2 size={14} />
+                                   Approve Shift
+                                 </>
+                               )}
+                             </button>
                           </div>
                         </div>
-                      ) : (
-                        <>
-                          <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
-                              <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toFixed(2)}</span>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="bg-gray-50/50 p-5 rounded-[2rem] border border-gray-100 space-y-3">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Cash Sales</span>
+                            <div className="flex items-center gap-2">
+                               {Math.abs(s2.closing.actualCash - s2.closing.expectedCash) > 0.01 && (
+                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.actualCash > s2.closing.expectedCash ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                   {s2.closing.actualCash > s2.closing.expectedCash ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.actualCash - s2.closing.expectedCash).toFixed(2)}
+                                 </span>
+                               )}
+                               <span className="text-sm font-black text-emerald-600">₹{(s2.closing.cashSales || 0).toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
-                              <span className="text-sm font-black text-orange-600">₹{(s2.closing.upiSales || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">UPI Sales</span>
+                            <div className="flex items-center gap-2">
+                               {Math.abs(s2.closing.upiSales - ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0))) > 0.01 && (
+                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.upiSales > ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0)) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                   {s2.closing.upiSales > ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0)) ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.upiSales - ((viewingSummary.dailySales?.totalUpi || 0) - (s1?.closing?.upiSales || 0))).toFixed(2)}
+                                 </span>
+                               )}
+                               <span className="text-sm font-black text-orange-600">₹{(s2.closing.upiSales || 0).toFixed(2)}</span>
                             </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
-                              <span className="text-sm font-black text-blue-600">₹{(s2.closing.cardSales || 0).toFixed(2)}</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Card Sales</span>
+                            <div className="flex items-center gap-2">
+                               {Math.abs(s2.closing.cardSales - ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0))) > 0.01 && (
+                                 <span className={`text-[8px] font-black px-1.5 py-0.5 rounded ${s2.closing.cardSales > ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0)) ? 'bg-blue-50 text-blue-600' : 'bg-rose-50 text-rose-600'}`}>
+                                   {s2.closing.cardSales > ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0)) ? 'Extra' : 'Short'}: ₹{Math.abs(s2.closing.cardSales - ((viewingSummary.dailySales?.totalCard || 0) - (s1?.closing?.cardSales || 0))).toFixed(2)}
+                                 </span>
+                               )}
+                               <span className="text-sm font-black text-blue-600">₹{(s2.closing.cardSales || 0).toFixed(2)}</span>
                             </div>
+                          </div>
                             <div className="flex justify-between items-center">
                               <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Expenses</span>
                               <span className="text-sm font-black text-rose-500">-₹{(s2.closing.expenses || 0).toFixed(2)}</span>
@@ -1338,6 +1604,8 @@ export default function AdminCashManagement() {
                             <button
                               onClick={() => {
                                 setIsReviewEditing(2);
+                                setActiveCorrectionTab('CASH');
+                                setAppliedParts({ CASH: false, UPI: false, CARD: false });
                                 setReviewEditData({
                                   actualCash: s2.closing.actualCash,
                                   upiSales: s2.closing.upiSales,
@@ -1749,7 +2017,7 @@ export default function AdminCashManagement() {
 
                     <button
                       onClick={() => {
-                        setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: storeRegisterData.liveMetrics?.availableCash || 0 }));
+                        setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: 0, denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } }));
                         setShowSafeMovementModal(true);
                       }}
                       className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
@@ -1842,7 +2110,7 @@ export default function AdminCashManagement() {
                     </div>
                     <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Counter Cash (Available)</p>
                     <p className="text-xl font-black text-sky-400">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
-                    <div className="mt-2 text-[8px] font-black text-sky-600/60 uppercase tracking-widest">In-Store Collection Pool</div>
+
                   </div>
                   <div className="bg-emerald-900 rounded-2xl p-4 shadow-xl border-b-4 border-emerald-950 relative overflow-hidden group">
                     <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
@@ -1955,6 +2223,71 @@ export default function AdminCashManagement() {
                     })}
                   </div>
                 </div>
+
+                {/* Today's Digital Collections */}
+                {(storeRegisterData?.liveMetrics?.totalStoreSalesUPI > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCard > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCount?.HYBRID > 0) && (
+                  <div className="bg-emerald-950/30 rounded-3xl p-5 border border-emerald-800/30 relative z-10">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                        <Smartphone size={12} /> Today's Digital Collections
+                      </h3>
+                      <p className="text-[9px] font-bold text-emerald-500/40 uppercase tracking-tighter">From In-Store POS</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-3">
+                      {/* UPI */}
+                      {storeRegisterData.liveMetrics.totalStoreSalesUPI > 0 && (
+                        <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-2xl border border-orange-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-orange-500/20 rounded-xl flex items-center justify-center">
+                              <Smartphone size={14} className="text-orange-400" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-orange-400 uppercase tracking-wider">UPI</p>
+                              <p className="text-[8px] font-bold text-emerald-500/40">{storeRegisterData.liveMetrics.totalStoreSalesCount?.UPI || 0} transaction(s)</p>
+                            </div>
+                          </div>
+                          <p className="text-sm font-black text-white tabular-nums">₹{storeRegisterData.liveMetrics.totalStoreSalesUPI.toFixed(2)}</p>
+                        </div>
+                      )}
+
+                      {/* Card */}
+                      {storeRegisterData.liveMetrics.totalStoreSalesCard > 0 && (
+                        <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-blue-500/20 rounded-xl flex items-center justify-center">
+                              <Building2 size={14} className="text-blue-400" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider">Card</p>
+                              <p className="text-[8px] font-bold text-emerald-500/40">{storeRegisterData.liveMetrics.totalStoreSalesCount?.CARD || 0} transaction(s)</p>
+                            </div>
+                          </div>
+                          <p className="text-sm font-black text-white tabular-nums">₹{storeRegisterData.liveMetrics.totalStoreSalesCard.toFixed(2)}</p>
+                        </div>
+                      )}
+
+                      {/* Hybrid (Cash + UPI) */}
+                      {storeRegisterData.liveMetrics.totalStoreSalesCount?.HYBRID > 0 && (
+                        <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
+                              <Zap size={14} className="text-amber-400" />
+                            </div>
+                            <div>
+                              <p className="text-[10px] font-black text-amber-400 uppercase tracking-wider">Hybrid (Split)</p>
+                              <p className="text-[8px] font-bold text-emerald-500/40">{storeRegisterData.liveMetrics.totalStoreSalesCount.HYBRID} transaction(s)</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-black text-white tabular-nums">₹{(storeRegisterData.liveMetrics.totalStoreSalesHybrid || 0).toFixed(2)}</p>
+                            <p className="text-[7px] font-bold text-emerald-500/40">Cash + UPI split</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -2086,12 +2419,6 @@ export default function AdminCashManagement() {
               className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'reconciliation' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
             >
               Daily Reconciliation
-            </button>
-            <button
-              onClick={() => setActiveTab('store_sales')}
-              className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'store_sales' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400'}`}
-            >
-              <ShoppingCart size={14} /> Store POS
             </button>
             <button
               onClick={() => setActiveTab('live')}
@@ -2227,6 +2554,41 @@ export default function AdminCashManagement() {
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Aggregate Daily Summary Card (POS Data) */}
+              <div className="p-6 bg-slate-900 border-t border-slate-800">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                    <BarChart3 size={20} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-black text-white uppercase tracking-widest">Aggregate Daily Sales Summary (POS)</h3>
+                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Consolidated revenue across all active vehicles Today</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  {[
+                    { label: 'Total POS Cash', value: filteredSummaries.reduce((sum, s) => sum + (s.dailySales?.totalCash || 0), 0), icon: Coins, color: 'text-emerald-400', bg: 'bg-emerald-500/5', border: 'border-emerald-500/10' },
+                    { label: 'Total POS UPI', value: filteredSummaries.reduce((sum, s) => sum + (s.dailySales?.totalUpi || 0), 0), icon: Smartphone, color: 'text-orange-400', bg: 'bg-orange-500/5', border: 'border-orange-500/10' },
+                    { label: 'Total POS Card', value: filteredSummaries.reduce((sum, s) => sum + (s.dailySales?.totalCard || 0), 0), icon: CreditCard, color: 'text-blue-400', bg: 'bg-blue-500/5', border: 'border-blue-500/10' },
+                    { label: 'Grand Total Sales', value: filteredSummaries.reduce((sum, s) => sum + (s.dailySales?.grandTotal || 0), 0), icon: Zap, color: 'text-amber-400', bg: 'bg-amber-500/5', border: 'border-amber-500/10' }
+                  ].map((stat, idx) => (
+                    <div key={idx} className={`${stat.bg} ${stat.border} border p-5 rounded-[2rem] transition-all hover:scale-[1.02] cursor-default group`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <p className="text-[10px] font-black tracking-widest uppercase text-slate-500 group-hover:text-slate-400 transition-colors">{stat.label}</p>
+                        <stat.icon size={16} className={`${stat.color} opacity-50 group-hover:opacity-100 transition-all`} />
+                      </div>
+                      <div className="flex items-baseline gap-1">
+                        <span className={`text-[12px] font-black ${stat.color} opacity-70`}>₹</span>
+                        <span className="text-2xl font-black text-white tracking-tight tabular-nums">
+                          {stat.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           ) : activeTab === 'live' ? (
@@ -2478,7 +2840,7 @@ export default function AdminCashManagement() {
                 </div>
               </div>
             </div>
-          ) : activeTab === 'ledger' || activeTab === 'store_sales' ? (
+          ) : activeTab === 'ledger' ? (
             /* ========== AUDIT LEDGER VIEW ========== */
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {ledgerLoading ? (
@@ -2504,11 +2866,10 @@ export default function AdminCashManagement() {
                         </div>
                         <div>
                           <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">
-                            {activeTab === 'store_sales' ? 'Store POS Sales' : 'Immutable Cash Ledger'}
+                            Immutable Cash Ledger
                           </h3>
                           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                             {ledgerData.ledger.filter(e => {
-                              if (activeTab === 'store_sales') return e.type === 'STORE_SALE';
                               if (ledgerFilter === 'BANK') return e.type === 'BANK_TRANSFER';
                               if (ledgerFilter === 'SAFE') return e.type === 'SAFE_MOVEMENT';
                               return true;
@@ -2517,41 +2878,21 @@ export default function AdminCashManagement() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
-                        {activeTab === 'store_sales' ? (
-                          // POS Specific Filters
-                          [
-                            { id: 'ALL', label: 'All Sales', icon: ShoppingCart, color: 'text-sky-600' },
-                            { id: 'P_CASH', label: 'Cash', icon: Coins, color: 'text-emerald-600' },
-                            { id: 'P_UPI', label: 'UPI', icon: Smartphone, color: 'text-orange-600' },
-                            { id: 'P_CARD', label: 'Card', icon: Building2, color: 'text-blue-600' },
-                            { id: 'P_HYBRID', label: 'Hybrid', icon: Zap, color: 'text-amber-600' }
-                          ].map(f => (
-                            <button
-                              key={f.id}
-                              onClick={() => setLedgerFilter(f.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${ledgerFilter === f.id ? `bg-white ${f.color} shadow-sm` : 'text-gray-400 hover:text-gray-600'}`}
-                            >
-                              <f.icon size={12} />
-                              {f.label}
-                            </button>
-                          ))
-                        ) : (
-                          // General Audit Ledger Filters
-                          [
-                            { id: 'ALL', label: 'All', icon: BookOpen, color: 'text-emerald-600' },
-                            { id: 'BANK', label: 'Bank', icon: Building2, color: 'text-rose-600' },
-                            { id: 'SAFE', label: 'Safe', icon: Vault, color: 'text-slate-600' }
-                          ].map(f => (
-                            <button
-                              key={f.id}
-                              onClick={() => setLedgerFilter(f.id)}
-                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${ledgerFilter === f.id ? `bg-white ${f.color} shadow-sm` : 'text-gray-400 hover:text-gray-600'}`}
-                            >
-                              <f.icon size={12} />
-                              {f.label}
-                            </button>
-                          ))
-                        )}
+                        {/* General Audit Ledger Filters */}
+                        {[
+                          { id: 'ALL', label: 'All', icon: BookOpen, color: 'text-emerald-600' },
+                          { id: 'BANK', label: 'Bank', icon: Building2, color: 'text-rose-600' },
+                          { id: 'SAFE', label: 'Safe', icon: Vault, color: 'text-slate-600' }
+                        ].map(f => (
+                          <button
+                            key={f.id}
+                            onClick={() => setLedgerFilter(f.id)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${ledgerFilter === f.id ? `bg-white ${f.color} shadow-sm` : 'text-gray-400 hover:text-gray-600'}`}
+                          >
+                            <f.icon size={12} />
+                            {f.label}
+                          </button>
+                        ))}
                       </div>
                     </div>
 
@@ -2571,14 +2912,6 @@ export default function AdminCashManagement() {
                         <tbody className="divide-y divide-gray-50">
                           {ledgerData.ledger
                             .filter(entry => {
-                              if (activeTab === 'store_sales') {
-                                if (entry.type !== 'STORE_SALE') return false;
-                                if (ledgerFilter === 'P_CASH') return entry.metadata.paymentMode === 'CASH';
-                                if (ledgerFilter === 'P_UPI') return entry.metadata.paymentMode === 'UPI';
-                                if (ledgerFilter === 'P_CARD') return entry.metadata.paymentMode === 'CARD';
-                                if (ledgerFilter === 'P_HYBRID') return entry.metadata.paymentMode === 'CASH_UPI';
-                                return true;
-                              }
                               if (ledgerFilter === 'BANK') return entry.type === 'BANK_TRANSFER';
                               if (ledgerFilter === 'SAFE') return entry.type === 'SAFE_MOVEMENT';
                               return true;
@@ -2614,6 +2947,11 @@ export default function AdminCashManagement() {
                                       </div>
                                       <div className="flex flex-col">
                                         <span className="text-xs font-black text-gray-800 block leading-tight">{entry.label}</span>
+                                      {entry.type === 'CLOSING' && entry.metadata?.closingRemarks && (
+                                        <span className="text-[9px] font-bold text-rose-500 mt-1.5 block italic leading-tight bg-rose-50/50 p-1.5 rounded-lg border border-rose-100/50">
+                                          " {entry.metadata.closingRemarks} "
+                                        </span>
+                                      )}
                                         <div className="flex items-center gap-1.5 mt-1">
                                           <span className={`text-[8px] font-black uppercase tracking-widest ${cfg.text} opacity-70`}>{cfg.badge}</span>
                                           {entry.type === 'STORE_SALE' && entry.metadata?.paymentMode && (
@@ -3488,8 +3826,8 @@ export default function AdminCashManagement() {
                 </div>
 
                 <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl border border-gray-100">
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Expected Safe Balance</p>
-                  <p className="text-lg font-black text-gray-900">₹{storeRegisterData?.liveMetrics?.liveExpected?.toFixed(2)}</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-wider">Expected Counter Cash</p>
+                  <p className="text-lg font-black text-gray-900">₹{storeRegisterData?.liveMetrics?.availableCash?.toFixed(2)}</p>
                 </div>
 
                 <div className="space-y-2">
@@ -3516,6 +3854,25 @@ export default function AdminCashManagement() {
                     ))}
                   </div>
                 </div>
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between pl-1">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Closing Remarks / Variance Reason</label>
+                    {Math.abs(storeDenomData.amount - (storeRegisterData?.liveMetrics?.availableCash || 0)) > 0.01 && (
+                      <span className="text-[9px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 px-2 py-0.5 rounded-md border border-rose-100 italic animate-pulse">Required</span>
+                    )}
+                  </div>
+                  <textarea
+                    rows={2}
+                    className={`w-full bg-gray-50 border rounded-xl px-4 py-3 text-sm font-bold text-gray-700 transition-all outline-none resize-none placeholder:text-gray-300 ${
+                      Math.abs(storeDenomData.amount - (storeRegisterData?.liveMetrics?.availableCash || 0)) > 0.01 && !storeDenomData.remarks
+                        ? 'border-rose-200 focus:ring-4 focus:ring-rose-500/10 focus:border-rose-500'
+                        : 'border-gray-100 focus:ring-4 focus:ring-sky-500/10 focus:border-sky-500'
+                    }`}
+                    placeholder="Enter reason for variance or closing notes..."
+                    value={storeDenomData.remarks}
+                    onChange={(e) => setStoreDenomData({ ...storeDenomData, remarks: e.target.value })}
+                  />
+                </div>
 
                 <div className="flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white bg-rose-600 shadow-rose-600/20">
                   <div className="flex flex-col">
@@ -3525,7 +3882,7 @@ export default function AdminCashManagement() {
                   <div className="flex flex-col text-right">
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60 mb-0.5">Variance</p>
                     {(() => {
-                      const expected = storeRegisterData?.liveMetrics?.liveExpected || 0;
+                      const expected = storeRegisterData?.liveMetrics?.availableCash || 0;
                       const diff = storeDenomData.amount - expected;
                       return (
                         <span className={`text-sm font-black ${diff === 0 ? 'text-white' : 'text-rose-200'}`}>
