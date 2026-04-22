@@ -15,6 +15,7 @@ import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
+import * as mediaCtr from '../controllers/admin/mediaController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
@@ -31,6 +32,9 @@ router.use(admin);
 
 // Dashboard
 router.get('/dashboard', dashboardCtr.getDashboardStats);
+
+// Generic Upload Helper
+router.post('/upload-image', uploadMiddleware.single('image'), mediaCtr.uploadImage);
 
 // Users
 router.route('/users')

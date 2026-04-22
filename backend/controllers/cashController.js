@@ -1629,6 +1629,38 @@ export const createSafeTransaction = async (req, res, next) => {
             throw new Error('Store ID, Date, Amount, and Type are required');
         }
 
+        // 🆕 Strict bounds checking on backend
+        const allOpening = await prisma.openingCash.aggregate({ where: { storeId, date }, _sum: { totalOpeningCash: true } });
+        const allDeposits = await prisma.storeDeposit.aggregate({ where: { storeId, date }, _sum: { amount: true } });
+        const allBankDeposits = await prisma.bankDeposit.aggregate({ where: { storeId, date }, _sum: { amount: true } });
+        const allSafeDeposits = await prisma.safeTransaction.aggregate({ where: { storeId, date, type: 'DEPOSIT' }, _sum: { amount: true } });
+        const allSafeWithdrawals = await prisma.safeTransaction.aggregate({ where: { storeId, date, type: 'WITHDRAW' }, _sum: { amount: true } });
+        const storeRegister = await prisma.storeCashRegister.findUnique({ where: { storeId_date: { storeId, date } } });
+
+        if (!storeRegister) {
+            res.status(400);
+            throw new Error('Store Register not found for this date. Initialize safe first.');
+        }
+
+        const assignedOut = allOpening._sum.totalOpeningCash || 0;
+        const receivedIn = allDeposits._sum.amount || 0;
+        const bankTransferred = allBankDeposits._sum.amount || 0;
+        const movedToSafe = allSafeDeposits._sum.amount || 0;
+        const withdrawnFromSafe = allSafeWithdrawals._sum.amount || 0;
+
+        const totalStoreCash = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+        const safeBalance = movedToSafe - withdrawnFromSafe - bankTransferred;
+        const availableCash = totalStoreCash - safeBalance;
+
+        if (type === 'DEPOSIT' && amount > availableCash) {
+            res.status(400);
+            throw new Error(`Limit Exceeded: The movement amount exceeds the available cash on hand (Current Max: ₹${Math.max(0, availableCash).toFixed(2)})`);
+        }
+        if (type === 'WITHDRAW' && amount > safeBalance) {
+            res.status(400);
+            throw new Error(`Limit Exceeded: The requested withdrawal exceeds the currently available safe balance (Current Max: ₹${Math.max(0, safeBalance).toFixed(2)})`);
+        }
+
         const movement = await prisma.safeTransaction.create({
             data: {
                 tenantId: req.user.tenantId,
@@ -1906,6 +1938,33 @@ export const adminAddBankDeposit = async (req, res, next) => {
         if (!storeId || !date || !amount || !branchName || !depositedBy) {
             res.status(400);
             throw new Error('All mandatory fields are required (Amount, Branch, Deposited By)');
+        }
+
+        // 🆕 Validate against current safe balance - Must be from safe ONLY and cannot go negative
+        const allSafeDeposits = await prisma.safeTransaction.aggregate({
+            where: { storeId, date, type: 'DEPOSIT' },
+            _sum: { amount: true }
+        });
+
+        const allSafeWithdrawals = await prisma.safeTransaction.aggregate({
+            where: { storeId, date, type: 'WITHDRAW' },
+            _sum: { amount: true }
+        });
+
+        const allBankDeposits = await prisma.bankDeposit.aggregate({
+            where: { storeId, date },
+            _sum: { amount: true }
+        });
+
+        const movedToSafe = allSafeDeposits._sum.amount || 0;
+        const withdrawnFromSafe = allSafeWithdrawals._sum.amount || 0;
+        const bankTransferred = allBankDeposits._sum.amount || 0;
+
+        const currentSafeBalance = movedToSafe - withdrawnFromSafe - bankTransferred;
+
+        if (amount > currentSafeBalance) {
+            res.status(400);
+            throw new Error(`Insufficient funds in Safe! Available: ₹${currentSafeBalance.toFixed(2)}, Requested: ₹${amount.toFixed(2)}`);
         }
 
         const bankDeposit = await prisma.bankDeposit.create({

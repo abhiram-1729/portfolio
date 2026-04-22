@@ -146,6 +146,11 @@ export const adminAPI = {
   updateRole: (id, data) => api.put(`/admin/roles/${id}`, data),
   deleteRole: (id) => api.delete(`/admin/roles/${id}`),
   assignRole: (data) => api.put('/admin/roles/assign', data),
+  
+  // Media / Uploads
+  uploadProductImage: (data) => api.post('/admin/upload-image', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 

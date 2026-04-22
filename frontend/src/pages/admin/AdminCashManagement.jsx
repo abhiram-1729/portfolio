@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, Info, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, Info, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText, ExternalLink } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -16,6 +16,7 @@ export default function AdminCashManagement() {
   const [vehicles, setVehicles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [previewImage, setPreviewImage] = useState(null);
 
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
@@ -208,7 +209,7 @@ export default function AdminCashManagement() {
 
   // Lazy-load ledger when tab is active
   useEffect(() => {
-    if (activeTab === 'ledger') {
+    if (['ledger', 'bank_history', 'safe_history'].includes(activeTab)) {
       fetchLedger();
     }
   }, [activeTab, date]);
@@ -234,9 +235,22 @@ export default function AdminCashManagement() {
   }, [showOpenStoreModal, storeRegisterData?.previousRegister]);
 
   const handleSafeMovement = async (e) => {
-    e.preventDefault();
-    if (!safeMovementData.amount || parseFloat(safeMovementData.amount) <= 0) {
+    const amount = parseFloat(safeMovementData.amount);
+    if (!amount || amount <= 0) {
       return toast.error('Enter a valid amount');
+    }
+
+    // 🆕 Strict bounds validation
+    if (safeMovementData.type === 'DEPOSIT') {
+      const available = storeRegisterData?.liveMetrics?.availableCash || 0;
+      if (amount > available) {
+        return toast.error(`Limit Exceeded: You cannot move more than the available cash on hand (Max: ₹${Math.max(0, available).toFixed(2)})`);
+      }
+    } else if (safeMovementData.type === 'WITHDRAW') {
+      const safe = storeRegisterData?.liveMetrics?.safeBalance || 0;
+      if (amount > safe) {
+        return toast.error(`Limit Exceeded: You cannot withdraw more than the currently available safe balance (Max: ₹${Math.max(0, safe).toFixed(2)})`);
+      }
     }
 
     try {
@@ -658,7 +672,7 @@ export default function AdminCashManagement() {
     if (e) e.preventDefault();
     if (bankData.amount <= 0) return toast.error('Enter valid amount');
     if (!bankData.branchName) return toast.error('Branch name is mandatory');
-    if (bankData.amount > storeRegisterData.liveMetrics.liveAvailable) {
+    if (bankData.amount > (storeRegisterData?.liveMetrics?.safeBalance || 0)) {
       return toast.error('Transfer amount exceeds currently available safe balance');
     }
 
@@ -1791,7 +1805,7 @@ export default function AdminCashManagement() {
                   <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50 group relative">
                     <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Opening Cash</p>
                     <div className="flex items-center justify-between">
-                      <p className="text-xl font-black text-white">₹{storeRegisterData.storeRegister.openingCash?.toFixed(2)}</p>
+                      <p className="text-xl font-black text-white">₹{Math.abs(storeRegisterData.storeRegister.openingCash || 0).toFixed(2)}</p>
                       <button
                         onClick={() => {
                           setStoreDenomData({
@@ -1808,30 +1822,30 @@ export default function AdminCashManagement() {
                   </div>
                   <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
                     <p className="text-[10px] font-black tracking-widest uppercase text-amber-500 mb-1">Agent Outflow</p>
-                    <p className="text-xl font-black text-amber-400">-₹{(storeRegisterData?.liveMetrics?.assignedOut || 0).toFixed(2)}</p>
+                    <p className="text-xl font-black text-amber-400">-₹{Math.abs(storeRegisterData?.liveMetrics?.assignedOut || 0).toFixed(2)}</p>
                   </div>
                   <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
                     <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Agent Inflow</p>
-                    <p className="text-xl font-black text-emerald-400">+₹{(storeRegisterData?.liveMetrics?.receivedIn || 0).toFixed(2)}</p>
+                    <p className="text-xl font-black text-emerald-400">+₹{Math.abs(storeRegisterData?.liveMetrics?.receivedIn || 0).toFixed(2)}</p>
                   </div>
                   <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
                     <p className="text-[10px] font-black tracking-widest uppercase text-rose-500 mb-1">Bank Transfer</p>
-                    <p className="text-xl font-black text-rose-400">-₹{(storeRegisterData?.liveMetrics?.bankTransferred || 0).toFixed(2)}</p>
+                    <p className="text-xl font-black text-rose-400">₹{Math.abs(storeRegisterData?.liveMetrics?.bankTransferred || 0).toFixed(2)}</p>
                   </div>
 
 
                   <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl">
                     <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Available Cash</p>
-                    <p className="text-xl font-black text-sky-400">₹{(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
+                    <p className="text-xl font-black text-sky-400">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
                   </div>
                   <div className="bg-white rounded-2xl p-4 shadow-xl border-b-4 border-emerald-100">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-[10px] font-black tracking-widest uppercase text-emerald-600">Chest</p>
                       <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded text-[8px] font-black text-emerald-600 border border-emerald-100">
-                        SAFE: ₹{(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(0)}
+                        SAFE: ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(0)}
                       </div>
                     </div>
-                    <p className="text-xl font-black text-emerald-900">₹{(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</p>
+                    <p className="text-xl font-black text-emerald-900">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</p>
                   </div>
                 </div>
 
@@ -2070,6 +2084,18 @@ export default function AdminCashManagement() {
             >
               <BookOpen size={14} /> Audit Ledger
             </button>
+            <button
+              onClick={() => setActiveTab('bank_history')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'bank_history' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-400'}`}
+            >
+              <Building2 size={14} /> Bank History
+            </button>
+            <button
+              onClick={() => setActiveTab('safe_history')}
+              className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'safe_history' ? 'bg-white text-slate-700 shadow-sm' : 'text-gray-400'}`}
+            >
+              <Vault size={14} /> Safe History
+            </button>
           </div>
 
           {/* TAB CONTENT */}
@@ -2287,7 +2313,7 @@ export default function AdminCashManagement() {
                 </table>
               </div>
             </div>
-          ) : activeTab === 'ledger' ? (
+          ) : ['ledger', 'bank_history', 'safe_history'].includes(activeTab) ? (
             /* ========== AUDIT LEDGER VIEW ========== */
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {ledgerLoading ? (
@@ -2325,7 +2351,7 @@ export default function AdminCashManagement() {
                       </div>
                       <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">At Hand (Counter)</h3>
                       <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black text-gray-900 tabular-nums">₹{ledgerData.summary.availableCash.toFixed(2)}</span>
+                        <span className="text-2xl font-black text-gray-900 tabular-nums">₹{Math.abs(ledgerData.summary.availableCash).toFixed(2)}</span>
                       </div>
                       <p className="text-[10px] font-bold text-gray-400 mt-2">Opening − Outflow + Inflow</p>
                     </div>
@@ -2353,13 +2379,7 @@ export default function AdminCashManagement() {
                       </div>
                       <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Store Safe Balance</h3>
                       <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black text-white tabular-nums">₹{ledgerData.summary.safeBalance.toFixed(2)}</span>
-                        {ledgerData.summary.safeBalance < 0 && (
-                          <div className="flex items-center gap-1 text-rose-400">
-                            <AlertCircle size={12} />
-                            <span className="text-[10px] font-black">NEGATIVE</span>
-                          </div>
-                        )}
+                        <span className="text-2xl font-black text-white tabular-nums">₹{Math.abs(ledgerData.summary.safeBalance).toFixed(2)}</span>
                       </div>
                       <p className="text-[10px] font-bold text-slate-500 mt-2">Deposits − Bank Transfers</p>
                     </div>
@@ -2369,17 +2389,17 @@ export default function AdminCashManagement() {
                       <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Total Store Cash</h3>
                       <div className="flex items-center gap-3">
                         <div className="text-center">
-                          <p className="text-xs font-black text-gray-800">₹{ledgerData.summary.availableCash.toFixed(1)}</p>
+                          <p className="text-xs font-black text-gray-800">₹{Math.abs(ledgerData.summary.availableCash).toFixed(1)}</p>
                           <p className="text-[8px] font-bold text-gray-400 uppercase">Available</p>
                         </div>
                         <span className="text-gray-300 font-bold">+</span>
                         <div className="text-center">
-                          <p className="text-xs font-black text-gray-800">₹{ledgerData.summary.safeBalance.toFixed(1)}</p>
+                          <p className="text-xs font-black text-gray-800">₹{Math.abs(ledgerData.summary.safeBalance).toFixed(1)}</p>
                           <p className="text-[8px] font-bold text-gray-400 uppercase">Safe</p>
                         </div>
                         <span className="text-gray-300 font-bold">=</span>
                         <div className="bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100 text-center">
-                          <p className="text-sm font-black text-emerald-600">₹{ledgerData.summary.totalStoreCash.toFixed(2)}</p>
+                          <p className="text-sm font-black text-emerald-600">₹{Math.abs(ledgerData.summary.totalStoreCash).toFixed(2)}</p>
                         </div>
                       </div>
                     </div>
@@ -2393,8 +2413,18 @@ export default function AdminCashManagement() {
                           <BookOpen size={20} />
                         </div>
                         <div>
-                          <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Immutable Cash Ledger</h3>
-                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{ledgerData.summary.entryCount} entries • {date} • {ledgerData.summary.status}</p>
+                          <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">
+                            {activeTab === 'bank_history' ? 'Bank Transfer History' :
+                              activeTab === 'safe_history' ? 'Safe Movement History' :
+                                'Immutable Cash Ledger'}
+                          </h3>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                            {ledgerData.ledger.filter(e => {
+                              if (activeTab === 'bank_history') return e.type === 'BANK_TRANSFER';
+                              if (activeTab === 'safe_history') return e.type === 'SAFE_MOVEMENT';
+                              return true;
+                            }).length} entries • {date} • {ledgerData.summary.status}
+                          </p>
                         </div>
                       </div>
                       <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
@@ -2412,11 +2442,18 @@ export default function AdminCashManagement() {
                             <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Reference</th>
                             <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Performed By</th>
                             <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Amount</th>
-                            <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Store Balance</th>
+                            <th className="px-5 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Store Balance</th>
+                            <th className="px-4 py-3.5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Docs</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
-                          {ledgerData.ledger.map((entry) => {
+                          {ledgerData.ledger
+                            .filter(entry => {
+                              if (activeTab === 'bank_history') return entry.type === 'BANK_TRANSFER';
+                              if (activeTab === 'safe_history') return entry.type === 'SAFE_MOVEMENT';
+                              return true;
+                            })
+                            .map((entry) => {
                             const typeConfig = {
                               'OPENING': { icon: Coins, bg: 'bg-emerald-50', text: 'text-emerald-600', badge: 'INIT' },
                               'AGENT_OUTFLOW': { icon: ArrowUpRight, bg: 'bg-amber-50', text: 'text-amber-600', badge: 'OUT' },
@@ -2458,7 +2495,7 @@ export default function AdminCashManagement() {
                                   <span className={`text-sm font-black tabular-nums ${entry.direction === 'IN' || entry.direction === 'IN_FROM_SAFE' ? 'text-emerald-600' :
                                     entry.direction === 'OUT' || entry.direction === 'OUT_TO_SAFE' ? 'text-rose-600' : 'text-gray-600'
                                     }`}>
-                                    {['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? '+' : ['OUT', 'OUT_TO_SAFE'].includes(entry.direction) ? '−' : ''}₹{entry.amount.toFixed(2)}
+                                    {['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? '+' : ['OUT', 'OUT_TO_SAFE'].includes(entry.direction) ? '−' : ''}₹{Math.abs(entry.amount || 0).toFixed(2)}
                                     {entry.type === 'SAFE_MOVEMENT' && (
                                       <span className="text-[8px] font-black block text-gray-400 uppercase tracking-tighter">
                                         {entry.direction === 'OUT_TO_SAFE' ? 'MOVE TO SAFE' : 'MOVE TO AVAILABLE'}
@@ -2468,9 +2505,22 @@ export default function AdminCashManagement() {
                                 </td>
                                 <td className="px-5 py-3.5 text-right">
                                   <div className="flex flex-col items-end">
-                                    <span className="text-[11px] font-black text-gray-700 tabular-nums">₹{entry.balanceAfter.toFixed(2)}</span>
+                                    <span className="text-[11px] font-black text-gray-700 tabular-nums">₹{Math.abs(entry.balanceAfter || 0).toFixed(2)}</span>
                                     <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Total Store</span>
                                   </div>
+                                </td>
+                                <td className="px-4 py-3.5 text-center">
+                                  {entry.metadata?.receiptImage ? (
+                                    <button 
+                                      onClick={() => setPreviewImage(entry.metadata.receiptImage)}
+                                      className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-sky-600 transition-all border border-transparent hover:border-gray-100"
+                                      title="View Receipt"
+                                    >
+                                      <ExternalLink size={14} />
+                                    </button>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">NA</span>
+                                  )}
                                 </td>
                               </tr>
                             );
@@ -2478,6 +2528,35 @@ export default function AdminCashManagement() {
                         </tbody>
                       </table>
                     </div>
+
+                    {/* IMAGE PREVIEW MODAL */}
+                    {previewImage && (
+                      <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setPreviewImage(null)}>
+                        <div className="relative max-w-4xl w-full flex flex-col items-center animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
+                          <div className="absolute -top-12 right-0 flex gap-4">
+                            <a 
+                              href={previewImage} 
+                              target="_blank" 
+                              rel="noreferrer"
+                              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 backdrop-blur-md"
+                            >
+                              Open Original <ExternalLink size={14} />
+                            </a>
+                            <button 
+                              onClick={() => setPreviewImage(null)}
+                              className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest backdrop-blur-md"
+                            >
+                              Close
+                            </button>
+                          </div>
+                          <img 
+                            src={previewImage} 
+                            alt="Receipt Preview" 
+                            className="max-h-[85vh] w-auto rounded-3xl shadow-2xl border-4 border-white/10 object-contain bg-white/5"
+                          />
+                        </div>
+                      </div>
+                    )}
 
                     {/* Footer Legend */}
                     <div className="px-6 py-4 border-t border-gray-100 bg-gray-50/30 flex items-center justify-between">
@@ -2952,7 +3031,11 @@ export default function AdminCashManagement() {
                       <h3 className="text-xl font-black text-gray-900 leading-tight">
                         {safeMovementData.type === 'DEPOSIT' ? 'Move to Safe' : 'Withdraw from Safe'}
                       </h3>
-                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">{date}</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">{date}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-lg border border-emerald-100 uppercase tracking-tighter">Safe: ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(0)}</span>
+                        <span className="text-[8px] font-black text-sky-600 bg-sky-50 px-1.5 py-0.5 rounded-lg border border-sky-100 uppercase tracking-tighter">At Hand: ₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(0)}</span>
+                      </div>
                     </div>
                   </div>
                   <button
@@ -2982,9 +3065,29 @@ export default function AdminCashManagement() {
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between bg-slate-900 px-6 py-4 rounded-2xl shadow-lg border border-slate-800">
-                    <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Amount</span>
-                    <span className="text-xl font-black text-white tabular-nums">₹{parseFloat(safeMovementData.amount || 0).toFixed(2)}</span>
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center justify-between bg-slate-900 px-6 py-4 rounded-2xl shadow-lg border border-slate-800">
+                      <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Total Amount</span>
+                      <span className="text-xl font-black text-white tabular-nums">₹{Math.abs(parseFloat(safeMovementData.amount || 0)).toFixed(2)}</span>
+                    </div>
+
+                    {(safeMovementData.type === 'DEPOSIT' && parseFloat(safeMovementData.amount) > (storeRegisterData?.liveMetrics?.availableCash || 0)) && (
+                      <div className="flex items-center gap-2 px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl animate-in shake duration-300">
+                        <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                        <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">
+                          Limit Exceeded: Exceeds At Hand Cash (₹{Math.max(0, storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)})
+                        </p>
+                      </div>
+                    )}
+
+                    {(safeMovementData.type === 'WITHDRAW' && parseFloat(safeMovementData.amount) > (storeRegisterData?.liveMetrics?.safeBalance || 0)) && (
+                      <div className="flex items-center gap-2 px-4 py-3 bg-rose-500/10 border border-rose-500/20 rounded-xl animate-in shake duration-300">
+                        <AlertTriangle size={14} className="text-rose-500 shrink-0" />
+                        <p className="text-[10px] font-bold text-rose-500 uppercase tracking-tight">
+                          Limit Exceeded: Exceeds Safe Balance (₹{Math.max(0, storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)})
+                        </p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">
@@ -3009,12 +3112,25 @@ export default function AdminCashManagement() {
                     </button>
                     <button
                       type="submit"
-                      className={`flex-1 text-white font-black text-xs py-4 rounded-2xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 ${safeMovementData.type === 'DEPOSIT'
+                      disabled={
+                        isSubmitting || 
+                        !safeMovementData.amount || 
+                        parseFloat(safeMovementData.amount) <= 0 ||
+                        (safeMovementData.type === 'DEPOSIT' && parseFloat(safeMovementData.amount) > (storeRegisterData?.liveMetrics?.availableCash || 0)) ||
+                        (safeMovementData.type === 'WITHDRAW' && parseFloat(safeMovementData.amount) > (storeRegisterData?.liveMetrics?.safeBalance || 0))
+                      }
+                      className={`flex-1 text-white font-black text-xs py-4 rounded-2xl uppercase tracking-widest transition-all shadow-xl flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:grayscale ${safeMovementData.type === 'DEPOSIT'
                         ? 'bg-sky-600 hover:bg-sky-700 shadow-sky-600/20'
                         : 'bg-amber-600 hover:bg-amber-700 shadow-amber-600/20'
                         }`}
                     >
-                      {safeMovementData.type === 'DEPOSIT' ? <Vault size={16} /> : <ArrowDownLeft size={16} />}
+                      {isSubmitting ? (
+                        <Loader2 className="animate-spin" size={16} />
+                      ) : safeMovementData.type === 'DEPOSIT' ? (
+                        <Vault size={16} />
+                      ) : (
+                        <ArrowDownLeft size={16} />
+                      )}
                       Confirm Movement
                     </button>
                   </div>
@@ -3627,7 +3743,17 @@ export default function AdminCashManagement() {
                     value={bankData.amount || ''}
                     onChange={(e) => setBankData({ ...bankData, amount: parseFloat(e.target.value) || 0 })}
                   />
-                  <p className="text-[9px] font-bold text-gray-400 uppercase pl-1">Available in Safe: ₹{(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}</p>
+                  <div className="flex flex-col gap-1.5">
+                    <p className="text-[9px] font-bold text-gray-400 uppercase pl-1">Available in Safe: ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}</p>
+                    {(bankData.amount > (storeRegisterData?.liveMetrics?.safeBalance || 0)) && (
+                      <div className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl animate-in shake duration-300">
+                        <AlertTriangle size={12} className="text-rose-500 shrink-0" />
+                        <p className="text-[9px] font-bold text-rose-500 uppercase tracking-tight">
+                          Limit Exceeded: Exceeds Safe Balance (Max: ₹{Math.max(0, storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)})
+                        </p>
+                      </div>
+                    )}
+                  </div>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Branch Name</label>
@@ -3701,8 +3827,13 @@ export default function AdminCashManagement() {
 
               <button
                 type="submit"
-                disabled={isSubmitting || bankData.amount <= 0 || !bankData.branchName}
-                className="w-full bg-sky-600 hover:bg-sky-700 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-sky-900/20 active:scale-95 flex items-center justify-center gap-2"
+                disabled={
+                  isSubmitting || 
+                  bankData.amount <= 0 || 
+                  !bankData.branchName ||
+                  (bankData.amount > (storeRegisterData?.liveMetrics?.safeBalance || 0))
+                }
+                className="w-full bg-sky-600 hover:bg-sky-700 text-white font-black py-4 rounded-2xl transition-all shadow-xl shadow-sky-900/20 active:scale-95 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:grayscale"
               >
                 {isSubmitting ? <Loader2 className="animate-spin" size={20} /> : <><Building2 size={20} />Confirm Bank Transfer</>}
               </button>
