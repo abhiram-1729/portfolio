@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, Info, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText, ExternalLink } from 'lucide-react';
+import { Coins, Truck, Search, Calendar, CheckCircle2, AlertCircle, AlertTriangle, Clock, Info, ArrowRight, Eye, Plus, Loader2, X, Pencil, Trash2, Sun, Moon, ArrowLeft, Building2, Camera, UploadCloud, User, BookOpen, ArrowDownLeft, ArrowUpRight, Shield, Lock, Vault, Printer, FileText, ExternalLink, ShoppingCart, Package, Smartphone, Zap } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -17,6 +17,8 @@ export default function AdminCashManagement() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [previewImage, setPreviewImage] = useState(null);
+  const [viewingOrder, setViewingOrder] = useState(null);
+  const [ledgerFilter, setLedgerFilter] = useState('ALL'); // ALL, BANK, SAFE, POS
 
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
@@ -209,7 +211,7 @@ export default function AdminCashManagement() {
 
   // Lazy-load ledger when tab is active
   useEffect(() => {
-    if (['ledger', 'bank_history', 'safe_history'].includes(activeTab)) {
+    if (['ledger', 'store_sales'].includes(activeTab)) {
       fetchLedger();
     }
   }, [activeTab, date]);
@@ -1772,7 +1774,7 @@ export default function AdminCashManagement() {
                       className="bg-white hover:bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
                     >
                       <Moon size={16} strokeWidth={3} />
-                      Close Safe
+                      Closing Store
                     </button>
                   </div>
                 ) : (
@@ -1834,18 +1836,31 @@ export default function AdminCashManagement() {
                   </div>
 
 
-                  <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl">
-                    <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Available Cash</p>
+                  <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-2 opacity-5">
+                      <ShoppingCart size={40} className="text-sky-400" />
+                    </div>
+                    <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Counter Cash (Available)</p>
                     <p className="text-xl font-black text-sky-400">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
+                    <div className="mt-2 text-[8px] font-black text-sky-600/60 uppercase tracking-widest">In-Store Collection Pool</div>
                   </div>
-                  <div className="bg-white rounded-2xl p-4 shadow-xl border-b-4 border-emerald-100">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-[10px] font-black tracking-widest uppercase text-emerald-600">Chest</p>
-                      <div className="flex items-center gap-1 bg-emerald-50 px-1.5 py-0.5 rounded text-[8px] font-black text-emerald-600 border border-emerald-100">
-                        SAFE: ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(0)}
+                  <div className="bg-emerald-900 rounded-2xl p-4 shadow-xl border-b-4 border-emerald-950 relative overflow-hidden group">
+                    <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                      <Vault size={40} className="text-white" />
+                    </div>
+                    <div className="relative z-10">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="text-[10px] font-black tracking-widest uppercase text-emerald-400">Store Chest (Safe)</p>
+                        <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-500/30">Secure</span>
+                      </div>
+                      <p className="text-xl font-black text-white tabular-nums">
+                        ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
+                      </p>
+                      <div className="mt-2 pt-2 border-t border-emerald-800/50 flex items-center justify-between">
+                        <span className="text-[8px] font-bold text-emerald-500 uppercase">Total Cash</span>
+                        <span className="text-[10px] font-black text-emerald-300">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</span>
                       </div>
                     </div>
-                    <p className="text-xl font-black text-emerald-900">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</p>
                   </div>
                 </div>
 
@@ -2073,6 +2088,12 @@ export default function AdminCashManagement() {
               Daily Reconciliation
             </button>
             <button
+              onClick={() => setActiveTab('store_sales')}
+              className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'store_sales' ? 'bg-white text-sky-600 shadow-sm' : 'text-gray-400'}`}
+            >
+              <ShoppingCart size={14} /> Store POS
+            </button>
+            <button
               onClick={() => setActiveTab('live')}
               className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'live' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
             >
@@ -2083,18 +2104,6 @@ export default function AdminCashManagement() {
               className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'ledger' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
             >
               <BookOpen size={14} /> Audit Ledger
-            </button>
-            <button
-              onClick={() => setActiveTab('bank_history')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'bank_history' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-400'}`}
-            >
-              <Building2 size={14} /> Bank History
-            </button>
-            <button
-              onClick={() => setActiveTab('safe_history')}
-              className={`px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all flex items-center gap-1.5 ${activeTab === 'safe_history' ? 'bg-white text-slate-700 shadow-sm' : 'text-gray-400'}`}
-            >
-              <Vault size={14} /> Safe History
             </button>
           </div>
 
@@ -2313,7 +2322,163 @@ export default function AdminCashManagement() {
                 </table>
               </div>
             </div>
-          ) : ['ledger', 'bank_history', 'safe_history'].includes(activeTab) ? (
+          ) : viewingOrder ? (
+            /* ========== SALES DETAIL FULL PAGE VIEW ========== */
+            <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-500">
+              <div className="flex items-center gap-4 mb-2">
+                <button
+                  onClick={() => setViewingOrder(null)}
+                  className="w-10 h-10 bg-white rounded-xl border border-gray-100 flex items-center justify-center text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <div>
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight flex items-center gap-2">
+                    Sales Details <span className="text-sky-500 text-sm font-bold bg-sky-50 px-2 py-0.5 rounded-lg border border-sky-100">{viewingOrder.metadata.orderNumber}</span>
+                  </h2>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Transaction Audit • {format(new Date(viewingOrder.timestamp), 'PPP p')}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Customer & Info Card */}
+                <div className="lg:col-span-1 space-y-6">
+                  <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                          <User size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Customer Information</p>
+                          <p className="text-sm font-black text-gray-900">{viewingOrder.referenceName.split(' • ')[0]}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-sky-50 text-sky-600 rounded-xl flex items-center justify-center">
+                          <Smartphone size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Contact Number</p>
+                          <p className="text-sm font-black text-gray-900">{viewingOrder.referenceName.split(' • ')[1] || '--'}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-slate-50 text-slate-600 rounded-xl flex items-center justify-center">
+                          <Shield size={20} />
+                        </div>
+                        <div>
+                          <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Processed By</p>
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-sm font-black text-gray-900">{viewingOrder.userName}</span>
+                            <span className="text-[8px] font-black bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded-md uppercase tracking-widest">Verified Admin</span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-gray-50">
+                      <div className="p-4 bg-emerald-900 rounded-2xl relative overflow-hidden group">
+                        <div className="absolute top-0 right-0 p-2 opacity-10">
+                          <Coins size={40} className="text-emerald-400" />
+                        </div>
+                        <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Total Collection</p>
+                        <p className="text-3xl font-black text-white tracking-tighter">₹{viewingOrder.amount.toFixed(2)}</p>
+                        <div className="mt-3 flex items-center gap-2">
+                          <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                          <span className="text-[8px] font-black text-emerald-100 uppercase tracking-widest">Paid In Cash</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 flex gap-3">
+                    <Info size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                    <p className="text-[10px] font-bold text-amber-900 leading-relaxed uppercase">
+                      This sale was completed directly at the warehouse counter. All items listed were deducted from store inventory and cash was added to the counter pool.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Items Table Card */}
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col h-full">
+                    <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/30 flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white rounded-xl border border-gray-100 flex items-center justify-center text-slate-600 shadow-sm">
+                          <Package size={20} />
+                        </div>
+                        <div>
+                          <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Itemized Breakdown</h3>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{viewingOrder.metadata.items.length} Unique items in basket</p>
+                        </div>
+                      </div>
+                      <div className="bg-sky-50 px-3 py-1.5 rounded-lg border border-sky-100">
+                        <span className="text-[10px] font-black text-sky-600 uppercase tracking-widest">Locked Transaction</span>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Product Details</th>
+                            <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Qty</th>
+                            <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Unit Price</th>
+                            <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Subtotal</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                          {viewingOrder.metadata.items.map((item, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                              <td className="px-6 py-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-9 h-9 bg-gray-50 rounded-xl flex items-center justify-center text-gray-300 font-black text-xs border border-gray-100 shadow-inner">
+                                    {idx + 1}
+                                  </div>
+                                  <div>
+                                    <p className="text-xs font-black text-gray-900 decoration-sky-500/20 underline-offset-2 uppercase">{item.name}</p>
+                                    <div className="flex items-center gap-2 mt-0.5">
+                                      <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded uppercase tracking-widest">SKU MATCH</span>
+                                    </div>
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-4 text-center">
+                                <span className="text-xs font-black text-emerald-700 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-100">
+                                  {item.qty}
+                                </span>
+                              </td>
+                              <td className="px-4 py-4 text-right">
+                                <span className="text-xs font-black text-gray-500 tabular-nums">₹{item.price.toFixed(2)}</span>
+                              </td>
+                              <td className="px-6 py-4 text-right">
+                                <span className="text-xs font-black text-gray-900 tabular-nums">₹{(item.price * item.qty).toFixed(2)}</span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+
+                    <div className="p-6 bg-gray-50/50 border-t border-gray-100 grid grid-cols-3 gap-4">
+                      <div className="text-center p-3 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Items</p>
+                        <p className="text-sm font-black text-gray-900">{viewingOrder.metadata.items.reduce((sum, i) => sum + i.qty, 0)}</p>
+                      </div>
+                      <div className="text-center p-3 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                        <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest mb-1">Tax Inclusive</p>
+                        <p className="text-sm font-black text-emerald-600 tracking-widest uppercase">Verified</p>
+                      </div>
+                      <button className="bg-gray-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 shadow-lg shadow-gray-900/10 hover:translate-y-[-2px] transition-all">
+                        <Printer size={14} /> Print Receipt
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : activeTab === 'ledger' || activeTab === 'store_sales' ? (
             /* ========== AUDIT LEDGER VIEW ========== */
             <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
               {ledgerLoading ? (
@@ -2328,82 +2493,7 @@ export default function AdminCashManagement() {
                 </div>
               ) : (
                 <>
-                  {/* Cash Pool Cards */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {/* Available / Counter Cash */}
-                    <div className="bg-white rounded-[2rem] p-6 shadow-sm border border-gray-100 relative group overflow-hidden">
-                      <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
-                        <Coins size={80} />
-                      </div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="w-10 h-10 bg-sky-50 rounded-xl flex items-center justify-center text-sky-600">
-                          <Coins size={20} />
-                        </div>
-                        <button
-                          onClick={() => {
-                            setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: ledgerData.summary.availableCash }));
-                            setShowSafeMovementModal(true);
-                          }}
-                          className="text-[10px] font-black text-sky-600 uppercase tracking-widest bg-sky-50 px-3 py-1.5 rounded-lg hover:bg-sky-100 transition-colors flex items-center gap-1.5"
-                        >
-                          <ArrowRight size={12} /> Move to Safe
-                        </button>
-                      </div>
-                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">At Hand (Counter)</h3>
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black text-gray-900 tabular-nums">₹{Math.abs(ledgerData.summary.availableCash).toFixed(2)}</span>
-                      </div>
-                      <p className="text-[10px] font-bold text-gray-400 mt-2">Opening − Outflow + Inflow</p>
-                    </div>
-
-                    {/* Safe Cash */}
-                    <div className="bg-slate-900 rounded-[2rem] p-6 shadow-xl relative group overflow-hidden border border-slate-800">
-                      <div className="absolute top-0 right-0 p-4 opacity-[0.05] group-hover:opacity-[0.1] transition-opacity">
-                        <Vault size={80} className="text-white" />
-                      </div>
-                      <div className="flex items-center justify-between mb-4">
-                        <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-                          <Vault size={20} />
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => {
-                              setSafeMovementData(prev => ({ ...prev, type: 'WITHDRAW', amount: '' }));
-                              setShowSafeMovementModal(true);
-                            }}
-                            className="text-[10px] font-black text-emerald-400 uppercase tracking-widest bg-white/5 px-3 py-1.5 rounded-lg hover:bg-white/10 transition-colors"
-                          >
-                            Withdraw
-                          </button>
-                        </div>
-                      </div>
-                      <h3 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Store Safe Balance</h3>
-                      <div className="mt-1 flex items-baseline gap-1.5">
-                        <span className="text-2xl font-black text-white tabular-nums">₹{Math.abs(ledgerData.summary.safeBalance).toFixed(2)}</span>
-                      </div>
-                      <p className="text-[10px] font-bold text-slate-500 mt-2">Deposits − Bank Transfers</p>
-                    </div>
-
-                    {/* Formula Visualization */}
-                    <div className="bg-gradient-to-br from-gray-50 to-white rounded-[2rem] p-6 shadow-sm border border-gray-100 flex flex-col justify-center">
-                      <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-4">Total Store Cash</h3>
-                      <div className="flex items-center gap-3">
-                        <div className="text-center">
-                          <p className="text-xs font-black text-gray-800">₹{Math.abs(ledgerData.summary.availableCash).toFixed(1)}</p>
-                          <p className="text-[8px] font-bold text-gray-400 uppercase">Available</p>
-                        </div>
-                        <span className="text-gray-300 font-bold">+</span>
-                        <div className="text-center">
-                          <p className="text-xs font-black text-gray-800">₹{Math.abs(ledgerData.summary.safeBalance).toFixed(1)}</p>
-                          <p className="text-[8px] font-bold text-gray-400 uppercase">Safe</p>
-                        </div>
-                        <span className="text-gray-300 font-bold">=</span>
-                        <div className="bg-emerald-50 px-3 py-2 rounded-xl border border-emerald-100 text-center">
-                          <p className="text-sm font-black text-emerald-600">₹{Math.abs(ledgerData.summary.totalStoreCash).toFixed(2)}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+                  {/* Ledger Table */}
 
                   {/* Ledger Table */}
                   <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
@@ -2414,22 +2504,54 @@ export default function AdminCashManagement() {
                         </div>
                         <div>
                           <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">
-                            {activeTab === 'bank_history' ? 'Bank Transfer History' :
-                              activeTab === 'safe_history' ? 'Safe Movement History' :
-                                'Immutable Cash Ledger'}
+                            {activeTab === 'store_sales' ? 'Store POS Sales' : 'Immutable Cash Ledger'}
                           </h3>
                           <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
                             {ledgerData.ledger.filter(e => {
-                              if (activeTab === 'bank_history') return e.type === 'BANK_TRANSFER';
-                              if (activeTab === 'safe_history') return e.type === 'SAFE_MOVEMENT';
+                              if (activeTab === 'store_sales') return e.type === 'STORE_SALE';
+                              if (ledgerFilter === 'BANK') return e.type === 'BANK_TRANSFER';
+                              if (ledgerFilter === 'SAFE') return e.type === 'SAFE_MOVEMENT';
                               return true;
                             }).length} entries • {date} • {ledgerData.summary.status}
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 bg-gray-100 px-3 py-1.5 rounded-lg">
-                        <Lock size={12} className="text-gray-400" />
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Read-Only</span>
+                      <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-xl border border-gray-200 shadow-inner">
+                        {activeTab === 'store_sales' ? (
+                          // POS Specific Filters
+                          [
+                            { id: 'ALL', label: 'All Sales', icon: ShoppingCart, color: 'text-sky-600' },
+                            { id: 'P_CASH', label: 'Cash', icon: Coins, color: 'text-emerald-600' },
+                            { id: 'P_UPI', label: 'UPI', icon: Smartphone, color: 'text-orange-600' },
+                            { id: 'P_CARD', label: 'Card', icon: Building2, color: 'text-blue-600' },
+                            { id: 'P_HYBRID', label: 'Hybrid', icon: Zap, color: 'text-amber-600' }
+                          ].map(f => (
+                            <button
+                              key={f.id}
+                              onClick={() => setLedgerFilter(f.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${ledgerFilter === f.id ? `bg-white ${f.color} shadow-sm` : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                              <f.icon size={12} />
+                              {f.label}
+                            </button>
+                          ))
+                        ) : (
+                          // General Audit Ledger Filters
+                          [
+                            { id: 'ALL', label: 'All', icon: BookOpen, color: 'text-emerald-600' },
+                            { id: 'BANK', label: 'Bank', icon: Building2, color: 'text-rose-600' },
+                            { id: 'SAFE', label: 'Safe', icon: Vault, color: 'text-slate-600' }
+                          ].map(f => (
+                            <button
+                              key={f.id}
+                              onClick={() => setLedgerFilter(f.id)}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${ledgerFilter === f.id ? `bg-white ${f.color} shadow-sm` : 'text-gray-400 hover:text-gray-600'}`}
+                            >
+                              <f.icon size={12} />
+                              {f.label}
+                            </button>
+                          ))
+                        )}
                       </div>
                     </div>
 
@@ -2449,82 +2571,106 @@ export default function AdminCashManagement() {
                         <tbody className="divide-y divide-gray-50">
                           {ledgerData.ledger
                             .filter(entry => {
-                              if (activeTab === 'bank_history') return entry.type === 'BANK_TRANSFER';
-                              if (activeTab === 'safe_history') return entry.type === 'SAFE_MOVEMENT';
+                              if (activeTab === 'store_sales') {
+                                if (entry.type !== 'STORE_SALE') return false;
+                                if (ledgerFilter === 'P_CASH') return entry.metadata.paymentMode === 'CASH';
+                                if (ledgerFilter === 'P_UPI') return entry.metadata.paymentMode === 'UPI';
+                                if (ledgerFilter === 'P_CARD') return entry.metadata.paymentMode === 'CARD';
+                                if (ledgerFilter === 'P_HYBRID') return entry.metadata.paymentMode === 'CASH_UPI';
+                                return true;
+                              }
+                              if (ledgerFilter === 'BANK') return entry.type === 'BANK_TRANSFER';
+                              if (ledgerFilter === 'SAFE') return entry.type === 'SAFE_MOVEMENT';
                               return true;
                             })
                             .map((entry) => {
-                            const typeConfig = {
-                              'OPENING': { icon: Coins, bg: 'bg-emerald-50', text: 'text-emerald-600', badge: 'INIT' },
-                              'AGENT_OUTFLOW': { icon: ArrowUpRight, bg: 'bg-amber-50', text: 'text-amber-600', badge: 'OUT' },
-                              'AGENT_INFLOW': { icon: ArrowDownLeft, bg: 'bg-sky-50', text: 'text-sky-600', badge: 'IN' },
-                              'BANK_TRANSFER': { icon: Building2, bg: 'bg-rose-50', text: 'text-rose-600', badge: 'BANK' },
-                              'SAFE_MOVEMENT': { icon: Vault, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'INTERNAL' },
-                              'CLOSING': { icon: Lock, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'CLOSE' },
-                            };
-                            const cfg = typeConfig[entry.type] || typeConfig['OPENING'];
-                            const Icon = cfg.icon;
+                              const typeConfig = {
+                                'OPENING': { icon: Coins, bg: 'bg-emerald-50', text: 'text-emerald-600', badge: 'INIT' },
+                                'AGENT_OUTFLOW': { icon: ArrowUpRight, bg: 'bg-amber-50', text: 'text-amber-600', badge: 'OUT' },
+                                'AGENT_INFLOW': { icon: ArrowDownLeft, bg: 'bg-sky-50', text: 'text-sky-600', badge: 'IN' },
+                                'BANK_TRANSFER': { icon: Building2, bg: 'bg-rose-50', text: 'text-rose-600', badge: 'BANK' },
+                                'SAFE_MOVEMENT': { icon: Vault, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'INTERNAL' },
+                                'STORE_SALE': { icon: ShoppingCart, bg: 'bg-sky-50', text: 'text-sky-600', badge: 'POS' },
+                                'CLOSING': { icon: Lock, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'CLOSE' },
+                              };
+                              const cfg = typeConfig[entry.type] || typeConfig['OPENING'];
+                              const Icon = cfg.icon;
 
-                            return (
-                              <tr key={entry.id} className={`hover:bg-gray-50/80 transition-colors ${['CLOSING', 'SAFE_MOVEMENT'].includes(entry.type) ? 'bg-slate-50/30' : ''}`}>
-                                <td className="px-5 py-3.5">
-                                  <span className="text-[11px] font-bold text-gray-500 tabular-nums">
-                                    {format(new Date(entry.timestamp), 'hh:mm a')}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3.5">
-                                  <div className="flex items-center gap-2.5">
-                                    <div className={`w-8 h-8 rounded-lg ${cfg.bg} flex items-center justify-center ${cfg.text}`}>
-                                      <Icon size={16} strokeWidth={2.5} />
+                              return (
+                                <tr
+                                  key={entry.id}
+                                  onClick={() => entry.type === 'STORE_SALE' && setViewingOrder(entry)}
+                                  className={`transition-colors ${['CLOSING', 'SAFE_MOVEMENT'].includes(entry.type) ? 'bg-slate-50/30' : ''} ${entry.type === 'STORE_SALE' ? 'hover:bg-sky-50/50 cursor-pointer group' : 'hover:bg-gray-50/80'}`}
+                                >
+                                  <td className="px-5 py-3.5">
+                                    <span className="text-[11px] font-bold text-gray-500 tabular-nums">
+                                      {format(new Date(entry.timestamp), 'hh:mm a')}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    <div className="flex items-center gap-2.5">
+                                      <div className={`w-8 h-8 rounded-lg ${cfg.bg} flex items-center justify-center ${cfg.text}`}>
+                                        <Icon size={16} strokeWidth={2.5} />
+                                      </div>
+                                      <div className="flex flex-col">
+                                        <span className="text-xs font-black text-gray-800 block leading-tight">{entry.label}</span>
+                                        <div className="flex items-center gap-1.5 mt-1">
+                                          <span className={`text-[8px] font-black uppercase tracking-widest ${cfg.text} opacity-70`}>{cfg.badge}</span>
+                                          {entry.type === 'STORE_SALE' && entry.metadata?.paymentMode && (
+                                            <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-widest border shadow-sm ${entry.metadata.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                                                entry.metadata.paymentMode === 'UPI' ? 'bg-orange-50 text-orange-600 border-orange-100' :
+                                                  entry.metadata.paymentMode === 'CARD' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                                                    'bg-amber-50 text-amber-600 border-amber-100'
+                                              }`}>
+                                              {entry.metadata.paymentMode === 'CASH_UPI' ? 'Hybrid (Split)' : entry.metadata.paymentMode}
+                                            </span>
+                                          )}
+                                        </div>
+                                      </div>
                                     </div>
-                                    <div>
-                                      <span className="text-xs font-black text-gray-800 block leading-tight">{entry.label}</span>
-                                      <span className={`text-[8px] font-black uppercase tracking-widest ${cfg.text} opacity-70`}>{cfg.badge}</span>
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    <span className="text-[10px] font-bold text-gray-400 leading-relaxed block max-w-[220px] truncate" title={entry.referenceName}>
+                                      {entry.referenceName}
+                                    </span>
+                                  </td>
+                                  <td className="px-4 py-3.5">
+                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">{entry.userName}</span>
+                                  </td>
+                                  <td className="px-4 py-3.5 text-right">
+                                    <span className={`text-sm font-black tabular-nums ${entry.direction === 'IN' || entry.direction === 'IN_FROM_SAFE' ? 'text-emerald-600' :
+                                      entry.direction === 'OUT' || entry.direction === 'OUT_TO_SAFE' ? 'text-rose-600' : 'text-gray-600'
+                                      }`}>
+                                      {['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? '+' : ['OUT', 'OUT_TO_SAFE'].includes(entry.direction) ? '−' : ''}₹{Math.abs(entry.amount || 0).toFixed(2)}
+                                      {entry.type === 'SAFE_MOVEMENT' && (
+                                        <span className="text-[8px] font-black block text-gray-400 uppercase tracking-tighter">
+                                          {entry.direction === 'OUT_TO_SAFE' ? 'MOVE TO SAFE' : 'MOVE TO AVAILABLE'}
+                                        </span>
+                                      )}
+                                    </span>
+                                  </td>
+                                  <td className="px-5 py-3.5 text-right">
+                                    <div className="flex flex-col items-end">
+                                      <span className="text-[11px] font-black text-gray-700 tabular-nums">₹{Math.abs(entry.balanceAfter || 0).toFixed(2)}</span>
+                                      <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Total Store</span>
                                     </div>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3.5">
-                                  <span className="text-[10px] font-bold text-gray-400 leading-relaxed block max-w-[220px] truncate" title={entry.referenceName}>
-                                    {entry.referenceName}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-3.5">
-                                  <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">{entry.userName}</span>
-                                </td>
-                                <td className="px-4 py-3.5 text-right">
-                                  <span className={`text-sm font-black tabular-nums ${entry.direction === 'IN' || entry.direction === 'IN_FROM_SAFE' ? 'text-emerald-600' :
-                                    entry.direction === 'OUT' || entry.direction === 'OUT_TO_SAFE' ? 'text-rose-600' : 'text-gray-600'
-                                    }`}>
-                                    {['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? '+' : ['OUT', 'OUT_TO_SAFE'].includes(entry.direction) ? '−' : ''}₹{Math.abs(entry.amount || 0).toFixed(2)}
-                                    {entry.type === 'SAFE_MOVEMENT' && (
-                                      <span className="text-[8px] font-black block text-gray-400 uppercase tracking-tighter">
-                                        {entry.direction === 'OUT_TO_SAFE' ? 'MOVE TO SAFE' : 'MOVE TO AVAILABLE'}
-                                      </span>
+                                  </td>
+                                  <td className="px-4 py-3.5 text-center">
+                                    {entry.metadata?.receiptImage ? (
+                                      <button
+                                        onClick={() => setPreviewImage(entry.metadata.receiptImage)}
+                                        className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-sky-600 transition-all border border-transparent hover:border-gray-100"
+                                        title="View Receipt"
+                                      >
+                                        <ExternalLink size={14} />
+                                      </button>
+                                    ) : (
+                                      <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">NA</span>
                                     )}
-                                  </span>
-                                </td>
-                                <td className="px-5 py-3.5 text-right">
-                                  <div className="flex flex-col items-end">
-                                    <span className="text-[11px] font-black text-gray-700 tabular-nums">₹{Math.abs(entry.balanceAfter || 0).toFixed(2)}</span>
-                                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Total Store</span>
-                                  </div>
-                                </td>
-                                <td className="px-4 py-3.5 text-center">
-                                  {entry.metadata?.receiptImage ? (
-                                    <button 
-                                      onClick={() => setPreviewImage(entry.metadata.receiptImage)}
-                                      className="p-1.5 hover:bg-white hover:shadow-sm rounded-lg text-sky-600 transition-all border border-transparent hover:border-gray-100"
-                                      title="View Receipt"
-                                    >
-                                      <ExternalLink size={14} />
-                                    </button>
-                                  ) : (
-                                    <span className="text-[10px] font-bold text-gray-200 uppercase tracking-widest">NA</span>
-                                  )}
-                                </td>
-                              </tr>
-                            );
-                          })}
+                                  </td>
+                                </tr>
+                              );
+                            })}
                         </tbody>
                       </table>
                     </div>
@@ -2534,24 +2680,24 @@ export default function AdminCashManagement() {
                       <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-md p-4" onClick={() => setPreviewImage(null)}>
                         <div className="relative max-w-4xl w-full flex flex-col items-center animate-in zoom-in-95 duration-200" onClick={e => e.stopPropagation()}>
                           <div className="absolute -top-12 right-0 flex gap-4">
-                            <a 
-                              href={previewImage} 
-                              target="_blank" 
+                            <a
+                              href={previewImage}
+                              target="_blank"
                               rel="noreferrer"
                               className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest flex items-center gap-2 backdrop-blur-md"
                             >
                               Open Original <ExternalLink size={14} />
                             </a>
-                            <button 
+                            <button
                               onClick={() => setPreviewImage(null)}
                               className="bg-white/10 hover:bg-white/20 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest backdrop-blur-md"
                             >
                               Close
                             </button>
                           </div>
-                          <img 
-                            src={previewImage} 
-                            alt="Receipt Preview" 
+                          <img
+                            src={previewImage}
+                            alt="Receipt Preview"
                             className="max-h-[85vh] w-auto rounded-3xl shadow-2xl border-4 border-white/10 object-contain bg-white/5"
                           />
                         </div>
@@ -3113,8 +3259,8 @@ export default function AdminCashManagement() {
                     <button
                       type="submit"
                       disabled={
-                        isSubmitting || 
-                        !safeMovementData.amount || 
+                        isSubmitting ||
+                        !safeMovementData.amount ||
                         parseFloat(safeMovementData.amount) <= 0 ||
                         (safeMovementData.type === 'DEPOSIT' && parseFloat(safeMovementData.amount) > (storeRegisterData?.liveMetrics?.availableCash || 0)) ||
                         (safeMovementData.type === 'WITHDRAW' && parseFloat(safeMovementData.amount) > (storeRegisterData?.liveMetrics?.safeBalance || 0))
@@ -3811,9 +3957,35 @@ export default function AdminCashManagement() {
                   />
                   <div className={`w-full py-8 border-2 border-dashed rounded-[2rem] flex flex-col items-center justify-center gap-3 transition-all ${bankData.receiptImage ? 'border-emerald-200 bg-emerald-50 text-emerald-600' : 'border-gray-200 bg-gray-50 text-gray-400 group-hover:border-sky-300'}`}>
                     {bankData.receiptImage ? (
-                      <div className="flex flex-col items-center">
-                        <CheckCircle2 size={32} />
-                        <span className="text-[10px] font-black uppercase tracking-widest mt-2">Receipt Attached</span>
+                      <div className="flex flex-col items-center gap-2">
+                        <div className="relative">
+                          <CheckCircle2 size={32} />
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPreviewImage(bankData.receiptImage);
+                            }}
+                            className="absolute -top-1 -right-1 bg-white p-1.5 rounded-full shadow-lg border border-emerald-100 hover:scale-110 active:scale-95 transition-all text-sky-600 z-20"
+                          >
+                            <Eye size={12} />
+                          </button>
+                        </div>
+                        <div className="text-center">
+                          <span className="text-[10px] font-black uppercase tracking-widest block">Receipt Attached</span>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              setPreviewImage(bankData.receiptImage);
+                            }}
+                            className="text-[8px] font-black uppercase underline tracking-tighter text-sky-600 hover:text-sky-700 z-20 mt-1"
+                          >
+                            Click to View Image
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <>
@@ -3828,8 +4000,8 @@ export default function AdminCashManagement() {
               <button
                 type="submit"
                 disabled={
-                  isSubmitting || 
-                  bankData.amount <= 0 || 
+                  isSubmitting ||
+                  bankData.amount <= 0 ||
                   !bankData.branchName ||
                   (bankData.amount > (storeRegisterData?.liveMetrics?.safeBalance || 0))
                 }

@@ -1332,13 +1332,31 @@ export const getStoreCashRegister = async (req, res, next) => {
         const assignedOut = allOpening._sum.totalOpeningCash || 0;
         const receivedIn = allDeposits._sum.amount || 0;
         const bankTransferred = allBankDeposits._sum.amount || 0;
-        
+
+        // Fetch Direct Store POS Sales (Cash Only)
+        const storeSalesCash = await prisma.order.findMany({
+            where: {
+                storeId,
+                createdAt: {
+                    gte: new Date(`${date}T00:00:00.000Z`),
+                    lte: new Date(`${date}T23:59:59.999Z`)
+                },
+                paymentMode: { in: ['CASH', 'CASH_UPI'] },
+                status: { in: ['PAID', 'COMPLETED'] }
+            }
+        });
+
+        const totalStoreSalesCash = storeSalesCash.reduce((sum, order) => {
+            if (order.paymentMode === 'CASH') return sum + order.totalAmount;
+            return sum + (order.cashAmount || 0);
+        }, 0);
+
         let totalStoreCash = 0;
         let safeBalance = 0;
         let availableCash = 0;
         
         if (storeRegister) {
-            totalStoreCash = storeRegister.openingCash - assignedOut + receivedIn - bankTransferred;
+            totalStoreCash = storeRegister.openingCash - assignedOut + receivedIn + totalStoreSalesCash - bankTransferred;
             safeBalance = movedToSafe - withdrawnFromSafe - bankTransferred;
             availableCash = totalStoreCash - safeBalance;
         }
@@ -1362,6 +1380,7 @@ export const getStoreCashRegister = async (req, res, next) => {
                 assignedOut,
                 receivedIn,
                 bankTransferred,
+                totalStoreSalesCash,
                 totalStoreCash: parseFloat(totalStoreCash.toFixed(2)),
                 safeBalance: parseFloat(safeBalance.toFixed(2)),
                 availableCash: parseFloat(availableCash.toFixed(2)),
@@ -1439,6 +1458,22 @@ export const getStoreCashLedger = async (req, res, next) => {
         const safeMovements = await prisma.safeTransaction.findMany({
             where: { storeId, date },
             include: { user: { select: { name: true } } },
+            orderBy: { createdAt: 'asc' }
+        });
+
+        const storeSales = await prisma.order.findMany({
+            where: {
+                storeId,
+                createdAt: {
+                    gte: new Date(`${date}T00:00:00.000Z`),
+                    lte: new Date(`${date}T23:59:59.999Z`)
+                },
+                status: { in: ['PAID', 'COMPLETED'] }
+            },
+            include: { 
+                user: { select: { name: true } },
+                items: { include: { product: { select: { name: true } } } }
+            },
             orderBy: { createdAt: 'asc' }
         });
 
@@ -1525,7 +1560,27 @@ export const getStoreCashLedger = async (req, res, next) => {
             });
         });
 
-        // Sort all entries chronologically
+        // 6. Direct POS Sales (Admin POS)
+        storeSales.forEach(o => {
+            const saleCash = o.paymentMode === 'CASH' ? o.totalAmount : (o.cashAmount || 0);
+            entries.push({
+                id: o.id,
+                type: 'STORE_SALE',
+                label: `POS Sale • ${o.paymentMode} • ${o.displayId || o.orderNumber}`,
+                amount: o.totalAmount,           // Total amount shown in column
+                cashImpact: saleCash,           // Actual cash added to register
+                direction: 'IN',
+                timestamp: o.createdAt,
+                userName: o.user?.name || 'Admin',
+                reference: o.id,
+                referenceName: `${o.customerName || 'Walk-in'} • ${o.mobile || 'No Mobile'}`,
+                metadata: { 
+                    orderNumber: o.displayId || o.orderNumber, 
+                    paymentMode: o.paymentMode,
+                    items: o.items.map(i => ({ name: i.product?.name, qty: i.quantity, price: i.price }))
+                }
+            });
+        });
         entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
         // Compute running balance (before/after for each entry)
@@ -1536,7 +1591,7 @@ export const getStoreCashLedger = async (req, res, next) => {
                 // But wait, direction IN/OUT should represent Total Store Cash impact
                 // SAFE_MOVEMENT doesn't change Total Cash.
                 if (entry.type !== 'SAFE_MOVEMENT') {
-                    runningBalance += (entry.direction === 'IN' ? entry.amount : -entry.amount);
+                    runningBalance += (['IN', 'IN_FROM_SAFE'].includes(entry.direction) ? entry.amount : -entry.amount);
                 }
             } else if (['OUT', 'OUT_TO_SAFE'].includes(entry.direction)) {
                 if (entry.type !== 'SAFE_MOVEMENT') {
@@ -1550,8 +1605,9 @@ export const getStoreCashLedger = async (req, res, next) => {
             
             // Let's just track Total Store Balance in the ledger list first
             if (entry.type !== 'SAFE_MOVEMENT') {
-                if (entry.direction === 'IN') runningBalance += entry.amount;
-                else if (entry.direction === 'OUT') runningBalance -= entry.amount;
+                const amountToApply = entry.type === 'STORE_SALE' ? (entry.cashImpact || 0) : entry.amount;
+                if (entry.direction === 'IN') runningBalance += amountToApply;
+                else if (entry.direction === 'OUT') runningBalance -= amountToApply;
             }
             
             return {

@@ -14,7 +14,8 @@ import {
   Tag,
   Gift,
   Loader2,
-  X
+  X,
+  Barcode
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { productsAPI } from '../../services/api';
@@ -183,7 +184,15 @@ export default function AdminPOS() {
                       )}
                     </div>
                     <div className="space-y-1">
-                      <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">{product.category?.name || 'General'}</p>
+                      <div className="flex items-center justify-between">
+                        <p className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">{product.category?.name || 'General'}</p>
+                        {product.barcode && (
+                          <div className="flex items-center gap-0.5 px-1 bg-gray-100 rounded border border-gray-200">
+                             <Barcode size={8} className="text-gray-500" />
+                             <span className="text-[7px] font-black text-gray-500 uppercase tracking-tighter">{product.barcode}</span>
+                          </div>
+                        )}
+                      </div>
                       <h4 className="text-[11px] font-black text-gray-900 leading-tight line-clamp-2 uppercase min-h-[1.75rem] mb-1">{product.name}</h4>
                       
                       <div className="flex items-center justify-between pt-1">
