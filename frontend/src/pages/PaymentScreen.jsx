@@ -43,16 +43,16 @@ export default function PaymentScreen() {
       // (as handlePayment clears the cart right before success navigation)
       const timer = setTimeout(() => {
         if (window.location.pathname === '/payment') {
-            navigate('/');
+          navigate('/');
         }
-      }, 500); 
+      }, 500);
       return () => clearTimeout(timer);
     }
   }, [items.length, navigate, loading]);
 
   const handlePayment = async () => {
     if (!selected) return toast.error('Please select a payment method');
-    
+
     if (selected === 'CASH_UPI') {
       const cash = parseFloat(splitAmounts.cash) || 0;
       const upi = parseFloat(splitAmounts.upi) || 0;
@@ -102,19 +102,19 @@ export default function PaymentScreen() {
         <div className="glass rounded-[1.5rem] p-6 text-center bg-white/70 border-white shadow-sm relative overflow-hidden">
           {/* Decorative background blur */}
           <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-emerald-500/10 to-transparent blur-[40px] pointer-events-none" />
-          
+
           <p className="text-emerald-800/40 font-black uppercase tracking-[0.2em] text-[9px] mb-2 relative z-10">Payable Amount</p>
           <p className="text-[2.5rem] font-black text-emerald-950 tracking-tighter leading-none relative z-10">₹{totalAmount.toFixed(2)}</p>
           <div className="flex flex-wrap justify-center gap-2 mt-6 relative z-10">
             {customerName && (
               <div className="inline-flex items-center gap-2 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100">
-                  <span className="text-sm font-black text-emerald-900 capitalize">{customerName}</span>
+                <span className="text-sm font-black text-emerald-900 capitalize">{customerName}</span>
               </div>
             )}
             {customerMobile && (
               <div className="inline-flex items-center gap-2 bg-emerald-50 px-4 py-1.5 rounded-xl border border-emerald-100">
-                  <Smartphone size={14} className="text-emerald-500" />
-                  <span className="text-sm font-black text-emerald-900">{customerMobile}</span>
+                <Smartphone size={14} className="text-emerald-500" />
+                <span className="text-sm font-black text-emerald-900">{customerMobile}</span>
               </div>
             )}
           </div>
@@ -138,11 +138,10 @@ export default function PaymentScreen() {
                       setSplitAmounts({ cash: totalAmount.toFixed(2), upi: '0.00' });
                     }
                   }}
-                  className={`flex flex-col items-center gap-2.5 py-4 px-1 rounded-2xl transition-all duration-300 active:scale-95 border ${
-                    isSelected
-                      ? `bg-gradient-to-br ${mode.color} text-white shadow-xl scale-105 border-transparent ${mode.shadow}`
-                      : 'bg-white text-emerald-900/40 hover:bg-emerald-50 shadow-sm border-emerald-50 hover:border-emerald-100'
-                  }`}
+                  className={`flex flex-col items-center gap-2.5 py-4 px-1 rounded-2xl transition-all duration-300 active:scale-95 border ${isSelected
+                    ? `bg-gradient-to-br ${mode.color} text-white shadow-xl scale-105 border-transparent ${mode.shadow}`
+                    : 'bg-white text-emerald-900/40 hover:bg-emerald-50 shadow-sm border-emerald-50 hover:border-emerald-100'
+                    }`}
                 >
                   <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${isSelected ? 'bg-white/20 shadow-inner' : 'bg-emerald-50/50 border border-emerald-50'}`}>
                     <Icon size={isSelected ? 20 : 18} strokeWidth={isSelected ? 3 : 2.5} className={isSelected ? 'text-white drop-shadow-sm' : 'text-emerald-300'} />
@@ -232,54 +231,53 @@ export default function PaymentScreen() {
 
             {/* Total Check */}
             <div className="flex items-center justify-between px-6 py-4 bg-emerald-950 rounded-[1.5rem] shadow-xl">
-               <div className="flex flex-col">
-                  <span className="text-[8px] font-black text-emerald-400/50 uppercase tracking-[0.2em]">Total Combined</span>
-                  <span className="text-lg font-black text-white">
-                    ₹{( (parseFloat(splitAmounts.cash)||0) + (parseFloat(splitAmounts.upi)||0) ).toFixed(2)}
-                  </span>
-               </div>
-               <div className="flex items-center gap-2">
-                  {Math.abs(((parseFloat(splitAmounts.cash)||0) + (parseFloat(splitAmounts.upi)||0)) - totalAmount) < 0.01 ? (
-                    <div className="flex items-center gap-2 bg-emerald-400/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-400/30">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Balanced</span>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-2 bg-orange-400/20 text-orange-400 px-3 py-1 rounded-full border border-orange-400/30">
-                      <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
-                      <span className="text-[10px] font-black uppercase tracking-widest">Unbalanced</span>
-                    </div>
-                  )}
-               </div>
+              <div className="flex flex-col">
+                <span className="text-[8px] font-black text-emerald-400/50 uppercase tracking-[0.2em]">Total Combined</span>
+                <span className="text-lg font-black text-white">
+                  ₹{((parseFloat(splitAmounts.cash) || 0) + (parseFloat(splitAmounts.upi) || 0)).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                {Math.abs(((parseFloat(splitAmounts.cash) || 0) + (parseFloat(splitAmounts.upi) || 0)) - totalAmount) < 0.01 ? (
+                  <div className="flex items-center gap-2 bg-emerald-400/20 text-emerald-400 px-3 py-1 rounded-full border border-emerald-400/30">
+                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Balanced</span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 bg-orange-400/20 text-orange-400 px-3 py-1 rounded-full border border-orange-400/30">
+                    <div className="w-1.5 h-1.5 rounded-full bg-orange-400 animate-pulse" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Unbalanced</span>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         )}
 
         {/* Confirm Button */}
         <div className="pt-4 pb-8">
-            <button
+          <button
             id="confirm-payment-btn"
             onClick={handlePayment}
             disabled={
-              !selected || 
-              loading || 
+              !selected ||
+              loading ||
               (selected === 'CASH' && (!cashReceived || parseFloat(cashReceived) < totalAmount)) ||
-              (selected === 'CASH_UPI' && Math.abs(((parseFloat(splitAmounts.cash)||0) + (parseFloat(splitAmounts.upi)||0)) - totalAmount) > 0.01)
+              (selected === 'CASH_UPI' && Math.abs(((parseFloat(splitAmounts.cash) || 0) + (parseFloat(splitAmounts.upi) || 0)) - totalAmount) > 0.01)
             }
-            className={`w-full font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative overflow-hidden group ${
-                !selected || loading || (selected === 'CASH' && (!cashReceived || parseFloat(cashReceived) < totalAmount)) || (selected === 'CASH_UPI' && Math.abs(((parseFloat(splitAmounts.cash)||0) + (parseFloat(splitAmounts.upi)||0)) - totalAmount) > 0.01)
-                ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70 shadow-none'
-                : 'bg-emerald-600 text-white shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700'
-            }`}
-            >
+            className={`w-full font-black text-lg py-5 rounded-[2rem] active:scale-[0.98] transition-all flex items-center justify-center gap-3 relative overflow-hidden group ${!selected || loading || (selected === 'CASH' && (!cashReceived || parseFloat(cashReceived) < totalAmount)) || (selected === 'CASH_UPI' && Math.abs(((parseFloat(splitAmounts.cash) || 0) + (parseFloat(splitAmounts.upi) || 0)) - totalAmount) > 0.01)
+              ? 'bg-slate-200 text-slate-400 cursor-not-allowed opacity-70 shadow-none'
+              : 'bg-emerald-600 text-white shadow-2xl shadow-emerald-600/30 hover:bg-emerald-700'
+              }`}
+          >
             <span className="relative z-10 flex items-center gap-3 uppercase text-xs tracking-[0.2em]">
-                {loading ? (
-                    <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                    `Complete ${selected || ''} Payment`
-                )}
+              {loading ? (
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                `Complete ${selected || ''} Payment`
+              )}
             </span>
-            </button>
+          </button>
         </div>
       </div>
     </div>

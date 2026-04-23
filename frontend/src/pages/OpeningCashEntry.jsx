@@ -157,7 +157,7 @@ export default function OpeningCashEntry() {
               </button>
             </div>
           </div>
-          
+
           {/* Active Vehicle Bar */}
           {user?.assignedVehicle && (
             <div className="bg-emerald-50/50 rounded-xl px-3 py-2 flex items-center justify-between border border-emerald-100/50">
@@ -190,7 +190,7 @@ export default function OpeningCashEntry() {
                   Opening cash is managed by admin. Please wait for the daily float to be assigned.
                 </p>
               </div>
-              <button 
+              <button
                 type="button"
                 onClick={() => navigate('/')}
                 className="px-6 py-2.5 bg-slate-900 text-white rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-slate-200"
@@ -201,16 +201,16 @@ export default function OpeningCashEntry() {
           )}
 
           {anyShiftAssigned && (
-             <div className="bg-emerald-50/80 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-bottom duration-500">
-               <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-500 shadow-sm border border-emerald-100/50">
-                 <CheckCircle2 size={16} />
-               </div>
-               <p className="text-[10px] font-black text-emerald-800 uppercase tracking-tight">
-                 {shift1?.openingAssigned && shift2?.openingAssigned
-                   ? 'Both floats assigned. Ready to start!'
-                   : 'Float assigned. Check with admin for other shift.'}
-               </p>
-             </div>
+            <div className="bg-emerald-50/80 border border-emerald-100 rounded-2xl p-4 flex items-center gap-3 animate-in fade-in slide-in-from-bottom duration-500">
+              <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-emerald-500 shadow-sm border border-emerald-100/50">
+                <CheckCircle2 size={16} />
+              </div>
+              <p className="text-[10px] font-black text-emerald-800 uppercase tracking-tight">
+                {shift1?.openingAssigned && shift2?.openingAssigned
+                  ? 'Both floats assigned. Ready to start!'
+                  : 'Float assigned. Check with admin for other shift.'}
+              </p>
+            </div>
           )}
         </div>
       </main>

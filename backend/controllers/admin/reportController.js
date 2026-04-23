@@ -491,3 +491,119 @@ export const getAgentPerformance = async (req, res) => {
     res.status(500).json({ message: 'Error fetching agent performance', error: error.message });
   }
 };
+
+export const getCategoryWiseReport = async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.order = { storeId };
+    }
+
+    const categorySales = await prisma.orderItem.findMany({
+      where,
+      include: {
+        product: {
+          include: { category: true }
+        }
+      }
+    });
+
+    const categoryMap = {};
+    categorySales.forEach(item => {
+      const catName = item.product?.category?.name || 'Uncategorized';
+      if (!categoryMap[catName]) {
+        categoryMap[catName] = { name: catName, totalSales: 0, orderCount: 0 };
+      }
+      categoryMap[catName].totalSales += item.price * item.quantity;
+      categoryMap[catName].orderCount += 1;
+    });
+
+    res.json(Object.values(categoryMap).sort((a, b) => b.totalSales - a.totalSales));
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching category report', error: error.message });
+  }
+};
+
+export const getReturnReport = async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    }
+
+    const returns = await prisma.orderReturn.findMany({
+      where,
+      include: {
+        order: { select: { displayId: true, customerName: true } },
+        product: { select: { name: true } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json(returns);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching return report', error: error.message });
+  }
+};
+
+export const getSessionReport = async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const where = { 
+      tenantId: req.user.tenantId,
+      status: { not: 'CANCELLED' }
+    };
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    }
+
+    const sessions = await prisma.order.groupBy({
+      by: ['coverageType'],
+      where,
+      _sum: { totalAmount: true },
+      _count: { id: true }
+    });
+
+    res.json(sessions.map(s => ({
+      session: s.coverageType || 'N/A',
+      totalSales: s._sum.totalAmount || 0,
+      orderCount: s._count.id
+    })));
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching session report', error: error.message });
+  }
+};
+
+export const getAllVehiclePerformance = async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    }
+
+    const vehicles = await prisma.vehicle.findMany({
+      where,
+      include: {
+        orders: {
+          where: { status: { not: 'CANCELLED' } },
+          select: { totalAmount: true }
+        }
+      }
+    });
+
+    const report = vehicles.map(v => ({
+      id: v.id,
+      displayId: v.displayId,
+      vehicleNumber: v.vehicleNumber,
+      totalSales: v.orders.reduce((sum, o) => sum + o.totalAmount, 0),
+      orderCount: v.orders.length
+    }));
+
+    res.json(report.sort((a, b) => b.totalSales - a.totalSales));
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vehicle performance', error: error.message });
+  }
+};

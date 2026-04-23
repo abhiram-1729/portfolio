@@ -26,7 +26,7 @@ export default function Login() {
       const { data } = await authAPI.login({ mobile, password });
       setUser(data, data.token);
       toast.success(`Welcome back, ${data.name || 'Agent'}!`);
-      
+
       if (data.role === 'TENANT_OWNER') {
         navigate('/tenant');
       } else if (data.role === 'ADMIN') {
@@ -85,7 +85,7 @@ export default function Login() {
             {loginError && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-start gap-3 animate-in fade-in zoom-in duration-200 shadow-sm">
                 <div className="mt-0.5 bg-red-100 p-1 rounded-full text-red-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-[13px] font-black tracking-tight leading-tight mb-0.5">Access Denied</p>

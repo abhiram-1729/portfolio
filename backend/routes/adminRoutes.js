@@ -107,6 +107,10 @@ router.get('/reports/reconciliation', reportCtr.getReconciliationReport);
 router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
 router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
 router.get('/reports/agent-performance', reportCtr.getAgentPerformance);
+router.get('/reports/category-wise', reportCtr.getCategoryWiseReport);
+router.get('/reports/returns', reportCtr.getReturnReport);
+router.get('/reports/sessions', reportCtr.getSessionReport);
+router.get('/reports/vehicle-all', reportCtr.getAllVehiclePerformance);
 
 // Activity Logs
 router.get('/activities', activityCtr.getActivityLogs);

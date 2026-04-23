@@ -84,54 +84,53 @@ export default function Reports() {
           <div className="space-y-4 animate-slide-up">
             {/* Target Progress Bar */}
             <div className="glass rounded-[2rem] p-6 bg-white/70 border border-emerald-100 shadow-sm relative overflow-hidden">
-                <div className="flex justify-between items-end mb-4 px-1">
-                    <div>
-                        <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.2em] mb-1">Daily Sales Goal</p>
-                        <p className="font-black text-emerald-950 text-xl tracking-tighter">
-                            ₹{report.totalSales?.toFixed(2)} <span className="text-emerald-800/30 font-bold text-sm">/ ₹{report.dailyTarget?.toLocaleString()}</span>
-                        </p>
-                    </div>
-                    <div className="text-right">
-                        <span className={`text-xl font-black tracking-tighter ${report.totalSales >= report.dailyTarget ? 'text-emerald-600' : 'text-orange-500'}`}>
-                            {Math.round((report.totalSales / report.dailyTarget) * 100)}%
-                        </span>
-                    </div>
+              <div className="flex justify-between items-end mb-4 px-1">
+                <div>
+                  <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.2em] mb-1">Daily Sales Goal</p>
+                  <p className="font-black text-emerald-950 text-xl tracking-tighter">
+                    ₹{report.totalSales?.toFixed(2)} <span className="text-emerald-800/30 font-bold text-sm">/ ₹{report.dailyTarget?.toLocaleString()}</span>
+                  </p>
                 </div>
-                <div className="h-4 bg-emerald-100/50 rounded-full overflow-hidden p-1 shadow-inner border border-emerald-50">
-                    <div 
-                        className={`h-full rounded-full transition-all duration-1000 cubic-bezier(0.16, 1, 0.3, 1) shadow-sm ${
-                            report.totalSales >= report.dailyTarget 
-                            ? 'bg-gradient-to-r from-emerald-500 to-emerald-400' 
-                            : 'bg-gradient-to-r from-orange-400 to-orange-500'
-                        }`}
-                        style={{ width: `${Math.min((report.totalSales / report.dailyTarget) * 100, 100)}%` }}
-                    />
+                <div className="text-right">
+                  <span className={`text-xl font-black tracking-tighter ${report.totalSales >= report.dailyTarget ? 'text-emerald-600' : 'text-orange-500'}`}>
+                    {Math.round((report.totalSales / report.dailyTarget) * 100)}%
+                  </span>
                 </div>
-                {report.totalSales >= report.dailyTarget && (
-                    <div className="mt-3 flex items-center gap-2 px-1 animate-bounce-subtle">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Target Achieved!</span>
-                    </div>
-                )}
+              </div>
+              <div className="h-4 bg-emerald-100/50 rounded-full overflow-hidden p-1 shadow-inner border border-emerald-50">
+                <div
+                  className={`h-full rounded-full transition-all duration-1000 cubic-bezier(0.16, 1, 0.3, 1) shadow-sm ${report.totalSales >= report.dailyTarget
+                    ? 'bg-gradient-to-r from-emerald-500 to-emerald-400'
+                    : 'bg-gradient-to-r from-orange-400 to-orange-500'
+                    }`}
+                  style={{ width: `${Math.min((report.totalSales / report.dailyTarget) * 100, 100)}%` }}
+                />
+              </div>
+              {report.totalSales >= report.dailyTarget && (
+                <div className="mt-3 flex items-center gap-2 px-1 animate-bounce-subtle">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Target Achieved!</span>
+                </div>
+              )}
             </div>
 
-            <StatCard 
-                icon={ShoppingBag} 
-                label="Orders Processed" 
-                value={report.totalOrders} 
-                color="from-emerald-500 to-emerald-600 shadow-emerald-500/20" 
+            <StatCard
+              icon={ShoppingBag}
+              label="Orders Processed"
+              value={report.totalOrders}
+              color="from-emerald-500 to-emerald-600 shadow-emerald-500/20"
             />
-            <StatCard 
-                icon={TrendingUp} 
-                label="Revenue Generated" 
-                value={`₹${report.totalSales?.toFixed(2) || '0.00'}`} 
-                color="from-orange-500 to-orange-600 shadow-orange-500/20" 
+            <StatCard
+              icon={TrendingUp}
+              label="Revenue Generated"
+              value={`₹${report.totalSales?.toFixed(2) || '0.00'}`}
+              color="from-orange-500 to-orange-600 shadow-orange-500/20"
             />
-            <StatCard 
-                icon={Banknote} 
-                label="Net Profit Generated" 
-                value={`₹${report.totalProfit?.toFixed(2) || '0.00'}`} 
-                color="from-amber-400 to-yellow-500 shadow-amber-400/20" 
+            <StatCard
+              icon={Banknote}
+              label="Net Profit Generated"
+              value={`₹${report.totalProfit?.toFixed(2) || '0.00'}`}
+              color="from-amber-400 to-yellow-500 shadow-amber-400/20"
             />
 
             <div className="glass rounded-[2.5rem] p-8 bg-white/70 border border-emerald-50 shadow-sm">
@@ -158,7 +157,7 @@ export default function Reports() {
         ) : (
           <div className="flex flex-col items-center justify-center py-20 text-emerald-800/20 gap-4">
             <div className="w-20 h-20 rounded-full bg-emerald-50 flex items-center justify-center">
-                <TrendingUp size={40} strokeWidth={1.5} />
+              <TrendingUp size={40} strokeWidth={1.5} />
             </div>
             <p className="text-xs font-black uppercase tracking-[0.2em]">No Activity Found</p>
           </div>

@@ -62,6 +62,11 @@ export const adminAPI = {
   getRouteWiseReport: (params) => api.get('/admin/reports/route-wise', { params }),
   getVillageWiseReport: (params) => api.get('/admin/reports/village-wise', { params }),
   getAgentPerformance: (params) => api.get('/admin/reports/agent-performance', { params }),
+  getCategoryReport: (params) => api.get('/admin/reports/category-wise', { params }),
+  getReturnReport: (params) => api.get('/admin/reports/returns', { params }),
+  getSessionReport: (params) => api.get('/admin/reports/sessions', { params }),
+  getVehicleAllPerformance: (params) => api.get('/admin/reports/vehicle-all', { params }),
+  getDamageReports: (params) => api.get('/damage/reports', { params }),
   
   // Settings
   getSettings: (params) => api.get('/admin/settings', { params }).catch(err => {

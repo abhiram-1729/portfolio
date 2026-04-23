@@ -25,8 +25,8 @@ export default function Notifications() {
     fetchNotifications();
   }, [fetchNotifications]);
 
-  const filteredNotifications = filter === 'all' 
-    ? notifications 
+  const filteredNotifications = filter === 'all'
+    ? notifications
     : notifications.filter(n => n.type === filter);
 
   const getIcon = (type) => {
@@ -49,11 +49,10 @@ export default function Notifications() {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${
-                filter === f 
-                ? 'bg-indigo-600 text-white shadow-md' 
+              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-all ${filter === f
+                ? 'bg-indigo-600 text-white shadow-md'
                 : 'bg-white text-gray-600 border border-gray-100 hover:bg-gray-50'
-              }`}
+                }`}
             >
               {f.charAt(0).toUpperCase() + f.slice(1)}
             </button>
@@ -69,15 +68,14 @@ export default function Notifications() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, x: -100 }}
-                  className={`relative bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md ${
-                    !notification.isRead ? 'ring-1 ring-indigo-50 border-transparent shadow-indigo-100/50' : ''
-                  }`}
+                  className={`relative bg-white rounded-2xl p-4 md:p-5 shadow-sm border border-gray-100 overflow-hidden transition-all hover:shadow-md ${!notification.isRead ? 'ring-1 ring-indigo-50 border-transparent shadow-indigo-100/50' : ''
+                    }`}
                   onClick={() => !notification.isRead && markAsRead(notification.id)}
                 >
                   {!notification.isRead && (
                     <div className="absolute top-0 left-0 w-1 h-full bg-indigo-600" />
                   )}
-                  
+
                   <div className="flex gap-3 md:gap-4">
                     <div className="flex-shrink-0">
                       {getIcon(notification.type)}
@@ -94,7 +92,7 @@ export default function Notifications() {
                       <p className="text-gray-600 text-xs md:text-sm leading-relaxed mb-2 line-clamp-3 md:line-clamp-none italic pr-1">
                         {notification.message}
                       </p>
-                      
+
                       <div className="flex items-center gap-2">
                         {notification.priority === 'high' && (
                           <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-50 text-red-600 text-[8px] md:text-[10px] font-black uppercase tracking-wider">
@@ -104,8 +102,8 @@ export default function Notifications() {
                         )}
                         {!notification.isRead && (
                           <span className="text-[8px] md:text-[10px] text-indigo-600 font-black flex items-center gap-1">
-                             <div className="w-1 h-1 bg-indigo-600 rounded-full" />
-                             NEW
+                            <div className="w-1 h-1 bg-indigo-600 rounded-full" />
+                            NEW
                           </span>
                         )}
                       </div>
@@ -126,11 +124,10 @@ export default function Notifications() {
                                 <span className="text-[10px] font-black text-slate-400 text-center">{item.requested}</span>
                                 <span className="text-[10px] font-black text-emerald-600 text-center">{item.approved}</span>
                                 <div className="text-right">
-                                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${
-                                    item.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
+                                  <span className={`text-[7px] font-black px-1.5 py-0.5 rounded uppercase tracking-tighter ${item.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700' :
                                     item.status === 'PARTIAL' ? 'bg-amber-100 text-amber-700' :
-                                    'bg-red-100 text-red-700'
-                                  }`}>
+                                      'bg-red-100 text-red-700'
+                                    }`}>
                                     {item.status}
                                   </span>
                                 </div>

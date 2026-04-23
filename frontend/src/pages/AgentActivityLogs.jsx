@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  History, 
-  Loader2, 
-  ShoppingCart, 
-  RefreshCcw, 
-  Banknote, 
-  CreditCard, 
-  Scale, 
+import {
+  History,
+  Loader2,
+  ShoppingCart,
+  RefreshCcw,
+  Banknote,
+  CreditCard,
+  Scale,
   Layout,
   ChevronLeft,
   ChevronRight,
@@ -113,14 +113,14 @@ export default function AgentActivityLogs() {
                   </div>
                   <p className="text-sm font-bold text-slate-700 leading-snug mb-2 whitespace-normal">{log.details}</p>
                   <p className="text-[9px] font-black text-slate-300 uppercase tracking-wider">
-                     {format(new Date(log.createdAt), 'EEEE, do MMMM yyyy')}
+                    {format(new Date(log.createdAt), 'EEEE, do MMMM yyyy')}
                   </p>
                 </div>
               </div>
             ))}
 
             <div className="flex items-center justify-between pt-4">
-              <button 
+              <button
                 onClick={() => setSkip(prev => Math.max(0, prev - LIMIT))}
                 disabled={skip === 0}
                 className="flex items-center gap-1.5 px-4 py-2 bg-white rounded-xl border border-slate-200 text-xs font-black uppercase text-slate-600 disabled:opacity-30 transition-all hover:bg-slate-50"
@@ -131,7 +131,7 @@ export default function AgentActivityLogs() {
               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
                 Page {Math.floor(skip / LIMIT) + 1}
               </span>
-              <button 
+              <button
                 onClick={() => setSkip(prev => prev + LIMIT)}
                 disabled={logs.length < LIMIT}
                 className="flex items-center gap-1.5 px-4 py-2 bg-white rounded-xl border border-slate-200 text-xs font-black uppercase text-slate-600 disabled:opacity-30 transition-all hover:bg-slate-50"

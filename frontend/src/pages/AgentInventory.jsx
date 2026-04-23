@@ -82,10 +82,10 @@ export default function AgentInventory() {
         const { data } = await productsAPI.getAll({ showAll: true });
         setAllProducts(data);
       }
-      
+
       const newRefillItems = {};
       let hasItemsToRefill = false;
-      
+
       inventory.forEach(item => {
         const targetCapacity = Math.max(item.openingQuantity || 0, item.quantity);
         const diff = targetCapacity - item.quantity;
@@ -94,12 +94,12 @@ export default function AgentInventory() {
           hasItemsToRefill = true;
         }
       });
-      
+
       if (!hasItemsToRefill) {
         toast.error('Inventory is already at full capacity');
         return;
       }
-      
+
       setRefillItems(newRefillItems);
       setShowRefillModal(true);
     } catch (error) {

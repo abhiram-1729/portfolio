@@ -94,7 +94,7 @@ export default function ClosingCashEntry() {
         shift: activeShift,
       });
       toast.success(`Shift ${activeShift} closing submitted successfully`);
-      
+
       if (activeShift === 1 && shift2?.openingAssigned) {
         setCounts(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {}));
         setRemark('');
@@ -164,7 +164,7 @@ export default function ClosingCashEntry() {
               const isClosed = s.data?.closingSubmitted;
               const isLocked = s.id === 2 && !canCloseShift2;
               const isActive = activeShift === s.id;
-              
+
               return (
                 <button
                   key={s.id}
@@ -176,13 +176,12 @@ export default function ClosingCashEntry() {
                       setRemark('');
                     }
                   }}
-                  className={`flex-1 flex items-center justify-center gap-1.5 p-1.5 rounded-lg border transition-all ${
-                    isActive
-                      ? s.color === 'emerald' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                      : !isAssigned || isLocked
-                        ? 'border-transparent bg-slate-50 opacity-40 cursor-not-allowed'
-                        : 'border-slate-100 bg-white hover:border-slate-200 text-slate-400'
-                  }`}
+                  className={`flex-1 flex items-center justify-center gap-1.5 p-1.5 rounded-lg border transition-all ${isActive
+                    ? s.color === 'emerald' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                    : !isAssigned || isLocked
+                      ? 'border-transparent bg-slate-50 opacity-40 cursor-not-allowed'
+                      : 'border-slate-100 bg-white hover:border-slate-200 text-slate-400'
+                    }`}
                 >
                   {isClosed ? <CheckCircle2 size={12} className="text-emerald-500" /> : isLocked ? <Lock size={12} /> : <s.icon size={12} />}
                   <span className="text-[10px] font-black uppercase tracking-tighter">{s.label}</span>
@@ -221,11 +220,10 @@ export default function ClosingCashEntry() {
 
           {/* Status Badge: Review State */}
           {currentShift?.closingSubmitted && (
-            <div className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-lg border animate-in fade-in slide-in-from-top-1 duration-500 ${
-              isApproved ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 
+            <div className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-lg border animate-in fade-in slide-in-from-top-1 duration-500 ${isApproved ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
               isRejected ? 'bg-rose-50 border-rose-100 text-rose-600' :
-              'bg-orange-50 border-orange-100 text-orange-600'
-            }`}>
+                'bg-orange-50 border-orange-100 text-orange-600'
+              }`}>
               {isApproved ? <CheckCircle2 size={12} /> : isRejected ? <XCircle size={12} /> : <Clock size={12} className="animate-pulse" />}
               <span className="text-[9px] font-black uppercase tracking-widest">
                 {isApproved ? 'Shift Approved' : isRejected ? 'Shift Rejected - Please Resubmit' : 'Awaiting Admin Review'}
@@ -256,7 +254,7 @@ export default function ClosingCashEntry() {
             </button>
           </div>
         ) : (
-          <div className="space-y-4 pb-24"> 
+          <div className="space-y-4 pb-24">
             <div className="bg-white rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/50 overflow-hidden divide-y divide-slate-100/60">
               <div className="px-5 py-3 bg-slate-50 flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Physical Cash Count</span>
@@ -315,7 +313,7 @@ export default function ClosingCashEntry() {
                       className={`w-full border-2 outline-none rounded-2xl p-4 font-bold transition-all h-20 text-sm ${isCurrentShiftClosed
                         ? 'bg-slate-50 border-slate-100 text-slate-400 opacity-60'
                         : 'bg-white border-rose-100 focus:border-rose-400 text-slate-900 placeholder:text-rose-200'
-                      }`}
+                        }`}
                     />
                   </div>
                 )}
@@ -355,11 +353,10 @@ export default function ClosingCashEntry() {
                   }).finally(() => setLoading(false));
                 }
               }}
-              className={`px-3 py-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${
-                isCurrentShiftClosed 
-                  ? 'border-transparent bg-slate-50 text-slate-300 grayscale select-none'
-                  : 'border-rose-100 bg-rose-50/30 text-rose-500 hover:bg-rose-50 active:bg-rose-100'
-              }`}
+              className={`px-3 py-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isCurrentShiftClosed
+                ? 'border-transparent bg-slate-50 text-slate-300 grayscale select-none'
+                : 'border-rose-100 bg-rose-50/30 text-rose-500 hover:bg-rose-50 active:bg-rose-100'
+                }`}
             >
               <AlertCircle size={14} />
               <span className="text-[8px] font-black uppercase tracking-tighter">S{activeShift} Damage</span>
@@ -377,13 +374,12 @@ export default function ClosingCashEntry() {
                   handleSubmit();
                 }
               }}
-              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] group ${
-                isCurrentShiftClosed && !(activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted)
-                  ? 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'
-                  : activeShift === 1 && shift1?.closingSubmitted
-                    ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600'
-                    : 'bg-slate-900 text-white shadow-slate-300 hover:bg-black'
-              }`}
+              className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] group ${isCurrentShiftClosed && !(activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted)
+                ? 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'
+                : activeShift === 1 && shift1?.closingSubmitted
+                  ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600'
+                  : 'bg-slate-900 text-white shadow-slate-300 hover:bg-black'
+                }`}
             >
               {loading ? (
                 'Processing...'

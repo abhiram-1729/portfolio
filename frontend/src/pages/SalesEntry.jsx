@@ -105,11 +105,11 @@ export default function SalesEntry() {
     const subsMap = {};
     products.forEach(p => {
       if (p.subCategory) {
-        subsMap[p.subCategory.name] = { 
-          id: p.subCategoryId, 
-          name: p.subCategory.name, 
+        subsMap[p.subCategory.name] = {
+          id: p.subCategoryId,
+          name: p.subCategory.name,
           categoryId: p.categoryId,
-          categoryName: p.category?.name 
+          categoryName: p.category?.name
         };
       }
     });
@@ -120,8 +120,8 @@ export default function SalesEntry() {
     let result = products;
     if (search.trim()) {
       const q = search.toLowerCase();
-      result = result.filter((p) => 
-        p.name.toLowerCase().includes(q) || 
+      result = result.filter((p) =>
+        p.name.toLowerCase().includes(q) ||
         (p.barcode && p.barcode.toLowerCase().includes(q))
       );
     }
@@ -216,11 +216,10 @@ export default function SalesEntry() {
               <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar scroll-smooth">
                 <button
                   onClick={() => { setFilterCategory('ALL'); setFilterSubCategory('ALL'); }}
-                  className={`whitespace-nowrap px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${
-                    filterCategory === 'ALL' 
-                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/10' 
+                  className={`whitespace-nowrap px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${filterCategory === 'ALL'
+                    ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/10'
                     : 'bg-white border-emerald-100 text-slate-400 hover:text-emerald-600'
-                  }`}
+                    }`}
                 >
                   All Items
                 </button>
@@ -228,11 +227,10 @@ export default function SalesEntry() {
                   <button
                     key={`cat-${cat.id}`}
                     onClick={() => { setFilterCategory(cat.name); setFilterSubCategory('ALL'); }}
-                    className={`whitespace-nowrap px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${
-                      filterCategory === cat.name 
-                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/10' 
+                    className={`whitespace-nowrap px-4 py-2 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${filterCategory === cat.name
+                      ? 'bg-emerald-600 border-emerald-600 text-white shadow-md shadow-emerald-500/10'
                       : 'bg-white border-emerald-100 text-slate-400 hover:text-emerald-600'
-                    }`}
+                      }`}
                   >
                     {cat.name}
                   </button>
@@ -250,11 +248,10 @@ export default function SalesEntry() {
                   </div>
                   <button
                     onClick={() => setFilterSubCategory('ALL')}
-                    className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border shrink-0 ${
-                      filterSubCategory === 'ALL' 
-                      ? 'bg-emerald-500 border-emerald-500 text-white' 
+                    className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border shrink-0 ${filterSubCategory === 'ALL'
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
                       : 'bg-white border-emerald-50 text-slate-400 hover:text-emerald-500'
-                    }`}
+                      }`}
                   >
                     All {filterCategory}
                   </button>
@@ -264,11 +261,10 @@ export default function SalesEntry() {
                       <button
                         key={`sub-${sub.id}`}
                         onClick={() => setFilterSubCategory(sub.name)}
-                        className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border shrink-0 ${
-                          filterSubCategory === sub.name 
-                          ? 'bg-emerald-500 border-emerald-500 text-white' 
+                        className={`whitespace-nowrap px-3.5 py-1.5 rounded-xl text-[8px] font-black uppercase tracking-widest transition-all border shrink-0 ${filterSubCategory === sub.name
+                          ? 'bg-emerald-500 border-emerald-500 text-white'
                           : 'bg-white border-emerald-50 text-slate-400 hover:text-emerald-500'
-                        }`}
+                          }`}
                       >
                         {sub.name}
                       </button>

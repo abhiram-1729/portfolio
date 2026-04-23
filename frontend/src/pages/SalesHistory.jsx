@@ -29,12 +29,12 @@ export default function SalesHistory() {
   };
 
   const filteredOrders = orders.filter(o => {
-    const matchesSearch = !search || 
+    const matchesSearch = !search ||
       o.customerName?.toLowerCase().includes(search.toLowerCase()) ||
       o.displayId?.toLowerCase().includes(search.toLowerCase()) ||
       o.mobile?.includes(search);
 
-    const matchesStatus = filterStatus === 'ALL' || o.status === filterStatus || 
+    const matchesStatus = filterStatus === 'ALL' || o.status === filterStatus ||
       (filterStatus === 'RETURNED' && ['RETURNED', 'PARTIALLY_RETURNED'].includes(o.status));
 
     let matchesTime = true;
@@ -61,7 +61,7 @@ export default function SalesHistory() {
         <div className="max-w-xl mx-auto space-y-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <button 
+              <button
                 onClick={() => navigate(-1)}
                 className="p-2 bg-emerald-50 text-emerald-600 rounded-xl active:scale-90 transition-all"
               >
@@ -70,8 +70,8 @@ export default function SalesHistory() {
               <h1 className="text-lg font-black text-emerald-950 tracking-tight">Sales History</h1>
             </div>
             <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5 shadow-sm">
-                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-                <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{filteredOrders.length} records</span>
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{filteredOrders.length} records</span>
             </div>
           </div>
 
@@ -89,37 +89,35 @@ export default function SalesHistory() {
 
           {/* Quick Filter Horizontal Scroll */}
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
-             <div className="flex items-center gap-1 bg-white border border-slate-100 p-1 rounded-full">
-               {['ALL', 'TODAY', 'WEEK', 'MONTH'].map((t) => (
-                  <button
-                    key={t}
-                    onClick={() => setTimeFilter(t)}
-                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                      timeFilter === t 
-                      ? 'bg-emerald-600 text-white shadow-md' 
-                      : 'bg-transparent text-slate-400'
+            <div className="flex items-center gap-1 bg-white border border-slate-100 p-1 rounded-full">
+              {['ALL', 'TODAY', 'WEEK', 'MONTH'].map((t) => (
+                <button
+                  key={t}
+                  onClick={() => setTimeFilter(t)}
+                  className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${timeFilter === t
+                    ? 'bg-emerald-600 text-white shadow-md'
+                    : 'bg-transparent text-slate-400'
                     }`}
-                  >
-                    {t}
-                  </button>
-               ))}
-             </div>
-             <div className="w-[1px] h-4 bg-slate-200 self-center mx-1" />
-             <div className="flex items-center gap-1 bg-white border border-slate-100 p-1 rounded-full">
-               {['ALL', 'COMPLETED', 'PENDING', 'CANCELLED', 'RETURNED'].map((s) => (
-                  <button
-                    key={s}
-                    onClick={() => setFilterStatus(s)}
-                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${
-                      filterStatus === s 
-                      ? 'bg-teal-600 text-white shadow-md' 
-                      : 'bg-transparent text-slate-400'
+                >
+                  {t}
+                </button>
+              ))}
+            </div>
+            <div className="w-[1px] h-4 bg-slate-200 self-center mx-1" />
+            <div className="flex items-center gap-1 bg-white border border-slate-100 p-1 rounded-full">
+              {['ALL', 'COMPLETED', 'PENDING', 'CANCELLED', 'RETURNED'].map((s) => (
+                <button
+                  key={s}
+                  onClick={() => setFilterStatus(s)}
+                  className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all whitespace-nowrap ${filterStatus === s
+                    ? 'bg-teal-600 text-white shadow-md'
+                    : 'bg-transparent text-slate-400'
                     }`}
-                  >
-                    {s}
-                  </button>
-               ))}
-             </div>
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -135,7 +133,7 @@ export default function SalesHistory() {
         ) : filteredOrders.length === 0 ? (
           <div className="flex flex-col items-center justify-center pt-20 text-center animate-slide-up">
             <div className="w-16 h-16 bg-emerald-50 rounded-[1.5rem] flex items-center justify-center mb-6 border border-emerald-100/50 shadow-inner">
-               <PackageOpen size={28} className="text-emerald-200" />
+              <PackageOpen size={28} className="text-emerald-200" />
             </div>
             <h3 className="text-lg font-black text-emerald-950 mb-1">No Results</h3>
             <p className="text-xs font-bold text-slate-400">Try adjusting your filters.</p>
@@ -143,39 +141,38 @@ export default function SalesHistory() {
         ) : (
           <div className="grid grid-cols-1 gap-3">
             {filteredOrders.map((order) => (
-              <div 
-                key={order.id} 
+              <div
+                key={order.id}
                 onClick={() => navigate(`/order-detail/${order.id}`)}
                 className="group bg-white hover:bg-emerald-50/20 active:bg-emerald-50 rounded-2xl border border-slate-100 hover:border-emerald-200 transition-all active:scale-[0.98] shadow-sm flex items-center p-3 gap-3"
               >
                 {/* Visual Accent */}
-                <div className={`w-1 h-8 rounded-full ${
-                  order.status === 'COMPLETED' ? 'bg-emerald-500' : 
-                  order.status === 'CANCELLED' ? 'bg-red-500' : 
-                  order.status === 'RETURNED' || order.status === 'PARTIALLY_RETURNED' ? 'bg-amber-500' :
-                  'bg-orange-400'}`} />
-                
+                <div className={`w-1 h-8 rounded-full ${order.status === 'COMPLETED' ? 'bg-emerald-500' :
+                  order.status === 'CANCELLED' ? 'bg-red-500' :
+                    order.status === 'RETURNED' || order.status === 'PARTIALLY_RETURNED' ? 'bg-amber-500' :
+                      'bg-orange-400'}`} />
+
                 {/* Main Content */}
                 <div className="flex-1 min-w-0">
-                   <div className="flex items-center justify-between">
-                      <h4 className="text-sm font-black text-emerald-950 truncate max-w-[65%] leading-tight capitalize">{order.customerName || 'Walk-in'}</h4>
-                      <span className="text-sm font-black text-emerald-700 tracking-tighter">₹{order.totalAmount.toFixed(2)}</span>
-                   </div>
-                   <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">#{order.displayId || 'SO-00'}</span>
-                      <div className="w-1 h-1 bg-slate-200 rounded-full" />
-                      <span className="text-[9px] font-black text-emerald-600/40 uppercase tracking-widest">{format(new Date(order.createdAt), 'dd MMM, hh:mm')}</span>
-                   </div>
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-sm font-black text-emerald-950 truncate max-w-[65%] leading-tight capitalize">{order.customerName || 'Walk-in'}</h4>
+                    <span className="text-sm font-black text-emerald-700 tracking-tighter">₹{order.totalAmount.toFixed(2)}</span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest bg-slate-50 px-1.5 py-0.5 rounded-md border border-slate-100">#{order.displayId || 'SO-00'}</span>
+                    <div className="w-1 h-1 bg-slate-200 rounded-full" />
+                    <span className="text-[9px] font-black text-emerald-600/40 uppercase tracking-widest">{format(new Date(order.createdAt), 'dd MMM, hh:mm')}</span>
+                  </div>
                 </div>
 
                 {/* Status Indicator */}
                 <div className="flex items-center gap-2 pl-2 border-l border-slate-50">
-                   {order.paymentMode === 'UPI' ? (
-                     <ShieldCheck size={14} className="text-blue-500" />
-                   ) : (
-                     <IndianRupee size={12} className="text-emerald-600" />
-                   )}
-                   <ChevronRight size={14} className="text-slate-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
+                  {order.paymentMode === 'UPI' ? (
+                    <ShieldCheck size={14} className="text-blue-500" />
+                  ) : (
+                    <IndianRupee size={12} className="text-emerald-600" />
+                  )}
+                  <ChevronRight size={14} className="text-slate-300 group-hover:text-emerald-500 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </div>
             ))}

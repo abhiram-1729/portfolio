@@ -137,18 +137,18 @@ export default function TodayPlan() {
       <div className="max-w-lg mx-auto px-5 space-y-5">
         {/* Simplified Title Section */}
         <div className="flex items-center justify-between mb-2">
-            <div>
-              <h2 className="text-xl font-black text-gray-900 tracking-tight">Today's Village</h2>
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
-              </p>
-            </div>
-            <button
-              onClick={handleRefresh}
-              className={`p-2.5 rounded-2xl bg-white border border-gray-100 shadow-sm transition-all ${refreshing ? 'animate-spin' : 'hover:bg-violet-50 active:scale-90 hover:text-violet-600'}`}
-            >
-              <RefreshCw size={18} strokeWidth={2.5} />
-            </button>
+          <div>
+            <h2 className="text-xl font-black text-gray-900 tracking-tight">Today's Village</h2>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              {new Date().toLocaleDateString('en-IN', { weekday: 'long', month: 'short', day: 'numeric' })}
+            </p>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className={`p-2.5 rounded-2xl bg-white border border-gray-100 shadow-sm transition-all ${refreshing ? 'animate-spin' : 'hover:bg-violet-50 active:scale-90 hover:text-violet-600'}`}
+          >
+            <RefreshCw size={18} strokeWidth={2.5} />
+          </button>
         </div>
 
         {/* ── Today's Village Card ──────────────────────── */}
@@ -231,14 +231,14 @@ export default function TodayPlan() {
 
             {/* Morning Slot */}
             <div className={`rounded-2xl p-4 border transition-all ${coverage.morningDone
-                ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
-                : 'bg-white border-gray-100 shadow-sm'
+              ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
+              : 'bg-white border-gray-100 shadow-sm'
               }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${coverage.morningDone
-                      ? 'bg-emerald-100 text-emerald-600'
-                      : 'bg-amber-50 text-amber-500'
+                    ? 'bg-emerald-100 text-emerald-600'
+                    : 'bg-amber-50 text-amber-500'
                     }`}>
                     <Sun size={22} strokeWidth={2.5} />
                   </div>
@@ -270,14 +270,14 @@ export default function TodayPlan() {
 
             {/* Evening Slot */}
             <div className={`rounded-2xl p-4 border transition-all ${coverage.eveningDone
-                ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
-                : 'bg-white border-gray-100 shadow-sm'
+              ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
+              : 'bg-white border-gray-100 shadow-sm'
               }`}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
                   <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${coverage.eveningDone
-                      ? 'bg-emerald-100 text-emerald-600'
-                      : 'bg-indigo-50 text-indigo-500'
+                    ? 'bg-emerald-100 text-emerald-600'
+                    : 'bg-indigo-50 text-indigo-500'
                     }`}>
                     <Moon size={22} strokeWidth={2.5} />
                   </div>

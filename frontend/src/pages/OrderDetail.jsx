@@ -271,10 +271,10 @@ export default function OrderDetail() {
             <div className="flex-1">
               <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Transaction Metadata</p>
               <div className="grid grid-cols-2 gap-y-1 mt-2">
-                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Hash size={8}/> ID: <span className="text-slate-700">{order.id.slice(-8).toUpperCase()}</span></div>
-                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Calendar size={8}/> {format(new Date(order.createdAt), 'dd MMMM yyyy')}</div>
-                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><CheckCircle2 size={8}/> {order.paymentMode}</div>
-                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><MapPin size={8}/> {order.villageName || 'Default'}</div>
+                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Hash size={8} /> ID: <span className="text-slate-700">{order.id.slice(-8).toUpperCase()}</span></div>
+                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><Calendar size={8} /> {format(new Date(order.createdAt), 'dd MMMM yyyy')}</div>
+                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><CheckCircle2 size={8} /> {order.paymentMode}</div>
+                <div className="text-[10px] font-bold text-slate-500 flex items-center gap-1"><MapPin size={8} /> {order.villageName || 'Default'}</div>
               </div>
             </div>
           </div>

@@ -977,59 +977,65 @@ export const auditVehicleStock = async (req, res) => {
         }
       });
 
+      // 2. Prepare data for batch operations
+      const auditItemsData = [];
+      const transactionsData = [];
+      
       for (const item of items) {
         const q = parseFloat(item.quantity);
-        
-        // Get current stock for historical record
+        if (isNaN(q)) continue;
+
+        // Get current stock for historical record (still need this per item unfortunately)
         const currentStock = await tx.vehicleStock.findUnique({
           where: { vehicleId_productId: { vehicleId: id, productId: item.productId } }
         });
 
-        // 2. Create Audit Item
-        await tx.stockAuditItem.create({
-          data: {
-            auditId: audit.id,
-            productId: item.productId,
-            oldQuantity: currentStock?.quantity || 0,
-            newQuantity: q
-          }
+        auditItemsData.push({
+          tenantId: req.user.tenantId,
+          auditId: audit.id,
+          productId: item.productId,
+          oldQuantity: Math.floor(currentStock?.quantity || 0),
+          newQuantity: Math.floor(q)
         });
 
-        // 3. Log the audit as a special transaction
-        await tx.stockTransaction.create({
-          data: {
-            tenantId: req.user.tenantId,
-            storeId,
-            type: 'AUDIT',
-            vehicleId: id,
-            productId: item.productId,
-            quantity: q,
-            date: new Date()
-          }
+        transactionsData.push({
+          tenantId: req.user.tenantId,
+          storeId,
+          type: 'AUDIT',
+          vehicleId: id,
+          productId: item.productId,
+          quantity: Math.floor(q),
+          date: new Date()
         });
 
-        // 4. Hard update the stock to the new audited value
+        // 3. Hard update the stock to the new audited value
         await tx.vehicleStock.upsert({
           where: {
             vehicleId_productId: { vehicleId: id, productId: item.productId }
           },
           update: { 
-            quantity: q,
-            openingQuantity: q 
+            quantity: Math.floor(q),
+            openingQuantity: Math.floor(q) 
           },
           create: { 
             tenantId: req.user.tenantId,
             storeId,
             vehicleId: id, 
             productId: item.productId, 
-            quantity: q,
-            openingQuantity: q
+            quantity: Math.floor(q),
+            openingQuantity: Math.floor(q)
           }
         });
       }
+
+      // 4. Batch create Audit Items and Transactions
+      if (auditItemsData.length > 0) {
+        await tx.stockAuditItem.createMany({ data: auditItemsData });
+        await tx.stockTransaction.createMany({ data: transactionsData });
+      }
     }, {
-      maxWait: 20000, // Wait up to 20s to acquire connection
-      timeout: 60000  // Allow up to 60s for the entire audit to process
+      maxWait: 20000,
+      timeout: 60000
     });
 
     // Find the user assigned to this vehicle to track as targetUserId
