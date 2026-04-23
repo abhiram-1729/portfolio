@@ -27,6 +27,7 @@ model Tenant {
   products          Product[]
   warehouses        Warehouse[]
   orders            Order[]
+  orderReturns      OrderReturn[]
   vehicles          Vehicle[]
   routes            Route[]
   villages          Village[]
@@ -37,6 +38,7 @@ model Tenant {
   incentiveConfig   VgeIncentiveConfig[]
   orderItems        OrderItem[]
   payments          Payment[]
+  sessionSales      SessionSales[]
   assetCategories   AssetCategory[]
   stores            Store[]
   stockAudits       StockAudit[]
@@ -240,6 +242,7 @@ model Product {
   purchaseItems      PurchaseInvoiceItem[]
   damageEntries      DamageEntry[]
   procurementLedger  ProcurementStockLedger[]
+  orderReturns       OrderReturn[]
 
   @@index([tenantId])
   @@index([status])
@@ -335,6 +338,7 @@ model Order {
   route        Route?        @relation(fields: [routeId], references: [id])
   store        Store?        @relation(fields: [storeId], references: [id])
   items        OrderItem[]
+  returns      OrderReturn[]
   payment      Payment?
 
   @@index([tenantId])
@@ -887,6 +891,7 @@ enum PaymentMode {
   UPI
   CARD
   CASH_UPI
+  CREDIT
 }
 
 enum OrderStatus {
@@ -894,6 +899,8 @@ enum OrderStatus {
   PAID
   COMPLETED
   CANCELLED
+  RETURNED
+  PARTIALLY_RETURNED
 }
 
 enum CoverageType {
@@ -1281,6 +1288,8 @@ model Store {
 
   // Store-scoped relations
   orders           Order[]
+  orderReturns     OrderReturn[]
+  sessionSales     SessionSales[]
   openingCash      OpeningCash[]
   closingCash      ClosingCash[]
   dailySummaries   DailyCashSummary[]
@@ -1908,4 +1917,69 @@ model DamageDeduction {
   @@index([damageEntryId])
   @@index([month])
   @@index([status])
+}
+
+// ─── ORDER RETURNS MODULE ─────────────────────────────────────────────────────
+
+model OrderReturn {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String?
+  orderId         String
+  orderItemId     String
+  productId       String
+  returnQty       Int
+  returnAmount    Float
+  reason          String?
+  returnedById    String   // Agent/Admin who processed the return
+  status          String   @default("COMPLETED") // COMPLETED, REVERSED
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  store           Store?   @relation(fields: [storeId], references: [id])
+  order           Order    @relation(fields: [orderId], references: [id])
+  product         Product  @relation(fields: [productId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([orderId])
+  @@index([productId])
+  @@index([createdAt])
+}
+
+// ─── SESSION SALES AGGREGATION ────────────────────────────────────────────────
+
+model SessionSales {
+  id              String   @id @default(cuid())
+  tenantId        String   @default("VK001")
+  storeId         String?
+  date            String   // YYYY-MM-DD
+  shift           Int      @default(1) // 1 = Morning, 2 = Afternoon
+  agentId         String?
+  vehicleId       String?
+  
+  totalSales      Float    @default(0)
+  totalReturns    Float    @default(0)
+  netSales        Float    @default(0)
+  cashSales       Float    @default(0)
+  upiSales        Float    @default(0)
+  creditSales     Float    @default(0)
+  totalOrders     Int      @default(0)
+  totalReturnOrders Int    @default(0)
+  
+  isFrozen        Boolean  @default(false) // True when session is closed
+  frozenAt        DateTime?
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  tenant          Tenant   @relation(fields: [tenantId], references: [id])
+  store           Store?   @relation(fields: [storeId], references: [id])
+
+  @@unique([tenantId, storeId, date, shift, agentId])
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([date])
+  @@index([agentId])
 }

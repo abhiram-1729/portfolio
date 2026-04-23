@@ -92,6 +92,16 @@ export const ordersAPI = {
   completePayment: (data) => api.post('/orders/complete-payment', data),
   getById: (id) => api.get(`/orders/${id}`),
   getMyHistory: (params) => api.get('/orders/my-history', { params }),
+  // V2.0 — Order Mutations
+  editItem: (orderId, itemId, data) => api.put(`/orders/${orderId}/items/${itemId}`, data),
+  removeItem: (orderId, itemId) => api.delete(`/orders/${orderId}/items/${itemId}`),
+  returnItems: (orderId, data) => api.post(`/orders/${orderId}/return`, data),
+  cancelOrder: (orderId, data) => api.post(`/orders/${orderId}/cancel`, data),
+  // V2.0 — Reports & Session
+  getSessionSales: (params) => api.get('/orders/session-sales', { params }),
+  getReturnReport: (params) => api.get('/orders/return-report', { params }),
+  getItemWiseReport: (params) => api.get('/orders/item-wise-report', { params }),
+  freezeSession: (data) => api.post('/orders/freeze-session', data),
 };
 
 export const reportsAPI = {

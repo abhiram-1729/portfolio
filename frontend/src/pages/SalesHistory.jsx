@@ -9,7 +9,7 @@ export default function SalesHistory() {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [filterStatus, setFilterStatus] = useState('ALL'); // ALL, COMPLETED, PENDING
+  const [filterStatus, setFilterStatus] = useState('ALL'); // ALL, COMPLETED, PENDING, CANCELLED, RETURNED
   const [timeFilter, setTimeFilter] = useState('ALL'); // ALL, TODAY, WEEK, MONTH
   const navigate = useNavigate();
 
@@ -34,7 +34,8 @@ export default function SalesHistory() {
       o.displayId?.toLowerCase().includes(search.toLowerCase()) ||
       o.mobile?.includes(search);
 
-    const matchesStatus = filterStatus === 'ALL' || o.status === filterStatus;
+    const matchesStatus = filterStatus === 'ALL' || o.status === filterStatus || 
+      (filterStatus === 'RETURNED' && ['RETURNED', 'PARTIALLY_RETURNED'].includes(o.status));
 
     let matchesTime = true;
     if (timeFilter !== 'ALL') {
@@ -105,7 +106,7 @@ export default function SalesHistory() {
              </div>
              <div className="w-[1px] h-4 bg-slate-200 self-center mx-1" />
              <div className="flex items-center gap-1 bg-white border border-slate-100 p-1 rounded-full">
-               {['ALL', 'COMPLETED', 'PENDING'].map((s) => (
+               {['ALL', 'COMPLETED', 'PENDING', 'CANCELLED', 'RETURNED'].map((s) => (
                   <button
                     key={s}
                     onClick={() => setFilterStatus(s)}
@@ -148,7 +149,11 @@ export default function SalesHistory() {
                 className="group bg-white hover:bg-emerald-50/20 active:bg-emerald-50 rounded-2xl border border-slate-100 hover:border-emerald-200 transition-all active:scale-[0.98] shadow-sm flex items-center p-3 gap-3"
               >
                 {/* Visual Accent */}
-                <div className={`w-1 h-8 rounded-full ${order.status === 'COMPLETED' ? 'bg-emerald-500' : 'bg-orange-400'}`} />
+                <div className={`w-1 h-8 rounded-full ${
+                  order.status === 'COMPLETED' ? 'bg-emerald-500' : 
+                  order.status === 'CANCELLED' ? 'bg-red-500' : 
+                  order.status === 'RETURNED' || order.status === 'PARTIALLY_RETURNED' ? 'bg-amber-500' :
+                  'bg-orange-400'}`} />
                 
                 {/* Main Content */}
                 <div className="flex-1 min-w-0">

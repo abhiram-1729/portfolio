@@ -363,13 +363,11 @@ export const getOrderById = async (req, res, next) => {
         const order = await prisma.order.findUnique({
             where: { id: req.params.id, tenantId: req.user.tenantId },
             include: {
-                items: {
-                    include: {
-                        // We don't have a direct relation on OrderItem -> Product
-                        // so we'll manually look them up
-                    },
-                },
+                items: true,
                 payment: true,
+                returns: {
+                    orderBy: { createdAt: 'desc' }
+                },
             },
         });
 
@@ -390,10 +388,16 @@ export const getOrderById = async (req, res, next) => {
             return acc;
         }, {});
 
-        const enrichedItems = order.items.map((item) => ({
-            ...item,
-            product: enrichedProductMap[item.productId] || null,
-        }));
+        const enrichedItems = order.items.map((item) => {
+            const itemReturns = order.returns.filter(r => r.orderItemId === item.id && r.status === 'COMPLETED');
+            const returnedQty = itemReturns.reduce((sum, r) => sum + r.returnQty, 0);
+            return {
+                ...item,
+                product: enrichedProductMap[item.productId] || null,
+                returnedQty,
+                returnableQty: item.quantity - returnedQty,
+            };
+        });
 
         res.json({ ...order, items: enrichedItems });
     } catch (error) {
@@ -418,7 +422,7 @@ export const getMyOrders = async (req, res, next) => {
                     { agentId: userId },
                     { userId: userId }
                 ],
-                status: { in: ['COMPLETED', 'PENDING'] }
+                status: { in: ['COMPLETED', 'PENDING', 'CANCELLED', 'RETURNED', 'PARTIALLY_RETURNED'] }
             },
             orderBy: { createdAt: 'desc' },
             take: parseInt(limit),
