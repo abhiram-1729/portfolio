@@ -37,12 +37,26 @@ export default function ClosingCashEntry() {
       const s1 = data?.shifts?.shift1;
       const s2 = data?.shifts?.shift2;
 
+      let selectedShift = 1;
       if (s1?.openingAssigned && !s1?.closingSubmitted) {
-        setActiveShift(1);
+        selectedShift = 1;
       } else if (s1?.closingSubmitted && s2?.openingAssigned && !s2?.closingSubmitted) {
-        setActiveShift(2);
+        selectedShift = 2;
       } else if (!s1?.openingAssigned && s2?.openingAssigned) {
-        setActiveShift(2);
+        selectedShift = 2;
+      }
+      setActiveShift(selectedShift);
+
+      // Pre-fill denomination fields with submitted values if shift is closed
+      const selectedShiftData = selectedShift === 1 ? s1 : s2;
+      if (selectedShiftData?.closingSubmitted && selectedShiftData?.closingDenominations) {
+        const submittedDenoms = selectedShiftData.closingDenominations;
+        setCounts(
+          DENOMINATIONS.reduce((acc, d) => ({
+            ...acc,
+            [d]: submittedDenoms[String(d)] !== undefined ? submittedDenoms[String(d)] : ''
+          }), {})
+        );
       }
     } catch (err) {
       toast.error('Failed to load cash status');
@@ -172,7 +186,18 @@ export default function ClosingCashEntry() {
                   onClick={() => {
                     if (isAssigned && !isLocked) {
                       setActiveShift(s.id);
-                      setCounts(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {}));
+                      // If this shift is closed, pre-fill with submitted denominations
+                      if (s.data?.closingSubmitted && s.data?.closingDenominations) {
+                        const submittedDenoms = s.data.closingDenominations;
+                        setCounts(
+                          DENOMINATIONS.reduce((acc, d) => ({
+                            ...acc,
+                            [d]: submittedDenoms[String(d)] !== undefined ? submittedDenoms[String(d)] : ''
+                          }), {})
+                        );
+                      } else {
+                        setCounts(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {}));
+                      }
                       setRemark('');
                     }
                   }}
@@ -260,9 +285,17 @@ export default function ClosingCashEntry() {
             <div className="bg-white rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/50 overflow-hidden divide-y divide-slate-100/60">
               <div className="px-5 py-3 bg-slate-50 flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Physical Cash Count</span>
-                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(difference) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                  {Math.abs(difference) <= 0.01 ? 'Matched' : difference > 0 ? `Extra: ₹${difference.toFixed(2)}` : `Short: ₹${Math.abs(difference).toFixed(2)}`}
-                </div>
+                {/* Only show Short/Extra badge when shift is NOT yet submitted */}
+                {!isCurrentShiftClosed && (
+                  <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(difference) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    {Math.abs(difference) <= 0.01 ? 'Matched' : difference > 0 ? `Extra: ₹${difference.toFixed(2)}` : `Short: ₹${Math.abs(difference).toFixed(2)}`}
+                  </div>
+                )}
+                {isCurrentShiftClosed && (
+                  <div className="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight bg-slate-100 text-slate-400">
+                    Submitted
+                  </div>
+                )}
               </div>
 
               {DENOMINATIONS.map((denom) => (
