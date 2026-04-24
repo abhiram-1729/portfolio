@@ -6,7 +6,7 @@ export function cn(...inputs) {
 }
 
 // Memoized row component for massive lists to prevent full-page re-renders
-export const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStock, mode = 'load' }) => {
+export const StockItemRow = React.memo(({ item, quantity, onChange, isFree, currentStock, mode = 'load', canWrite = true }) => {
   const qty = parseFloat(quantity) || 0;
   const price = parseFloat(item.price) || 0;
   const isReturn = mode === 'return';
@@ -38,19 +38,25 @@ export const StockItemRow = React.memo(({ item, quantity, onChange, isFree, curr
       </div>
 
       <div className="flex flex-col items-center gap-1">
-        <input
-          type="number"
-          placeholder="0"
-          step="any"
-          min="0"
-          onWheel={(e) => e.target.blur()}
-          className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${qty > (currentStock || 0) && isReturn ? 'border-rose-500 ring-2 ring-rose-500/20' : (isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300')}`}
-          value={quantity || ''}
-          onChange={(e) => {
-            const val = Math.max(0, parseFloat(e.target.value) || 0);
-            onChange(item.id, val);
-          }}
-        />
+        {canWrite ? (
+          <input
+            type="number"
+            placeholder="0"
+            step="any"
+            min="0"
+            onWheel={(e) => e.target.blur()}
+            className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${qty > (currentStock || 0) && isReturn ? 'border-rose-500 ring-2 ring-rose-500/20' : (isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300')}`}
+            value={quantity || ''}
+            onChange={(e) => {
+              const val = Math.max(0, parseFloat(e.target.value) || 0);
+              onChange(item.id, val);
+            }}
+          />
+        ) : (
+          <div className="w-16 h-10 flex items-center justify-center bg-white/50 rounded-lg border border-gray-100 text-sm font-black text-gray-400">
+            {quantity || 0}
+          </div>
+        )}
         {isReturn && qty > (currentStock || 0) && (
           <span className="text-[7px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
         )}

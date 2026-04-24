@@ -975,6 +975,7 @@ export default function AdminInventory() {
       handleInitiateLoad={handleInitiateLoad}
       isSubmitting={isSubmitting}
       hasInvalidQuantities={hasInvalidQuantities}
+      can={can}
     />
   );
 
@@ -999,6 +1000,7 @@ export default function AdminInventory() {
       isSubmitting={isSubmitting}
       hasInvalidReturnQuantities={hasInvalidReturnQuantities}
       vehicleInventoryMap={vehicleInventoryMap}
+      can={can}
     />
   );
 
@@ -1012,6 +1014,7 @@ export default function AdminInventory() {
       warehouseCategory={warehouseCategory}
       setWarehouseCategory={setWarehouseCategory}
       categories={categories}
+      can={can}
     />
   );
 
@@ -1038,6 +1041,7 @@ export default function AdminInventory() {
       auditHistory={auditHistory}
       setSubTab={setSubTab}
       units={units}
+      can={can}
     />
   );
 
@@ -1055,6 +1059,7 @@ export default function AdminInventory() {
       setStockInputs={setStockInputs}
       handleUpdateStock={handleUpdateStock}
       processingItems={processingItems}
+      can={can}
     />
   );
 
@@ -1180,6 +1185,7 @@ export default function AdminInventory() {
       loadingRefills={loadingRefills}
       groupedRefills={groupedRefills}
       auditSearch={auditSearch}
+      can={can}
     />
   );
 
@@ -1412,7 +1418,7 @@ export default function AdminInventory() {
                             else setReturnSubCategory('ALL');
                           }}
                           className={`whitespace-nowrap px-4 py-2 rounded-xl text-[9px] uppercase tracking-widest font-black transition-all border ${(subTab === 'loading' ? opsSubCategory : returnSubCategory) === 'ALL'
-                            ? 'bg-emerald-500 border-emerald-500 text-white'
+                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-md'
                             : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-200'
                             }`}
                         >

@@ -20,7 +20,8 @@ const VehicleStockSection = ({
   setAuditRemark,
   auditQuantities,
   auditHistory,
-  setSubTab
+  setSubTab,
+  can
 }) => {
   if (loadingVehicles) {
     return (
@@ -124,35 +125,37 @@ const VehicleStockSection = ({
                     <Barcode size={14} />
                   </button>
                 </div>
-                {isAuditMode ? (
-                  <>
+                {can && can('INVENTORY', 'UPDATE') && (
+                  isAuditMode ? (
+                    <>
+                      <button
+                        onClick={() => { setIsAuditMode(false); setAuditQuantities({}); }}
+                        className="px-4 py-2 rounded-xl border border-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-wider hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                      <button
+                        onClick={handleAuditSave}
+                        disabled={isSubmitting}
+                        className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-all"
+                      >
+                        {isSubmitting ? 'Saving...' : 'Save Audit'}
+                      </button>
+                    </>
+                  ) : (
                     <button
-                      onClick={() => { setIsAuditMode(false); setAuditQuantities({}); }}
-                      className="px-4 py-2 rounded-xl border border-gray-200 text-gray-500 text-[10px] font-black uppercase tracking-wider hover:bg-gray-50 transition-colors"
+                      onClick={() => {
+                        setIsAuditMode(true);
+                        const initial = {};
+                        filteredActiveStock.forEach(s => initial[s.productId] = s.quantity);
+                        setAuditQuantities(initial);
+                      }}
+                      className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
                     >
-                      Cancel
+                      <Pencil size={12} />
+                      Audit Inventory
                     </button>
-                    <button
-                      onClick={handleAuditSave}
-                      disabled={isSubmitting}
-                      className="px-5 py-2 rounded-xl bg-emerald-600 text-white text-[10px] font-black uppercase tracking-wider shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 disabled:opacity-50 transition-all"
-                    >
-                      {isSubmitting ? 'Saving...' : 'Save Audit'}
-                    </button>
-                  </>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setIsAuditMode(true);
-                      const initial = {};
-                      filteredActiveStock.forEach(s => initial[s.productId] = s.quantity);
-                      setAuditQuantities(initial);
-                    }}
-                    className="px-4 py-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 text-[10px] font-black uppercase tracking-wider hover:bg-emerald-100 transition-all flex items-center gap-2 whitespace-nowrap"
-                  >
-                    <Pencil size={12} />
-                    Audit Inventory
-                  </button>
+                  )
                 )}
               </div>
             </div>

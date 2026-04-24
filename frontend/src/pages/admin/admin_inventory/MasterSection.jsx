@@ -119,7 +119,7 @@ const MasterSection = ({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {can('INVENTORY', 'UPDATE') && (
+          {can('INVENTORY', 'TOGGLE_STATUS') && (
             <button
               onClick={() => handleToggleStatus(item)}
               className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}

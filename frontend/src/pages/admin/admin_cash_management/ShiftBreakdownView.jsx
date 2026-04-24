@@ -21,7 +21,8 @@ const ShiftBreakdownView = ({
   setAppliedParts,
   handleDenominationChange,
   handleReviewClosing,
-  isSubmitting
+  isSubmitting,
+  can
 }) => {
   if (!viewingSummary) return null;
 
@@ -309,41 +310,43 @@ const ShiftBreakdownView = ({
                       </div>
                     )}
 
-                    <div className="flex gap-3 pt-2">
-                      <button
-                        onClick={() => {
-                          setIsReviewEditing(1);
-                          setActiveCorrectionTab('CASH');
-                          setAppliedParts({ CASH: false, UPI: false, CARD: false });
-                          setReviewEditData({
-                            actualCash: s1.closing.actualCash,
-                            upiSales: s1.closing.upiSales,
-                            cardSales: s1.closing.cardSales,
-                            denominations: s1.closing.denominations,
-                            remark: s1.closing.remark || ''
-                          });
-                        }}
-                        className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
-                      >
-                        <Pencil size={12} /> Edit
-                      </button>
-                      {s1.closing.status === 'PENDING' && (
-                        <>
-                          <button
-                            onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
-                            className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
-                          >
-                            Quick Approve
-                          </button>
-                          <button
-                            onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
-                            className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
-                          >
-                            Reject
-                          </button>
-                        </>
-                      )}
-                    </div>
+                    {can('CASH', 'UPDATE') && (
+                      <div className="flex gap-3 pt-2">
+                        <button
+                          onClick={() => {
+                            setIsReviewEditing(1);
+                            setActiveCorrectionTab('CASH');
+                            setAppliedParts({ CASH: false, UPI: false, CARD: false });
+                            setReviewEditData({
+                              actualCash: s1.closing.actualCash,
+                              upiSales: s1.closing.upiSales,
+                              cardSales: s1.closing.cardSales,
+                              denominations: s1.closing.denominations,
+                              remark: s1.closing.remark || ''
+                            });
+                          }}
+                          className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                        >
+                          <Pencil size={12} /> Edit
+                        </button>
+                        {s1.closing.status === 'PENDING' && (
+                          <>
+                            <button
+                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'APPROVED')}
+                              className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                            >
+                              Quick Approve
+                            </button>
+                            <button
+                              onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 1, 'REJECTED')}
+                              className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </>
                 )}
               </div>
@@ -621,41 +624,43 @@ const ShiftBreakdownView = ({
                           </div>
                         )}
 
-                        <div className="flex gap-3 pt-2">
-                          <button
-                            onClick={() => {
-                              setIsReviewEditing(2);
-                              setActiveCorrectionTab('CASH');
-                              setAppliedParts({ CASH: false, UPI: false, CARD: false });
-                              setReviewEditData({
-                                actualCash: s2.closing.actualCash,
-                                upiSales: s2.closing.upiSales,
-                                cardSales: s2.closing.cardSales,
-                                denominations: s2.closing.denominations,
-                                remark: s2.closing.remark || ''
-                              });
-                            }}
-                            className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
-                          >
-                            <Pencil size={12} /> Edit
-                          </button>
-                          {s2.closing.status === 'PENDING' && (
-                            <>
-                              <button
-                                onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
-                                className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
-                              >
-                                Quick Approve
-                              </button>
-                              <button
-                                onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
-                                className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
-                              >
-                                Reject
-                              </button>
-                            </>
-                          )}
-                        </div>
+                        {can('CASH', 'UPDATE') && (
+                          <div className="flex gap-3 pt-2">
+                            <button
+                              onClick={() => {
+                                setIsReviewEditing(2);
+                                setActiveCorrectionTab('CASH');
+                                setAppliedParts({ CASH: false, UPI: false, CARD: false });
+                                setReviewEditData({
+                                  actualCash: s2.closing.actualCash,
+                                  upiSales: s2.closing.upiSales,
+                                  cardSales: s2.closing.cardSales,
+                                  denominations: s2.closing.denominations,
+                                  remark: s2.closing.remark || ''
+                                });
+                              }}
+                              className="flex-1 flex items-center justify-center gap-2 bg-white border border-gray-200 text-gray-700 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-gray-50 transition-all"
+                            >
+                              <Pencil size={12} /> Edit
+                            </button>
+                            {s2.closing.status === 'PENDING' && (
+                              <>
+                                <button
+                                  onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'APPROVED')}
+                                  className="flex-[2] bg-emerald-600 text-white text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-emerald-700 transition-shadow shadow-lg shadow-emerald-600/20"
+                                >
+                                  Quick Approve
+                                </button>
+                                <button
+                                  onClick={() => handleReviewClosing(viewingSummary.vehicleId, viewingSummary.date, 2, 'REJECTED')}
+                                  className="flex-1 bg-rose-50 text-rose-600 text-[10px] font-black uppercase py-3.5 rounded-2xl hover:bg-rose-100 transition-colors"
+                                >
+                                  Reject
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        )}
                       </>
                     )}
                   </div>

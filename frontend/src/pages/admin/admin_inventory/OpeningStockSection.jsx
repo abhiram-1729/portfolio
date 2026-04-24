@@ -13,7 +13,8 @@ const OpeningStockSection = ({
   stockInputs,
   setStockInputs,
   handleUpdateStock,
-  processingItems
+  processingItems,
+  can
 }) => {
   const filteredOpeningItems = items.filter(item => {
     const search = openingSearch.toLowerCase();
@@ -81,7 +82,9 @@ const OpeningStockSection = ({
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400">Product Detail</th>
                 <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Category</th>
                 <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Current Store Stock</th>
-                <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-indigo-600 text-center bg-indigo-50/30">Set Opening Stock</th>
+                {can && can('INVENTORY', 'UPDATE') && (
+                  <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-indigo-600 text-center bg-indigo-50/30">Set Opening Stock</th>
+                )}
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
               </tr>
             </thead>
@@ -108,34 +111,38 @@ const OpeningStockSection = ({
                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">In Warehouse</span>
                     </div>
                   </td>
-                  <td className="px-6 py-5 text-center bg-indigo-50/10">
-                    <div className="flex justify-center">
-                      <div className="relative">
-                        <input
-                          type="number"
-                          min="0"
-                          className="w-28 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-center font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm group-hover:shadow-md"
-                          placeholder="0"
-                          value={stockInputs[item.id] || ''}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            if (val === '' || parseInt(val) >= 0) {
-                              setStockInputs(p => ({ ...p, [item.id]: val }));
-                            }
-                          }}
-                        />
+                  {can && can('INVENTORY', 'UPDATE') && (
+                    <td className="px-6 py-5 text-center bg-indigo-50/10">
+                      <div className="flex justify-center">
+                        <div className="relative">
+                          <input
+                            type="number"
+                            min="0"
+                            className="w-28 bg-white border border-gray-200 rounded-2xl px-4 py-2.5 text-sm text-center font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all shadow-sm group-hover:shadow-md"
+                            placeholder="0"
+                            value={stockInputs[item.id] || ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '' || parseInt(val) >= 0) {
+                                setStockInputs(p => ({ ...p, [item.id]: val }));
+                              }
+                            }}
+                          />
+                        </div>
                       </div>
-                    </div>
-                  </td>
+                    </td>
+                  )}
                   <td className="px-8 py-5 text-right">
-                    <button
-                      onClick={() => handleUpdateStock(item.id, stockInputs[item.id], 'set')}
-                      disabled={processingItems.has(item.id) || !stockInputs[item.id]}
-                      className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-30 flex items-center gap-2 ml-auto"
-                    >
-                      {processingItems.has(item.id) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} strokeWidth={3} />}
-                      Initialize
-                    </button>
+                    {can && can('INVENTORY', 'UPDATE') && (
+                      <button
+                        onClick={() => handleUpdateStock(item.id, stockInputs[item.id], 'set')}
+                        disabled={processingItems.has(item.id) || !stockInputs[item.id]}
+                        className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-700 shadow-lg shadow-indigo-600/20 transition-all active:scale-95 disabled:opacity-30 flex items-center gap-2 ml-auto"
+                      >
+                        {processingItems.has(item.id) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} strokeWidth={3} />}
+                        Initialize
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))}

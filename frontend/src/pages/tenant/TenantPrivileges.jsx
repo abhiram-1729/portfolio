@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Shield, Plus, Pencil, Trash2, Users, X, Loader2, Check, ChevronRight, Key, Save, AlertTriangle } from 'lucide-react';
+import { Shield, Plus, Pencil, Trash2, Users, X, Loader2, Check, ChevronRight, Key, Save, AlertTriangle, CheckCircle2, XCircle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
@@ -216,6 +216,18 @@ export default function TenantPrivileges() {
                   className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
                 />
               </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Portal Type *</label>
+                <select
+                  value={formPortalType}
+                  onChange={(e) => setFormPortalType(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all appearance-none"
+                >
+                  {PORTAL_TYPES.map(pt => (
+                    <option key={pt.key} value={pt.key}>{pt.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Description</label>
@@ -261,7 +273,7 @@ export default function TenantPrivileges() {
                     <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
                   </div>
 
-                  {MODULES.map((mod) => {
+                  {MODULES.filter(mod => mod.categories.includes(formPortalType)).map((mod) => {
                     const modulePerms = formPerms[mod.key] || [];
                     const allSelected = ACTIONS.every(a => modulePerms.includes(a.key));
                     const someSelected = modulePerms.length > 0;
@@ -288,16 +300,16 @@ export default function TenantPrivileges() {
                               onClick={() => togglePermission(mod.key, action.key)}
                               className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all border ${
                                 isChecked
-                                  ? `bg-${action.color}-500 text-white border-${action.color}-500 shadow-lg shadow-${action.color}-500/20`
+                                  ? `bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20`
                                   : 'bg-white border-gray-200 text-gray-300 hover:border-gray-300'
                               }`}
                               style={isChecked ? {
-                                backgroundColor: action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'amber' ? '#f59e0b' : action.color === 'purple' ? '#a855f7' : '#f43f5e',
-                                borderColor: action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'amber' ? '#f59e0b' : action.color === 'purple' ? '#a855f7' : '#f43f5e',
+                                backgroundColor: '#10b981',
+                                borderColor: '#10b981',
                                 color: 'white'
                               } : {}}
                             >
-                              {isChecked ? <Check size={16} strokeWidth={3} /> : <span className="w-4 h-4 rounded border-2 border-gray-200" />}
+                              {isChecked ? <CheckCircle2 size={18} strokeWidth={3} /> : <XCircle size={18} strokeWidth={2.5} className="text-rose-500" />}
                             </button>
                           );
                         })}

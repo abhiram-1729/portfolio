@@ -327,7 +327,7 @@ export default function AdminUsers({ type }) {
                     <Pencil size={15} />
                   </button>
                 )}
-                {can('STAFF', 'UPDATE') && (
+                {can('STAFF', 'TOGGLE_STATUS') && (
                   <button onClick={() => handleToggleStatus(user)}
                     className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
                     {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
@@ -473,7 +473,7 @@ export default function AdminUsers({ type }) {
                         <Pencil size={15} />
                       </button>
                     )}
-                    {can('STAFF', 'UPDATE') && (
+                    {can('STAFF', 'TOGGLE_STATUS') && (
                       <button
                         onClick={() => handleToggleStatus(user)}
                         title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
@@ -846,7 +846,7 @@ export default function AdminUsers({ type }) {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          {can('STAFF', 'CREATE') && (
+          {can('STAFF', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
             <button
               onClick={() => {
                 setNewUser({
@@ -1015,6 +1015,24 @@ export default function AdminUsers({ type }) {
                     value={editingUser.baseSalary || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, baseSalary: e.target.value })}
                   />
+                </div>
+              )}
+
+              {can('STAFF', 'TOGGLE_STATUS') && (
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-700">Account Access</span>
+                    <span className={`text-[10px] font-black uppercase ${editingUser.status === 'ACTIVE' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                      {editingUser.status === 'ACTIVE' ? 'ACTIVE / AUTHORIZED' : 'SUSPENDED / BLOCKED'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({ ...editingUser, status: editingUser.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                    className={cn('w-12 h-6 rounded-full relative transition-colors shadow-inner', editingUser.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-rose-400')}
+                  >
+                    <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300', editingUser.status === 'ACTIVE' ? 'right-1' : 'left-1')} />
+                  </button>
                 </div>
               )}
 

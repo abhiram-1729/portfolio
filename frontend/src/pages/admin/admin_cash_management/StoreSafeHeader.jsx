@@ -11,7 +11,7 @@ const StoreSafeHeader = ({
   setSafeMovementData, setBankData, setStoreDenomData,
   isShiftDeposited, setActiveTab,
   setEditingDeposit, setDepositData, setShowEditDepositModal,
-  handleDeleteDeposit, toast
+  handleDeleteDeposit, toast, can
 }) => {
   return (
     <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden group">
@@ -100,86 +100,98 @@ const StoreSafeHeader = ({
 
         <div className="flex items-center gap-3">
           {!storeRegisterData?.storeRegister ? (
-            <button
-              onClick={() => setShowOpenStoreModal(true)}
-              className="bg-white hover:bg-emerald-50 text-emerald-950 px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-2xl active:scale-95 border-b-4 border-emerald-100"
-            >
-              Initialize Store Safe
-            </button>
+            can('CASH', 'CREATE') && (
+              <button
+                onClick={() => setShowOpenStoreModal(true)}
+                className="bg-white hover:bg-emerald-50 text-emerald-950 px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-2xl active:scale-95 border-b-4 border-emerald-100"
+              >
+                Initialize Store Safe
+              </button>
+            )
           ) : storeRegisterData.storeRegister.status === 'OPEN' ? (
             <div className="flex items-center gap-3">
-              <div className="flex flex-col gap-1.5">
-                <button
-                  onClick={() => {
-                    const hasSubmissions = summaries.some(s => s.shiftDetails?.shift1?.closing || s.shiftDetails?.shift2?.closing);
-                    if (!hasSubmissions) {
-                      return toast.error('No agent has completed their shift yet. Shifts must be closed by agents before depositing cash.');
-                    }
-                    setShowDepositModal(true);
-                  }}
-                  className="bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-amber-950 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-amber-950/20 active:scale-95 flex items-center gap-2"
-                >
-                  <Plus size={16} strokeWidth={3} />
-                  Deposit Shift Cash
-                </button>
-                <div className="flex items-center justify-around px-2">
-                  <div className="flex items-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isShiftDeposited(1) ? 'bg-emerald-500' : 'bg-white/20'}`} />
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${isShiftDeposited(1) ? 'text-emerald-400' : 'text-white/40'}`}>S1</span>
-                  </div>
-                  <div className="flex items-center gap-1">
-                    <div className={`w-1.5 h-1.5 rounded-full ${isShiftDeposited(2) ? 'bg-emerald-500' : 'bg-white/20'}`} />
-                    <span className={`text-[8px] font-black uppercase tracking-widest ${isShiftDeposited(2) ? 'text-emerald-400' : 'text-white/40'}`}>S2</span>
+              {can('CASH', 'UPDATE') && (
+                <div className="flex flex-col gap-1.5">
+                  <button
+                    onClick={() => {
+                      const hasSubmissions = summaries.some(s => s.shiftDetails?.shift1?.closing || s.shiftDetails?.shift2?.closing);
+                      if (!hasSubmissions) {
+                        return toast.error('No agent has completed their shift yet. Shifts must be closed by agents before depositing cash.');
+                      }
+                      setShowDepositModal(true);
+                    }}
+                    className="bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-amber-950 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-amber-950/20 active:scale-95 flex items-center gap-2"
+                  >
+                    <Plus size={16} strokeWidth={3} />
+                    Deposit Shift Cash
+                  </button>
+                  <div className="flex items-center justify-around px-2">
+                    <div className="flex items-center gap-1">
+                      <div className={`w-1.5 h-1.5 rounded-full ${isShiftDeposited(1) ? 'bg-emerald-500' : 'bg-white/20'}`} />
+                      <span className={`text-[8px] font-black uppercase tracking-widest ${isShiftDeposited(1) ? 'text-emerald-400' : 'text-white/40'}`}>S1</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <div className={`w-1.5 h-1.5 rounded-full ${isShiftDeposited(2) ? 'bg-emerald-500' : 'bg-white/20'}`} />
+                      <span className={`text-[8px] font-black uppercase tracking-widest ${isShiftDeposited(2) ? 'text-emerald-400' : 'text-white/40'}`}>S2</span>
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
-              <button
-                onClick={() => {
-                  setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: 0, denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } }));
-                  setShowSafeMovementModal(true);
-                }}
-                className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
-              >
-                <Vault size={16} strokeWidth={3} />
-                Move to Safe
-              </button>
+              {can('CASH', 'UPDATE') && (
+                <button
+                  onClick={() => {
+                    setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: 0, denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } }));
+                    setShowSafeMovementModal(true);
+                  }}
+                  className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                >
+                  <Vault size={16} strokeWidth={3} />
+                  Move to Safe
+                </button>
+              )}
 
-              <button
-                onClick={() => {
-                  setBankData(prev => ({ ...prev, adminId: user?.id, depositedBy: user?.name || '' }));
-                  setShowBankModal(true);
-                }}
-                className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
-              >
-                <Building2 size={16} strokeWidth={3} />
-                Account Transfer
-              </button>
+              {can('CASH', 'UPDATE') && (
+                <button
+                  onClick={() => {
+                    setBankData(prev => ({ ...prev, adminId: user?.id, depositedBy: user?.name || '' }));
+                    setShowBankModal(true);
+                  }}
+                  className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                >
+                  <Building2 size={16} strokeWidth={3} />
+                  Account Transfer
+                </button>
+              )}
 
-              <button
-                onClick={() => setShowCloseStoreModal(true)}
-                className="bg-white hover:bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
-              >
-                <Moon size={16} strokeWidth={3} />
-                Closing Store
-              </button>
+              {can('CASH', 'UPDATE') && (
+                <button
+                  onClick={() => setShowCloseStoreModal(true)}
+                  className="bg-white hover:bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
+                >
+                  <Moon size={16} strokeWidth={3} />
+                  Closing Store
+                </button>
+              )}
             </div>
           ) : (
             <div className="flex items-center gap-3">
               <div className="px-6 py-3 bg-emerald-950/50 rounded-2xl border border-emerald-800 text-emerald-300 text-xs font-black uppercase tracking-widest flex items-center gap-3">
                 Safe Closed: Diff ₹{storeRegisterData.storeRegister.closingDifference?.toFixed(2)}
-                <button
-                  onClick={() => {
-                    setStoreDenomData({
-                      amount: storeRegisterData.storeRegister.actualClosingCash,
-                      denominations: storeRegisterData.storeRegister.closingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                    });
-                    setShowCloseStoreModal(true);
-                  }}
-                  className="p-1 px-2 bg-emerald-800/50 hover:bg-emerald-700 text-emerald-400 hover:text-white rounded-lg transition-all text-[10px]"
-                >
-                  Edit Closing
-                </button>
+                {can('CASH', 'UPDATE') && (
+                  <button
+                    onClick={() => {
+                      setStoreDenomData({
+                        amount: storeRegisterData.storeRegister.actualClosingCash,
+                        denominations: storeRegisterData.storeRegister.closingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                      });
+                      setShowCloseStoreModal(true);
+                    }}
+                    className="p-1 px-2 bg-emerald-800/50 hover:bg-emerald-700 text-emerald-400 hover:text-white rounded-lg transition-all text-[10px]"
+                  >
+                    Edit Closing
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -193,18 +205,20 @@ const StoreSafeHeader = ({
               <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Opening Cash</p>
               <div className="flex items-center justify-between">
                 <p className="text-xl font-black text-white">₹{Math.abs(storeRegisterData.storeRegister.openingCash || 0).toFixed(2)}</p>
-                <button
-                  onClick={() => {
-                    setStoreDenomData({
-                      amount: storeRegisterData.storeRegister.openingCash,
-                      denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                    });
-                    setShowEditStoreModal(true);
-                  }}
-                  className="p-1.5 bg-emerald-800/50 text-emerald-400 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                >
-                  <Pencil size={12} />
-                </button>
+                {can('CASH', 'UPDATE') && (
+                  <button
+                    onClick={() => {
+                      setStoreDenomData({
+                        amount: storeRegisterData.storeRegister.openingCash,
+                        denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                      });
+                      setShowEditStoreModal(true);
+                    }}
+                    className="p-1.5 bg-emerald-800/50 text-emerald-400 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                  >
+                    <Pencil size={12} />
+                  </button>
+                )}
               </div>
             </div>
             <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
@@ -299,27 +313,31 @@ const StoreSafeHeader = ({
 
                       {depositRecord && (
                         <div className="flex items-center gap-1">
-                          <button
-                            onClick={() => {
-                              setEditingDeposit(depositRecord);
-                              setDepositData({
-                                shift: depositRecord.shift,
-                                description: depositRecord.description,
-                                amount: depositRecord.amount,
-                                denominations: depositRecord.denominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                              });
-                              setShowEditDepositModal(true);
-                            }}
-                            className="p-1.5 text-emerald-500/50 hover:text-sky-400 hover:bg-sky-400/10 rounded-lg transition-all"
-                          >
-                            <Pencil size={13} />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteDeposit(depositRecord.id)}
-                            className="p-1.5 text-emerald-500/50 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-all"
-                          >
-                            <AlertCircle size={13} /> {/* Using AlertCircle as placeholder for Trash2 if needed */}
-                          </button>
+                          {can('CASH', 'UPDATE') && (
+                            <button
+                              onClick={() => {
+                                setEditingDeposit(depositRecord);
+                                setDepositData({
+                                  shift: depositRecord.shift,
+                                  description: depositRecord.description,
+                                  amount: depositRecord.amount,
+                                  denominations: depositRecord.denominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                                });
+                                setShowEditDepositModal(true);
+                              }}
+                              className="p-1.5 text-emerald-500/50 hover:text-sky-400 hover:bg-sky-400/10 rounded-lg transition-all"
+                            >
+                              <Pencil size={13} />
+                            </button>
+                          )}
+                          {can('CASH', 'DELETE') && (
+                            <button
+                              onClick={() => handleDeleteDeposit(depositRecord.id)}
+                              className="p-1.5 text-emerald-500/50 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-all"
+                            >
+                              <AlertCircle size={13} />
+                            </button>
+                          )}
                         </div>
                       )}
                       {!depositRecord && expectedAmount > 0 && (

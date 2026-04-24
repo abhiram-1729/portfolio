@@ -278,9 +278,11 @@ const VendorsSection = ({ can }) => {
                         {can('PROCUREMENT', 'UPDATE') && (
                           <>
                             <button onClick={() => openEdit(v)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all" title="Edit"><Edit3 size={14} /></button>
-                            <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
-                              {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
-                            </button>
+                            {can('PROCUREMENT', 'TOGGLE_STATUS') && (
+                              <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
+                                {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
+                              </button>
+                            )}
                             {can('PROCUREMENT', 'DELETE') && (
                               <button onClick={() => handleDeleteVendor(v.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all" title="Delete"><Trash2 size={14} /></button>
                             )}
@@ -309,10 +311,14 @@ const VendorsSection = ({ can }) => {
                   <span className={`text-sm font-black ${v.currentBalance > 0 ? 'text-red-600' : 'text-gray-400'}`}>₹{Math.abs(v.currentBalance).toLocaleString()} {v.currentBalance > 0 ? 'DR' : v.currentBalance < 0 ? 'CR' : ''}</span>
                   <div className="flex gap-1.5">
                     <button onClick={() => openLedger(v.id)} className="p-2 bg-blue-50 text-blue-600 rounded-lg"><BookOpen size={14} /></button>
-                    <button onClick={() => openEdit(v)} className="p-2 bg-gray-50 text-gray-600 rounded-lg"><Edit3 size={14} /></button>
-                    <button onClick={() => handleToggleStatus(v.id)} className="p-2 rounded-lg bg-gray-50">
-                      {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
-                    </button>
+                    {can('PROCUREMENT', 'UPDATE') && (
+                      <button onClick={() => openEdit(v)} className="p-2 bg-gray-50 text-gray-600 rounded-lg"><Edit3 size={14} /></button>
+                    )}
+                    {can('PROCUREMENT', 'TOGGLE_STATUS') && (
+                      <button onClick={() => handleToggleStatus(v.id)} className="p-2 rounded-lg bg-gray-50">
+                        {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
+                      </button>
+                    )}
                     {can('PROCUREMENT', 'DELETE') && (
                       <button onClick={() => handleDeleteVendor(v.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg"><Trash2 size={14} /></button>
                     )}

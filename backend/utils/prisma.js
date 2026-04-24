@@ -14,7 +14,10 @@ if (!connectionString) {
 
 const pool = new pg.Pool({
   connectionString,
-  ssl: { rejectUnauthorized: false }
+  ssl: { rejectUnauthorized: false },
+  max: 20,                 // Maximum number of clients in the pool
+  idleTimeoutMillis: 60000, // 60s
+  connectionTimeoutMillis: 30000, // 30s
 });
 
 const adapter = new PrismaPg(pool);

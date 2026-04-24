@@ -18,7 +18,8 @@ const RefillsSection = ({
   processingItems,
   isSubmitting,
   handleRejectRefill,
-  handleApproveRefill
+  handleApproveRefill,
+  can
 }) => {
   if (activeRefillGroup) {
     const group = activeRefillGroup;
@@ -126,7 +127,7 @@ const RefillsSection = ({
                         <div key={item.id} className={`bg-white p-3.5 rounded-[1.5rem] border transition-all duration-300 ${!isSelected ? 'border-gray-100 opacity-40 grayscale' : 'border-indigo-100 shadow-sm'}`}>
                           {/* Integrated Top: Info + Toggle */}
                           <div className="flex items-center gap-3 mb-2.5">
-                            {req.status === 'PENDING' && (
+                            {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE') && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
                                 className={`shrink-0 transition-all ${isSelected ? 'text-indigo-600' : 'text-gray-300'}`}
@@ -156,33 +157,43 @@ const RefillsSection = ({
                             <div className="flex items-center gap-2">
                               {/* Qty Adj */}
                               <div className="flex-1 flex items-center justify-between bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
-                                <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1) }))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
-                                <input
-                                  type="number"
-                                  value={editedQuantities[item.id] ?? item.quantity}
-                                  onChange={(e) => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
-                                  className="w-8 text-center bg-transparent font-black text-xs text-indigo-600 outline-none"
-                                />
-                                <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: (editedQuantities[item.id] ?? item.quantity) + 1 }))} className="p-1 text-indigo-600"><Plus size={14} /></button>
+                                {can && can('INVENTORY', 'UPDATE') ? (
+                                  <>
+                                    <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1) }))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
+                                    <input
+                                      type="number"
+                                      value={editedQuantities[item.id] ?? item.quantity}
+                                      onChange={(e) => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, parseInt(e.target.value) || 0) }))}
+                                      className="w-8 text-center bg-transparent font-black text-xs text-indigo-600 outline-none"
+                                    />
+                                    <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: (editedQuantities[item.id] ?? item.quantity) + 1 }))} className="p-1 text-indigo-600"><Plus size={14} /></button>
+                                  </>
+                                ) : (
+                                  <span className="flex-1 text-center font-black text-xs text-gray-500">
+                                    {editedQuantities[item.id] ?? item.quantity}
+                                  </span>
+                                )}
                               </div>
 
                               {/* Quick Actions */}
-                              <div className="flex gap-1.5 shrink-0">
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
-                                  disabled={processingItems.has(item.id)}
-                                  className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 border border-rose-100 disabled:opacity-50"
-                                >
-                                  {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <X size={16} strokeWidth={3} />}
-                                </button>
-                                <button
-                                  onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
-                                  disabled={processingItems.has(item.id) || (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0)}
-                                  className={`w-10 h-10 flex items-center justify-center rounded-xl ${(editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'} disabled:opacity-50 transition-all`}
-                                >
-                                  {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
-                                </button>
-                              </div>
+                              {can && can('INVENTORY', 'UPDATE') && (
+                                <div className="flex gap-1.5 shrink-0">
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
+                                    disabled={processingItems.has(item.id)}
+                                    className="w-10 h-10 flex items-center justify-center rounded-xl bg-rose-50 text-rose-500 border border-rose-100 disabled:opacity-50"
+                                  >
+                                    {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <X size={16} strokeWidth={3} />}
+                                  </button>
+                                  <button
+                                    onClick={(e) => { e.stopPropagation(); handleApproveSingleItem(req.id, item.id); }}
+                                    disabled={processingItems.has(item.id) || (editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0)}
+                                    className={`w-10 h-10 flex items-center justify-center rounded-xl ${(editedQuantities[item.id] ?? item.quantity) > (prod?.stock || 0) ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-emerald-600 text-white shadow-sm shadow-emerald-500/20'} disabled:opacity-50 transition-all`}
+                                  >
+                                    {processingItems.has(item.id) ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} strokeWidth={3} />}
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           ) : (
                             <div className="flex items-center justify-between bg-gray-50/50 rounded-xl px-3 py-2 mt-1">
@@ -196,7 +207,7 @@ const RefillsSection = ({
                   </div>
 
                   {/* Action Controls */}
-                  {req.status === 'PENDING' && (
+                  {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE') && (
                     <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 mt-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }}

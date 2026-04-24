@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Link, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
+import { NavLink, Link, Outlet, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -52,6 +52,7 @@ export default function AdminLayout() {
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const activeStoreId = searchParams.get('storeId');
   const activeStoreName = searchParams.get('storeName');
 
@@ -68,7 +69,7 @@ export default function AdminLayout() {
     navigate('/login');
   };
 
-  const navItems = [
+  const rawNavItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
     {
       label: 'Operation',
@@ -118,13 +119,22 @@ export default function AdminLayout() {
     },
     { to: '/admin/damage', icon: AlertTriangle, label: 'Damage', module: 'INVENTORY' },
     { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
-  ].filter(item => {
-    // If no specific module or if user is owner/full admin, show all
-    if (!item.module || user?.role === 'TENANT_OWNER' || user?.role === 'ADMIN') return true;
+  ];
 
-    // Check custom permissions
-    const perms = user?.permissions?.[item.module] || [];
-    return perms.includes('READ');
+  const navItems = rawNavItems.map(item => {
+    if (item.subItems) {
+      const filteredSubItems = item.subItems.filter(sub => {
+        const requiredModule = sub.module || item.module;
+        if (!requiredModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+        return (user?.permissions?.[requiredModule] || []).includes('READ');
+      });
+      return { ...item, subItems: filteredSubItems };
+    }
+    return item;
+  }).filter(item => {
+    if (item.subItems) return item.subItems.length > 0;
+    if (!item.module || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    return (user?.permissions?.[item.module] || []).includes('READ');
   });
 
   const [openMenus, setOpenMenus] = React.useState({
@@ -136,6 +146,32 @@ export default function AdminLayout() {
 
   const toggleMenu = (label) => {
     setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const getRequiredModule = (pathname) => {
+    if (pathname === '/admin') return 'DASHBOARD';
+    if (pathname.startsWith('/admin/users')) return 'STAFF';
+    if (pathname.startsWith('/admin/vehicles')) return 'VEHICLES';
+    if (pathname.startsWith('/admin/routes')) return 'ROUTES';
+    if (pathname.startsWith('/admin/sales')) return 'SALES';
+    if (pathname.startsWith('/admin/inventory')) return 'INVENTORY';
+    if (pathname.startsWith('/admin/damage')) return 'INVENTORY';
+    if (pathname.startsWith('/admin/reports') || pathname.startsWith('/admin/finance-reports')) return 'REPORTS';
+    if (pathname.startsWith('/admin/cash')) return 'CASH';
+    if (pathname.startsWith('/admin/targets')) return 'TARGETS';
+    if (pathname.startsWith('/admin/assets')) return 'ASSETS';
+    if (pathname.startsWith('/admin/expenses')) return 'EXPENSES';
+    if (pathname.startsWith('/admin/procurement')) return 'PROCUREMENT';
+    if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
+    return null;
+  };
+
+  const currentModule = getRequiredModule(location.pathname);
+  
+  const isAuthorizedRoute = () => {
+    if (!currentModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    const perms = user?.permissions?.[currentModule] || [];
+    return perms.includes('READ');
   };
 
 
@@ -382,7 +418,25 @@ export default function AdminLayout() {
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
-        <Outlet />
+        {isAuthorizedRoute() ? (
+          <Outlet />
+        ) : (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] bg-white rounded-[2rem] border border-gray-100 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mb-6 border-8 border-rose-50/50">
+              <AlertTriangle size={32} strokeWidth={2.5} />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-2">Access Denied</h2>
+            <p className="text-gray-500 font-medium tracking-wide text-center max-w-sm mb-8">
+              You do not have the required privileges to view this section. Please contact your administrator.
+            </p>
+            <button 
+              onClick={() => navigate('/admin')}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Mobile Bottom Navigation */}

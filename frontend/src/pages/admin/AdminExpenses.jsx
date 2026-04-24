@@ -20,8 +20,10 @@ import {
 import { getAllExpenses, updateExpenseStatus, getExpenseCategories, createExpenseCategory } from '../../services/expenseService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
+import { useUserStore } from '../../store/userStore';
 
 export default function AdminExpenses() {
+    const can = useUserStore(s => s.can);
     const [expenses, setExpenses] = useState([]);
     const [loading, setLoading] = useState(true);
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -109,7 +111,7 @@ export default function AdminExpenses() {
                     </div>
                 )}
                 
-                {activeTab === 'categories' && (
+                {activeTab === 'categories' && can('EXPENSES', 'CREATE') && (
                     <button 
                         onClick={() => setShowAddCategory(true)}
                         className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
@@ -215,18 +217,24 @@ export default function AdminExpenses() {
                                             <div className="px-5 pb-5">
                                               {exp.status === 'PENDING' ? (
                                                   <div className="flex gap-2">
-                                                      <button 
-                                                          onClick={() => handleAction(exp.id, 'APPROVED')}
-                                                          className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-500/20"
-                                                      >
-                                                          Approve
-                                                      </button>
-                                                      <button 
-                                                          onClick={() => handleAction(exp.id, 'REJECTED')}
-                                                          className="flex-1 bg-gray-100 text-gray-400 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest"
-                                                      >
-                                                          Reject
-                                                      </button>
+                                                      {can('EXPENSES', 'UPDATE') ? (
+                                                        <>
+                                                          <button 
+                                                              onClick={() => handleAction(exp.id, 'APPROVED')}
+                                                              className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
+                                                          >
+                                                              Approve
+                                                          </button>
+                                                          <button 
+                                                              onClick={() => handleAction(exp.id, 'REJECTED')}
+                                                              className="flex-1 bg-gray-100 text-gray-400 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest"
+                                                          >
+                                                              Reject
+                                                          </button>
+                                                        </>
+                                                      ) : (
+                                                        <span className="flex-1 text-center text-[8px] font-black text-orange-500 uppercase py-2 bg-orange-50 rounded-xl">Pending Action</span>
+                                                      )}
                                                   </div>
                                               ) : (
                                                   <div className={`py-2 px-4 rounded-xl text-center font-black text-[10px] uppercase tracking-widest border ${
@@ -298,18 +306,24 @@ export default function AdminExpenses() {
                                           <td className="px-6 py-4 text-right">
                                             {exp.status === 'PENDING' ? (
                                               <div className="flex items-center justify-end gap-2">
-                                                <button 
-                                                  onClick={() => handleAction(exp.id, 'APPROVED')}
-                                                  className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                                                >
-                                                  <Check size={16} strokeWidth={3} />
-                                                </button>
-                                                <button 
-                                                  onClick={() => handleAction(exp.id, 'REJECTED')}
-                                                  className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-100"
-                                                >
-                                                  <X size={16} strokeWidth={3} />
-                                                </button>
+                                                {can('EXPENSES', 'UPDATE') ? (
+                                                  <>
+                                                    <button 
+                                                      onClick={() => handleAction(exp.id, 'APPROVED')}
+                                                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
+                                                    >
+                                                      <Check size={16} strokeWidth={3} />
+                                                    </button>
+                                                    <button 
+                                                      onClick={() => handleAction(exp.id, 'REJECTED')}
+                                                      className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-100"
+                                                    >
+                                                      <X size={16} strokeWidth={3} />
+                                                    </button>
+                                                  </>
+                                                ) : (
+                                                  <span className="text-[9px] font-black text-orange-400 uppercase tracking-widest bg-orange-50 px-2 py-1 rounded-lg">Awaiting Decision</span>
+                                                )}
                                               </div>
                                             ) : (
                                               <div className="flex items-center justify-end text-[9px] font-black text-gray-300 uppercase tracking-widest">
@@ -362,9 +376,11 @@ export default function AdminExpenses() {
                                 </span>
                               </td>
                               <td className="px-6 py-4 text-right">
-                                <button className="p-2 text-gray-300 hover:text-emerald-600 transition-colors">
-                                  <Settings size={16} />
-                                </button>
+                                {can('EXPENSES', 'UPDATE') && (
+                                  <button className="p-2 text-gray-300 hover:text-emerald-600 transition-colors">
+                                    <Settings size={16} />
+                                  </button>
+                                )}
                               </td>
                             </tr>
                           ))}

@@ -244,7 +244,7 @@ export default function AdminVehicles() {
               </div>
 
               <div className="flex items-center gap-1">
-                {can('VEHICLES', 'UPDATE') && (
+                {can('VEHICLES', 'TOGGLE_STATUS') && (
                   <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
                     className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
                     {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
@@ -369,7 +369,7 @@ export default function AdminVehicles() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1 transition-all">
-                    {can('VEHICLES', 'UPDATE') && (
+                    {can('VEHICLES', 'TOGGLE_STATUS') && (
                       <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
                         className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
                         {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
@@ -658,7 +658,7 @@ export default function AdminVehicles() {
                   className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
                 />
               </div>
-              {can('VEHICLES', 'CREATE') && (
+              {can('VEHICLES', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
                 <button onClick={() => {
                   setNewVehicle({
                     vehicleNumber: '',
@@ -754,13 +754,15 @@ export default function AdminVehicles() {
                     <DocUpload label="Permit Document" fieldKey="permitDocument" existing={editingVehicle.permitDocument} files={editDocuments} setFiles={setEditDocuments} />
                   </div>
 
-                  <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                    <span className="text-sm font-medium text-gray-700">Status Active</span>
-                    <button type="button" onClick={() => setEditingVehicle({ ...editingVehicle, status: !editingVehicle.status })}
-                      className={cn('w-12 h-6 rounded-full relative transition-colors', editingVehicle.status ? 'bg-emerald-500' : 'bg-gray-300')}>
-                      <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white transition-all', editingVehicle.status ? 'right-1' : 'left-1')} />
-                    </button>
-                  </div>
+                  {can('VEHICLES', 'TOGGLE_STATUS') && (
+                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                      <span className="text-sm font-medium text-gray-700">Status Active</span>
+                      <button type="button" onClick={() => setEditingVehicle({ ...editingVehicle, status: !editingVehicle.status })}
+                        className={cn('w-12 h-6 rounded-full relative transition-colors', editingVehicle.status ? 'bg-emerald-500' : 'bg-gray-300')}>
+                        <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white transition-all', editingVehicle.status ? 'right-1' : 'left-1')} />
+                      </button>
+                    </div>
+                  )}
 
                   <button type="submit" disabled={isSubmitting}
                     className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-70">

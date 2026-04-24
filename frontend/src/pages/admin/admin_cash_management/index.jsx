@@ -560,6 +560,7 @@ export default function AdminCashManagementContent() {
           appliedParts={appliedParts} setAppliedParts={setAppliedParts}
           handleDenominationChange={handleDenominationChange} handleReviewClosing={handleReviewClosing}
           isSubmitting={isSubmitting}
+          can={can}
         />
       </div>
     );
@@ -747,6 +748,7 @@ export default function AdminCashManagementContent() {
             isShiftDeposited={isShiftDeposited} setActiveTab={setActiveTab}
             setEditingDeposit={setEditingDeposit} setDepositData={setDepositData}
             setShowEditDepositModal={setShowEditDepositModal} handleDeleteDeposit={handleDeleteDeposit} toast={toast}
+            can={can}
           />
 
           <SimulatorTools resetStoreCashRegister={resetStoreCashRegister} fetchStoreRegister={fetchStoreRegister} date={date} setDate={setDate} toast={toast} />

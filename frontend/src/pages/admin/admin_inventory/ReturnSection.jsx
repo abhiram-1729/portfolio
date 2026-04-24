@@ -20,7 +20,8 @@ const ReturnSection = ({
   handleStockAction,
   isSubmitting,
   hasInvalidReturnQuantities,
-  vehicleInventoryMap
+  vehicleInventoryMap,
+  can
 }) => {
   const allFiltered = [...groupedReturnItems.regular, ...groupedReturnItems.free];
   const totalPages = Math.ceil(allFiltered.length / itemsPerPage);
@@ -37,7 +38,9 @@ const ReturnSection = ({
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">In Vehicle</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-orange-600 text-center bg-orange-50/10">Return Qty</th>
+            {can && can('INVENTORY', 'UPDATE') && (
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-orange-600 text-center bg-orange-50/10">Return Qty</th>
+            )}
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Return Value</th>
           </tr>
         </thead>
@@ -70,25 +73,27 @@ const ReturnSection = ({
                 <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
                   <span className="text-[11px] font-black text-emerald-600">{item.stock || 0}</span>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                  <div className="flex flex-col items-center justify-center gap-1">
-                    <input
-                      type="number"
-                      placeholder="0"
-                      min="0"
-                      onWheel={(e) => e.target.blur()}
-                      className={`w-20 bg-white border ${qty > currentStock ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-sm`}
-                      value={stockQuantities[item.id] || ''}
-                      onChange={(e) => {
-                        const val = Math.max(0, parseInt(e.target.value) || 0);
-                        handleQuantityChange(item.id, val);
-                      }}
-                    />
-                    {qty > currentStock && (
-                      <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
-                    )}
-                  </div>
-                </td>
+                {can && can('INVENTORY', 'UPDATE') && (
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-orange-50/5">
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        className={`w-20 bg-white border ${qty > currentStock ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-orange-500/20 outline-none transition-all shadow-sm`}
+                        value={stockQuantities[item.id] || ''}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          handleQuantityChange(item.id, val);
+                        }}
+                      />
+                      {qty > currentStock && (
+                        <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
+                      )}
+                    </div>
+                  </td>
+                )}
                 <td className="px-6 py-4 text-right">
                   <span className={`text-sm font-black ${qty > 0 ? 'text-orange-600' : 'text-gray-300'}`}>
                     ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -182,6 +187,7 @@ const ReturnSection = ({
                           onChange={handleQuantityChange}
                           currentStock={vehicleInventoryMap[item.id] || 0}
                           mode="return"
+                          canWrite={can && can('INVENTORY', 'UPDATE')}
                         />
                       ))}
                     </div>
@@ -198,6 +204,7 @@ const ReturnSection = ({
                           currentStock={vehicleInventoryMap[item.id] || 0}
                           mode="return"
                           isFree
+                          canWrite={can && can('INVENTORY', 'UPDATE')}
                         />
                       ))}
                     </div>
@@ -279,13 +286,15 @@ const ReturnSection = ({
             )}
           </div>
 
-          <button
-            onClick={() => handleStockAction('RETURN')}
-            disabled={!selectedVehicleId || isSubmitting || hasInvalidReturnQuantities}
-            className={`w-full ${hasInvalidReturnQuantities ? 'bg-gray-400' : 'bg-orange-600 hover:bg-orange-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-orange-600/20`}
-          >
-            {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Confirm & Submit Return'}
-          </button>
+          {can && can('INVENTORY', 'UPDATE') && (
+            <button
+              onClick={() => handleStockAction('RETURN')}
+              disabled={!selectedVehicleId || isSubmitting || hasInvalidReturnQuantities}
+              className={`w-full ${hasInvalidReturnQuantities ? 'bg-gray-400' : 'bg-orange-600 hover:bg-orange-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-orange-600/20`}
+            >
+              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Confirm & Submit Return'}
+            </button>
+          )}
         </div>
       </div>
     </div>

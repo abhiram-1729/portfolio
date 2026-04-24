@@ -19,7 +19,8 @@ const LoadingSection = ({
   totalLoadingValue,
   handleInitiateLoad,
   isSubmitting,
-  hasInvalidQuantities
+  hasInvalidQuantities,
+  can
 }) => {
   const allFiltered = [...groupedLoadingItems.regular, ...groupedLoadingItems.free];
   const totalPages = Math.ceil(allFiltered.length / itemsPerPage);
@@ -36,7 +37,9 @@ const LoadingSection = ({
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/10">Load Qty</th>
+            {can && can('INVENTORY', 'UPDATE') && (
+              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/10">Load Qty</th>
+            )}
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
           </tr>
         </thead>
@@ -74,25 +77,27 @@ const LoadingSection = ({
                     {item.stock || 0}
                   </span>
                 </td>
-                <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-emerald-50/5">
-                  <div className="flex flex-col items-center gap-1">
-                    <input
-                      type="number"
-                      placeholder="0"
-                      min="0"
-                      onWheel={(e) => e.target.blur()}
-                      className={`w-20 bg-white border ${qty > (item.stock || 0) ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-emerald-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm`}
-                      value={stockQuantities[item.id] || ''}
-                      onChange={(e) => {
-                        const val = Math.max(0, parseInt(e.target.value) || 0);
-                        handleQuantityChange(item.id, val);
-                      }}
-                    />
-                    {qty > (item.stock || 0) && (
-                      <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
-                    )}
-                  </div>
-                </td>
+                {can && can('INVENTORY', 'UPDATE') && (
+                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-emerald-50/5">
+                    <div className="flex flex-col items-center gap-1">
+                      <input
+                        type="number"
+                        placeholder="0"
+                        min="0"
+                        onWheel={(e) => e.target.blur()}
+                        className={`w-20 bg-white border ${qty > (item.stock || 0) ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-emerald-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm`}
+                        value={stockQuantities[item.id] || ''}
+                        onChange={(e) => {
+                          const val = Math.max(0, parseInt(e.target.value) || 0);
+                          handleQuantityChange(item.id, val);
+                        }}
+                      />
+                      {qty > (item.stock || 0) && (
+                        <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
+                      )}
+                    </div>
+                  </td>
+                )}
                 <td className="px-6 py-4 text-right">
                   <span className={`text-sm font-black ${qty > 0 ? 'text-emerald-700' : 'text-gray-300'}`}>
                     ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
@@ -182,6 +187,7 @@ const LoadingSection = ({
                       item={item}
                       quantity={stockQuantities[item.id]}
                       onChange={handleQuantityChange}
+                      canWrite={can && can('INVENTORY', 'UPDATE')}
                     />
                   ))}
                 </div>
@@ -195,6 +201,7 @@ const LoadingSection = ({
                       item={item}
                       quantity={stockQuantities[item.id]}
                       onChange={handleQuantityChange}
+                      canWrite={can && can('INVENTORY', 'UPDATE')}
                       isFree
                     />
                   ))}
@@ -269,13 +276,15 @@ const LoadingSection = ({
             )}
           </div>
 
-          <button
-            onClick={handleInitiateLoad}
-            disabled={isSubmitting || hasInvalidQuantities}
-            className={`w-full ${hasInvalidQuantities ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-emerald-600/20`}
-          >
-            {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Initiate Loading'}
-          </button>
+          {can && can('INVENTORY', 'UPDATE') && (
+            <button
+              onClick={handleInitiateLoad}
+              disabled={isSubmitting || hasInvalidQuantities}
+              className={`w-full ${hasInvalidQuantities ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-emerald-600/20`}
+            >
+              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Initiate Loading'}
+            </button>
+          )}
         </div>
       </div>
     </div>
