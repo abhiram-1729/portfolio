@@ -37,12 +37,26 @@ export default function ClosingCashEntry() {
       const s1 = data?.shifts?.shift1;
       const s2 = data?.shifts?.shift2;
 
+      let selectedShift = 1;
       if (s1?.openingAssigned && !s1?.closingSubmitted) {
-        setActiveShift(1);
+        selectedShift = 1;
       } else if (s1?.closingSubmitted && s2?.openingAssigned && !s2?.closingSubmitted) {
-        setActiveShift(2);
+        selectedShift = 2;
       } else if (!s1?.openingAssigned && s2?.openingAssigned) {
-        setActiveShift(2);
+        selectedShift = 2;
+      }
+      setActiveShift(selectedShift);
+
+      // Pre-fill denomination fields with submitted values if shift is closed
+      const selectedShiftData = selectedShift === 1 ? s1 : s2;
+      if (selectedShiftData?.closingSubmitted && selectedShiftData?.closingDenominations) {
+        const submittedDenoms = selectedShiftData.closingDenominations;
+        setCounts(
+          DENOMINATIONS.reduce((acc, d) => ({
+            ...acc,
+            [d]: submittedDenoms[String(d)] !== undefined ? submittedDenoms[String(d)] : ''
+          }), {})
+        );
       }
     } catch (err) {
       toast.error('Failed to load cash status');
@@ -172,15 +186,26 @@ export default function ClosingCashEntry() {
                   onClick={() => {
                     if (isAssigned && !isLocked) {
                       setActiveShift(s.id);
-                      setCounts(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {}));
+                      // If this shift is closed, pre-fill with submitted denominations
+                      if (s.data?.closingSubmitted && s.data?.closingDenominations) {
+                        const submittedDenoms = s.data.closingDenominations;
+                        setCounts(
+                          DENOMINATIONS.reduce((acc, d) => ({
+                            ...acc,
+                            [d]: submittedDenoms[String(d)] !== undefined ? submittedDenoms[String(d)] : ''
+                          }), {})
+                        );
+                      } else {
+                        setCounts(DENOMINATIONS.reduce((acc, d) => ({ ...acc, [d]: '' }), {}));
+                      }
                       setRemark('');
                     }
                   }}
                   className={`flex-1 flex items-center justify-center gap-1.5 p-1.5 rounded-lg border transition-all ${isActive
-                    ? s.color === 'emerald' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-indigo-500 bg-indigo-50 text-indigo-700'
-                    : !isAssigned || isLocked
-                      ? 'border-transparent bg-slate-50 opacity-40 cursor-not-allowed'
-                      : 'border-slate-100 bg-white hover:border-slate-200 text-slate-400'
+                      ? s.color === 'emerald' ? 'border-emerald-500 bg-emerald-50 text-emerald-700' : 'border-indigo-500 bg-indigo-50 text-indigo-700'
+                      : !isAssigned || isLocked
+                        ? 'border-transparent bg-slate-50 opacity-40 cursor-not-allowed'
+                        : 'border-slate-100 bg-white hover:border-slate-200 text-slate-400'
                     }`}
                 >
                   {isClosed ? <CheckCircle2 size={12} className="text-emerald-500" /> : isLocked ? <Lock size={12} /> : <s.icon size={12} />}
@@ -221,8 +246,8 @@ export default function ClosingCashEntry() {
           {/* Status Badge: Review State */}
           {currentShift?.closingSubmitted && (
             <div className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-lg border animate-in fade-in slide-in-from-top-1 duration-500 ${isApproved ? 'bg-emerald-50 border-emerald-100 text-emerald-600' :
-              isRejected ? 'bg-rose-50 border-rose-100 text-rose-600' :
-                'bg-orange-50 border-orange-100 text-orange-600'
+                isRejected ? 'bg-rose-50 border-rose-100 text-rose-600' :
+                  'bg-orange-50 border-orange-100 text-orange-600'
               }`}>
               {isApproved ? <CheckCircle2 size={12} /> : isRejected ? <XCircle size={12} /> : <Clock size={12} className="animate-pulse" />}
               <span className="text-[9px] font-black uppercase tracking-widest">
@@ -258,9 +283,17 @@ export default function ClosingCashEntry() {
             <div className="bg-white rounded-3xl border border-slate-200/60 shadow-xl shadow-slate-200/50 overflow-hidden divide-y divide-slate-100/60">
               <div className="px-5 py-3 bg-slate-50 flex justify-between items-center">
                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Physical Cash Count</span>
-                <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(difference) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                  {Math.abs(difference) <= 0.01 ? 'Matched' : difference > 0 ? `Extra: ₹${difference.toFixed(2)}` : `Short: ₹${Math.abs(difference).toFixed(2)}`}
-                </div>
+                {/* Only show Short/Extra badge when shift is NOT yet submitted */}
+                {!isCurrentShiftClosed && (
+                  <div className={`px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight ${Math.abs(difference) <= 0.01 ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                    {Math.abs(difference) <= 0.01 ? 'Matched' : difference > 0 ? `Extra: ₹${difference.toFixed(2)}` : `Short: ₹${Math.abs(difference).toFixed(2)}`}
+                  </div>
+                )}
+                {isCurrentShiftClosed && (
+                  <div className="px-2 py-1 rounded-lg text-[10px] font-black uppercase tracking-tight bg-slate-100 text-slate-400">
+                    Submitted
+                  </div>
+                )}
               </div>
 
               {DENOMINATIONS.map((denom) => (
@@ -354,8 +387,8 @@ export default function ClosingCashEntry() {
                 }
               }}
               className={`px-3 py-2.5 rounded-xl border-2 flex flex-col items-center justify-center gap-0.5 transition-all active:scale-95 ${isCurrentShiftClosed
-                ? 'border-transparent bg-slate-50 text-slate-300 grayscale select-none'
-                : 'border-rose-100 bg-rose-50/30 text-rose-500 hover:bg-rose-50 active:bg-rose-100'
+                  ? 'border-transparent bg-slate-50 text-slate-300 grayscale select-none'
+                  : 'border-rose-100 bg-rose-50/30 text-rose-500 hover:bg-rose-50 active:bg-rose-100'
                 }`}
             >
               <AlertCircle size={14} />
@@ -375,10 +408,10 @@ export default function ClosingCashEntry() {
                 }
               }}
               className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg transition-all active:scale-[0.98] group ${isCurrentShiftClosed && !(activeShift === 1 && shift1?.closingSubmitted && !shift2?.closingSubmitted)
-                ? 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'
-                : activeShift === 1 && shift1?.closingSubmitted
-                  ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600'
-                  : 'bg-slate-900 text-white shadow-slate-300 hover:bg-black'
+                  ? 'bg-slate-200 text-slate-400 shadow-none cursor-not-allowed'
+                  : activeShift === 1 && shift1?.closingSubmitted
+                    ? 'bg-amber-500 text-white shadow-amber-200 hover:bg-amber-600'
+                    : 'bg-slate-900 text-white shadow-slate-300 hover:bg-black'
                 }`}
             >
               {loading ? (
