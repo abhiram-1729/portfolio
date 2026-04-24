@@ -63,6 +63,28 @@ export const assignRouteToVehicle = async (req, res, next) => {
             }
         });
 
+        // Deactivate previous active assignment for this user
+        await prisma.routeAssignment.updateMany({
+            where: {
+                userId,
+                status: true
+            },
+            data: {
+                status: false
+            }
+        });
+
+        // Sync the user's assigned vehicle to match this route assignment
+        await prisma.user.updateMany({
+            where: { assignedVehicleId: vehicleId },
+            data: { assignedVehicleId: null }
+        });
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { assignedVehicleId: vehicleId }
+        });
+
         const assignment = await prisma.routeAssignment.create({
             data: {
                 vehicleId,
@@ -119,6 +141,18 @@ export const updateRouteAssignment = async (req, res, next) => {
         if (!vehicleId && userId) {
             const user = await prisma.user.findUnique({ where: { id: userId } });
             vehicleId = user?.assignedVehicleId || undefined;
+        }
+
+        // Sync the user's assigned vehicle if both are present
+        if (vehicleId && userId) {
+            await prisma.user.updateMany({
+                where: { assignedVehicleId: vehicleId },
+                data: { assignedVehicleId: null }
+            });
+            await prisma.user.update({
+                where: { id: userId },
+                data: { assignedVehicleId: vehicleId }
+            });
         }
 
         const assignment = await prisma.routeAssignment.update({
