@@ -18,6 +18,7 @@ const MODULES = [
   { key: 'PROCUREMENT', label: 'Procurement', desc: 'Vendor & purchase', categories: ['ADMIN'] },
   { key: 'REPORTS', label: 'Reports', desc: 'Business reports', categories: ['ADMIN', 'SUPERVISOR'] },
   { key: 'NOTIFICATIONS', label: 'Notifications', desc: 'Alert management', categories: ['ADMIN', 'AGENT', 'SUPERVISOR', 'HELPER'] },
+  { key: 'HR', label: 'HR', desc: 'Attendance, Leave, Payroll', categories: ['ADMIN', 'SUPERVISOR'] },
   { key: 'SETTINGS', label: 'Settings', desc: 'System configuration', categories: ['ADMIN'] },
 ];
 
@@ -33,6 +34,7 @@ const ACTIONS = [
   { key: 'CREATE', label: 'Create', color: 'blue' },
   { key: 'UPDATE', label: 'Edit', color: 'amber' },
   { key: 'DELETE', label: 'Delete', color: 'rose' },
+  { key: 'TOGGLE_STATUS', label: 'Status', color: 'purple' },
 ];
 
 export default function TenantPrivileges() {
@@ -180,6 +182,172 @@ export default function TenantPrivileges() {
     );
   }
 
+  if (showModal) {
+    return (
+      <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in duration-300">
+        <div className="flex items-center gap-4">
+          <button 
+            onClick={() => setShowModal(false)}
+            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all shadow-sm"
+          >
+            <ChevronRight className="rotate-180" size={20} />
+          </button>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+              {isEditing ? 'Edit Role' : 'Create New Role'}
+            </h2>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              Define access privileges
+            </p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="p-8 space-y-8">
+            {/* Role Info */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Role Name *</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Field Manager"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
+                />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Description</label>
+              <input
+                type="text"
+                placeholder="Brief description..."
+                value={formDesc}
+                onChange={(e) => setFormDesc(e.target.value)}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
+              />
+            </div>
+
+            {/* Quick Actions */}
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                <Key size={14} className="text-emerald-600" /> Permission Matrix
+              </h3>
+              <div className="flex gap-2">
+                <button onClick={selectAllPermissions} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest">
+                  Select All
+                </button>
+                <button onClick={clearAllPermissions} className="text-[9px] font-black text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 hover:bg-gray-100 transition-all uppercase tracking-widest">
+                  Clear All
+                </button>
+              </div>
+            </div>
+
+            {/* Permission Matrix */}
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border w-fit bg-emerald-50 border-emerald-100 text-emerald-600">
+                  <Shield size={14} />
+                  <span className="text-[10px] font-black uppercase tracking-widest">All System Privileges</span>
+                </div>
+
+                <div className="space-y-2">
+                  {/* Desktop Header */}
+                  <div className="hidden sm:grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 pb-1 border-b border-gray-50">
+                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Module</span>
+                    {ACTIONS.map(a => (
+                      <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
+                    ))}
+                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
+                  </div>
+
+                  {MODULES.map((mod) => {
+                    const modulePerms = formPerms[mod.key] || [];
+                    const allSelected = ACTIONS.every(a => modulePerms.includes(a.key));
+                    const someSelected = modulePerms.length > 0;
+
+                    return (
+                      <div
+                        key={mod.key}
+                        className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-3 rounded-2xl border transition-all ${
+                          someSelected ? 'bg-emerald-50/30 border-emerald-100/50' : 'bg-gray-50/50 border-gray-100/50 hover:bg-gray-50'
+                        }`}
+                      >
+                        {/* Module Name */}
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-black text-gray-800 uppercase tracking-tight truncate">{mod.label}</span>
+                          <span className="text-[8px] text-gray-400 font-bold hidden sm:block truncate">{mod.desc}</span>
+                        </div>
+
+                        {/* Action Checkboxes */}
+                        {ACTIONS.map(action => {
+                          const isChecked = modulePerms.includes(action.key);
+                          return (
+                            <button
+                              key={`${mod.key}-${action.key}`}
+                              onClick={() => togglePermission(mod.key, action.key)}
+                              className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all border ${
+                                isChecked
+                                  ? `bg-${action.color}-500 text-white border-${action.color}-500 shadow-lg shadow-${action.color}-500/20`
+                                  : 'bg-white border-gray-200 text-gray-300 hover:border-gray-300'
+                              }`}
+                              style={isChecked ? {
+                                backgroundColor: action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'amber' ? '#f59e0b' : action.color === 'purple' ? '#a855f7' : '#f43f5e',
+                                borderColor: action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'amber' ? '#f59e0b' : action.color === 'purple' ? '#a855f7' : '#f43f5e',
+                                color: 'white'
+                              } : {}}
+                            >
+                              {isChecked ? <Check size={16} strokeWidth={3} /> : <span className="w-4 h-4 rounded border-2 border-gray-200" />}
+                            </button>
+                          );
+                        })}
+
+                        {/* Toggle All */}
+                        <button
+                          onClick={() => toggleAllForModule(mod.key)}
+                          className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${
+                            allSelected
+                              ? 'bg-emerald-600 text-white'
+                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                          }`}
+                        >
+                          {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Modal Footer */}
+          <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-between shrink-0 bg-gray-50/50">
+            <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+              {getPermCount(formPerms)} permissions selected
+            </div>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setShowModal(false)}
+                className="px-6 py-3 bg-white border border-gray-200 rounded-xl font-black text-xs text-gray-500 uppercase tracking-widest hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={saving || !formName.trim()}
+                className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center gap-2"
+              >
+                {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+                {isEditing ? 'Update Role' : 'Create Role'}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-8 max-w-6xl mx-auto">
       {/* Header */}
@@ -311,184 +479,6 @@ export default function TenantPrivileges() {
         </div>
       )}
 
-      {/* Create/Edit Permission Modal */}
-      <AnimatePresence>
-        {showModal && (
-          <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center p-0 sm:p-4 animate-in fade-in duration-300">
-            <motion.div
-              initial={{ opacity: 0, y: 50, scale: 0.95 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: 50, scale: 0.95 }}
-              className="bg-white w-full max-w-3xl max-h-[95vh] rounded-t-[2.5rem] sm:rounded-[2.5rem] shadow-2xl flex flex-col overflow-hidden"
-            >
-              {/* Modal Header */}
-              <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between shrink-0">
-                <div className="flex items-center gap-3">
-                  <div className="w-11 h-11 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 border border-emerald-100">
-                    <Shield size={20} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <h2 className="text-lg font-black text-gray-900 tracking-tight">
-                      {isEditing ? 'Edit Role' : 'Create New Role'}
-                    </h2>
-                    <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
-                      Define access privileges
-                    </p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowModal(false)}
-                  className="p-2.5 bg-gray-50 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors"
-                >
-                  <X size={18} />
-                </button>
-              </div>
-
-              {/* Scrollable Body */}
-              <div className="flex-1 overflow-y-auto px-8 py-6 space-y-6">
-                {/* Role Info */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Role Name *</label>
-                    <input
-                      type="text"
-                      placeholder="e.g., Field Manager"
-                      value={formName}
-                      onChange={(e) => setFormName(e.target.value)}
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
-                    />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Description</label>
-                  <input
-                    type="text"
-                    placeholder="Brief description..."
-                    value={formDesc}
-                    onChange={(e) => setFormDesc(e.target.value)}
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
-                  />
-                </div>
-
-                {/* Quick Actions */}
-                <div className="flex items-center justify-between">
-                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                    <Key size={14} className="text-emerald-600" /> Permission Matrix
-                  </h3>
-                  <div className="flex gap-2">
-                    <button onClick={selectAllPermissions} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest">
-                      Select All
-                    </button>
-                    <button onClick={clearAllPermissions} className="text-[9px] font-black text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 hover:bg-gray-100 transition-all uppercase tracking-widest">
-                      Clear All
-                    </button>
-                  </div>
-                </div>
-
-                {/* Permission Matrix */}
-                <div className="space-y-6">
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border w-fit bg-emerald-50 border-emerald-100 text-emerald-600">
-                      <Shield size={14} />
-                      <span className="text-[10px] font-black uppercase tracking-widest">All System Privileges</span>
-                    </div>
-
-                    <div className="space-y-2">
-                      {/* Desktop Header */}
-                      <div className="hidden sm:grid grid-cols-[1fr_repeat(4,60px)_40px] gap-2 px-4 pb-1 border-b border-gray-50">
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Module</span>
-                        {ACTIONS.map(a => (
-                          <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
-                        ))}
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
-                      </div>
-
-                      {MODULES.map((mod) => {
-                        const modulePerms = formPerms[mod.key] || [];
-                        const allSelected = ACTIONS.every(a => modulePerms.includes(a.key));
-                        const someSelected = modulePerms.length > 0;
-
-                        return (
-                          <div
-                            key={mod.key}
-                            className={`grid grid-cols-[1fr_repeat(4,60px)_40px] gap-2 items-center px-4 py-3 rounded-2xl border transition-all ${
-                              someSelected ? 'bg-emerald-50/30 border-emerald-100/50' : 'bg-gray-50/50 border-gray-100/50 hover:bg-gray-50'
-                            }`}
-                          >
-                            {/* Module Name */}
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-xs font-black text-gray-800 uppercase tracking-tight truncate">{mod.label}</span>
-                              <span className="text-[8px] text-gray-400 font-bold hidden sm:block truncate">{mod.desc}</span>
-                            </div>
-
-                            {/* Action Checkboxes */}
-                            {ACTIONS.map(action => {
-                              const isChecked = modulePerms.includes(action.key);
-                              return (
-                                <button
-                                  key={`${mod.key}-${action.key}`}
-                                  onClick={() => togglePermission(mod.key, action.key)}
-                                  className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all border ${
-                                    isChecked
-                                      ? `bg-${action.color}-500 text-white border-${action.color}-500 shadow-lg shadow-${action.color}-500/20`
-                                      : 'bg-white border-gray-200 text-gray-300 hover:border-gray-300'
-                                  }`}
-                                  style={isChecked ? {
-                                    backgroundColor: action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'amber' ? '#f59e0b' : '#f43f5e',
-                                    borderColor: action.color === 'emerald' ? '#10b981' : action.color === 'blue' ? '#3b82f6' : action.color === 'amber' ? '#f59e0b' : '#f43f5e',
-                                    color: 'white'
-                                  } : {}}
-                                >
-                                  {isChecked ? <Check size={16} strokeWidth={3} /> : <span className="w-4 h-4 rounded border-2 border-gray-200" />}
-                                </button>
-                              );
-                            })}
-
-                            {/* Toggle All */}
-                            <button
-                              onClick={() => toggleAllForModule(mod.key)}
-                              className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${
-                                allSelected
-                                  ? 'bg-emerald-600 text-white'
-                                  : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                              }`}
-                            >
-                              {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="px-8 py-5 border-t border-gray-100 flex items-center justify-between shrink-0 bg-gray-50/50">
-                <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                  {getPermCount(formPerms)} permissions selected
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setShowModal(false)}
-                    className="px-6 py-3 bg-white border border-gray-200 rounded-xl font-black text-xs text-gray-500 uppercase tracking-widest hover:bg-gray-50 transition-all"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    onClick={handleSave}
-                    disabled={saving || !formName.trim()}
-                    className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-                    {isEditing ? 'Update Role' : 'Create Role'}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </div>
   );
 }
