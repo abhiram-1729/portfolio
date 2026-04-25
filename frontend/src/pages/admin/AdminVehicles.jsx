@@ -27,6 +27,14 @@ export default function AdminVehicles() {
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  
+  // Audit Modal States
+  const [showAuditModal, setShowAuditModal] = useState(false);
+  const [auditTargetUser, setAuditTargetUser] = useState(null);
+  const [vehicleInventory, setVehicleInventory] = useState([]);
+  const [isAuditing, setIsAuditing] = useState(false);
+  const [auditRemark, setAuditRemark] = useState('');
+
   const ITEMS_PER_PAGE = 10;
 
   const [newVehicle, setNewVehicle] = useState({
@@ -69,7 +77,6 @@ export default function AdminVehicles() {
       const fd = new FormData();
       fd.append('vehicleNumber', newVehicle.vehicleNumber);
       if (newVehicle.vehicleName) fd.append('vehicleName', newVehicle.vehicleName);
-      if (newVehicle.assignedUserId) fd.append('assignedUserId', newVehicle.assignedUserId);
       if (newVehicle.storeId) fd.append('storeId', newVehicle.storeId);
       fd.append('status', newVehicle.status);
       if (documents.rcDocument) fd.append('rcDocument', documents.rcDocument);
@@ -108,7 +115,6 @@ export default function AdminVehicles() {
       fd.append('vehicleName', editingVehicle.vehicleName || '');
       fd.append('status', editingVehicle.status);
       if (editingVehicle.storeId) fd.append('storeId', editingVehicle.storeId);
-      fd.append('assignedUserId', editingVehicle.assignedUserId || '');
       if (editDocuments.rcDocument) fd.append('rcDocument', editDocuments.rcDocument);
       if (editDocuments.insuranceDocument) fd.append('insuranceDocument', editDocuments.insuranceDocument);
       if (editDocuments.permitDocument) fd.append('permitDocument', editDocuments.permitDocument);
@@ -168,19 +174,77 @@ export default function AdminVehicles() {
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedVehicles = filteredVehicles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
 
-  // ── Assign driver ─────────────────────────────────────────
-  const handleAssignDriver = async (userId) => {
+  // ── Assign driver & Audit ─────────────────────────────────────────
+  const initiateAssignDriver = async (user) => {
+    setAuditTargetUser(user);
     setIsSubmitting(true);
     try {
-      await adminAPI.assignDriver(selectedVehicle.id, userId);
-      toast.success('Driver assigned successfully');
+      const res = await adminAPI.getVehicleInventory(selectedVehicle.id);
+      const inv = res.data || [];
+      setVehicleInventory(inv.map(item => ({
+        productId: item.productId,
+        name: item.product?.name || 'Unknown Item',
+        sku: item.product?.skuCode || item.productId.slice(-6).toUpperCase(),
+        oldQuantity: item.quantity,
+        newQuantity: item.quantity,
+        unit: item.product?.unit?.name || 'pcs'
+      })));
+      setShowAssignModal(false);
+      setShowAuditModal(true);
+    } catch (error) {
+      toast.error('Failed to fetch vehicle inventory for audit');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleUnassignDriver = async () => {
+    setIsSubmitting(true);
+    try {
+      await adminAPI.assignDriver(selectedVehicle.id, '');
+      toast.success('Vehicle driver unassigned successfully');
       setShowAssignModal(false);
       setSelectedVehicle(null);
       fetchData();
     } catch (error) {
-      toast.error(error.response?.data?.message || 'Failed to assign driver');
+      toast.error(error.response?.data?.message || 'Failed to unassign driver');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmAuditAndAssign = async () => {
+    setIsAuditing(true);
+    try {
+      // 1. Submit Audit
+      const auditItems = vehicleInventory.map(item => ({
+        productId: item.productId,
+        quantity: item.newQuantity
+      }));
+      
+      // Even if items is empty, we can still audit (0 items), or just skip if empty
+      // But it's safer to always send it so a 0-item audit is logged, except backend might reject empty array.
+      if (auditItems.length > 0) {
+        await adminAPI.auditVehicleStock(selectedVehicle.id, { 
+          items: auditItems, 
+          remark: auditRemark || `Handover audit to ${auditTargetUser.name}` 
+        });
+      }
+
+      // 2. Assign Driver
+      await adminAPI.assignDriver(selectedVehicle.id, auditTargetUser.id);
+      
+      toast.success(`Vehicle assigned to ${auditTargetUser.name} & stock audited`);
+      setShowAuditModal(false);
+      setAuditTargetUser(null);
+      setSelectedVehicle(null);
+      setVehicleInventory([]);
+      setAuditRemark('');
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to complete audit and assignment');
+    } finally {
+      setIsAuditing(false);
     }
   };
 
@@ -548,13 +612,9 @@ export default function AdminVehicles() {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
                         <User size={12} className="text-emerald-500" /> Driver Assignment
                       </label>
-                      <select className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight appearance-none mt-0.5"
-                        value={newVehicle.assignedUserId} onChange={(e) => setNewVehicle({ ...newVehicle, assignedUserId: e.target.value })}>
-                        <option value="">-- Unassigned --</option>
-                        {users.filter(u => !u.assignedVehicleId).map(u => (
-                          <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                        ))}
-                      </select>
+                      <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-sm text-gray-500 font-medium tracking-tight mt-0.5">
+                        Register this vehicle first to assign a driver & audit initial stock.
+                      </div>
                     </div>
 
                     <div className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl border border-dotted border-slate-200">
@@ -593,6 +653,107 @@ export default function AdminVehicles() {
                     className={cn('w-full md:w-auto px-16 py-5 rounded-2xl shadow-2xl shadow-emerald-500/30 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3',
                       isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700')}>
                     {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Processing...</> : <><CheckCircle2 size={18} /> Register Vehicle</>}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      ) : showEditModal && editingVehicle ? (
+        <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-500 min-h-screen">
+          <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">Edit Vehicle</h2>
+              <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest mt-1 italic">Update Details & Documents</p>
+            </div>
+            <button onClick={() => { setShowEditModal(false); setEditingVehicle(null); }} className="flex items-center gap-2 text-gray-500 hover:text-gray-900 border border-gray-100 bg-white px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-sm transition-all hover:border-gray-200">
+              <ArrowLeft size={16} /> Back
+            </button>
+          </div>
+
+          <div className="bg-white rounded-[2.5rem] border border-gray-50 shadow-2xl shadow-slate-200/50 overflow-hidden">
+            <div className="p-8 md:p-12">
+              <form onSubmit={handleUpdateVehicle} className="max-w-4xl mx-auto space-y-12">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <Truck size={12} className="text-emerald-500" /> Vehicle Number <span className="text-red-500">*</span>
+                      </label>
+                      <input type="text" required placeholder="e.g. KA 01 AB 1234"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                        value={editingVehicle.vehicleNumber}
+                        onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleNumber: e.target.value })} />
+                    </div>
+
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <Package size={12} className="text-emerald-500" /> Vehicle Model / Name
+                      </label>
+                      <input type="text" placeholder="e.g. Tata Ace Gold"
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                        value={editingVehicle.vehicleName || ''}
+                        onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleName: e.target.value })} />
+                    </div>
+                  </div>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                        <User size={12} className="text-emerald-500" /> Driver Assignment
+                      </label>
+                      <div className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 flex items-center justify-between mt-0.5">
+                        <div className="flex flex-col">
+                          <span className="text-sm font-bold text-gray-900">
+                            {users.find(u => u.assignedVehicleId === editingVehicle.id)?.name || 'Unassigned'}
+                          </span>
+                          <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Current Driver</span>
+                        </div>
+                        <button type="button" onClick={() => { setSelectedVehicle(editingVehicle); setShowAssignModal(true); }}
+                          className="px-4 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-600 hover:text-white rounded-xl text-xs font-bold uppercase tracking-widest transition-colors flex items-center gap-2">
+                          <User size={14} /> Assign
+                        </button>
+                      </div>
+                    </div>
+
+                    {can('VEHICLES', 'TOGGLE_STATUS') && (
+                      <div className="flex items-center justify-between p-6 bg-slate-50 rounded-2xl border border-dotted border-slate-200">
+                        <div className="flex flex-col">
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Current Asset Status</span>
+                          <span className={cn("text-xs font-black uppercase mt-1", editingVehicle.status ? "text-emerald-600" : "text-rose-400")}>
+                            {editingVehicle.status ? "Active Fleet" : "Inactive Asset"}
+                          </span>
+                        </div>
+                        <button type="button" onClick={() => setEditingVehicle({ ...editingVehicle, status: !editingVehicle.status })}
+                          className={cn('w-14 h-7 rounded-full relative transition-all shadow-inner', editingVehicle.status ? 'bg-emerald-500' : 'bg-slate-300')}>
+                          <div className={cn('absolute top-1.5 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300', editingVehicle.status ? 'right-1.5' : 'left-1.5')} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-6">
+                  <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
+                    <FileText size={20} className="text-emerald-500" />
+                    <h4 className="text-xs font-black uppercase tracking-widest text-slate-800">Compliance & Registration</h4>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <DocUpload label="RC Document" fieldKey="rcDocument" existing={editingVehicle.rcDocument} files={editDocuments} setFiles={setEditDocuments} />
+                    <DocUpload label="Insurance Document" fieldKey="insuranceDocument" existing={editingVehicle.insuranceDocument} files={editDocuments} setFiles={setEditDocuments} />
+                    <DocUpload label="Permit Document" fieldKey="permitDocument" existing={editingVehicle.permitDocument} files={editDocuments} setFiles={setEditDocuments} />
+                  </div>
+                </div>
+
+                <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-8 border-t border-slate-100">
+                  <button type="button" onClick={() => { setShowEditModal(false); setEditingVehicle(null); }}
+                    className="w-full md:w-auto px-10 py-5 rounded-2xl font-black text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all border border-transparent hover:border-gray-50">
+                    Discard Changes
+                  </button>
+                  <button type="submit" disabled={isSubmitting}
+                    className={cn('w-full md:w-auto px-16 py-5 rounded-2xl shadow-2xl shadow-emerald-500/30 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3',
+                      isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700')}>
+                    {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Processing...</> : <><CheckCircle2 size={18} /> Save Changes</>}
                   </button>
                 </div>
               </form>
@@ -704,108 +865,146 @@ export default function AdminVehicles() {
 
 
 
-          {/* ── Edit Vehicle Modal ──────────────────────────────── */}
-          {showEditModal && editingVehicle && (
-            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] overflow-y-auto border border-indigo-50">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Edit Vehicle</h3>
-                    <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Update Details & Documents</p>
-                  </div>
-                  <button onClick={() => { setShowEditModal(false); setEditingVehicle(null); }}
-                    className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
-                </div>
-
-                <form onSubmit={handleUpdateVehicle} className="space-y-4">
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Number <span className="text-red-500">*</span></label>
-                    <input type="text" required
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={editingVehicle.vehicleNumber}
-                      onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleNumber: e.target.value })} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Vehicle Name</label>
-                    <input type="text" placeholder="e.g. Tata Ace Gold"
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={editingVehicle.vehicleName || ''}
-                      onChange={(e) => setEditingVehicle({ ...editingVehicle, vehicleName: e.target.value })} />
-                  </div>
-
-                  <div className="space-y-1">
-                    <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Assigned Driver</label>
-                    <select className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:ring-2 focus:ring-indigo-500/20 outline-none"
-                      value={editingVehicle.assignedUserId || ''}
-                      onChange={(e) => setEditingVehicle({ ...editingVehicle, assignedUserId: e.target.value })}>
-                      <option value="">-- Unassigned --</option>
-                      {users.filter(u => !u.assignedVehicleId || u.assignedVehicleId === editingVehicle.id).map(u => (
-                        <option key={u.id} value={u.id}>{u.name} ({u.role})</option>
-                      ))}
-                    </select>
-                  </div>
 
 
-                  <div className="space-y-3 pt-1 border-t border-gray-50">
-                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wider pt-1">Documents (upload to replace)</p>
-                    <DocUpload label="RC Document" fieldKey="rcDocument" existing={editingVehicle.rcDocument} files={editDocuments} setFiles={setEditDocuments} />
-                    <DocUpload label="Insurance Document" fieldKey="insuranceDocument" existing={editingVehicle.insuranceDocument} files={editDocuments} setFiles={setEditDocuments} />
-                    <DocUpload label="Permit Document" fieldKey="permitDocument" existing={editingVehicle.permitDocument} files={editDocuments} setFiles={setEditDocuments} />
-                  </div>
-
-                  {can('VEHICLES', 'TOGGLE_STATUS') && (
-                    <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                      <span className="text-sm font-medium text-gray-700">Status Active</span>
-                      <button type="button" onClick={() => setEditingVehicle({ ...editingVehicle, status: !editingVehicle.status })}
-                        className={cn('w-12 h-6 rounded-full relative transition-colors', editingVehicle.status ? 'bg-emerald-500' : 'bg-gray-300')}>
-                        <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white transition-all', editingVehicle.status ? 'right-1' : 'left-1')} />
-                      </button>
-                    </div>
-                  )}
-
-                  <button type="submit" disabled={isSubmitting}
-                    className="w-full bg-indigo-600 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all text-sm uppercase tracking-wider flex items-center justify-center gap-2 disabled:opacity-70">
-                    {isSubmitting ? <><Loader2 className="animate-spin" size={18} />Saving...</> : 'Save Changes'}
-                  </button>
-                </form>
-              </div>
-            </div>
-          )}
-
-          {/* ── Assign Driver Modal ─────────────────────────────── */}
-          {showAssignModal && (
-            <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-              <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[80vh] flex flex-col">
-                <div className="flex items-center justify-between mb-6 shrink-0">
-                  <div>
-                    <h3 className="text-xl font-bold text-gray-900">Assign Driver</h3>
-                    <p className="text-xs text-gray-400 font-medium tracking-wide">Vehicle: {selectedVehicle?.vehicleNumber}</p>
-                  </div>
-                  <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
-                </div>
-
-                <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                  {users.filter(u => !u.assignedVehicleId).map(user => (
-                    <button key={user.id} disabled={isSubmitting} onClick={() => handleAssignDriver(user.id)}
-                      className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
-                          {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
-                        </div>
-                        <div className="flex flex-col items-start">
-                          <span className="font-bold text-gray-900 text-sm">{user.name}</span>
-                          <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
-                        </div>
-                      </div>
-                      {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </>
+      )}
+
+      {/* ── Assign Driver Modal ─────────────────────────────── */}
+      {showAssignModal && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between mb-6 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Assign Driver</h3>
+                <p className="text-xs text-gray-400 font-medium tracking-wide">Vehicle: {selectedVehicle?.vehicleNumber}</p>
+              </div>
+              <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+              {users.filter(u => !u.assignedVehicleId).map(user => (
+                <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
+                  className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                      {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
+                    </div>
+                    <div className="flex flex-col items-start">
+                      <span className="font-bold text-gray-900 text-sm">{user.name}</span>
+                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
+                    </div>
+                  </div>
+                  {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
+                </button>
+              ))}
+              <button onClick={() => {
+                if (window.confirm("Are you sure you want to unassign the current driver?")) {
+                   handleUnassignDriver();
+                }
+              }} className="w-full py-4 bg-gray-50 text-gray-500 font-bold text-sm uppercase tracking-widest rounded-2xl hover:bg-rose-50 hover:text-rose-600 transition-colors border border-gray-100 hover:border-rose-100 mt-4">
+                Unassign Current Driver
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Audit Vehicle Stock Modal ───────────────────────── */}
+      {showAuditModal && selectedVehicle && auditTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-3xl rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[90vh] flex flex-col">
+            <div className="flex items-center justify-between mb-6 shrink-0">
+              <div>
+                <h3 className="text-xl font-bold text-gray-900">Audit & Assign</h3>
+                <p className="text-xs text-gray-500 font-medium tracking-wide">
+                  Vehicle: <span className="text-gray-900 font-bold">{selectedVehicle.vehicleNumber}</span> → Driver: <span className="text-emerald-600 font-bold">{auditTargetUser.name}</span>
+                </p>
+              </div>
+              <button onClick={() => { setShowAuditModal(false); setAuditTargetUser(null); setVehicleInventory([]); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+              {vehicleInventory.length === 0 ? (
+                <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
+                  <Package size={32} className="mx-auto text-gray-300 mb-3" />
+                  <p className="text-gray-500 font-medium text-sm">Vehicle has no stock assigned.</p>
+                  <p className="text-gray-400 text-xs mt-1">You can proceed to assign the driver directly.</p>
+                </div>
+              ) : (
+                <div className="border border-gray-100 rounded-2xl overflow-hidden bg-white">
+                  <table className="w-full text-left">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest">Product</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Current Qty</th>
+                        <th className="px-4 py-3 text-[10px] font-black uppercase text-gray-400 tracking-widest text-center">Audited Qty</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {vehicleInventory.map((item, idx) => (
+                        <tr key={idx} className={item.oldQuantity !== item.newQuantity ? 'bg-orange-50/30' : ''}>
+                          <td className="px-4 py-3">
+                            <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.name}</p>
+                            <p className="text-[10px] text-gray-400 tracking-wider font-mono mt-0.5">{item.sku}</p>
+                          </td>
+                          <td className="px-4 py-3 text-center">
+                            <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+                              {item.oldQuantity} {item.unit}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3">
+                            <div className="flex items-center justify-center">
+                              <input 
+                                type="number"
+                                min="0"
+                                value={item.newQuantity}
+                                onChange={(e) => {
+                                  const val = parseInt(e.target.value) || 0;
+                                  const newInv = [...vehicleInventory];
+                                  newInv[idx].newQuantity = Math.max(0, val);
+                                  setVehicleInventory(newInv);
+                                }}
+                                className={cn(
+                                  "w-20 px-2 py-1.5 text-center text-sm font-bold border rounded-lg outline-none transition-all focus:ring-2",
+                                  item.oldQuantity !== item.newQuantity 
+                                    ? "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500/20 focus:border-orange-500"
+                                    : "border-gray-200 bg-gray-50 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                )}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="pt-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Audit Remark (Optional)</label>
+                <input 
+                  type="text" 
+                  placeholder="e.g. Broken items found during handover..."
+                  value={auditRemark}
+                  onChange={(e) => setAuditRemark(e.target.value)}
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 mt-4">
+              <button onClick={() => { setShowAuditModal(false); setAuditTargetUser(null); setVehicleInventory([]); }} 
+                className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-all">
+                Cancel
+              </button>
+              <button onClick={handleConfirmAuditAndAssign} disabled={isAuditing}
+                className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2">
+                {isAuditing ? <><Loader2 className="animate-spin" size={16} /> Submitting...</> : <><CheckCircle2 size={16} /> Confirm Audit & Assign</>}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

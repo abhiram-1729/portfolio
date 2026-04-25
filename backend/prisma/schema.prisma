@@ -98,6 +98,7 @@ model User {
   routeAssignments   RouteAssignment[]
   refillRequests     RefillRequest[]
   notifications      Notification[]
+  stockTransactions  StockTransaction[]    @relation("UserStockTransactions")
   dailyPerformance   VgeDailyPerformance[] @relation("UserDailyPerformance")
   monthlySummaries   VgeMonthlySummary[]   @relation("UserMonthlySummary")
   assetAssignments   AssetAssignment[]
@@ -118,6 +119,7 @@ model User {
   deductionsApplied  DamageDeduction[]     @relation("DeductionApplier")
   safeTransactions   SafeTransaction[]
   openedRegisters    StoreCashRegister[]   @relation("OpenedRegisters")
+  approvedRefills    RefillRequest[]       @relation("ApprovedRefills")
   closedRegisters    StoreCashRegister[]   @relation("ClosedRegisters")
 
   @@index([tenantId])
@@ -437,9 +439,11 @@ model StockTransaction {
   quantity  Int
   tenantId  String          @default("VK001")
   storeId   String?
+  userId    String?
   vehicle   Vehicle         @relation(fields: [vehicleId], references: [id])
   product   Product         @relation(fields: [productId], references: [id])
   store     Store?          @relation(fields: [storeId], references: [id])
+  user      User?           @relation("UserStockTransactions", fields: [userId], references: [id])
 
   @@index([tenantId])
   @@index([storeId])
@@ -447,6 +451,7 @@ model StockTransaction {
   @@index([type])
   @@index([vehicleId])
   @@index([productId])
+  @@index([userId])
 }
 
 model Route {
@@ -795,8 +800,10 @@ model RefillRequest {
   lat       Float?
   long      Float?
   photo     String?
+  approvedById String?
   vehicle   Vehicle      @relation(fields: [vehicleId], references: [id])
   user      User         @relation(fields: [userId], references: [id])
+  approvedBy User?       @relation("ApprovedRefills", fields: [approvedById], references: [id])
   store     Store?       @relation(fields: [storeId], references: [id])
   items     RefillItem[]
 
@@ -1767,6 +1774,7 @@ enum TransactionType {
   RETURN
   AUDIT
   DAMAGE
+  REFILL
 }
 
 enum PaymentMode {

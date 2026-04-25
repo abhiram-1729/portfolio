@@ -45,7 +45,7 @@ export const StockItemRow = React.memo(({ item, quantity, onChange, isFree, curr
             step="any"
             min="0"
             onWheel={(e) => e.target.blur()}
-            className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${qty > (currentStock || 0) && isReturn ? 'border-rose-500 ring-2 ring-rose-500/20' : (isReturn ? 'border-gray-200 focus:ring-orange-500/20 focus:border-orange-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300')}`}
+            className={`w-16 bg-white border rounded-lg px-2 py-1.5 text-sm text-center font-bold focus:ring-2 outline-none transition-all shadow-sm ${qty > (currentStock || 0) && isReturn ? 'border-rose-500 ring-2 ring-rose-500/20' : (isReturn ? 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300' : 'border-gray-200 focus:ring-emerald-500/20 focus:border-emerald-300')}`}
             value={quantity || ''}
             onChange={(e) => {
               const val = Math.max(0, parseFloat(e.target.value) || 0);

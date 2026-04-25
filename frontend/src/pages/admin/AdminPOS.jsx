@@ -18,10 +18,23 @@ import {
   Barcode
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { productsAPI } from '../../services/api';
+import { productsAPI, ordersAPI } from '../../services/api';
+import adminAPI from '../../services/adminService';
 import { useCartStore } from '../../store/cartStore';
 import { useUserStore } from '../../store/userStore';
+import { 
+  Banknote, 
+  CreditCard, 
+  CheckCircle, 
+  Home, 
+  Share2, 
+  Download, 
+  ChevronLeft 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
+import { jsPDF } from 'jspdf';
+import villagKartLogo from '../../assets/vk.png';
+import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
 
 export default function AdminPOS() {
   const navigate = useNavigate();
@@ -31,14 +44,24 @@ export default function AdminPOS() {
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
+  
+  // Checkout States
+  const [checkoutStep, setCheckoutStep] = useState('CART'); // 'CART', 'PAYMENT', 'SUCCESS'
+  const [selectedPaymentMode, setSelectedPaymentMode] = useState(null);
+  const [cashReceived, setCashReceived] = useState('');
+  const [splitAmounts, setSplitAmounts] = useState({ cash: '', upi: '' });
+  const [actionLoading, setActionLoading] = useState(false);
+  const [lastOrder, setLastOrder] = useState(null);
+  const [settings, setSettings] = useState(null);
+  const [isDownloading, setIsDownloading] = useState(false);
   
   // Fetch Warehouse Products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         setLoading(true);
-        // Using showAll=true to get everything or just default for admin
         const { data } = await productsAPI.getAll({ showAll: true });
         setProducts(data);
       } catch (err) {
@@ -47,7 +70,18 @@ export default function AdminPOS() {
         setLoading(false);
       }
     };
+
+    const fetchSettings = async () => {
+      try {
+        const { data } = await adminAPI.getSettings();
+        if (data?.success) setSettings(data.data);
+      } catch (err) {
+        console.warn('Failed to load settings');
+      }
+    };
+
     fetchProducts();
+    fetchSettings();
   }, []);
 
   const categories = useMemo(() => {
@@ -69,14 +103,160 @@ export default function AdminPOS() {
       toast.error('Cart is empty');
       return;
     }
-    navigate('/payment');
+    setCheckoutStep('PAYMENT');
+  };
+
+  const handlePayment = async () => {
+    if (!selectedPaymentMode) return toast.error('Please select payment mode');
+
+    if (selectedPaymentMode === 'CASH_UPI') {
+      const cash = parseFloat(splitAmounts.cash) || 0;
+      const upi = parseFloat(splitAmounts.upi) || 0;
+      if (Math.abs((cash + upi) - totalAmount) > 0.01) {
+        return toast.error(`Total must equal ₹${totalAmount.toFixed(2)}`);
+      }
+    }
+
+    setActionLoading(true);
+    try {
+      const { data: order } = await ordersAPI.createFromCart({
+        mobile: customerMobile || undefined,
+        customerName: customerName || undefined,
+        items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+      });
+
+      await ordersAPI.completePayment({
+        orderId: order.id,
+        paymentMode: selectedPaymentMode,
+        cashAmount: selectedPaymentMode === 'CASH_UPI' ? parseFloat(splitAmounts.cash) : undefined,
+        upiAmount: selectedPaymentMode === 'CASH_UPI' ? parseFloat(splitAmounts.upi) : undefined,
+      });
+
+      setLastOrder(order);
+      setCheckoutStep('SUCCESS');
+      clearCart();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Payment failed');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const resetPOS = () => {
+    setCheckoutStep('CART');
+    setLastOrder(null);
+    setSelectedPaymentMode(null);
+    setCashReceived('');
+    setSplitAmounts({ cash: '', upi: '' });
+  };
+
+  const getInvoiceNumber = (o) => o?.orderNumber ? String(o.orderNumber) : String(o?.id).replace(/\D/g, '').slice(0, 6) || '000000';
+
+  const loadImageAsBase64 = (url) => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(img, 0, 0);
+        resolve(canvas.toDataURL('image/png'));
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  };
+
+  const generateInvoicePDF = async (order, bizSettings) => {
+    if (!order) return null;
+    const currentSettings = bizSettings || settings || { businessName: 'VillagKart' };
+
+    let logoBase64 = null;
+    try {
+      logoBase64 = await loadImageAsBase64(villagKartLogo);
+    } catch {
+      console.warn('Could not load logo');
+    }
+
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const margin = 20;
+    const contentWidth = pageWidth - margin * 2;
+    let y = 20;
+
+    const emerald = [5, 150, 105];
+    const darkText = [15, 23, 42];
+    const grayText = [100, 116, 139];
+    const lightLine = [226, 232, 240];
+    const orangeAccent = [234, 88, 12];
+
+    const headerHeight = 55;
+    pdf.setFillColor(255, 255, 255);
+    pdf.rect(0, 0, pageWidth, headerHeight, 'F');
+
+    if (logoBase64) {
+      pdf.addImage(logoBase64, 'PNG', margin, 5, 30, 30);
+    }
+
+    pdf.setTextColor(...darkText);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setFontSize(5);
+    pdf.text('Shop any Time, Save Everytime', margin + 1.5, 37);
+
+    pdf.setFontSize(28);
+    pdf.text('INVOICE', pageWidth - margin, 20, { align: 'right' });
+
+    pdf.setFillColor(...orangeAccent);
+    pdf.rect(0, headerHeight, pageWidth, 2, 'F');
+
+    y = headerHeight + 10;
+    const invoiceNo = getInvoiceNumber(order);
+    
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(8);
+    pdf.text('INVOICE NUMBER', margin, y);
+    pdf.setTextColor(...darkText);
+    pdf.setFontSize(12);
+    pdf.text(`#VK-${invoiceNo}`, margin, y + 6);
+
+    y += 40;
+    // (Simplified table for now to keep it lean, or just the full one if needed)
+    // Actually, I'll just use a simpler version to avoid massive code duplication in AdminPOS
+    pdf.text('Order Details', margin, y);
+    y += 10;
+    order.items?.forEach((item, i) => {
+        pdf.text(`${i+1}. ${item.product?.name || 'Product'} x ${item.quantity}`, margin, y);
+        y += 7;
+    });
+
+    y += 10;
+    pdf.setFontSize(14);
+    pdf.text(`Total: Rs.${order.totalAmount.toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+
+    return pdf;
+  };
+
+  const handleDownloadPDF = async () => {
+    if (!lastOrder) return;
+    try {
+      setIsDownloading(true);
+      const pdf = await generateInvoicePDF(lastOrder, settings);
+      pdf.save(`Invoice_VK-${getInvoiceNumber(lastOrder)}.pdf`);
+      toast.success('Invoice downloaded');
+    } catch (error) {
+      toast.error('Failed to generate PDF');
+    } finally {
+      setIsDownloading(false);
+    }
   };
 
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] animate-in fade-in duration-500 relative">
+    <div className="flex flex-col h-full min-h-[calc(100vh-4rem)] animate-in fade-in duration-500 relative">
       {/* Page Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
@@ -95,10 +275,7 @@ export default function AdminPOS() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <button 
-            onClick={() => setIsCartOpen(true)}
-            className="bg-emerald-50 px-4 py-2 rounded-2xl border border-emerald-100 flex items-center gap-3 hover:bg-emerald-100 transition-all active:scale-95"
-          >
+          <div className="flex items-center gap-3 bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm lg:hidden">
             <div className="w-8 h-8 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20 relative">
               <ShoppingCart size={16} />
               {cartCount > 0 && (
@@ -108,16 +285,16 @@ export default function AdminPOS() {
               )}
             </div>
             <div className="text-right">
-              <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none">View Cart</p>
+              <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none">Cart</p>
               <p className="text-lg font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</p>
             </div>
-          </button>
+          </div>
         </div>
       </div>
 
-      <div className="flex flex-col gap-6 flex-1 overflow-hidden">
-        {/* Full Width Product Selector */}
-        <div className="flex-1 flex flex-col gap-6 overflow-hidden">
+      <div className="flex flex-1 gap-6 overflow-hidden">
+        {/* Left Side: Product Selector */}
+        <div className="flex-[3] flex flex-col gap-6 overflow-hidden">
           {/* Filters & Search */}
           <div className="bg-white p-4 rounded-[2rem] border border-gray-100 shadow-sm space-y-4">
             <div className="relative">
@@ -125,10 +302,17 @@ export default function AdminPOS() {
               <input 
                 type="text"
                 placeholder="Find products by name or barcode..."
-                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-12 pr-14 py-4 text-sm font-bold text-gray-900 outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
               />
+              <button 
+                onClick={() => setIsScanning(true)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 p-2 bg-white rounded-lg border border-gray-200 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm"
+                title="Scan Barcode"
+              >
+                <Barcode size={18} />
+              </button>
             </div>
             <div className="flex items-center gap-2 overflow-x-auto pb-2 [scrollbar-width:none]">
               {categories.map(cat => (
@@ -147,8 +331,8 @@ export default function AdminPOS() {
             </div>
           </div>
 
-          {/* Product Grid - Fixed column counts for full width */}
-          <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 xl:grid-cols-6 gap-4 pb-20 scrollbar-thin scrollbar-thumb-gray-200">
+          {/* Product Grid */}
+          <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 2xl:grid-cols-6 gap-3 pb-20 lg:pb-6 scrollbar-thin scrollbar-thumb-gray-200">
             {loading ? (
               [...Array(12)].map((_, i) => (
                 <div key={i} className="aspect-square bg-white rounded-[2rem] border border-gray-50 animate-pulse shadow-sm" />
@@ -165,7 +349,7 @@ export default function AdminPOS() {
                   <div 
                     key={product.id}
                     onClick={() => addItem(product)}
-                    className={`group relative bg-white rounded-[2rem] p-4 border transition-all cursor-pointer hover:shadow-xl hover:shadow-emerald-900/5 ${
+                    className={`group relative bg-white rounded-3xl p-3 border transition-all cursor-pointer hover:shadow-xl hover:shadow-emerald-900/5 ${
                       inCart ? 'border-emerald-500 ring-4 ring-emerald-500/5' : 'border-gray-50'
                     }`}
                   >
@@ -232,11 +416,309 @@ export default function AdminPOS() {
             )}
           </div>
         </div>
+
+        <div className="flex-[1.5] hidden lg:flex flex-col bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden animate-in slide-in-from-right duration-500">
+          {checkoutStep === 'CART' && (
+            <>
+              {/* Header */}
+              <div className="p-6 border-b border-emerald-50 flex items-center justify-between bg-emerald-50/20">
+                  <div>
+                      <h3 className="text-xl font-black text-emerald-950 tracking-tight flex items-center gap-2">
+                          <Zap size={20} className="text-emerald-600" />
+                          SUMMARY
+                      </h3>
+                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">{cartCount} ITEM(S) IN BASKET</p>
+                  </div>
+                  <button 
+                    onClick={clearCart}
+                    className="p-2.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                    title="Clear Cart"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+              </div>
+
+              {/* Customer Info */}
+              <div className="px-6 py-4 border-b border-gray-50 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Customer Name</label>
+                        <input 
+                            type="text"
+                            placeholder="..."
+                            className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-2.5 text-[10px] font-bold outline-none focus:bg-white focus:border-emerald-500/20"
+                            value={customerName}
+                            onChange={(e) => setCustomerName(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-1">
+                        <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
+                        <input 
+                            type="tel"
+                            placeholder="..."
+                            className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-2.5 text-[10px] font-bold outline-none focus:bg-white focus:border-emerald-500/20"
+                            value={customerMobile}
+                            onChange={(e) => setCustomerMobile(e.target.value)}
+                        />
+                    </div>
+                </div>
+              </div>
+
+              {/* Totals & Checkout */}
+              <div className="p-6 bg-emerald-50/50 border-b border-emerald-100/50 space-y-4">
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center px-1">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
+                    <span className="text-xs font-black text-gray-700">₹{totalAmount.toFixed(2)}</span>
+                  </div>
+                  
+                  {items.some(i => i.mrp > i.price) && (
+                    <div className="bg-emerald-600 p-4 rounded-2xl shadow-xl shadow-emerald-500/10">
+                       <div className="flex items-center justify-between text-white">
+                          <div className="flex flex-col">
+                            <span className="text-[7px] font-black opacity-80 uppercase tracking-widest">Savings</span>
+                            <h3 className="font-black text-[10px] uppercase">Direct Discount</h3>
+                          </div>
+                          <span className="text-xl font-black tracking-tighter">
+                            -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(2)}
+                          </span>
+                       </div>
+                    </div>
+                  )}
+                  
+                  <div className="flex justify-between items-center px-1 pt-2">
+                    <span className="text-sm font-black text-emerald-950 uppercase tracking-wider">Total Amount</span>
+                    <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleCheckout}
+                  disabled={items.length === 0}
+                  className={`w-full font-black py-4 rounded-2xl active:scale-95 transition-all shadow-xl flex items-center justify-center gap-3 ${
+                    items.length === 0 
+                    ? 'bg-gray-200 text-gray-400 cursor-not-allowed' 
+                    : 'bg-emerald-600 text-white shadow-emerald-600/20 hover:bg-emerald-700'
+                  }`}
+                >
+                  Process Checkout
+                  <ChevronRight size={18} />
+                </button>
+              </div>
+
+              {/* Items List */}
+              <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-thin scrollbar-thumb-emerald-100">
+                {items.length === 0 ? (
+                   <div className="h-full flex flex-col items-center justify-center text-center p-6 text-gray-300">
+                      <ShoppingCart size={48} className="mb-4 opacity-20" />
+                      <p className="text-[10px] font-black uppercase tracking-widest">Cart is empty</p>
+                      <p className="text-[9px] font-bold opacity-60">Add products to begin billing</p>
+                   </div>
+                ) : (
+                  items.map(item => (
+                    <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-50 group hover:bg-white hover:border-emerald-100 transition-all">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
+                          {item.image ? (
+                            <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center text-gray-200"><Package size={14} /></div>
+                          )}
+                        </div>
+                        <div>
+                          <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-tight leading-tight max-w-[120px] truncate">{item.name}</h4>
+                          <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(2)}</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <button 
+                            onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                            className="w-6 h-6 flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400 hover:text-rose-500"
+                          >
+                            <Minus size={10} strokeWidth={3} />
+                          </button>
+                          <span className="w-5 text-center text-[10px] font-black">{item.quantity}</span>
+                          <button 
+                            onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                            className="w-6 h-6 flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400 hover:text-emerald-500"
+                          >
+                            <Plus size={10} strokeWidth={3} />
+                          </button>
+                        </div>
+                        <div className="text-right min-w-[50px]">
+                          <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(2)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </>
+          )}
+
+          {checkoutStep === 'PAYMENT' && (
+            <div className="flex flex-col h-full animate-in slide-in-from-right duration-300">
+               <div className="p-6 border-b border-gray-100 flex items-center gap-4">
+                  <button onClick={() => setCheckoutStep('CART')} className="p-2 rounded-xl bg-gray-50 text-gray-500 hover:text-emerald-600 transition-all">
+                    <ChevronLeft size={20} />
+                  </button>
+                  <h3 className="text-xl font-black text-gray-900 tracking-tight">PAYMENT</h3>
+               </div>
+
+               <div className="p-6 border-b border-gray-100 bg-white z-10 shadow-sm">
+                  <button
+                    onClick={handlePayment}
+                    disabled={actionLoading || !selectedPaymentMode}
+                    className="w-full bg-emerald-600 text-white font-black py-5 rounded-[2rem] shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-3"
+                  >
+                    {actionLoading ? <Loader2 className="animate-spin" /> : <CheckCircle size={20} />}
+                    Complete Payment
+                  </button>
+               </div>
+
+               <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                  <div className="bg-emerald-50 rounded-3xl p-6 text-center border border-emerald-100">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Payable Amount</p>
+                    <p className="text-4xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { id: 'CASH', label: 'Cash', icon: Banknote, color: 'bg-emerald-600' },
+                      { id: 'UPI', label: 'UPI', icon: Smartphone, color: 'bg-orange-600' },
+                      { id: 'CARD', label: 'Card', icon: CreditCard, color: 'bg-sky-600' },
+                      { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'bg-indigo-600' }
+                    ].map(mode => (
+                      <button
+                        key={mode.id}
+                        onClick={() => setSelectedPaymentMode(mode.id)}
+                        className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                          selectedPaymentMode === mode.id 
+                          ? `border-${mode.color.split('-')[1]}-500 ${mode.color} text-white shadow-lg` 
+                          : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                        }`}
+                      >
+                        <mode.icon size={24} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">{mode.label}</span>
+                      </button>
+                    ))}
+                  </div>
+
+                  {selectedPaymentMode === 'CASH' && (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
+                      <div className="bg-white border border-gray-100 rounded-2xl p-4 space-y-3">
+                        <div>
+                          <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Received Cash</label>
+                          <input 
+                            type="number"
+                            value={cashReceived}
+                            onChange={(e) => setCashReceived(e.target.value)}
+                            className="w-full text-xl font-black text-emerald-950 outline-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="flex justify-between items-center pt-2 border-t border-gray-50">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Change Due</span>
+                          <span className="text-lg font-black text-orange-600">
+                            ₹{Math.max(0, (parseFloat(cashReceived) || 0) - totalAmount).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {selectedPaymentMode === 'CASH_UPI' && (
+                    <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                          <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1">Cash</label>
+                          <input 
+                            type="number"
+                            value={splitAmounts.cash}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const rem = Math.max(0, totalAmount - (parseFloat(val) || 0));
+                              setSplitAmounts({ cash: val, upi: rem.toFixed(2) });
+                            }}
+                            className="w-full text-lg font-black text-emerald-950 outline-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+                        <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                          <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1">UPI</label>
+                          <input 
+                            type="number"
+                            value={splitAmounts.upi}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              const rem = Math.max(0, totalAmount - (parseFloat(val) || 0));
+                              setSplitAmounts({ upi: val, cash: rem.toFixed(2) });
+                            }}
+                            className="w-full text-lg font-black text-orange-600 outline-none"
+                            placeholder="0.00"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  )}
+               </div>
+            </div>
+          )}
+
+          {checkoutStep === 'SUCCESS' && lastOrder && (
+            <div className="flex flex-col h-full animate-in zoom-in duration-500 bg-emerald-50/10">
+               <div className="flex-1 overflow-y-auto p-8 flex flex-col items-center text-center space-y-6">
+                  <div className="w-24 h-24 bg-emerald-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-emerald-600/30">
+                    <CheckCircle size={48} strokeWidth={3} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Sale Successful!</h3>
+                    <p className="text-xs font-bold text-gray-400 mt-1">Order #VK-{getInvoiceNumber(lastOrder)}</p>
+                  </div>
+
+                  <div className="w-full space-y-4 pt-4">
+                    <div className="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Amount</span>
+                        <span className="text-2xl font-black text-emerald-950">₹{lastOrder.totalAmount?.toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-4 border-t border-gray-50">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paid Via</span>
+                        <span className="text-xs font-black text-gray-900 uppercase bg-emerald-50 px-3 py-1 rounded-lg border border-emerald-100">
+                          {selectedPaymentMode}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <button onClick={resetPOS} className="w-full bg-white text-gray-900 font-black text-xs py-4 rounded-2xl border border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
+                        <Home size={16} /> New Sale
+                      </button>
+                      <button 
+                         onClick={handleDownloadPDF} 
+                         disabled={isDownloading}
+                         className="w-full bg-emerald-600 text-white font-black text-xs py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                      >
+                        <Download size={16} /> {isDownloading ? '...' : 'PDF'}
+                      </button>
+                    </div>
+                    <button 
+                       onClick={() => navigate(`/admin/sales`)} 
+                       className="w-full bg-gray-50 text-gray-400 font-black text-[10px] py-3 rounded-xl hover:text-emerald-600 transition-all uppercase tracking-widest"
+                    >
+                      View All History
+                    </button>
+                  </div>
+               </div>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Floating Summary Trigger */}
+      {/* Floating Summary Trigger (Mobile Only) */}
       {cartCount > 0 && (
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40 w-full max-w-xs animate-slide-up">
+        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40 w-full max-w-xs animate-slide-up lg:hidden">
             <button
                 onClick={() => setIsCartOpen(true)}
                 className="w-full bg-emerald-950 text-white font-black py-4 rounded-3xl shadow-2xl flex items-center justify-between px-6 hover:scale-[1.02] active:scale-95 transition-all group"
@@ -255,16 +737,16 @@ export default function AdminPOS() {
         </div>
       )}
 
-      {/* Billing Summary Modal Overlay */}
+      {/* Billing Summary Modal Overlay (Mobile Only) */}
       {isCartOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 lg:hidden">
           <div 
             className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm animate-fade-in" 
             onClick={() => setIsCartOpen(false)}
           />
           
           <div className="relative w-full max-w-md max-h-[90vh] flex flex-col animate-slide-up">
-              {/* Cart Summary Card (SuccessScreen design) */}
+              {/* Cart Summary Card */}
               <div className="flex-1 overflow-hidden flex flex-col relative group">
                 <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-600/10 rounded-[2.5rem] -z-10" />
                 
@@ -273,126 +755,233 @@ export default function AdminPOS() {
                   <div className="p-6 border-b border-emerald-50 flex items-center justify-between bg-emerald-50/20">
                     <div>
                       <h3 className="text-xl font-black text-emerald-950 tracking-tight flex items-center gap-2">
-                        <Zap size={20} className="text-emerald-600" />
-                        BILLING SUMMARY
+                        {checkoutStep === 'CART' ? <Zap size={20} className="text-emerald-600" /> : <CheckCircle size={20} className="text-emerald-600" />}
+                        {checkoutStep === 'CART' ? 'BILLING SUMMARY' : checkoutStep === 'PAYMENT' ? 'PAYMENT' : 'SUCCESS'}
                       </h3>
-                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">{cartCount} ITEM(S) IN BASKET</p>
+                      <p className="text-[9px] font-black text-emerald-600 uppercase tracking-[0.2em]">
+                        {checkoutStep === 'CART' ? `${cartCount} ITEM(S) IN BASKET` : checkoutStep === 'PAYMENT' ? 'Select Payment Mode' : 'Order Completed'}
+                      </p>
                     </div>
                     <button 
-                      onClick={() => setIsCartOpen(false)}
+                      onClick={() => {
+                        if (checkoutStep === 'SUCCESS') resetPOS();
+                        setIsCartOpen(false);
+                      }}
                       className="p-2 bg-white rounded-full border border-gray-100 text-gray-400 hover:text-gray-900 shadow-sm"
                     >
                       <X size={20} />
                     </button>
                   </div>
 
-                  {/* Customer Info (Moved inside Modal) */}
-                  <div className="px-6 py-4 border-b border-gray-50 space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Customer Name</label>
-                            <input 
-                                type="text"
-                                placeholder="..."
-                                className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-2.5 text-[10px] font-bold outline-none focus:bg-white focus:border-emerald-500/20"
-                                value={customerName}
-                                onChange={(e) => setCustomerName(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-1">
-                            <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
-                            <input 
-                                type="tel"
-                                placeholder="..."
-                                className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-2.5 text-[10px] font-bold outline-none focus:bg-white focus:border-emerald-500/20"
-                                value={customerMobile}
-                                onChange={(e) => setCustomerMobile(e.target.value)}
-                            />
-                        </div>
-                    </div>
-                  </div>
-
-                  {/* Items List */}
-                  <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-thin scrollbar-thumb-emerald-100">
-                    {items.map(item => (
-                      <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-50">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
-                            {item.image ? (
-                              <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full flex items-center justify-center text-gray-200"><Package size={14} /></div>
-                            )}
-                          </div>
-                          <div>
-                            <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-tight leading-tight max-w-[120px] truncate">{item.name}</h4>
-                            <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(2)}</span>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1">
-                            <button 
-                              onClick={() => updateQuantity(item.productId, item.quantity - 1)}
-                              className="w-6 h-6 flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400"
-                            >
-                              <Minus size={10} strokeWidth={3} />
-                            </button>
-                            <span className="w-5 text-center text-[10px] font-black">{item.quantity}</span>
-                            <button 
-                              onClick={() => updateQuantity(item.productId, item.quantity + 1)}
-                              className="w-6 h-6 flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400"
-                            >
-                              <Plus size={10} strokeWidth={3} />
-                            </button>
-                          </div>
-                          <div className="text-right min-w-[50px]">
-                            <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(2)}</p>
-                          </div>
+                  {checkoutStep === 'CART' && (
+                    <>
+                      {/* Customer Info */}
+                      <div className="px-6 py-4 border-b border-gray-50 space-y-3">
+                        <div className="grid grid-cols-2 gap-3">
+                            <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Customer Name</label>
+                                <input 
+                                    type="text"
+                                    placeholder="..."
+                                    className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-2.5 text-[10px] font-bold outline-none focus:bg-white focus:border-emerald-500/20"
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-1">
+                                <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
+                                <input 
+                                    type="tel"
+                                    placeholder="..."
+                                    className="w-full bg-gray-50 border border-transparent rounded-xl px-4 py-2.5 text-[10px] font-bold outline-none focus:bg-white focus:border-emerald-500/20"
+                                    value={customerMobile}
+                                    onChange={(e) => setCustomerMobile(e.target.value)}
+                                />
+                            </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
 
-                  {/* Footer Stats & Checkout */}
-                  <div className="p-6 bg-emerald-50/50 border-t border-emerald-100/50 space-y-4">
-                    <div className="space-y-2">
-                      <div className="flex justify-between items-center px-1">
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
-                        <span className="text-xs font-black text-gray-700">₹{totalAmount.toFixed(2)}</span>
+                      {/* Footer Stats & Checkout */}
+                      <div className="p-6 bg-emerald-50/50 border-b border-emerald-100/50 space-y-4">
+                        <div className="space-y-2">
+                          <div className="flex justify-between items-center px-1">
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
+                            <span className="text-xs font-black text-gray-700">₹{totalAmount.toFixed(2)}</span>
+                          </div>
+                          
+                          {items.some(i => i.mrp > i.price) && (
+                            <div className="bg-emerald-600 p-4 rounded-2xl shadow-xl shadow-emerald-500/10">
+                               <div className="flex items-center justify-between text-white">
+                                  <div className="flex flex-col">
+                                    <span className="text-[7px] font-black opacity-80 uppercase tracking-widest">Savings</span>
+                                    <h3 className="font-black text-[10px] uppercase">Direct Discount</h3>
+                                  </div>
+                                  <span className="text-xl font-black tracking-tighter">
+                                    -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(2)}
+                                  </span>
+                               </div>
+                            </div>
+                          )}
+                          
+                          <div className="flex justify-between items-center px-1 pt-2">
+                            <span className="text-sm font-black text-emerald-950 uppercase tracking-wider">Total Amount</span>
+                            <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={handleCheckout}
+                          className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl active:scale-95 transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3"
+                        >
+                          Process Checkout
+                          <ChevronRight size={18} />
+                        </button>
                       </div>
-                      
-                      {items.some(i => i.mrp > i.price) && (
-                        <div className="bg-emerald-600 p-4 rounded-2xl shadow-xl shadow-emerald-500/10">
-                           <div className="flex items-center justify-between text-white">
-                              <div className="flex flex-col">
-                                <span className="text-[7px] font-black opacity-80 uppercase tracking-widest">Savings</span>
-                                <h3 className="font-black text-[10px] uppercase">Direct Discount</h3>
+
+                      {/* Items List */}
+                      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3 scrollbar-thin scrollbar-thumb-emerald-100">
+                        {items.map(item => (
+                          <div key={item.productId} className="flex items-center justify-between p-3 bg-gray-50/50 rounded-2xl border border-gray-50">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-white rounded-xl overflow-hidden flex-shrink-0 border border-gray-100">
+                                {item.image ? (
+                                  <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full flex items-center justify-center text-gray-200"><Package size={14} /></div>
+                                )}
                               </div>
-                              <span className="text-xl font-black tracking-tighter">
-                                -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(2)}
-                              </span>
-                           </div>
+                              <div>
+                                <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-tight leading-tight max-w-[120px] truncate">{item.name}</h4>
+                                <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(2)}</span>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <div className="flex items-center gap-1">
+                                <button 
+                                  onClick={() => updateQuantity(item.productId, item.quantity - 1)}
+                                  className="w-6 h-6 flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400"
+                                >
+                                  <Minus size={10} strokeWidth={3} />
+                                </button>
+                                <span className="w-5 text-center text-[10px] font-black">{item.quantity}</span>
+                                <button 
+                                  onClick={() => updateQuantity(item.productId, item.quantity + 1)}
+                                  className="w-6 h-6 flex items-center justify-center bg-white rounded-lg border border-gray-100 text-gray-400"
+                                >
+                                  <Plus size={10} strokeWidth={3} />
+                                </button>
+                              </div>
+                              <div className="text-right min-w-[50px]">
+                                <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  )}
+
+                  {checkoutStep === 'PAYMENT' && (
+                    <div className="flex flex-col h-full animate-in slide-in-from-right duration-300">
+                      <div className="p-6 border-b border-gray-100 flex gap-3 bg-white z-10 shadow-sm">
+                        <button onClick={() => setCheckoutStep('CART')} className="flex-1 bg-gray-100 text-gray-900 font-black py-4 rounded-2xl">
+                          Back
+                        </button>
+                        <button
+                          onClick={handlePayment}
+                          disabled={actionLoading || !selectedPaymentMode}
+                          className="flex-[2] bg-emerald-600 text-white font-black py-4 rounded-2xl shadow-xl disabled:opacity-50"
+                        >
+                          {actionLoading ? '...' : 'Pay Now'}
+                        </button>
+                      </div>
+
+                      <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                        <div className="bg-emerald-50 rounded-3xl p-6 text-center border border-emerald-100">
+                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Payable Amount</p>
+                          <p className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</p>
                         </div>
-                      )}
-                      
-                      <div className="flex justify-between items-center px-1 pt-2">
-                        <span className="text-sm font-black text-emerald-950 uppercase tracking-wider">Total</span>
-                        <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          {[
+                            { id: 'CASH', label: 'Cash', icon: Banknote, color: 'bg-emerald-600' },
+                            { id: 'UPI', label: 'UPI', icon: Smartphone, color: 'bg-orange-600' },
+                            { id: 'CARD', label: 'Card', icon: CreditCard, color: 'bg-sky-600' },
+                            { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'bg-indigo-600' }
+                          ].map(mode => (
+                            <button
+                              key={mode.id}
+                              onClick={() => setSelectedPaymentMode(mode.id)}
+                              className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${
+                                selectedPaymentMode === mode.id 
+                                ? `border-${mode.color.split('-')[1]}-500 ${mode.color} text-white shadow-lg` 
+                                : 'border-gray-100 bg-gray-50 text-gray-400 hover:border-gray-200'
+                              }`}
+                            >
+                              <mode.icon size={20} />
+                              <span className="text-[9px] font-black uppercase tracking-widest">{mode.label}</span>
+                            </button>
+                          ))}
+                        </div>
+
+                        {selectedPaymentMode === 'CASH' && (
+                          <div className="space-y-3 animate-in fade-in slide-in-from-top-4">
+                            <div className="bg-white border border-gray-100 rounded-2xl p-4">
+                              <label className="text-[8px] font-black text-gray-400 uppercase tracking-widest block mb-1">Received Cash</label>
+                              <input 
+                                type="number"
+                                value={cashReceived}
+                                onChange={(e) => setCashReceived(e.target.value)}
+                                className="w-full text-xl font-black text-emerald-950 outline-none"
+                                placeholder="0.00"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
+                  )}
 
-                    <button
-                      onClick={handleCheckout}
-                      className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl active:scale-95 transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center gap-3"
-                    >
-                      Process Payment
-                      <ChevronRight size={18} />
-                    </button>
-                  </div>
+                  {checkoutStep === 'SUCCESS' && lastOrder && (
+                    <div className="flex flex-col items-center text-center p-8 space-y-6 animate-in zoom-in duration-500">
+                      <div className="w-20 h-20 bg-emerald-600 rounded-full flex items-center justify-center text-white shadow-2xl shadow-emerald-600/30">
+                        <CheckCircle size={40} strokeWidth={3} />
+                      </div>
+                      <div>
+                        <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Sale Successful!</h3>
+                        <p className="text-[10px] font-bold text-gray-400 mt-1">Order #VK-{getInvoiceNumber(lastOrder)}</p>
+                      </div>
+
+                      <div className="w-full grid grid-cols-2 gap-3 pt-4">
+                        <button 
+                          onClick={() => { resetPOS(); setIsCartOpen(false); }} 
+                          className="w-full bg-white text-gray-900 font-black text-xs py-4 rounded-2xl border border-gray-200"
+                        >
+                          New Sale
+                        </button>
+                        <button 
+                           onClick={() => { resetPOS(); setIsCartOpen(false); navigate('/admin/sales'); }} 
+                           className="w-full bg-emerald-600 text-white font-black text-xs py-4 rounded-2xl shadow-lg shadow-emerald-600/20"
+                        >
+                          History
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
           </div>
         </div>
+      )}
+
+      {isScanning && (
+        <BarcodeScannerOverlay
+          onClose={() => setIsScanning(false)}
+          onScan={(code) => {
+            setSearchTerm(code);
+            toast.success("Barcode Scanned!");
+          }}
+        />
       )}
     </div>
   );

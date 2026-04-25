@@ -84,8 +84,11 @@ router.route('/inventory/items/:id')
   .delete(inventoryCtr.deleteItem);
 
 router.post('/inventory/load', inventoryCtr.loadStock);
+router.get('/inventory/load-history', inventoryCtr.getLoadHistory);
 router.post('/inventory/stock', inventoryCtr.updateProductStock);
 router.post('/inventory/return', inventoryCtr.returnStock);
+router.get('/inventory/return-history', inventoryCtr.getReturnHistory);
+router.get('/inventory/refill-history', inventoryCtr.getRefillHistory);
 router.get('/inventory/vehicle/:id', inventoryCtr.getVehicleInventory);
 router.put('/inventory/vehicle/:id/audit', inventoryCtr.auditVehicleStock);
 router.get('/inventory/audit-history', inventoryCtr.getAuditHistory);

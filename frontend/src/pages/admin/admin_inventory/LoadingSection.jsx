@@ -1,6 +1,8 @@
-import React from 'react';
-import { Truck, Search, Barcode, ArrowUpCircle, Gift, Package, ArrowLeft, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Truck, Search, Barcode, ArrowUpCircle, Gift, Package, ArrowLeft, Loader2, History, Clock, Printer, FileDown, FileText, RefreshCw, Check } from 'lucide-react';
 import { StockItemRow } from './SharedComponents';
+import adminAPI from '../../../services/adminService';
+import * as XLSX from 'xlsx';
 
 const LoadingSection = ({
   groupedLoadingItems,
@@ -22,6 +24,86 @@ const LoadingSection = ({
   hasInvalidQuantities,
   can
 }) => {
+  const [activeTab, setActiveTab] = useState('load');
+  const [historyData, setHistoryData] = useState([]);
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [selectedSession, setSelectedSession] = useState(null);
+
+  useEffect(() => {
+    if (activeTab === 'history') {
+      fetchHistory();
+    }
+  }, [activeTab]);
+
+  const fetchHistory = async () => {
+    setIsLoadingHistory(true);
+    try {
+      const res = await adminAPI.getLoadHistory();
+      
+      const grouped = {};
+      res.data.forEach(item => {
+        const d = new Date(item.date);
+        const timeKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${Math.floor(d.getMinutes() / 5)}`; 
+        const key = `${item.vehicleId}_${timeKey}`;
+        if (!grouped[key]) {
+          grouped[key] = {
+            date: item.date,
+            vehicle: item.vehicle,
+            user: item.user,
+            items: []
+          };
+        }
+        grouped[key].items.push(item);
+      });
+      
+      setHistoryData(Object.values(grouped).sort((a,b) => new Date(b.date) - new Date(a.date)));
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsLoadingHistory(false);
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const exportHistoryToExcel = () => {
+    const data = historyData.map(session => ({
+      'Vehicle Number': session.vehicle?.vehicleNumber,
+      'Vehicle Type': session.vehicle?.vehicleName || 'Standard Load',
+      'Authorized By': session.user?.name || 'System Admin',
+      'Date': new Date(session.date).toLocaleDateString(),
+      'Time': new Date(session.date).toLocaleTimeString(),
+      'SKUs Loaded': session.items.length,
+      'Total Qty': session.items.reduce((acc, item) => acc + item.quantity, 0),
+      'Timestamp': new Date(session.date).toISOString()
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "LoadHistory");
+    XLSX.writeFile(wb, `Load_History_${new Date().toLocaleDateString()}.xlsx`);
+  };
+
+  const exportLoadDetailToExcel = () => {
+    if (!selectedSession) return;
+    const data = selectedSession.items.map(item => ({
+      'Product Name': item.product?.name,
+      'Category': item.product?.category?.name || 'General',
+      'SKU Code': item.product?.skuCode,
+      'Rate': item.priceAtTime || item.product?.price,
+      'Quantity Loaded': item.quantity,
+      'Unit': item.product?.unit?.name || 'pcs',
+      'Total Value': (item.quantity * (item.priceAtTime || item.product?.price)).toFixed(2),
+      'Vehicle': selectedSession.vehicle?.vehicleNumber,
+      'Date': new Date(selectedSession.date).toLocaleString()
+    }));
+    const ws = XLSX.utils.json_to_sheet(data);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "LoadDetails");
+    XLSX.writeFile(wb, `Load_Details_${selectedSession.vehicle?.vehicleNumber}_${new Date(selectedSession.date).toLocaleDateString()}.xlsx`);
+  };
+
   const allFiltered = [...groupedLoadingItems.regular, ...groupedLoadingItems.free];
   const totalPages = Math.ceil(allFiltered.length / itemsPerPage);
   const paginatedItemsFromAll = allFiltered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
@@ -112,181 +194,288 @@ const LoadingSection = ({
   );
 
   return (
-    <div className="space-y-6">
-      <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4">
-        <div className="space-y-2">
-          <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">Select Vehicle</label>
-          <div className="relative">
-            <select
-              value={selectedVehicleId}
-              onChange={(e) => setSelectedVehicleId(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
-            >
-              <option value="">Select Vehicle No.</option>
-              {vehicles.map(v => {
-                const nameStr = v.vehicleName ? `(${v.vehicleName})` : '';
-                const agentStr = v.assignedUsers?.[0] ? `- Agent: ${v.assignedUsers[0].name}` : '- Unassigned';
-                return (
-                  <option key={v.id} value={v.id}>
-                    {`${v.vehicleNumber} ${nameStr} ${agentStr}`}
-                  </option>
-                );
-              })}
-            </select>
-            <Truck size={18} className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-          </div>
-        </div>
+    <div className="space-y-6 animate-in fade-in duration-500 print:p-0">
+      <style dangerouslySetInnerHTML={{ __html: `
+        @media print {
+          @page { size: A4; margin: 10mm; }
+          body { background: white !important; -webkit-print-color-adjust: exact; }
+          body * { visibility: hidden; }
+          .print-section, .print-section * { visibility: visible; }
+          .print-section { 
+            position: absolute; 
+            left: 0; 
+            top: 0; 
+            width: 100%; 
+            border: none !important; 
+            box-shadow: none !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .no-print { display: none !important; }
+          .print-header { display: block !important; margin-bottom: 20px; border-bottom: 3px solid #059669; padding-bottom: 10px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 10pt; }
+          th, td { border: 1px solid #e2e8f0; padding: 10px; text-align: left; }
+          th { background-color: #f8fafc !important; color: #059669 !important; font-weight: 900 !important; text-transform: uppercase; letter-spacing: 0.05em; font-size: 8pt; }
+        }
+        .print-header { display: none; }
+      `}} />
+      <div className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 max-w-fit no-print">
+        <button onClick={() => setActiveTab('load')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'load' ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
+          <ArrowUpCircle size={14} className="inline mr-2 mb-0.5" /> Loading Operations
+        </button>
+        <button onClick={() => setActiveTab('history')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
+          <History size={14} className="inline mr-2 mb-0.5" /> Loading History
+        </button>
+      </div>
 
-        <div className="pt-4 space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <h4 className="text-sm font-black text-gray-900 flex items-center gap-2 whitespace-nowrap uppercase tracking-widest">
-              <ArrowUpCircle size={18} className="text-emerald-500" />
-              Stock Loading
-            </h4>
-            <div className="w-full md:max-w-md flex items-center gap-2 bg-gray-50 border border-gray-100 rounded-xl px-3 py-1.5 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
-              <Search size={16} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search by name or barcode..."
-                className="w-full bg-transparent border-none outline-none text-sm"
-                value={opsSearch}
-                onChange={(e) => setOpsSearch(e.target.value)}
-              />
-              <button
-                onClick={() => {
-                  setScannerTarget('ops');
-                  setShowScanner(true);
-                }}
-                className="p-1.5 rounded-lg hover:bg-white text-gray-400 hover:text-emerald-600 transition-all"
-                title="Scan Barcode"
-              >
-                <Barcode size={16} />
-              </button>
-            </div>
-          </div>
-
-          <div className="flex items-center justify-between bg-emerald-50 p-6 rounded-3xl border border-emerald-100 shadow-sm">
-            <div className="flex flex-col">
-              <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Loading Value</span>
-              <span className="text-2xl font-black text-emerald-900">₹{totalLoadingValue.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>
-            </div>
-            <div className="w-14 h-14 bg-emerald-500 shadow-lg shadow-emerald-500/20 rounded-2xl flex items-center justify-center border border-emerald-400">
-              <Truck className="text-white" size={28} />
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            {/* Mobile Card View */}
-            <div className="md:hidden space-y-6 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
-              {regularItems.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Regular Products</h4>
-                  {regularItems.map((item) => (
-                    <StockItemRow
-                      key={`load-mob-${item.id}`}
-                      item={item}
-                      quantity={stockQuantities[item.id]}
-                      onChange={handleQuantityChange}
-                      canWrite={can && can('INVENTORY', 'UPDATE')}
-                    />
-                  ))}
+      {activeTab === 'load' ? (
+        <div className="no-print space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-8">
+            <div className="lg:col-span-3 bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-2 h-full bg-emerald-600"></div>
+              <div className="flex flex-col md:flex-row items-center justify-between mb-8 pb-6 border-b border-gray-100 gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 bg-emerald-50 rounded-3xl flex items-center justify-center text-emerald-600 shadow-inner">
+                    <Truck size={32} />
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tight leading-none mb-2 uppercase">Vehicle Loading</h3>
+                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2">
+                      <Barcode size={14} className="text-emerald-400" /> Scan or search products to load
+                    </p>
+                  </div>
                 </div>
-              )}
-              {freeItems.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-1 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
-                  {freeItems.map((item) => (
-                    <StockItemRow
-                      key={`load-free-mob-${item.id}`}
-                      item={item}
-                      quantity={stockQuantities[item.id]}
-                      onChange={handleQuantityChange}
-                      canWrite={can && can('INVENTORY', 'UPDATE')}
-                      isFree
-                    />
-                  ))}
+                <div className="flex flex-wrap items-center gap-4 w-full md:w-auto">
+                  <div className="relative flex-1 md:w-64">
+                    <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input type="text" placeholder="Search products..." className="w-full bg-gray-50 border border-gray-100 rounded-2xl pl-10 pr-4 py-3 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all shadow-inner" value={opsSearch} onChange={(e) => setOpsSearch(e.target.value)} />
+                  </div>
+                  <button onClick={() => { setScannerTarget('loading'); setShowScanner(true); }} className="p-3 bg-gray-50 hover:bg-emerald-50 rounded-2xl text-gray-400 hover:text-emerald-600 transition-all border border-transparent hover:border-emerald-100 shadow-sm">
+                    <Barcode size={24} />
+                  </button>
                 </div>
-              )}
-              {allFiltered.length === 0 && (
-                <div className="text-center py-8 text-gray-400 text-xs italic">No items found matching "{opsSearch}"</div>
-              )}
-            </div>
+              </div>
 
-            {/* Desktop Table View */}
-            <div className="hidden md:block">
               {regularItems.length > 0 && (
-                <div className="space-y-3">
-                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-4">Regular Products</h4>
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest px-2">Regular Products</h4>
                   {renderLoadingTable(regularItems)}
                 </div>
               )}
               {freeItems.length > 0 && (
-                <div className="space-y-3 mt-4">
-                  <h4 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest pl-4 flex items-center gap-1.5"><Gift size={14} /> Promotional Gifts</h4>
+                <div className="mt-8">
+                  <div className="flex items-center gap-2 mb-4 px-2">
+                    <Gift size={16} className="text-emerald-500" />
+                    <h4 className="text-[10px] font-black text-emerald-600 uppercase tracking-[0.2em]">Free / Promotional Items</h4>
+                  </div>
                   {renderLoadingTable(freeItems, true)}
                 </div>
               )}
-              {allFiltered.length === 0 && (
-                <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200">
-                  <p className="text-sm font-bold text-gray-400">No items found matching "{opsSearch}"</p>
+
+              {totalPages > 1 && (
+                <div className="flex items-center justify-center gap-2 mt-8 py-4 border-t border-gray-50">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-emerald-600 disabled:opacity-30 transition-colors">Prev</button>
+                  <span className="text-[10px] font-black text-emerald-600 px-4 py-2 bg-emerald-50 rounded-xl">Page {currentPage} of {totalPages}</span>
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-emerald-600 disabled:opacity-30 transition-colors">Next</button>
                 </div>
               )}
             </div>
 
-            {/* Pagination Controls */}
-            {totalPages > 1 && (
-              <div className="pt-6 border-t border-gray-100">
-                <div className="flex flex-wrap items-center justify-center gap-2">
-                  <button
-                    disabled={currentPage === 1}
-                    onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                    className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
-                  >
-                    <ArrowLeft size={14} /> Prev
-                  </button>
-                  {(() => {
-                    let pages = [];
-                    let startPage = Math.max(1, currentPage - 2);
-                    let endPage = Math.min(totalPages, startPage + 4);
-                    if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
-                    for (let i = startPage; i <= endPage; i++) {
-                      if (i > 0) {
-                        pages.push(
-                          <button
-                            key={`load-page-${i}`}
-                            onClick={() => { setCurrentPage(i); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                            className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${currentPage === i ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-emerald-200'}`}
-                          >
-                            {i}
-                          </button>
-                        );
-                      }
-                    }
-                    return pages;
-                  })()}
-                  <button
-                    disabled={currentPage === totalPages}
-                    onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                    className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
-                  >
-                    Next <ArrowLeft size={14} className="rotate-180" />
-                  </button>
+            <div className="lg:col-span-1 space-y-6">
+              <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden flex flex-col items-center text-center">
+                <div className="absolute top-0 right-0 p-4">
+                  <div className="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></div>
+                </div>
+                <div className="w-20 h-20 bg-emerald-50 rounded-[2rem] flex items-center justify-center text-emerald-600 mb-6 shadow-inner">
+                  <Truck size={40} strokeWidth={2.5} />
+                </div>
+                <h4 className="text-xs font-black text-gray-400 uppercase tracking-[0.2em] mb-2">Selected Vehicle</h4>
+                <select className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-xs font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all text-center" value={selectedVehicleId} onChange={(e) => setSelectedVehicleId(e.target.value)}>
+                  <option value="">Select a Vehicle</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.vehicleNumber} ({v.vehicleName})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="bg-emerald-600 p-8 rounded-[2.5rem] shadow-xl shadow-emerald-600/20 text-white relative overflow-hidden group">
+                <div className="absolute -right-4 -bottom-4 w-32 h-32 bg-white/10 rounded-full group-hover:scale-150 transition-transform duration-700"></div>
+                <h4 className="text-[10px] font-black text-emerald-200 uppercase tracking-[0.2em] mb-4">Total Load Value</h4>
+                <div className="text-4xl font-black mb-8 leading-none tracking-tighter">₹{totalLoadingValue.toFixed(2)}</div>
+                <button onClick={handleInitiateLoad} disabled={isSubmitting || !selectedVehicleId || totalLoadingValue === 0 || hasInvalidQuantities} className="w-full bg-white text-emerald-600 py-5 rounded-3xl font-black text-xs uppercase tracking-widest hover:bg-emerald-50 active:scale-95 transition-all shadow-lg disabled:opacity-50 flex items-center justify-center gap-3">
+                  {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <ArrowUpCircle size={18} strokeWidth={3} />}
+                  Complete Load
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4 min-h-[400px]">
+          {selectedSession ? (
+            <div className="animate-in fade-in slide-in-from-right-4 duration-300 print:p-0">
+              <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100 no-print">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => setSelectedSession(null)} className="p-2.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-all border border-gray-100"><ArrowLeft size={18} /></button>
+                  <div>
+                    <h4 className="text-sm font-black text-gray-900 uppercase tracking-widest">Loading Details</h4>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Inventory Load Session</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button onClick={exportLoadDetailToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-100 shadow-sm"><FileDown size={14} /> Excel</button>
+                  <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-gray-50 text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-100 transition-all border border-gray-100 shadow-sm"><Printer size={14} /> Print</button>
                 </div>
               </div>
-            )}
-          </div>
 
-          {can && can('INVENTORY', 'UPDATE') && (
-            <button
-              onClick={handleInitiateLoad}
-              disabled={isSubmitting || hasInvalidQuantities}
-              className={`w-full ${hasInvalidQuantities ? 'bg-gray-400' : 'bg-emerald-600 hover:bg-emerald-700'} text-white font-black py-4 rounded-2xl shadow-xl transition-all flex items-center justify-center gap-2 disabled:opacity-50 text-sm uppercase tracking-widest mt-2 shadow-emerald-600/20`}
-            >
-              {isSubmitting ? <><Loader2 size={20} className="animate-spin" /> Processing...</> : 'Initiate Loading'}
-            </button>
+              <div className="print-section">
+                <div className="print-header">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <h1 className="text-2xl font-black text-emerald-600 uppercase">Load Session Report</h1>
+                      <p className="text-xs font-bold text-gray-400 tracking-[0.2em] uppercase">VillageKart Sales Tracker</p>
+                    </div>
+                    <div className="text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Date: {new Date(selectedSession.date).toLocaleString()}</div>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap items-start gap-x-12 gap-y-6 mb-8 pb-6 border-b border-gray-50">
+                  <div className="flex flex-col min-w-[150px]">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Truck size={10} className="text-emerald-400" /> Vehicle</span>
+                    <span className="text-xs font-black text-gray-800 uppercase">{selectedSession.vehicle?.vehicleNumber || 'Unknown'}</span>
+                  </div>
+                  <div className="flex flex-col min-w-[150px]">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Check size={10} className="text-emerald-400" /> Authorized By</span>
+                    <span className="text-xs font-black text-gray-800">{selectedSession.user?.name || 'System Admin'}</span>
+                  </div>
+                  <div className="flex flex-col min-w-[150px]">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><RefreshCw size={10} className="text-emerald-400" /> Timestamp</span>
+                    <span className="text-xs font-black text-gray-800">{new Date(selectedSession.date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                  </div>
+                  <div className="flex flex-col min-w-[100px]">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 flex items-center gap-1.5"><Package size={10} className="text-emerald-400" /> Total Items</span>
+                    <span className="text-xs font-black text-emerald-600">{selectedSession.items.length} Products</span>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-xl border border-gray-100 overflow-hidden shadow-sm">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50/50">
+                        <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest">Product</th>
+                        <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Rate</th>
+                        <th className="px-4 py-3 text-[9px] font-black text-emerald-600 uppercase tracking-widest text-right">Qty Loaded</th>
+                        <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Value</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {selectedSession.items.map((item, i) => (
+                        <tr key={`det-load-${i}`} className="hover:bg-emerald-50/10 transition-colors group">
+                          <td className="px-4 py-2.5">
+                            <div className="flex flex-col">
+                              <span className="text-[11px] font-black text-gray-800 group-hover:text-emerald-600 transition-colors uppercase tracking-tight leading-none mb-0.5">{item.product?.name}</span>
+                              <span className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">{item.product?.category?.name || 'General'}</span>
+                            </div>
+                          </td>
+                          <td className="px-4 py-2.5 text-[10px] font-bold text-gray-400 text-center">₹{(item.priceAtTime || item.product?.price || 0).toFixed(2)}</td>
+                          <td className="px-4 py-2.5 text-right"><span className="text-[11px] font-black text-emerald-600">+{item.quantity}</span><span className="text-[8px] font-bold text-gray-400 uppercase ml-1">{item.product?.unit?.name || 'pcs'}</span></td>
+                          <td className="px-4 py-2.5 text-right text-[11px] font-black text-gray-900">₹{(item.quantity * (item.priceAtTime || item.product?.price || 0)).toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                <div className="mt-20 hidden print:block">
+                  <div className="flex justify-between px-10 gap-20">
+                    <div className="text-center flex-1">
+                      <div className="border-t border-gray-400 pt-2">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Authorized Signatory</p>
+                      </div>
+                    </div>
+                    <div className="text-center flex-1">
+                      <div className="border-t border-gray-400 pt-2">
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Driver / Agent Signature</p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="mt-8 text-center">
+                    <p className="text-[8px] font-bold text-gray-400 uppercase tracking-tighter">This is a system generated loading manifest from VillageKart Sales Tracker.</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="print-section">
+              <div className="print-header">
+                <div className="flex justify-between items-center">
+                  <div>
+                    <h1 className="text-2xl font-black text-emerald-600 uppercase">Loading History Logs</h1>
+                    <p className="text-sm font-bold text-gray-500 uppercase tracking-widest">VillageKart Sales Tracker</p>
+                  </div>
+                  <div className="text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Export Date: {new Date().toLocaleString()}</div>
+                </div>
+              </div>
+              <div className="flex items-center justify-between no-print mb-6 pb-4 border-b border-gray-100">
+                <h4 className="text-sm font-black text-gray-900 flex items-center gap-2 uppercase tracking-widest"><History size={18} className="text-emerald-500" /> Loading History</h4>
+                <div className="flex items-center gap-2">
+                  <button onClick={exportHistoryToExcel} className="flex items-center gap-2 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm"><FileDown size={14} /> Export Excel</button>
+                  <button onClick={handlePrint} className="flex items-center gap-2 px-4 py-2 bg-white text-gray-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all border border-gray-100 shadow-sm"><Printer size={14} /> Print History</button>
+                </div>
+              </div>
+
+              {isLoadingHistory ? (
+                <div className="flex items-center justify-center py-12"><Loader2 size={32} className="animate-spin text-emerald-500" /></div>
+              ) : historyData.length === 0 ? (
+                <div className="text-center py-12 bg-gray-50 rounded-3xl border border-dashed border-gray-200"><Clock size={32} className="mx-auto text-gray-300 mb-3" /><p className="text-sm font-bold text-gray-400">No loading history found.</p></div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 no-print">
+                    {historyData.map((session, idx) => (
+                      <button key={`load-hist-${idx}`} onClick={() => setSelectedSession(session)} className="group bg-gray-50/50 border border-gray-100 rounded-3xl p-5 hover:border-emerald-200 hover:bg-emerald-50/30 transition-all text-left relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/5 rounded-full -mr-8 -mt-8 group-hover:bg-emerald-500/10 transition-colors" />
+                        <div className="flex items-center justify-between mb-4">
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 shadow-sm">{new Date(session.date).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}</span>
+                          <div className="p-2 rounded-xl bg-white border border-gray-100 text-gray-400 group-hover:text-emerald-600 group-hover:border-emerald-200 transition-all"><Package size={14} /></div>
+                        </div>
+                        <div className="space-y-3 relative z-10">
+                          <div><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-1">Vehicle Number</span><h5 className="font-black text-gray-900 text-sm flex items-center gap-2 uppercase"><Truck size={16} className="text-emerald-500" /> {session.vehicle?.vehicleNumber || 'Unspecified'}</h5></div>
+                          <div className="flex items-center justify-between pt-3 border-t border-gray-100/50">
+                            <div><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">Loaded By</span><span className="text-xs font-bold text-gray-700">{session.user?.name || 'System Admin'}</span></div>
+                            <div className="text-right"><span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">Total SKU's</span><span className="text-xs font-black text-emerald-600">{session.items.length} Items</span></div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                  <div className="hidden print:block">
+                    <table className="w-full border-collapse">
+                      <thead>
+                        <tr className="bg-gray-100">
+                          <th className="border border-gray-300 p-2 text-[10px] font-black uppercase">Date & Time</th>
+                          <th className="border border-gray-300 p-2 text-[10px] font-black uppercase">Vehicle Number</th>
+                          <th className="border border-gray-300 p-2 text-[10px] font-black uppercase">Admin</th>
+                          <th className="border border-gray-300 p-2 text-[10px] font-black uppercase text-center">Items</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {historyData.map((session, idx) => (
+                          <tr key={`print-load-${idx}`} className="page-break-inside-avoid">
+                            <td className="border border-gray-200 p-2 text-[10px]">{new Date(session.date).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}</td>
+                            <td className="border border-gray-200 p-2 text-[10px] font-bold uppercase">{session.vehicle?.vehicleNumber || '---'}</td>
+                            <td className="border border-gray-200 p-2 text-[10px]">{session.user?.name || 'System'}</td>
+                            <td className="border border-gray-200 p-2 text-[10px] text-center font-bold">{session.items.length}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
-      </div>
+      )}
     </div>
   );
 };

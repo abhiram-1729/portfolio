@@ -374,6 +374,7 @@ export const loadStock = async (req, res) => {
         data: {
           tenantId: req.user.tenantId,
           storeId,
+          userId: req.user.id,
           type: 'LOAD',
           vehicleId,
           productId: item.productId,
@@ -440,6 +441,48 @@ export const loadStock = async (req, res) => {
   }
 };
 
+export const getLoadHistory = async (req, res) => {
+  try {
+    const { storeFilterId, startDate, endDate } = req.query;
+
+    const whereClause = {
+      tenantId: req.user.tenantId,
+      type: 'LOAD'
+    };
+
+    if (storeFilterId) whereClause.storeId = storeFilterId;
+    else if (req.user.storeId) whereClause.storeId = req.user.storeId;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      whereClause.date = { gte: start, lte: end };
+    } else {
+      // Default to last 7 days if not provided
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      whereClause.date = { gte: start };
+    }
+
+    const history = await prisma.stockTransaction.findMany({
+      where: whereClause,
+      include: {
+        vehicle: { select: { vehicleNumber: true, displayId: true } },
+        product: { select: { name: true, skuCode: true, unit: { select: { name: true } } } },
+        user: { select: { name: true, role: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching load history', error: error.message });
+  }
+};
+
 // Stock Return (Evening)
 export const returnStock = async (req, res) => {
   try {
@@ -462,6 +505,7 @@ export const returnStock = async (req, res) => {
         data: {
           tenantId: req.user.tenantId,
           storeId,
+          userId: req.user.id,
           type: 'RETURN',
           vehicleId,
           productId: item.productId,
@@ -501,8 +545,8 @@ export const returnStock = async (req, res) => {
       userId: req.user.id,
       tenantId: req.user.tenantId,
       storeId,
-      action: 'STOCK_RETURNED',
-      details: `Processed evening stock return for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || vehicleId}. Total items: ${items.length}`,
+      action: 'STOCK_RETURNING',
+      details: `Returned evening stock for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || vehicleId}. Total items: ${items.length}`,
       targetUserId: assignedUser?.id,
       metadata: { vehicleId, itemCount: items.length }
     });
@@ -511,13 +555,55 @@ export const returnStock = async (req, res) => {
       vehicleIds: [vehicleId],
       roles: ['ADMIN'],
       title: 'Stock Returned',
-      message: `Evening stock return processed for vehicle.`,
+      message: `Stock has been returned from vehicle.`,
       type: 'inventory',
       priority: 'low',
       metadata: { vehicleId }
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error returning stock', error: error.message });
+  }
+};
+
+export const getReturnHistory = async (req, res) => {
+  try {
+    const { storeFilterId, startDate, endDate } = req.query;
+
+    const whereClause = {
+      tenantId: req.user.tenantId,
+      type: 'RETURN'
+    };
+
+    if (storeFilterId) whereClause.storeId = storeFilterId;
+    else if (req.user.storeId) whereClause.storeId = req.user.storeId;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      whereClause.date = { gte: start, lte: end };
+    } else {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      whereClause.date = { gte: start };
+    }
+
+    const history = await prisma.stockTransaction.findMany({
+      where: whereClause,
+      include: {
+        vehicle: { select: { vehicleNumber: true, displayId: true } },
+        product: { select: { name: true, skuCode: true, unit: { select: { name: true } } } },
+        user: { select: { name: true, role: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching return history', error: error.message });
   }
 };
 
@@ -1166,8 +1252,9 @@ export const approveRefillRequest = async (req, res) => {
           data: {
             tenantId: request.tenantId,
             storeId: request.storeId,
+            userId: req.user.id,
             date: new Date(),
-            type: 'LOAD',
+            type: 'REFILL',
             vehicleId: request.vehicleId,
             productId: item.productId,
             quantity: item.quantity
@@ -1213,6 +1300,7 @@ export const approveRefillRequest = async (req, res) => {
             tenantId: request.tenantId,
             vehicleId: request.vehicleId,
             userId: request.userId,
+            approvedById: req.user.id,
             status: 'APPROVED',
             parentId: request.parentId || request.id,
             items: {
@@ -1230,7 +1318,10 @@ export const approveRefillRequest = async (req, res) => {
         // Full Approval
         await tx.refillRequest.update({
           where: { id },
-          data: { status: 'APPROVED' }
+          data: { 
+            status: 'APPROVED',
+            approvedById: req.user.id
+          }
         });
 
         // Update items to store the requested quantity if not already set
@@ -1643,5 +1734,45 @@ export const updateProductStock = async (req, res) => {
       body: req.body
     });
     res.status(500).json({ message: 'Error updating stock', error: error.message });
+  }
+};
+export const getRefillHistory = async (req, res) => {
+  try {
+    const { storeFilterId, startDate, endDate } = req.query;
+
+    const whereClause = {
+      tenantId: req.user.tenantId,
+      type: 'REFILL'
+    };
+
+    if (storeFilterId) whereClause.storeId = storeFilterId;
+    else if (req.user.storeId) whereClause.storeId = req.user.storeId;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      whereClause.date = { gte: start, lte: end };
+    } else {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      whereClause.date = { gte: start };
+    }
+
+    const history = await prisma.stockTransaction.findMany({
+      where: whereClause,
+      include: {
+        vehicle: { select: { vehicleNumber: true, displayId: true } },
+        product: { select: { name: true, skuCode: true, unit: { select: { name: true } } } },
+        user: { select: { name: true, role: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching refill history', error: error.message });
   }
 };

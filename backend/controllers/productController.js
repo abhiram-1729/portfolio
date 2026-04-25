@@ -162,3 +162,37 @@ export const requestRefill = async (req, res, next) => {
         next(error);
     }
 };
+
+export const getVehicleAuditHistory = async (req, res, next) => {
+    try {
+        const { vehicleId } = req.params;
+
+        if (!vehicleId || vehicleId === 'undefined' || vehicleId === 'null') {
+            return res.json([]);
+        }
+
+        const audits = await prisma.stockAudit.findMany({
+            where: {
+                vehicleId,
+                tenantId: req.user.tenantId
+            },
+            include: {
+                user: { select: { name: true } },
+                items: {
+                    include: {
+                        product: {
+                            include: {
+                                unit: true
+                            }
+                        }
+                    }
+                }
+            },
+            orderBy: { createdAt: 'desc' }
+        });
+
+        res.json(audits);
+    } catch (error) {
+        next(error);
+    }
+};

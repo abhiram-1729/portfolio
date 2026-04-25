@@ -175,9 +175,15 @@ export default function AdminLayout() {
   };
 
 
+  const isPOS = location.pathname === '/admin/pos';
+
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0 md:pl-64">
+    <div className={cn(
+      "min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0",
+      !isPOS && "md:pl-64"
+    )}>
       {/* Header */}
+      {!isPOS && (
       <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <img src={logo} alt="VillagKart" className="h-10 w-auto" />
@@ -230,10 +236,12 @@ export default function AdminLayout() {
           </button>
         </div>
       </header>
+      )}
 
 
       {/* Desktop Sidebar - Non-scrollable Single Screen */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-40">
+      {!isPOS && (
+        <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-40">
         {/* Sidebar Header: Store Info */}
         <div className="p-6">
           <div className="flex flex-col gap-4">
@@ -415,6 +423,7 @@ export default function AdminLayout() {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
@@ -440,7 +449,8 @@ export default function AdminLayout() {
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-3 md:hidden">
+      {!isPOS && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-3 md:hidden">
         {navItems.slice(0, 5).map((item) => (
           <NavLink
             key={item.to || item.label}
@@ -471,6 +481,7 @@ export default function AdminLayout() {
           <span className="text-[10px] font-medium">Menu</span>
         </button>
       </nav>
+      )}
 
       {/* Mobile Overlay Menu */}
       {isMobileMenuOpen && (

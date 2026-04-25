@@ -76,6 +76,7 @@ export const productsAPI = {
   getAll: (params) => api.get('/products', { params }),
   getById: (id) => api.get(`/products/${id}`),
   getVehicleInventory: (id) => api.get(`/products/vehicle-inventory/${id}`),
+  getAuditHistory: (vehicleId) => api.get(`/products/audit-history/${vehicleId}`),
   requestRefill: (data) => api.post('/products/refill', data),
 };
 
