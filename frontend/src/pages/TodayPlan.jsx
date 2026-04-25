@@ -14,11 +14,17 @@ import {
   Truck,
   RefreshCw,
   AlertTriangle,
-  X
+  X,
+  Play,
+  Square,
+  Activity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import { useUserStore } from '../store/userStore';
 import * as routeService from '../services/routeService';
+import * as locationService from '../services/locationService';
+import * as shiftService from '../services/shiftService';
 import toast from 'react-hot-toast';
 export default function TodayPlan() {
   const { user } = useUserStore();
@@ -66,6 +72,73 @@ export default function TodayPlan() {
   };
 
   const [checkingIn, setCheckingIn] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
+  const [activeShift, setActiveShift] = useState(null);
+  const [activeVillageVisit, setActiveVillageVisit] = useState(null);
+  const [villageActionLoading, setVillageActionLoading] = useState(false);
+
+  useEffect(() => {
+    fetchActiveShift();
+  }, []);
+
+  const fetchActiveShift = async () => {
+    try {
+      const { data } = await shiftService.getShiftStatus();
+      setActiveShift(data.activeShift);
+      if (data.activeShift?.activities?.length > 0) {
+        const latest = data.activeShift.activities[0];
+        if (!latest.endTime) setActiveVillageVisit(latest);
+      }
+    } catch (err) {
+      console.error('Failed to fetch shift status');
+    }
+  };
+
+  const handleVillageVisit = async (action) => {
+    if (!activeShift) {
+      toast.error('Start your shift first in the Shift Tracking menu.');
+      return;
+    }
+    
+    setVillageActionLoading(true);
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+      });
+      const { latitude, longitude, accuracy } = pos.coords;
+
+      if (accuracy > 2000) {
+        toast.error(`GPS accuracy too low (${Math.round(accuracy)}m).`);
+        return;
+      }
+
+      if (action === 'start') {
+        const { data } = await api.post('/village-activities/start', {
+          lat: latitude,
+          lon: longitude,
+          accuracy,
+          villageId: today.villageId,
+          shiftLogId: activeShift.id
+        });
+        setActiveVillageVisit(data.activity);
+        toast.success('Village Visit Started ✅');
+      } else {
+        await api.post('/village-activities/end', {
+          lat: latitude,
+          lon: longitude,
+          accuracy,
+          activityId: activeVillageVisit.id
+        });
+        setActiveVillageVisit(null);
+        toast.success('Village Visit Ended ✅');
+      }
+      fetchActiveShift();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Action failed');
+    } finally {
+      setVillageActionLoading(false);
+    }
+  };
 
   const handleLocationCheckIn = () => {
     if (!hasPlan) return;
@@ -80,13 +153,26 @@ export default function TodayPlan() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy } = position.coords;
+          
+          if (accuracy > 2000) {
+            toast.error(`GPS accuracy too low (${Math.round(accuracy)}m). Please move to an open area.`);
+            setCheckingIn(false);
+            return;
+          }
+
+          // Legacy check-in (compatibility)
           await routeService.locationCheckIn({
             latitude,
             longitude,
             villageName: today.villageName
           });
-          toast.success("Location tracked successfully!");
+
+          // Start continuous live tracking
+          locationService.startLiveTracking();
+          setIsTracking(true);
+          
+          toast.success("Location tracking active!");
           fetchStatus();
         } catch (err) {
           toast.error("Failed to track location");
@@ -97,7 +183,8 @@ export default function TodayPlan() {
       (error) => {
         toast.error("Unable to retrieve your location. Please enable location services.");
         setCheckingIn(false);
-      }
+      },
+      { enableHighAccuracy: true }
     );
   };
 
@@ -203,11 +290,11 @@ export default function TodayPlan() {
                 </div>
               </div>
 
-              {statusData.checkIn ? (
-                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border ${statusData.checkIn.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                  <CheckCircle2 size={16} strokeWidth={3} />
+              {statusData.checkIn || isTracking ? (
+                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border ${isTracking ? 'bg-blue-100 text-blue-700 border-blue-200' : (statusData.checkIn.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200')}`}>
+                  {isTracking ? <Activity size={16} className="animate-pulse" /> : <CheckCircle2 size={16} strokeWidth={3} />}
                   <span className="text-[10px] font-black uppercase tracking-widest">
-                    {statusData.checkIn.status === 'ON_TIME' ? 'On Time' : 'Late'}
+                    {isTracking ? 'Live Tracking' : (statusData.checkIn.status === 'ON_TIME' ? 'On Time' : 'Late')}
                   </span>
                 </div>
               ) : (
@@ -216,11 +303,57 @@ export default function TodayPlan() {
                   disabled={checkingIn}
                   className="bg-blue-600 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {checkingIn ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {checkingIn ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
                   Turn ON Location
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Village Visit Controls ─────────────────── */}
+        {hasPlan && (
+          <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm space-y-4">
+             <div className="flex items-center justify-between">
+                <div>
+                   <h4 className="font-black text-gray-900 text-sm">Village Visit</h4>
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {activeVillageVisit ? 'Visit in progress...' : 'Ready to start visit?'}
+                   </p>
+                </div>
+                {activeVillageVisit && (
+                   <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black animate-pulse">
+                      LIVE
+                   </div>
+                )}
+             </div>
+
+             <div className="flex gap-3">
+                {!activeVillageVisit ? (
+                   <button 
+                      onClick={() => handleVillageVisit('start')}
+                      disabled={villageActionLoading || !activeShift}
+                      className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                   >
+                      {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                      Start Village Visit
+                   </button>
+                ) : (
+                   <button 
+                      onClick={() => handleVillageVisit('end')}
+                      disabled={villageActionLoading}
+                      className="flex-1 bg-gray-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-gray-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                   >
+                      {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
+                      End Village Visit
+                   </button>
+                )}
+             </div>
+             {!activeShift && (
+                <p className="text-[9px] text-rose-500 font-black uppercase text-center tracking-widest">
+                   ⚠️ Start shift in "Shift Tracking" menu first
+                </p>
+             )}
           </div>
         )}
 

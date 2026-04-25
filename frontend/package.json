@@ -10,6 +10,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@turf/turf": "^7.3.5",
     "@zxing/browser": "^0.1.5",
     "@zxing/library": "^0.21.3",
     "axios": "^1.14.0",
@@ -18,11 +19,13 @@
     "framer-motion": "^12.38.0",
     "html5-qrcode": "^2.3.8",
     "jspdf": "^4.2.1",
+    "leaflet": "^1.9.4",
     "lucide-react": "^1.7.0",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-hot-toast": "^2.6.0",
     "react-is": "^19.2.4",
+    "react-leaflet": "^5.0.0",
     "react-router-dom": "^7.13.2",
     "recharts": "^3.8.1",
     "socket.io-client": "^4.8.3",

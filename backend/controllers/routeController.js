@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { format, addDays } from 'date-fns';
+import { reverseGeocode } from '../utils/geoUtils.js';
 
 // Helper: get all active vehicle assignments (used by cron)
 export const getAllActiveAssignments = async () => {
@@ -318,6 +319,8 @@ export const locationCheckIn = async (req, res, next) => {
             }
         }
 
+        const subLocation = await reverseGeocode(latitude, longitude);
+
         const checkIn = await prisma.locationCheckIn.create({
             data: {
                 tenantId,
@@ -326,6 +329,7 @@ export const locationCheckIn = async (req, res, next) => {
                 latitude,
                 longitude,
                 villageName,
+                subLocation,
                 status,
                 isLocationMatched,
                 time: now

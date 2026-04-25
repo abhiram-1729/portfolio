@@ -3,7 +3,7 @@ import prisma from '../../utils/prisma.js';
 export const createVillage = async (req, res, next) => {
     try {
         console.log('[VillageControl] Create Body:', req.body);
-        const { name, latitude, longitude, storeId: bodyStoreId } = req.body;
+        const { name, latitude, longitude, radius, boundary, isPolygon, storeId: bodyStoreId } = req.body;
         const tenantId = req.user.tenantId || "VK001";
         const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
 
@@ -22,7 +22,10 @@ export const createVillage = async (req, res, next) => {
                 tenantId,
                 storeId,
                 latitude: !isNaN(lat) ? lat : null,
-                longitude: !isNaN(lng) ? lng : null
+                longitude: !isNaN(lng) ? lng : null,
+                radius: radius ? parseInt(radius) : 500,
+                boundary: boundary || null,
+                isPolygon: isPolygon === true || isPolygon === 'true'
             } 
         });
         res.status(201).json(village);
@@ -57,7 +60,7 @@ export const updateVillage = async (req, res, next) => {
     try {
         const { id } = req.params;
         console.log('[VillageControl] Update Body:', req.body, 'ID:', id);
-        const { name, latitude, longitude } = req.body;
+        const { name, latitude, longitude, radius, boundary, isPolygon } = req.body;
         
         // Robust coordinate parsing
         const lat = latitude !== null && latitude !== '' ? parseFloat(latitude) : null;
@@ -68,7 +71,10 @@ export const updateVillage = async (req, res, next) => {
             data: { 
                 name,
                 latitude: !isNaN(lat) ? lat : null,
-                longitude: !isNaN(lng) ? lng : null
+                longitude: !isNaN(lng) ? lng : null,
+                radius: radius ? parseInt(radius) : 500,
+                boundary: boundary || null,
+                isPolygon: isPolygon === true || isPolygon === 'true'
             } 
         });
         res.json(village);
