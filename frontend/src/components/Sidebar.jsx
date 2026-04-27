@@ -25,7 +25,6 @@ export default function Sidebar({ isOpen, onClose }) {
   const menuItems = [
     { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'SALES' },
     { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'ROUTES' },
-    { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
     { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'INVENTORY' },
     { 

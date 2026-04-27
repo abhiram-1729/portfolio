@@ -220,6 +220,7 @@ export const getShiftStatus = async (req, res, next) => {
           date: dateStr,
           status: 'STARTED'
         },
+        orderBy: { startTime: 'desc' },
         include: {
           activities: {
             orderBy: { startTime: 'desc' },

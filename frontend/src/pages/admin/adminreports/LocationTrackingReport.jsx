@@ -1,14 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Navigation, MapPin } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
-import L from 'leaflet';
+import { GoogleMap, useJsApiLoader, MarkerF, InfoWindow } from '@react-google-maps/api';
 import { format } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 import adminAPI from '../../../services/adminService';
 import toast from 'react-hot-toast';
 import ReportLayout from './ReportLayout';
 import { formatMinutesToHours } from './ReportUtils';
+import { Loader2 } from 'lucide-react';
 
 export default function LocationTrackingReport() {
   const [reportData, setReportData] = useState([]);
@@ -16,7 +15,13 @@ export default function LocationTrackingReport() {
   const [isLoading, setIsLoading] = useState(false);
   const [subTab, setSubTab] = useState('live-map');
   const [searchParams] = useSearchParams();
+  const [activeAgent, setActiveAgent] = useState(null);
   const storeId = searchParams.get('storeId');
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  });
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -41,13 +46,6 @@ export default function LocationTrackingReport() {
 
   useEffect(() => { fetchData(); }, [storeId]);
 
-  const agentIcon = new L.Icon({
-    iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
-    iconSize: [32, 32],
-    iconAnchor: [16, 32],
-    popupAnchor: [0, -32]
-  });
-
   return (
     <ReportLayout title="Location Tracking" icon={Navigation} activeTab="location-tracking" reportData={reportData} isLoading={isLoading}>
       <div className="space-y-6 animate-in fade-in duration-500">
@@ -65,28 +63,50 @@ export default function LocationTrackingReport() {
 
           {subTab === 'live-map' && (
               <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[600px] relative">
-                  <MapContainer center={[20.5937, 78.9629]} zoom={5} style={{ height: '100%', width: '100%' }}>
-                      <TileLayer
-                          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                      />
-                      {Array.isArray(reportData) && reportData.map((log, i) => (
-                          log.lat && log.long && (
-                              <Marker key={i} position={[log.lat, log.long]} icon={agentIcon}>
-                                  <Popup>
-                                      <div className="p-2">
-                                          <p className="font-black text-gray-900">{log.user?.name}</p>
-                                          <p className="text-[10px] text-gray-500 uppercase font-bold">{log.villageName || 'In-Transit'}</p>
-                                          {log.subLocation && <p className="text-[9px] text-gray-400 italic mt-0.5 line-clamp-1">{log.subLocation}</p>}
-                                          <p className="text-[10px] text-rose-600 font-black mt-2">
-                                              Last updated: {log.createdAt ? format(new Date(log.createdAt), 'hh:mm a') : 'N/A'}
-                                          </p>
-                                      </div>
-                                  </Popup>
-                              </Marker>
-                          )
-                      ))}
-                  </MapContainer>
+                  {isLoaded ? (
+                    <GoogleMap
+                        mapContainerStyle={{ height: '100%', width: '100%' }}
+                        center={{ lat: 20.5937, lng: 78.9629 }}
+                        zoom={5}
+                        options={{
+                            mapTypeControl: true,
+                            streetViewControl: false,
+                            fullscreenControl: true
+                        }}
+                    >
+                        {Array.isArray(reportData) && reportData.map((log, i) => (
+                            log.lat && log.long && (
+                                <MarkerF 
+                                    key={i} 
+                                    position={{ lat: log.lat, lng: log.long }}
+                                    onClick={() => setActiveAgent(log)}
+                                    icon={{
+                                        url: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+                                        scaledSize: new window.google.maps.Size(32, 32),
+                                        anchor: new window.google.maps.Point(16, 32)
+                                    }}
+                                >
+                                    {activeAgent === log && (
+                                        <InfoWindow onCloseClick={() => setActiveAgent(null)}>
+                                            <div className="p-2 min-w-[150px]">
+                                                <p className="font-black text-gray-900">{log.user?.name}</p>
+                                                <p className="text-[10px] text-gray-500 uppercase font-bold">{log.villageName || 'In-Transit'}</p>
+                                                {log.subLocation && <p className="text-[9px] text-gray-400 italic mt-0.5 line-clamp-1">{log.subLocation}</p>}
+                                                <p className="text-[10px] text-rose-600 font-black mt-2">
+                                                    Last updated: {log.createdAt ? format(new Date(log.createdAt), 'hh:mm a') : 'N/A'}
+                                                </p>
+                                            </div>
+                                        </InfoWindow>
+                                    )}
+                                </MarkerF>
+                            )
+                        ))}
+                    </GoogleMap>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                        <Loader2 className="animate-spin text-emerald-600" />
+                    </div>
+                  )}
               </div>
           )}
 

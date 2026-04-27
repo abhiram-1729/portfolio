@@ -23,8 +23,7 @@ import {
   Circle as CircleIcon,
   RotateCcw
 } from 'lucide-react';
-import { MapContainer, TileLayer, Marker, Circle, Polygon, useMapEvents, useMap, Tooltip, Popup } from 'react-leaflet';
-import 'leaflet/dist/leaflet.css';
+import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, CircleF, InfoWindow } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
 import * as routeService from '../../services/routeService';
 import adminAPI from '../../services/adminService';
@@ -52,6 +51,12 @@ export default function AdminRoutes() {
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [polygonPoints, setPolygonPoints] = useState([]);
+  const [map, setMap] = useState(null);
+
+  const { isLoaded } = useJsApiLoader({
+    id: 'google-map-script',
+    googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY
+  });
 
   // Form States
   const [villageForm, setVillageForm] = useState({
@@ -134,31 +139,7 @@ export default function AdminRoutes() {
   const totalAssignmentPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
   const paginatedAssignments = filteredAssignments.slice((assignmentPage - 1) * ITEMS_PER_PAGE, assignmentPage * ITEMS_PER_PAGE);
 
-  // Helper for map interaction
-  function LocationPicker({ onLocationSelect }) {
-    useMapEvents({
-      click(e) {
-        onLocationSelect(e.latlng.lat, e.latlng.lng);
-      },
-    });
-    return null;
-  }
-
-  function MapUpdater({ center, points = [] }) {
-    const map = useMap();
-    useEffect(() => {
-      map.invalidateSize();
-      if (points.length > 1) {
-        const bounds = points.filter(p => p && p[0] && p[1]);
-        if (bounds.length > 0) {
-          map.fitBounds(bounds, { padding: [50, 50] });
-        }
-      } else if (center && center[0] && center[1]) {
-        map.setView(center, 15);
-      }
-    }, [center, points, map]);
-    return null;
-  }
+  // Helper for map interaction - now handled via GoogleMap props
 
   const resetVillageForm = () => {
     setVillageForm({
@@ -393,24 +374,26 @@ export default function AdminRoutes() {
               <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 flex flex-col md:flex-row min-h-[600px]">
                 {/* Left Side: Map Picker */}
                 <div className="w-full md:w-3/5 h-[400px] md:h-auto relative bg-gray-100">
-                  <MapContainer
-                    center={[villageForm.latitude || 17.3850, villageForm.longitude || 78.4867]}
-                    zoom={13}
-                    style={{ height: '100%', width: '100%' }}
-                    className="z-0"
-                  >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    <MapUpdater center={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]} />
-                    <LocationPicker
-                      onLocationSelect={(lat, lng) => {
+                  {isLoaded ? (
+                    <GoogleMap
+                      mapContainerStyle={{ height: '100%', width: '100%' }}
+                      center={{ 
+                        lat: parseFloat(villageForm.latitude) || 17.3850, 
+                        lng: parseFloat(villageForm.longitude) || 78.4867 
+                      }}
+                      zoom={13}
+                      onLoad={m => setMap(m)}
+                      onClick={(e) => {
+                        const lat = e.latLng.lat();
+                        const lng = e.latLng.lng();
                         if (villageForm.isPolygon) {
-                          const newPoints = [...polygonPoints, [lat, lng]];
+                          const newPoints = [...polygonPoints, { lat, lng }];
                           setPolygonPoints(newPoints);
                           if (!villageForm.latitude) {
                             setVillageForm(prev => ({ ...prev, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
                           }
                           if (newPoints.length >= 3) {
-                            const coords = [...newPoints, newPoints[0]].map(p => [p[1], p[0]]);
+                            const coords = [...newPoints, newPoints[0]].map(p => [p.lng, p.lat]);
                             setVillageForm(prev => ({
                               ...prev,
                               boundary: { type: 'Polygon', coordinates: [coords] }
@@ -420,85 +403,80 @@ export default function AdminRoutes() {
                           setVillageForm(prev => ({ ...prev, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
                         }
                       }}
-                    />
+                      options={{
+                        mapTypeControl: true,
+                        streetViewControl: false,
+                        fullscreenControl: true
+                      }}
+                    >
+                      {!villageForm.isPolygon && villageForm.latitude && villageForm.longitude && (
+                        <>
+                          <MarkerF 
+                            position={{ 
+                              lat: parseFloat(villageForm.latitude), 
+                              lng: parseFloat(villageForm.longitude) 
+                            }} 
+                            label={{
+                              text: villageForm.name || 'Village Center',
+                              className: 'bg-white/80 px-2 py-1 rounded text-[10px] font-bold shadow-sm mb-8'
+                            }}
+                          />
+                          <CircleF
+                            center={{ 
+                              lat: parseFloat(villageForm.latitude), 
+                              lng: parseFloat(villageForm.longitude) 
+                            }}
+                            radius={parseInt(villageForm.radius) || 500}
+                            options={{
+                              strokeColor: '#10b981',
+                              fillColor: '#10b981',
+                              fillOpacity: 0.2
+                            }}
+                          />
+                        </>
+                      )}
 
-                    {!villageForm.isPolygon && villageForm.latitude && villageForm.longitude && (
-                      <>
-                        <Marker position={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]}>
-                          <Tooltip permanent direction="top" offset={[0, -10]}>
-                            <span className="font-bold text-xs">{villageForm.name || 'Village Center'}</span>
-                          </Tooltip>
-                        </Marker>
-                        <Circle
-                          center={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]}
-                          radius={parseInt(villageForm.radius) || 500}
-                          pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.2 }}
-                        />
-                      </>
-                    )}
-
-                    {villageForm.isPolygon && polygonPoints.length > 0 && (
-                      <>
-                        {polygonPoints.map((p, i) => (
-                          <Marker
-                            key={i}
-                            position={p}
-                            draggable={true}
-                            eventHandlers={{
-                              dragend: (e) => {
-                                const marker = e.target;
-                                const position = marker.getLatLng();
+                      {villageForm.isPolygon && polygonPoints.length > 0 && (
+                        <>
+                          {polygonPoints.map((p, i) => (
+                            <MarkerF
+                              key={i}
+                              position={p}
+                              draggable={true}
+                              onDragEnd={(e) => {
                                 const newPoints = [...polygonPoints];
-                                newPoints[i] = [position.lat, position.lng];
+                                newPoints[i] = { lat: e.latLng.lat(), lng: e.latLng.lng() };
                                 setPolygonPoints(newPoints);
                                 if (newPoints.length >= 3) {
-                                  const coords = [...newPoints, newPoints[0]].map(pt => [pt[1], pt[0]]);
+                                  const coords = [...newPoints, newPoints[0]].map(pt => [pt.lng, pt.lat]);
                                   setVillageForm(prev => ({
                                     ...prev,
                                     boundary: { type: 'Polygon', coordinates: [coords] }
                                   }));
                                 }
-                              },
-                            }}
-                          >
-                            <Tooltip permanent direction="bottom" offset={[0, 10]}>
-                              <span className="text-[10px] font-bold bg-white/80 px-1 rounded shadow-sm">P{i + 1}</span>
-                            </Tooltip>
-                            <Popup>
-                              <div className="flex flex-col gap-2 p-1 min-w-[100px]">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Point {i + 1}</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    const next = polygonPoints.filter((_, idx) => idx !== i);
-                                    setPolygonPoints(next);
-                                    if (next.length >= 3) {
-                                      const coords = [...next, next[0]].map(pt => [pt[1], pt[0]]);
-                                      setVillageForm(prev => ({
-                                        ...prev,
-                                        boundary: { type: 'Polygon', coordinates: [coords] }
-                                      }));
-                                    } else {
-                                      setVillageForm(prev => ({ ...prev, boundary: null }));
-                                    }
-                                  }}
-                                  className="w-full bg-rose-50 text-rose-600 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-[0.15em] border border-rose-100 hover:bg-rose-100 transition-all flex items-center justify-center gap-2"
-                                >
-                                  <Trash2 size={12} /> Remove
-                                </button>
-                              </div>
-                            </Popup>
-                          </Marker>
-                        ))}
-                        {polygonPoints.length >= 2 && (
-                          <Polygon
-                            positions={polygonPoints}
-                            pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.2, dashArray: '5, 10' }}
-                          />
-                        )}
-                      </>
-                    )}
-                  </MapContainer>
+                              }}
+                              label={`P${i + 1}`}
+                            />
+                          ))}
+                          {polygonPoints.length >= 2 && (
+                            <PolygonF
+                              paths={polygonPoints}
+                              options={{
+                                strokeColor: '#10b981',
+                                fillColor: '#10b981',
+                                fillOpacity: 0.2,
+                                strokeDasharray: '5, 10'
+                              }}
+                            />
+                          )}
+                        </>
+                      )}
+                    </GoogleMap>
+                  ) : (
+                    <div className="flex items-center justify-center h-full">
+                      <Loader2 className="animate-spin text-emerald-600" />
+                    </div>
+                  )}
 
                   <div className="absolute top-4 left-4 z-[10] flex flex-col gap-2">
                     <div className="bg-white/90 backdrop-blur px-3 py-2 rounded-xl border border-gray-100 shadow-lg">
@@ -636,14 +614,14 @@ export default function AdminRoutes() {
                           ) : (
                             polygonPoints.map((p, i) => (
                               <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-indigo-50 shadow-sm">
-                                <span className="text-[10px] font-bold text-gray-600">Point {i + 1}: {p[0].toFixed(4)}, {p[1].toFixed(4)}</span>
+                                <span className="text-[10px] font-bold text-gray-600">Point {i + 1}: {p.lat.toFixed(4)}, {p.lng.toFixed(4)}</span>
                                 <button
                                   type="button"
                                   onClick={() => {
                                     const next = polygonPoints.filter((_, idx) => idx !== i);
                                     setPolygonPoints(next);
                                     if (next.length >= 3) {
-                                      const coords = [...next, next[0]].map(pt => [pt[1], pt[0]]);
+                                      const coords = [...next, next[0]].map(pt => [pt.lng, pt.lat]);
                                       setVillageForm(prev => ({ ...prev, boundary: { type: 'Polygon', coordinates: [coords] } }));
                                     } else {
                                       setVillageForm(prev => ({ ...prev, boundary: null }));
@@ -782,7 +760,7 @@ export default function AdminRoutes() {
                                           boundary: v.boundary || null
                                         });
                                         if (v.boundary && v.boundary.coordinates) {
-                                          setPolygonPoints(v.boundary.coordinates[0].map(c => [c[1], c[0]]));
+                                          setPolygonPoints(v.boundary.coordinates[0].map(c => ({ lat: c[1], lng: c[0] })));
                                         } else {
                                           setPolygonPoints([]);
                                         }
