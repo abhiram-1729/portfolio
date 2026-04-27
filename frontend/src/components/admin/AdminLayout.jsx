@@ -94,6 +94,7 @@ export default function AdminLayout() {
         { to: '/admin/inventory?tab=return&sub=loading', label: 'Loading', icon: ArrowUpCircle },
         { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle },
         { to: '/admin/inventory?tab=return&sub=refills', label: 'Refills', icon: Package },
+        { to: '/admin/damage', label: 'Damage', icon: AlertTriangle },
         { to: '/admin/inventory?tab=return&sub=audits', label: 'Audits', icon: CheckSquare },
       ]
     },
@@ -119,7 +120,6 @@ export default function AdminLayout() {
         { to: '/admin/procurement?tab=reports', icon: BarChart3, label: 'Reports' },
       ]
     },
-    { to: '/admin/damage', icon: AlertTriangle, label: 'Damage', module: 'INVENTORY' },
     { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
   ];
 
@@ -141,7 +141,7 @@ export default function AdminLayout() {
 
   const [openMenus, setOpenMenus] = React.useState({
     Procurement: location.pathname.startsWith('/admin/procurement'),
-    Inventory: location.pathname.startsWith('/admin/inventory'),
+    Inventory: location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage'),
     Operation: location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes'),
     'Return & Stock': location.search.includes('tab=return')
   });
@@ -278,7 +278,7 @@ export default function AdminLayout() {
                       className={cn(
                         "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
                         (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
-                          (location.pathname.startsWith('/admin/inventory') && item.label === 'Inventory') ||
+                          ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
                           ((location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes')) && item.label === 'Operation')
                           ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
                           : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
@@ -346,15 +346,20 @@ export default function AdminLayout() {
                           }
 
                           const isProcurement = location.pathname === '/admin/procurement';
-                          const isInventory = location.pathname === '/admin/inventory';
+                          const isInventoryPath = location.pathname === '/admin/inventory';
+                          const isDamagePath = location.pathname === '/admin/damage';
 
                           let isActive = false;
                           if (isProcurement && item.label === 'Procurement') {
                             isActive = searchParams.get('tab') === new URLSearchParams(sub.to.split('?')[1]).get('tab');
-                          } else if (isInventory && item.label === 'Inventory') {
-                            const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
-                            const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
-                            isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
+                          } else if (item.label === 'Inventory') {
+                            if (sub.to === '/admin/damage') {
+                              isActive = isDamagePath;
+                            } else if (isInventoryPath) {
+                              const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                              const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
+                              isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
+                            }
                           } else if (item.label === 'Operation') {
                             isActive = location.pathname === sub.to;
                           }
