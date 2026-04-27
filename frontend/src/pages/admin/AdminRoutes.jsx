@@ -54,14 +54,14 @@ export default function AdminRoutes() {
   const [polygonPoints, setPolygonPoints] = useState([]);
 
   // Form States
-  const [villageForm, setVillageForm] = useState({ 
-    id: '', 
-    name: '', 
-    latitude: '', 
-    longitude: '', 
+  const [villageForm, setVillageForm] = useState({
+    id: '',
+    name: '',
+    latitude: '',
+    longitude: '',
     radius: 500,
     isPolygon: false,
-    boundary: null 
+    boundary: null
   });
   const [villageSuggestions, setVillageSuggestions] = useState([]);
   const [isSearchingVillage, setIsSearchingVillage] = useState(false);
@@ -74,7 +74,7 @@ export default function AdminRoutes() {
   const [isAssignmentsLoading, setIsAssignmentsLoading] = useState(false);
   const [routeForm, setRouteForm] = useState({ id: '', routeName: '', selectedVillages: [] });
   const [assignmentForm, setAssignmentForm] = useState({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' });
-  
+
   const [searchParams, setSearchParams] = useSearchParams();
   const storeId = searchParams.get('storeId');
   const location = useLocation();
@@ -126,14 +126,14 @@ export default function AdminRoutes() {
   const paginatedRoutes = filteredRoutes.slice((routePage - 1) * ITEMS_PER_PAGE, routePage * ITEMS_PER_PAGE);
 
   const q = assignmentSearchQuery.toLowerCase();
-  const filteredAssignments = assignments.filter(a => 
-    a.route?.routeName?.toLowerCase().includes(q) || 
-    a.user?.name?.toLowerCase().includes(q) || 
+  const filteredAssignments = assignments.filter(a =>
+    a.route?.routeName?.toLowerCase().includes(q) ||
+    a.user?.name?.toLowerCase().includes(q) ||
     a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
   );
   const totalAssignmentPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
   const paginatedAssignments = filteredAssignments.slice((assignmentPage - 1) * ITEMS_PER_PAGE, assignmentPage * ITEMS_PER_PAGE);
-  
+
   // Helper for map interaction
   function LocationPicker({ onLocationSelect }) {
     useMapEvents({
@@ -161,14 +161,14 @@ export default function AdminRoutes() {
   }
 
   const resetVillageForm = () => {
-    setVillageForm({ 
-      id: '', 
-      name: '', 
-      latitude: '', 
-      longitude: '', 
-      radius: 500, 
-      isPolygon: false, 
-      boundary: null 
+    setVillageForm({
+      id: '',
+      name: '',
+      latitude: '',
+      longitude: '',
+      radius: 500,
+      isPolygon: false,
+      boundary: null
     });
     setPolygonPoints([]);
     setVillageSuggestions([]);
@@ -178,7 +178,7 @@ export default function AdminRoutes() {
 
   const searchVillages = (query) => {
     if (searchTimeout.current) clearTimeout(searchTimeout.current);
-    
+
     if (query.length < 3) {
       setVillageSuggestions([]);
       return;
@@ -209,7 +209,7 @@ export default function AdminRoutes() {
     setIsSubmitting(true);
     try {
       if (villageForm.id) {
-        await routeService.updateVillage(villageForm.id, { 
+        await routeService.updateVillage(villageForm.id, {
           name: villageForm.name,
           latitude: villageForm.latitude ? parseFloat(villageForm.latitude) : null,
           longitude: villageForm.longitude ? parseFloat(villageForm.longitude) : null,
@@ -219,7 +219,7 @@ export default function AdminRoutes() {
         });
         toast.success('Village updated');
       } else {
-        await routeService.createVillage({ 
+        await routeService.createVillage({
           name: villageForm.name,
           latitude: villageForm.latitude ? parseFloat(villageForm.latitude) : null,
           longitude: villageForm.longitude ? parseFloat(villageForm.longitude) : null,
@@ -263,7 +263,7 @@ export default function AdminRoutes() {
     e.preventDefault();
     if (!routeForm.routeName) return toast.error('Route name required');
     if (routeForm.selectedVillages.length === 0) return toast.error('Select at least one village');
-    
+
     setIsSubmitting(true);
     try {
       const payload = {
@@ -271,7 +271,7 @@ export default function AdminRoutes() {
         villages: routeForm.selectedVillages,
         cycles: [] // We no longer use cycles, but pass empty to not break backend if expected
       };
-      
+
       if (routeForm.id) {
         await routeService.updateRoute(routeForm.id, payload);
         toast.success('Route updated');
@@ -319,16 +319,16 @@ export default function AdminRoutes() {
   // Gatekeeper
   const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
   const isTenantRoute = location.pathname.includes('/tenant/');
-  
+
   if (isGlobalRole && isTenantRoute && !storeId) {
     return (
-       <StoreSelector 
-         title="Route & Coverage"
-         description="Please select a store branch to manage its routes and agent assignments."
-         onSelect={(id) => {
-           setSearchParams({ storeId: id });
-         }}
-       />
+      <StoreSelector
+        title="Route & Coverage"
+        description="Please select a store branch to manage its routes and agent assignments."
+        onSelect={(id) => {
+          setSearchParams({ storeId: id });
+        }}
+      />
     );
   }
 
@@ -343,8 +343,8 @@ export default function AdminRoutes() {
             {isTenantRoute && storeId && (
               <>
                 <span className="text-gray-300">•</span>
-                <button 
-                  onClick={() => setSearchParams({})} 
+                <button
+                  onClick={() => setSearchParams({})}
                   className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
                 >
                   Change Store
@@ -382,7 +382,7 @@ export default function AdminRoutes() {
           {isVillageEditorOpen ? (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <button 
+                <button
                   onClick={() => setIsVillageEditorOpen(false)}
                   className="flex items-center gap-2 text-gray-500 hover:text-emerald-600 font-bold transition-colors"
                 >
@@ -393,15 +393,15 @@ export default function AdminRoutes() {
               <div className="bg-white rounded-[2.5rem] shadow-xl overflow-hidden border border-gray-100 flex flex-col md:flex-row min-h-[600px]">
                 {/* Left Side: Map Picker */}
                 <div className="w-full md:w-3/5 h-[400px] md:h-auto relative bg-gray-100">
-                  <MapContainer 
-                    center={[villageForm.latitude || 17.3850, villageForm.longitude || 78.4867]} 
-                    zoom={13} 
+                  <MapContainer
+                    center={[villageForm.latitude || 17.3850, villageForm.longitude || 78.4867]}
+                    zoom={13}
                     style={{ height: '100%', width: '100%' }}
                     className="z-0"
                   >
                     <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
                     <MapUpdater center={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]} />
-                    <LocationPicker 
+                    <LocationPicker
                       onLocationSelect={(lat, lng) => {
                         if (villageForm.isPolygon) {
                           const newPoints = [...polygonPoints, [lat, lng]];
@@ -411,17 +411,17 @@ export default function AdminRoutes() {
                           }
                           if (newPoints.length >= 3) {
                             const coords = [...newPoints, newPoints[0]].map(p => [p[1], p[0]]);
-                            setVillageForm(prev => ({ 
-                              ...prev, 
-                              boundary: { type: 'Polygon', coordinates: [coords] } 
+                            setVillageForm(prev => ({
+                              ...prev,
+                              boundary: { type: 'Polygon', coordinates: [coords] }
                             }));
                           }
                         } else {
                           setVillageForm(prev => ({ ...prev, latitude: lat.toFixed(6), longitude: lng.toFixed(6) }));
                         }
-                      }} 
+                      }}
                     />
-                    
+
                     {!villageForm.isPolygon && villageForm.latitude && villageForm.longitude && (
                       <>
                         <Marker position={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]}>
@@ -429,8 +429,8 @@ export default function AdminRoutes() {
                             <span className="font-bold text-xs">{villageForm.name || 'Village Center'}</span>
                           </Tooltip>
                         </Marker>
-                        <Circle 
-                          center={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]} 
+                        <Circle
+                          center={[parseFloat(villageForm.latitude), parseFloat(villageForm.longitude)]}
                           radius={parseInt(villageForm.radius) || 500}
                           pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.2 }}
                         />
@@ -440,9 +440,9 @@ export default function AdminRoutes() {
                     {villageForm.isPolygon && polygonPoints.length > 0 && (
                       <>
                         {polygonPoints.map((p, i) => (
-                          <Marker 
-                            key={i} 
-                            position={p} 
+                          <Marker
+                            key={i}
+                            position={p}
                             draggable={true}
                             eventHandlers={{
                               dragend: (e) => {
@@ -453,30 +453,30 @@ export default function AdminRoutes() {
                                 setPolygonPoints(newPoints);
                                 if (newPoints.length >= 3) {
                                   const coords = [...newPoints, newPoints[0]].map(pt => [pt[1], pt[0]]);
-                                  setVillageForm(prev => ({ 
-                                    ...prev, 
-                                    boundary: { type: 'Polygon', coordinates: [coords] } 
+                                  setVillageForm(prev => ({
+                                    ...prev,
+                                    boundary: { type: 'Polygon', coordinates: [coords] }
                                   }));
                                 }
                               },
                             }}
                           >
                             <Tooltip permanent direction="bottom" offset={[0, 10]}>
-                              <span className="text-[10px] font-bold bg-white/80 px-1 rounded shadow-sm">P{i+1}</span>
+                              <span className="text-[10px] font-bold bg-white/80 px-1 rounded shadow-sm">P{i + 1}</span>
                             </Tooltip>
                             <Popup>
                               <div className="flex flex-col gap-2 p-1 min-w-[100px]">
-                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Point {i+1}</span>
-                                <button 
+                                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Point {i + 1}</span>
+                                <button
                                   type="button"
                                   onClick={() => {
                                     const next = polygonPoints.filter((_, idx) => idx !== i);
                                     setPolygonPoints(next);
                                     if (next.length >= 3) {
                                       const coords = [...next, next[0]].map(pt => [pt[1], pt[0]]);
-                                      setVillageForm(prev => ({ 
-                                        ...prev, 
-                                        boundary: { type: 'Polygon', coordinates: [coords] } 
+                                      setVillageForm(prev => ({
+                                        ...prev,
+                                        boundary: { type: 'Polygon', coordinates: [coords] }
                                       }));
                                     } else {
                                       setVillageForm(prev => ({ ...prev, boundary: null }));
@@ -491,7 +491,7 @@ export default function AdminRoutes() {
                           </Marker>
                         ))}
                         {polygonPoints.length >= 2 && (
-                          <Polygon 
+                          <Polygon
                             positions={polygonPoints}
                             pathOptions={{ color: '#10b981', fillColor: '#10b981', fillOpacity: 0.2, dashArray: '5, 10' }}
                           />
@@ -499,7 +499,7 @@ export default function AdminRoutes() {
                       </>
                     )}
                   </MapContainer>
-                  
+
                   <div className="absolute top-4 left-4 z-[10] flex flex-col gap-2">
                     <div className="bg-white/90 backdrop-blur px-3 py-2 rounded-xl border border-gray-100 shadow-lg">
                       <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest flex items-center gap-2">
@@ -507,7 +507,7 @@ export default function AdminRoutes() {
                       </p>
                     </div>
                     {villageForm.isPolygon && polygonPoints.length > 0 && (
-                      <button 
+                      <button
                         onClick={() => { setPolygonPoints([]); setVillageForm(prev => ({ ...prev, boundary: null })); }}
                         className="bg-rose-50 text-rose-600 px-3 py-2 rounded-xl border border-rose-100 shadow-lg text-[9px] font-black uppercase tracking-widest flex items-center gap-2 hover:bg-rose-100 transition-all"
                       >
@@ -516,17 +516,17 @@ export default function AdminRoutes() {
                     )}
                   </div>
 
-                  <button 
+                  <button
                     type="button"
                     onClick={() => {
                       if (navigator.geolocation) {
                         navigator.geolocation.getCurrentPosition((pos) => {
                           const lat = pos.coords.latitude;
                           const lng = pos.coords.longitude;
-                          setVillageForm(prev => ({ 
-                            ...prev, 
-                            latitude: lat.toFixed(6), 
-                            longitude: lng.toFixed(6) 
+                          setVillageForm(prev => ({
+                            ...prev,
+                            latitude: lat.toFixed(6),
+                            longitude: lng.toFixed(6)
                           }));
                         });
                       }
@@ -545,13 +545,13 @@ export default function AdminRoutes() {
                   </div>
 
                   <div className="flex bg-gray-200/50 p-1 rounded-2xl">
-                    <button 
+                    <button
                       onClick={() => setVillageForm(prev => ({ ...prev, isPolygon: false }))}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${!villageForm.isPolygon ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
                     >
                       <CircleIcon size={14} /> Circle
                     </button>
-                    <button 
+                    <button
                       onClick={() => setVillageForm(prev => ({ ...prev, isPolygon: true }))}
                       className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${villageForm.isPolygon ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
                     >
@@ -564,15 +564,15 @@ export default function AdminRoutes() {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village Name</label>
                       <div className="relative">
                         <Home className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                        <input 
-                          type="text" 
-                          placeholder="Search or enter village name..." 
-                          className="w-full bg-white border border-gray-100 pl-12 pr-10 py-4 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all" 
-                          value={villageForm.name} 
+                        <input
+                          type="text"
+                          placeholder="Search or enter village name..."
+                          className="w-full bg-white border border-gray-100 pl-12 pr-10 py-4 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
+                          value={villageForm.name}
                           onChange={e => {
-                            setVillageForm({...villageForm, name: e.target.value});
+                            setVillageForm({ ...villageForm, name: e.target.value });
                             searchVillages(e.target.value);
-                          }} 
+                          }}
                         />
                         {isSearchingVillage && (
                           <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -583,7 +583,7 @@ export default function AdminRoutes() {
                         {villageSuggestions.length > 0 && (
                           <div className="absolute left-0 right-0 top-full mt-2 bg-white rounded-2xl border border-gray-100 shadow-2xl z-[999] overflow-hidden animate-slide-up ring-4 ring-black/5">
                             <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                               <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Global Location Results</span>
+                              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Global Location Results</span>
                             </div>
                             <div className="max-h-[250px] overflow-y-auto custom-scrollbar">
                               {villageSuggestions.map((s, i) => (
@@ -617,10 +617,10 @@ export default function AdminRoutes() {
                           <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Geofence Radius</label>
                           <span className="text-xs font-black text-emerald-700 bg-emerald-100/50 px-2.5 py-1 rounded-lg">{villageForm.radius}m</span>
                         </div>
-                        <input 
-                          type="range" 
-                          min="100" 
-                          max="5000" 
+                        <input
+                          type="range"
+                          min="100"
+                          max="5000"
                           step="100"
                           className="w-full h-1.5 bg-emerald-100 rounded-lg appearance-none cursor-pointer accent-emerald-600"
                           value={villageForm.radius}
@@ -636,8 +636,8 @@ export default function AdminRoutes() {
                           ) : (
                             polygonPoints.map((p, i) => (
                               <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-indigo-50 shadow-sm">
-                                <span className="text-[10px] font-bold text-gray-600">Point {i+1}: {p[0].toFixed(4)}, {p[1].toFixed(4)}</span>
-                                <button 
+                                <span className="text-[10px] font-bold text-gray-600">Point {i + 1}: {p[0].toFixed(4)}, {p[1].toFixed(4)}</span>
+                                <button
                                   type="button"
                                   onClick={() => {
                                     const next = polygonPoints.filter((_, idx) => idx !== i);
@@ -666,18 +666,18 @@ export default function AdminRoutes() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Latitude</label>
-                        <input type="number" step="any" placeholder="0.0000" className="w-full bg-white border border-gray-100 p-4 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold" value={villageForm.latitude} onChange={e => setVillageForm({...villageForm, latitude: e.target.value})} />
+                        <input type="number" step="any" placeholder="0.0000" className="w-full bg-white border border-gray-100 p-4 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold" value={villageForm.latitude} onChange={e => setVillageForm({ ...villageForm, latitude: e.target.value })} />
                       </div>
                       <div className="space-y-1">
                         <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Longitude</label>
-                        <input type="number" step="any" placeholder="0.0000" className="w-full bg-white border border-gray-100 p-4 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold" value={villageForm.longitude} onChange={e => setVillageForm({...villageForm, longitude: e.target.value})} />
+                        <input type="number" step="any" placeholder="0.0000" className="w-full bg-white border border-gray-100 p-4 rounded-xl outline-none focus:border-emerald-500 text-xs font-bold" value={villageForm.longitude} onChange={e => setVillageForm({ ...villageForm, longitude: e.target.value })} />
                       </div>
                     </div>
 
                     <div className="pt-4 flex flex-col gap-3">
-                      <button 
-                        type="submit" 
-                        disabled={isSubmitting || (villageForm.isPolygon && polygonPoints.length < 3)} 
+                      <button
+                        type="submit"
+                        disabled={isSubmitting || (villageForm.isPolygon && polygonPoints.length < 3)}
                         className="w-full bg-emerald-600 text-white p-5 rounded-3xl font-black text-sm uppercase tracking-[0.2em] shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50"
                       >
                         {isSubmitting ? 'Syncing...' : 'Confirm Village Area'}
@@ -692,9 +692,9 @@ export default function AdminRoutes() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Search villages..." 
+                  <input
+                    type="text"
+                    placeholder="Search villages..."
                     className="w-full bg-white border border-gray-100 pl-12 pr-4 py-3.5 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
                     value={villageSearchQuery}
                     onChange={(e) => setVillageSearchQuery(e.target.value)}
@@ -751,16 +751,16 @@ export default function AdminRoutes() {
                                 </div>
                               </td>
                               <td className="px-8 py-4 text-center">
-                                 <div className="flex flex-col items-center gap-0.5">
-                                   <div className={`w-2 h-2 rounded-full ${v.latitude && v.longitude ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-gray-200'}`} />
-                                   <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
-                                     {v.latitude && v.longitude ? 'Geocoded' : 'Missing Area'}
-                                   </span>
-                                 </div>
+                                <div className="flex flex-col items-center gap-0.5">
+                                  <div className={`w-2 h-2 rounded-full ${v.latitude && v.longitude ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-gray-200'}`} />
+                                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
+                                    {v.latitude && v.longitude ? 'Geocoded' : 'Missing Area'}
+                                  </span>
+                                </div>
                               </td>
                               <td className="px-8 py-4">
                                 <div className="flex items-center justify-end gap-2 outline-none">
-                                  <a 
+                                  <a
                                     href={`https://www.google.com/maps?q=${encodeURIComponent(v.name + ' village')}`}
                                     target="_blank"
                                     rel="noopener noreferrer"
@@ -770,23 +770,23 @@ export default function AdminRoutes() {
                                     <MapPin size={15} />
                                   </a>
                                   {can('ROUTES', 'UPDATE') && (
-                                    <button 
-                                      onClick={() => { 
-                                        setVillageForm({ 
-                                          id: v.id, 
-                                          name: v.name, 
-                                          latitude: v.latitude || '', 
-                                          longitude: v.longitude || '', 
+                                    <button
+                                      onClick={() => {
+                                        setVillageForm({
+                                          id: v.id,
+                                          name: v.name,
+                                          latitude: v.latitude || '',
+                                          longitude: v.longitude || '',
                                           radius: v.radius || 500,
                                           isPolygon: v.isPolygon || false,
                                           boundary: v.boundary || null
-                                        }); 
+                                        });
                                         if (v.boundary && v.boundary.coordinates) {
                                           setPolygonPoints(v.boundary.coordinates[0].map(c => [c[1], c[0]]));
                                         } else {
                                           setPolygonPoints([]);
                                         }
-                                        setIsVillageEditorOpen(true); 
+                                        setIsVillageEditorOpen(true);
                                       }}
                                       className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"
                                     >
@@ -794,7 +794,7 @@ export default function AdminRoutes() {
                                     </button>
                                   )}
                                   {can('ROUTES', 'DELETE') && (
-                                    <button 
+                                    <button
                                       onClick={() => handleDeleteVillage(v.id)}
                                       className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"
                                     >
@@ -814,49 +814,49 @@ export default function AdminRoutes() {
 
               {totalVillagePages > 1 && (
                 <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm mt-4">
-                   <div className="flex items-center gap-2">
-                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                       Showing {(villagePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(villagePage * ITEMS_PER_PAGE, filteredVillages.length)} of {filteredVillages.length}
-                     </p>
-                   </div>
-                   
-                   <div className="flex items-center gap-1.5">
-                     <button
-                       onClick={() => setVillagePage(prev => Math.max(1, prev - 1))}
-                       disabled={villagePage === 1}
-                       className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
-                     >
-                       <ChevronLeft size={16} />
-                     </button>
-                     
-                     <div className="flex items-center gap-1">
-                       {[...Array(totalVillagePages)].map((_, i) => {
-                         const pageNum = i + 1;
-                         if (pageNum === 1 || pageNum === totalVillagePages || (pageNum >= villagePage - 1 && pageNum <= villagePage + 1)) {
-                           return (
-                             <button
-                               key={pageNum}
-                               onClick={() => setVillagePage(pageNum)}
-                               className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${villagePage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
-                             >
-                               {pageNum}
-                             </button>
-                           );
-                         } else if (pageNum === villagePage - 2 || pageNum === villagePage + 2) {
-                           return <span key={pageNum} className="text-gray-300 px-1">...</span>;
-                         }
-                         return null;
-                       })}
-                     </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                      Showing {(villagePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(villagePage * ITEMS_PER_PAGE, filteredVillages.length)} of {filteredVillages.length}
+                    </p>
+                  </div>
 
-                     <button
-                       onClick={() => setVillagePage(prev => Math.min(totalVillagePages, prev + 1))}
-                       disabled={villagePage === totalVillagePages}
-                       className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
-                     >
-                       <ChevronRight size={16} />
-                     </button>
-                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setVillagePage(prev => Math.max(1, prev - 1))}
+                      disabled={villagePage === 1}
+                      className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {[...Array(totalVillagePages)].map((_, i) => {
+                        const pageNum = i + 1;
+                        if (pageNum === 1 || pageNum === totalVillagePages || (pageNum >= villagePage - 1 && pageNum <= villagePage + 1)) {
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setVillagePage(pageNum)}
+                              className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${villagePage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        } else if (pageNum === villagePage - 2 || pageNum === villagePage + 2) {
+                          return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                        }
+                        return null;
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => setVillagePage(prev => Math.min(totalVillagePages, prev + 1))}
+                      disabled={villagePage === totalVillagePages}
+                      className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -871,7 +871,7 @@ export default function AdminRoutes() {
             <div className="space-y-6">
               <div className="flex items-center justify-between bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
                 <div className="flex items-center gap-4">
-                  <button 
+                  <button
                     onClick={() => setIsRouteEditorOpen(false)}
                     className="p-3 hover:bg-gray-50 rounded-2xl text-gray-400 hover:text-emerald-600 transition-all"
                   >
@@ -884,84 +884,32 @@ export default function AdminRoutes() {
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Group villages into an operational cluster</p>
                   </div>
                 </div>
-                <button 
-                  onClick={handleSaveRoute}
-                  disabled={isSubmitting || !routeForm.routeName || routeForm.selectedVillages.length === 0}
-                  className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
-                >
-                  {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Cluster'}
-                </button>
+                <div className="flex flex-col items-end gap-1">
+                  <button
+                    onClick={handleSaveRoute}
+                    disabled={isSubmitting || !routeForm.routeName || routeForm.selectedVillages.length === 0}
+                    className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98] disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Cluster'}
+                  </button>
+                  {!routeForm.routeName && <span className="text-[8px] font-bold text-rose-500 uppercase tracking-tighter">* Enter Route Name</span>}
+                  {routeForm.selectedVillages.length === 0 && <span className="text-[8px] font-bold text-rose-500 uppercase tracking-tighter">* Select Villages Below</span>}
+                </div>
               </div>
 
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-280px)]">
-                {/* Map View */}
-                <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden relative group">
-                  <MapContainer 
-                    center={[17.3850, 78.4867]} 
-                    zoom={11} 
-                    style={{ height: '100%', width: '100%' }}
-                    className="z-0"
-                  >
-                    <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-                    {(() => {
-                      const selectedVillageData = villages.filter(v => routeForm.selectedVillages.includes(v.name));
-                      if (selectedVillageData.length === 0) return null;
-                      
-                      const points = selectedVillageData.map(v => [v.latitude, v.longitude]);
-                      return (
-                        <>
-                          <MapUpdater points={points} center={points.length === 1 ? points[0] : null} />
-                          {selectedVillageData.map(v => (
-                            <Marker key={v.id} position={[v.latitude, v.longitude]}>
-                              <Tooltip permanent direction="top" offset={[0, -10]}>
-                                <div className="font-bold text-[10px] uppercase tracking-tighter text-emerald-700 bg-white/90 px-1.5 py-0.5 rounded shadow-sm border border-emerald-100">
-                                  {v.name}
-                                </div>
-                              </Tooltip>
-                              <Popup>
-                                <div className="p-2 font-bold text-xs uppercase tracking-widest text-emerald-700">{v.name}</div>
-                              </Popup>
-                              {v.isPolygon && v.boundary && (
-                                <Polygon 
-                                  positions={v.boundary.coordinates[0].map(c => [c[1], c[0]])} 
-                                  pathOptions={{ color: '#10b981', dashArray: '5, 10', fillOpacity: 0.1 }}
-                                />
-                              )}
-                              {!v.isPolygon && (
-                                <Circle 
-                                  center={[v.latitude, v.longitude]} 
-                                  radius={v.radius || 500}
-                                  pathOptions={{ color: '#10b981', dashArray: '5, 10', fillOpacity: 0.1 }}
-                                />
-                              )}
-                            </Marker>
-                          ))}
-                        </>
-                      );
-                    })()}
-                  </MapContainer>
-                  <div className="absolute top-6 left-6 z-[10] flex flex-col gap-2">
-                    <div className="bg-white/90 backdrop-blur-md px-4 py-2 rounded-xl shadow-lg border border-emerald-100 flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-[10px] font-black text-gray-700 uppercase tracking-widest">
-                        {routeForm.selectedVillages.length} Villages Visualized
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
+              <div className="flex flex-col gap-6 h-[calc(100vh-280px)]">
                 {/* Selection Panel */}
-                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 overflow-y-auto custom-scrollbar flex flex-col gap-6">
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 overflow-y-auto custom-scrollbar flex flex-col gap-6 flex-1">
                   <div className="space-y-2">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Route Name</label>
                     <div className="relative">
                       <LayoutGrid className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                      <input 
-                        type="text" 
-                        placeholder="e.g. Hyderabad North Cluster" 
-                        className="w-full bg-white border border-gray-100 pl-12 pr-4 py-4 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all" 
-                        value={routeForm.routeName} 
-                        onChange={e => setRouteForm({...routeForm, routeName: e.target.value})} 
+                      <input
+                        type="text"
+                        placeholder="e.g. Hyderabad North Cluster"
+                        className="w-full bg-white border border-gray-100 pl-12 pr-4 py-4 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
+                        value={routeForm.routeName}
+                        onChange={e => setRouteForm({ ...routeForm, routeName: e.target.value })}
                       />
                     </div>
                   </div>
@@ -971,7 +919,7 @@ export default function AdminRoutes() {
                       <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Village Selection</label>
                       <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded">Select to map</span>
                     </div>
-                    
+
                     <div className="grid grid-cols-1 gap-2 overflow-y-auto pr-2 custom-scrollbar">
                       {(() => {
                         const assignedVillages = routes.reduce((acc, r) => {
@@ -986,19 +934,19 @@ export default function AdminRoutes() {
                         if (availableVillages.length === 0) return <p className="text-[10px] text-gray-400 italic p-4 text-center">No villages available for clustering</p>;
 
                         return availableVillages.map(v => (
-                          <label 
-                            key={v.id} 
+                          <label
+                            key={v.id}
                             className={`p-4 rounded-2xl border cursor-pointer flex items-center justify-between transition-all group ${routeForm.selectedVillages.includes(v.name) ? 'bg-emerald-50 border-emerald-200 shadow-sm' : 'bg-white border-gray-50 hover:border-emerald-100 hover:bg-gray-50/50'}`}
                           >
                             <div className="flex items-center gap-3">
-                              <input 
-                                type="checkbox" 
-                                className="hidden" 
-                                checked={routeForm.selectedVillages.includes(v.name)} 
-                                onChange={() => handleToggleRouteVillage(v.name)} 
+                              <input
+                                type="checkbox"
+                                className="hidden"
+                                checked={routeForm.selectedVillages.includes(v.name)}
+                                onChange={() => handleToggleRouteVillage(v.name)}
                               />
                               <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${routeForm.selectedVillages.includes(v.name) ? 'bg-emerald-500 border-emerald-500' : 'bg-white border-gray-200 group-hover:border-emerald-300'}`}>
-                                {routeForm.selectedVillages.includes(v.name) && <Check size={12} className="text-white" strokeWidth={4}/>}
+                                {routeForm.selectedVillages.includes(v.name) && <CheckCircle2 size={12} className="text-white" strokeWidth={4} />}
                               </div>
                               <div className="flex flex-col">
                                 <span className={`text-sm font-black uppercase tracking-tight ${routeForm.selectedVillages.includes(v.name) ? 'text-emerald-900' : 'text-gray-700'}`}>{v.name}</span>
@@ -1019,9 +967,9 @@ export default function AdminRoutes() {
               <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="relative flex-1 max-w-md">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-                  <input 
-                    type="text" 
-                    placeholder="Search clusters..." 
+                  <input
+                    type="text"
+                    placeholder="Search clusters..."
                     className="w-full bg-white border border-gray-100 pl-12 pr-4 py-3.5 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
                     value={routeSearchQuery}
                     onChange={(e) => setRouteSearchQuery(e.target.value)}
@@ -1089,22 +1037,22 @@ export default function AdminRoutes() {
                             <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-2 transition-all">
                                 {can('ROUTES', 'UPDATE') && (
-                                  <button 
-                                    onClick={() => { 
-                                      setRouteForm({ 
-                                        id: r.id, 
-                                        routeName: r.routeName, 
-                                        selectedVillages: r.villages || [] 
-                                      }); 
-                                      setIsRouteEditorOpen(true); 
-                                    }} 
+                                  <button
+                                    onClick={() => {
+                                      setRouteForm({
+                                        id: r.id,
+                                        routeName: r.routeName,
+                                        selectedVillages: r.villages || []
+                                      });
+                                      setIsRouteEditorOpen(true);
+                                    }}
                                     className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 shadow-sm transition-all"
                                   >
-                                    <Pencil size={15}/>
+                                    <Pencil size={15} />
                                   </button>
                                 )}
                                 {can('ROUTES', 'DELETE') && (
-                                  <button onClick={async () => { if(window.confirm('Delete?')){ await routeService.deleteRoute(r.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><Trash2 size={15}/></button>
+                                  <button onClick={async () => { if (window.confirm('Delete?')) { await routeService.deleteRoute(r.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><Trash2 size={15} /></button>
                                 )}
                               </div>
                             </td>
@@ -1118,49 +1066,49 @@ export default function AdminRoutes() {
 
               {totalRoutePages > 1 && (
                 <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm mt-4">
-                   <div className="flex items-center gap-2">
-                     <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                       Showing {(routePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(routePage * ITEMS_PER_PAGE, filteredRoutes.length)} of {filteredRoutes.length}
-                     </p>
-                   </div>
-                   
-                   <div className="flex items-center gap-1.5">
-                     <button
-                       onClick={() => setRoutePage(prev => Math.max(1, prev - 1))}
-                       disabled={routePage === 1}
-                       className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
-                     >
-                       <ChevronLeft size={16} />
-                     </button>
-                     
-                     <div className="flex items-center gap-1">
-                       {[...Array(totalRoutePages)].map((_, i) => {
-                         const pageNum = i + 1;
-                         if (pageNum === 1 || pageNum === totalRoutePages || (pageNum >= routePage - 1 && pageNum <= routePage + 1)) {
-                           return (
-                             <button
-                               key={pageNum}
-                               onClick={() => setRoutePage(pageNum)}
-                               className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${routePage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
-                             >
-                               {pageNum}
-                             </button>
-                           );
-                         } else if (pageNum === routePage - 2 || pageNum === routePage + 2) {
-                           return <span key={pageNum} className="text-gray-300 px-1">...</span>;
-                         }
-                         return null;
-                       })}
-                     </div>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                      Showing {(routePage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(routePage * ITEMS_PER_PAGE, filteredRoutes.length)} of {filteredRoutes.length}
+                    </p>
+                  </div>
 
-                     <button
-                       onClick={() => setRoutePage(prev => Math.min(totalRoutePages, prev + 1))}
-                       disabled={routePage === totalRoutePages}
-                       className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
-                     >
-                       <ChevronRight size={16} />
-                     </button>
-                   </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={() => setRoutePage(prev => Math.max(1, prev - 1))}
+                      disabled={routePage === 1}
+                      className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                    >
+                      <ChevronLeft size={16} />
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      {[...Array(totalRoutePages)].map((_, i) => {
+                        const pageNum = i + 1;
+                        if (pageNum === 1 || pageNum === totalRoutePages || (pageNum >= routePage - 1 && pageNum <= routePage + 1)) {
+                          return (
+                            <button
+                              key={pageNum}
+                              onClick={() => setRoutePage(pageNum)}
+                              className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${routePage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                            >
+                              {pageNum}
+                            </button>
+                          );
+                        } else if (pageNum === routePage - 2 || pageNum === routePage + 2) {
+                          return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                        }
+                        return null;
+                      })}
+                    </div>
+
+                    <button
+                      onClick={() => setRoutePage(prev => Math.min(totalRoutePages, prev + 1))}
+                      disabled={routePage === totalRoutePages}
+                      className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                    >
+                      <ChevronRight size={16} />
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -1174,9 +1122,9 @@ export default function AdminRoutes() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div className="relative flex-1 max-w-md">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={18} />
-              <input 
-                type="text" 
-                placeholder="Search assignments (agent, route, vehicle)..." 
+              <input
+                type="text"
+                placeholder="Search assignments (agent, route, vehicle)..."
                 className="w-full bg-white border border-gray-100 pl-12 pr-4 py-3.5 rounded-2xl outline-none focus:border-emerald-500 font-bold text-sm shadow-sm transition-all"
                 value={assignmentSearchQuery}
                 onChange={(e) => setAssignmentSearchQuery(e.target.value)}
@@ -1202,7 +1150,7 @@ export default function AdminRoutes() {
               <div className="grid grid-cols-1 md:hidden gap-4">
                 {(() => {
                   if (paginatedAssignments.length === 0) return <div className="text-center py-10 text-gray-400 font-bold text-xs uppercase italic bg-white rounded-3xl border border-gray-100">No matching assignments</div>;
-                  
+
                   return paginatedAssignments.map(a => (
                     <div key={a.id} className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col gap-4">
                       <div className="flex justify-between items-center pb-3 border-b border-gray-50">
@@ -1210,30 +1158,30 @@ export default function AdminRoutes() {
                         <div className="flex gap-1">
                           {can('ROUTES', 'UPDATE') && (
                             <button onClick={() => {
-                                setAssignmentForm({
-                                  id: a.id,
-                                  vehicleId: a.vehicleId,
-                                  userId: a.userId,
-                                  routeId: a.routeId,
-                                  morningSession: a.morningSession || '',
-                                  afternoonSession: a.afternoonSession || '',
-                                  schedule: a.schedule || null
-                                });
-                                setShowAssignModal(true);
-                            }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15}/></button>
+                              setAssignmentForm({
+                                id: a.id,
+                                vehicleId: a.vehicleId,
+                                userId: a.userId,
+                                routeId: a.routeId,
+                                morningSession: a.morningSession || '',
+                                afternoonSession: a.afternoonSession || '',
+                                schedule: a.schedule || null
+                              });
+                              setShowAssignModal(true);
+                            }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15} /></button>
                           )}
                           {can('ROUTES', 'DELETE') && (
-                            <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15}/></button>
+                            <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15} /></button>
                           )}
                         </div>
                       </div>
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><Truck size={10}/> Vehicle</span>
+                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><Truck size={10} /> Vehicle</span>
                           <span className="text-sm font-black text-gray-800 leading-none">{a.vehicle?.vehicleNumber}</span>
                         </div>
                         <div className="flex flex-col gap-1">
-                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><User size={10}/> Agent</span>
+                          <span className="text-[10px] text-gray-400 font-black uppercase tracking-widest flex items-center gap-1.5"><User size={10} /> Agent</span>
                           <span className="text-sm font-black text-gray-800 leading-none">{a.user?.name}</span>
                         </div>
                       </div>
@@ -1347,10 +1295,10 @@ export default function AdminRoutes() {
                                     schedule: a.schedule || null
                                   });
                                   setShowAssignModal(true);
-                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15}/></button>
+                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15} /></button>
                               )}
                               {can('ROUTES', 'DELETE') && (
-                                <button onClick={async () => { if(window.confirm('Remove?')){ await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15}/></button>
+                                <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15} /></button>
                               )}
                             </div>
                           </td>
@@ -1365,49 +1313,49 @@ export default function AdminRoutes() {
 
           {totalAssignmentPages > 1 && (
             <div className="flex items-center justify-between bg-white px-8 py-4 rounded-[2rem] border border-gray-100 shadow-sm mt-4">
-               <div className="flex items-center gap-2">
-                 <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
-                   Showing {(assignmentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(assignmentPage * ITEMS_PER_PAGE, filteredAssignments.length)} of {filteredAssignments.length}
-                 </p>
-               </div>
-               
-               <div className="flex items-center gap-1.5">
-                 <button
-                   onClick={() => setAssignmentPage(prev => Math.max(1, prev - 1))}
-                   disabled={assignmentPage === 1}
-                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
-                 >
-                   <ChevronLeft size={16} />
-                 </button>
-                 
-                 <div className="flex items-center gap-1">
-                   {[...Array(totalAssignmentPages)].map((_, i) => {
-                     const pageNum = i + 1;
-                     if (pageNum === 1 || pageNum === totalAssignmentPages || (pageNum >= assignmentPage - 1 && pageNum <= assignmentPage + 1)) {
-                       return (
-                         <button
-                           key={pageNum}
-                           onClick={() => setAssignmentPage(pageNum)}
-                           className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
-                         >
-                           {pageNum}
-                         </button>
-                       );
-                     } else if (pageNum === assignmentPage - 2 || pageNum === assignmentPage + 2) {
-                       return <span key={pageNum} className="text-gray-300 px-1">...</span>;
-                     }
-                     return null;
-                   })}
-                 </div>
+              <div className="flex items-center gap-2">
+                <p className="text-[10px] font-black uppercase text-gray-400 tracking-widest">
+                  Showing {(assignmentPage - 1) * ITEMS_PER_PAGE + 1}-{Math.min(assignmentPage * ITEMS_PER_PAGE, filteredAssignments.length)} of {filteredAssignments.length}
+                </p>
+              </div>
 
-                 <button
-                   onClick={() => setAssignmentPage(prev => Math.min(totalAssignmentPages, prev + 1))}
-                   disabled={assignmentPage === totalAssignmentPages}
-                   className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
-                 >
-                   <ChevronRight size={16} />
-                 </button>
-               </div>
+              <div className="flex items-center gap-1.5">
+                <button
+                  onClick={() => setAssignmentPage(prev => Math.max(1, prev - 1))}
+                  disabled={assignmentPage === 1}
+                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+
+                <div className="flex items-center gap-1">
+                  {[...Array(totalAssignmentPages)].map((_, i) => {
+                    const pageNum = i + 1;
+                    if (pageNum === 1 || pageNum === totalAssignmentPages || (pageNum >= assignmentPage - 1 && pageNum <= assignmentPage + 1)) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => setAssignmentPage(pageNum)}
+                          className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (pageNum === assignmentPage - 2 || pageNum === assignmentPage + 2) {
+                      return <span key={pageNum} className="text-gray-300 px-1">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => setAssignmentPage(prev => Math.min(totalAssignmentPages, prev + 1))}
+                  disabled={assignmentPage === totalAssignmentPages}
+                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -1419,13 +1367,13 @@ export default function AdminRoutes() {
       {showAssignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-indigo-500"/> Assign Route</h3>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-indigo-500" /> Assign Route</h3>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Route <span className="text-rose-500">*</span></label>
                 <select className="w-full bg-gray-50 border p-3 rounded-xl outline-none font-medium" value={assignmentForm.routeId} onChange={e => {
                   const r = routes.find(x => x.id === e.target.value);
-                  setAssignmentForm({...assignmentForm, routeId: e.target.value, morningSession: '', afternoonSession: ''});
+                  setAssignmentForm({ ...assignmentForm, routeId: e.target.value, morningSession: '', afternoonSession: '' });
                 }}>
                   <option value="">Select Route</option>
                   {routes.map(r => <option key={r.id} value={r.id}>{r.routeName}</option>)}
@@ -1437,8 +1385,8 @@ export default function AdminRoutes() {
                 <select className="w-full bg-gray-50 border p-3 rounded-xl outline-none font-medium" value={assignmentForm.userId} onChange={e => {
                   const u = users.find(x => x.id === e.target.value);
                   setAssignmentForm({
-                    ...assignmentForm, 
-                    userId: e.target.value, 
+                    ...assignmentForm,
+                    userId: e.target.value,
                     vehicleId: u?.assignedVehicleId || ''
                   });
                 }}>
@@ -1457,53 +1405,53 @@ export default function AdminRoutes() {
                 const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
                 if (!assignmentForm.schedule) {
-                   assignmentForm.schedule = daysOfWeek.reduce((acc, d) => ({
-                      ...acc, 
-                      [d]: { morning: '', evening: '' }
-                   }), {});
+                  assignmentForm.schedule = daysOfWeek.reduce((acc, d) => ({
+                    ...acc,
+                    [d]: { morning: '', evening: '' }
+                  }), {});
                 }
 
                 return (
                   <div className="space-y-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between">
-                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Weekly Field Schedule <span className="text-rose-500">*</span></label>
-                       <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
+                      <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Weekly Field Schedule <span className="text-rose-500">*</span></label>
+                      <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
                     </div>
 
                     <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
-                       {daysOfWeek.map(day => (
-                         <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-indigo-100 transition-all">
-                            <div className="flex items-center justify-between">
-                               <span className="text-xs font-black text-gray-900 uppercase tracking-tight">{day}</span>
-                            </div>
-                            
-                            <div className="grid grid-cols-2 gap-2">
-                               <select 
-                                 className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500" 
-                                 value={assignmentForm.schedule[day]?.morning || ''} 
-                                 onChange={e => setAssignmentForm({
-                                   ...assignmentForm, 
-                                   schedule: { ...assignmentForm.schedule, [day]: { ...assignmentForm.schedule[day], morning: e.target.value } }
-                                 })}
-                               >
-                                 <option value="">Mrng (Off)</option>
-                                 {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
-                               </select>
+                      {daysOfWeek.map(day => (
+                        <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-indigo-100 transition-all">
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-black text-gray-900 uppercase tracking-tight">{day}</span>
+                          </div>
 
-                               <select 
-                                 className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500" 
-                                 value={assignmentForm.schedule[day]?.evening || ''} 
-                                 onChange={e => setAssignmentForm({
-                                   ...assignmentForm, 
-                                   schedule: { ...assignmentForm.schedule, [day]: { ...assignmentForm.schedule[day], evening: e.target.value } }
-                                 })}
-                               >
-                                 <option value="">Evng (Off)</option>
-                                 {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
-                               </select>
-                            </div>
-                         </div>
-                       ))}
+                          <div className="grid grid-cols-2 gap-2">
+                            <select
+                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                              value={assignmentForm.schedule[day]?.morning || ''}
+                              onChange={e => setAssignmentForm({
+                                ...assignmentForm,
+                                schedule: { ...assignmentForm.schedule, [day]: { ...assignmentForm.schedule[day], morning: e.target.value } }
+                              })}
+                            >
+                              <option value="">Mrng (Off)</option>
+                              {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+
+                            <select
+                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                              value={assignmentForm.schedule[day]?.evening || ''}
+                              onChange={e => setAssignmentForm({
+                                ...assignmentForm,
+                                schedule: { ...assignmentForm.schedule, [day]: { ...assignmentForm.schedule[day], evening: e.target.value } }
+                              })}
+                            >
+                              <option value="">Evng (Off)</option>
+                              {routeVillages.map(v => <option key={v} value={v}>{v}</option>)}
+                            </select>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 );

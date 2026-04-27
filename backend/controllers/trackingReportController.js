@@ -22,14 +22,32 @@ export const getVillageVisitReport = async (req, res, next) => {
     if (storeId) where.shiftLog = { storeId };
     if (userId) where.userId = userId;
 
-    const activities = await prisma.villageActivity.findMany({
-      where,
-      include: {
-        user: { select: { name: true } },
-        village: { select: { name: true, radius: true } }
-      },
-      orderBy: { startTime: 'desc' }
-    });
+    let activities;
+    try {
+      activities = await prisma.villageActivity.findMany({
+        where,
+        include: {
+          user: { select: { name: true } },
+          village: { select: { name: true, radius: true } }
+        },
+        orderBy: { startTime: 'desc' }
+      });
+    } catch (prismaError) {
+      if (prismaError.message.includes('column') && prismaError.message.includes('subLocation')) {
+        console.warn('[TrackingReport] subLocation missing in DB, falling back.');
+        activities = await prisma.villageActivity.findMany({
+          where,
+          include: {
+            user: { select: { name: true } },
+            village: { select: { name: true, radius: true } }
+          },
+          orderBy: { startTime: 'desc' }
+        });
+        // Note: subLocation will be undefined in the results
+      } else {
+        throw prismaError;
+      }
+    }
 
     const report = activities.map(act => {
       const duration = act.endTime ? differenceInMinutes(new Date(act.endTime), new Date(act.startTime)) : 0;

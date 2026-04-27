@@ -46,12 +46,42 @@ export const getVillages = async (req, res, next) => {
         const where = { tenantId: req.user.tenantId };
         if (storeId) where.storeId = storeId;
 
-        const villages = await prisma.village.findMany({ 
-            where,
-            orderBy: { name: 'asc' } 
-        });
-        res.json(villages);
+        try {
+            const villages = await prisma.village.findMany({ 
+                where,
+                orderBy: { name: 'asc' } 
+            });
+            res.json(villages);
+        } catch (prismaError) {
+            console.error('[VillageControl] Prisma Error:', prismaError.message);
+            // Check if it's a "column does not exist" error
+            if (prismaError.message.includes('column') && prismaError.message.includes('does not exist')) {
+                console.warn('[VillageControl] Schema mismatch detected. Returning basic village data.');
+                // Fallback: Try to fetch only basic columns if boundary is missing
+                // In Prisma 7, we can't easily exclude, but we can select specifically
+                const basicVillages = await prisma.village.findMany({
+                    where,
+                    select: {
+                        id: true,
+                        name: true,
+                        tenantId: true,
+                        storeId: true,
+                        latitude: true,
+                        longitude: true,
+                        radius: true,
+                        status: true,
+                        createdAt: true,
+                        updatedAt: true
+                        // Exclude boundary and isPolygon if they might be missing
+                    },
+                    orderBy: { name: 'asc' }
+                });
+                return res.json(basicVillages);
+            }
+            throw prismaError;
+        }
     } catch (error) {
+        console.error('[VillageControl] GetVillages Error:', error);
         next(error);
     }
 };

@@ -304,7 +304,8 @@ export const locationCheckIn = async (req, res, next) => {
         const now = new Date();
         const hour = now.getHours();
 
-        const status = (hour >= 6 && hour < 9) ? "ON_TIME" : "LATE";
+        // On-time if checked in before 10:30 AM
+        const status = (hour >= 6 && (hour < 10 || (hour === 10 && now.getMinutes() <= 30))) ? "ON_TIME" : "LATE";
 
         // Validate location match
         let isLocationMatched = true;
@@ -321,20 +322,42 @@ export const locationCheckIn = async (req, res, next) => {
 
         const subLocation = await reverseGeocode(latitude, longitude);
 
-        const checkIn = await prisma.locationCheckIn.create({
-            data: {
-                tenantId,
-                userId,
-                date: dateString,
-                latitude,
-                longitude,
-                villageName,
-                subLocation,
-                status,
-                isLocationMatched,
-                time: now
+        let checkIn;
+        try {
+            checkIn = await prisma.locationCheckIn.create({
+                data: {
+                    tenantId,
+                    userId,
+                    date: dateString,
+                    latitude,
+                    longitude,
+                    villageName,
+                    subLocation,
+                    status,
+                    isLocationMatched,
+                    time: now
+                }
+            });
+        } catch (prismaError) {
+            if (prismaError.message.includes('Unknown argument') && prismaError.message.includes('subLocation')) {
+                console.warn('[RouteControl] subLocation missing in DB, retrying without it.');
+                checkIn = await prisma.locationCheckIn.create({
+                    data: {
+                        tenantId,
+                        userId,
+                        date: dateString,
+                        latitude,
+                        longitude,
+                        villageName,
+                        status,
+                        isLocationMatched,
+                        time: now
+                    }
+                });
+            } else {
+                throw prismaError;
             }
-        });
+        }
 
         res.json({ success: true, checkIn });
     } catch (error) {
@@ -348,11 +371,25 @@ export const locationCheckIn = async (req, res, next) => {
 export const getAllLocationCheckIns = async (req, res, next) => {
     try {
         const tenantId = req.user.tenantId || "VK001";
-        const checkIns = await prisma.locationCheckIn.findMany({
-            where: { tenantId },
-            include: { user: { select: { name: true, email: true, storeId: true } } },
-            orderBy: { createdAt: 'desc' }
-        });
+        let checkIns;
+        try {
+            checkIns = await prisma.locationCheckIn.findMany({
+                where: { tenantId },
+                include: { user: { select: { name: true, email: true, storeId: true } } },
+                orderBy: { createdAt: 'desc' }
+            });
+        } catch (prismaError) {
+            if (prismaError.message.includes('column') && prismaError.message.includes('subLocation')) {
+                console.warn('[RouteControl] subLocation missing in DB, falling back.');
+                checkIns = await prisma.locationCheckIn.findMany({
+                    where: { tenantId },
+                    include: { user: { select: { name: true, email: true, storeId: true } } },
+                    orderBy: { createdAt: 'desc' }
+                });
+            } else {
+                throw prismaError;
+            }
+        }
         res.json(checkIns);
     } catch (error) {
         next(error);
