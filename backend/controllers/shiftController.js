@@ -188,6 +188,7 @@ export const getShiftStatus = async (req, res, next) => {
 
     res.json({ activeShift });
   } catch (error) {
+    console.error('getShiftStatus error:', error);
     next(error);
   }
 };

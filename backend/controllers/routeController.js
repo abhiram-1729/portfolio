@@ -212,12 +212,8 @@ export const markCoverage = async (req, res, next) => {
 
         res.json({ success: true, coverage });
     } catch (error) {
-        console.error('getCoverageStatus error:', error);
-        res.status(500).json({ 
-          success: false, 
-          message: error.message || 'Failed to load coverage status',
-          error: process.env.NODE_ENV === 'development' ? error : undefined
-        });
+        console.error('markCoverage error:', error);
+        next(error);
     }
 };
 
@@ -270,6 +266,7 @@ export const getCoverageStatus = async (req, res, next) => {
             checkIn: checkIn || null
         });
     } catch (error) {
+        console.error('getCoverageStatus error:', error);
         next(error);
     }
 };
