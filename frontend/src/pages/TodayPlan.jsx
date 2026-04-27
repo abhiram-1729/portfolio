@@ -146,6 +146,12 @@ export default function TodayPlan() {
 
   const handleLocationCheckIn = () => {
     if (!hasPlan) return;
+    
+    if (!activeShift) {
+      toast.error('Please start your shift in the "Shift Tracking" menu first.');
+      return;
+    }
+
     setCheckingIn(true);
 
     if (!navigator.geolocation) {
@@ -217,11 +223,13 @@ export default function TodayPlan() {
     );
   }
 
-  const { today, tomorrow, tomorrowLabel, coverage } = statusData;
+  const { today, tomorrow, tomorrowLabel, coverage, shifts: configShifts } = statusData;
   const hasPlan = today && !today.message && !today.noVillage;
   const hasTomorrow = tomorrow && !tomorrow.message && !tomorrow.noVillage;
-  const currentHour = new Date().getHours();
-  const isBeforeNoon = currentHour < 14;
+  
+  const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+  const currentShift = (configShifts || []).find(s => currentTime >= s.startTime && currentTime <= s.endTime) || (configShifts ? configShifts[0] : null);
+  const sessionName = currentShift ? currentShift.name : (new Date().getHours() < 14 ? 'Morning' : 'Evening');
 
   return (
     <div className="min-h-screen pb-28 pt-6">
@@ -265,8 +273,8 @@ export default function TodayPlan() {
                   {today.routeName}
                 </span>
                 <span className="bg-white/15 backdrop-blur-sm px-3 py-1.5 rounded-xl text-[10px] font-black text-white uppercase tracking-wider border border-white/10 flex items-center gap-1.5">
-                  {isBeforeNoon ? <Sun size={12} /> : <Moon size={12} />}
-                  {isBeforeNoon ? 'Morning Session' : 'Evening Session'}
+                  {sessionName.toLowerCase().includes('evening') || sessionName.toLowerCase().includes('night') ? <Moon size={12} /> : <Sun size={12} />}
+                  {sessionName} Session
                 </span>
               </div>
             </div>

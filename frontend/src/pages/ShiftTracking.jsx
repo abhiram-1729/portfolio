@@ -18,6 +18,7 @@ import toast from 'react-hot-toast';
 
 export default function ShiftTracking() {
   const [activeShift, setActiveShift] = useState(null);
+  const [availableShifts, setAvailableShifts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
   const [location, setLocation] = useState(null);
@@ -33,6 +34,7 @@ export default function ShiftTracking() {
     try {
       const { data } = await shiftService.getShiftStatus();
       setActiveShift(data.activeShift);
+      setAvailableShifts(data.shifts || []);
     } catch (err) {
       toast.error('Failed to load shift status');
     } finally {
@@ -84,7 +86,7 @@ export default function ShiftTracking() {
         lon: coords.longitude,
         accuracy: coords.accuracy,
         facePhoto,
-        shiftType: type
+        shiftType: parseInt(type)
       });
 
       toast.success('Shift Started ✅');
@@ -156,22 +158,38 @@ export default function ShiftTracking() {
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              <button 
-                onClick={() => handleStartShift(1)}
-                disabled={actionLoading}
-                className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {actionLoading ? <Loader2 className="animate-spin" /> : <Play size={20} />}
-                Start Morning Shift (5:45 AM)
-              </button>
-              <button 
-                onClick={() => handleStartShift(2)}
-                disabled={actionLoading}
-                className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
-              >
-                {actionLoading ? <Loader2 className="animate-spin" /> : <Play size={20} />}
-                Start Evening Shift (3:30 PM)
-              </button>
+              {availableShifts.length > 0 ? (
+                availableShifts.map((shift, idx) => (
+                  <button 
+                    key={shift.id || idx}
+                    onClick={() => handleStartShift(idx + 1)}
+                    disabled={actionLoading}
+                    className={`w-full ${idx % 2 === 0 ? 'bg-emerald-600 shadow-emerald-600/20' : 'bg-indigo-600 shadow-indigo-600/20'} text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50`}
+                  >
+                    {actionLoading ? <Loader2 className="animate-spin" /> : <Play size={20} />}
+                    Start {shift.name} Shift ({shift.startTime})
+                  </button>
+                ))
+              ) : (
+                <>
+                  <button 
+                    onClick={() => handleStartShift(1)}
+                    disabled={actionLoading}
+                    className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {actionLoading ? <Loader2 className="animate-spin" /> : <Play size={20} />}
+                    Start Morning Shift (5:45 AM)
+                  </button>
+                  <button 
+                    onClick={() => handleStartShift(2)}
+                    disabled={actionLoading}
+                    className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-widest shadow-lg shadow-indigo-600/20 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                  >
+                    {actionLoading ? <Loader2 className="animate-spin" /> : <Play size={20} />}
+                    Start Evening Shift (3:30 PM)
+                  </button>
+                </>
+              )}
             </div>
           </div>
         ) : (

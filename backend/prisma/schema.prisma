@@ -769,6 +769,7 @@ model DailyCoverage {
   villageName String
   morningDone Boolean  @default(false)
   eveningDone Boolean  @default(false)
+  shiftStatus Json?
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1102,6 +1103,7 @@ model LocationCheckIn {
   latitude          Float
   longitude         Float
   villageName       String?
+  subLocation       String?
   status            String
   createdAt         DateTime @default(now())
   isLocationMatched Boolean  @default(true)

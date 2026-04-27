@@ -1,6 +1,7 @@
 import prisma from '../utils/prisma.js';
 import { format, addDays } from 'date-fns';
 import { reverseGeocode } from '../utils/geoUtils.js';
+import { getShiftsConfig } from './shiftController.js';
 
 // Helper: get all active vehicle assignments (used by cron)
 export const getAllActiveAssignments = async () => {
@@ -113,27 +114,7 @@ export const getTomorrowPlan = async (req, res, next) => {
 
 // Utility for coverage type determination
 // Helper: Get shifts configuration for the current store/tenant
-const getShiftsConfig = async (tenantId, storeId) => {
-    let settings = await prisma.businessSettings.findUnique({
-        where: { tenantId_storeId: { tenantId, storeId } }
-    });
-
-    if (!settings && storeId) {
-        settings = await prisma.businessSettings.findUnique({
-            where: { tenantId_storeId: { tenantId, storeId: null } }
-        });
-    }
-
-    if (settings && settings.shifts && Array.isArray(settings.shifts) && settings.shifts.length > 0) {
-        return settings.shifts;
-    }
-
-    // Default shifts if none configured
-    return [
-        { id: 'shift_1', name: 'Morning', startTime: '08:00', endTime: '14:00' },
-        { id: 'shift_2', name: 'Evening', startTime: '14:00', endTime: '20:00' }
-    ];
-};
+// (Moved to shiftController.js)
 
 export const getCoverageType = (date = new Date()) => {
     const hours = date.getHours();
@@ -341,10 +322,40 @@ export const locationCheckIn = async (req, res, next) => {
         const tenantId = req.user.tenantId || "VK001";
         const dateString = format(new Date(), 'yyyy-MM-dd');
         const now = new Date();
-        const hour = now.getHours();
+        const currentTimeStr = format(now, 'HH:mm');
+        
+        // Dynamic Status Calculation based on Shift
+        let status = "LATE";
+        
+        // 1. Find active shift
+        const activeShift = await prisma.shiftLog.findFirst({
+            where: { userId, date: dateString, status: 'STARTED' }
+        });
 
-        // On-time if checked in before 10:30 AM
-        const status = (hour >= 6 && (hour < 10 || (hour === 10 && now.getMinutes() <= 30))) ? "ON_TIME" : "LATE";
+        if (activeShift) {
+            const shifts = await getShiftsConfig(tenantId, req.user.storeId);
+            const shiftConfig = shifts.find((s, idx) => 
+                s.id === activeShift.shift || 
+                s.id === `shift_${activeShift.shift}` || 
+                (idx + 1) === activeShift.shift
+            );
+
+            if (shiftConfig && shiftConfig.startTime) {
+                // threshold = start time + 2.5 hours (matching legacy 8:00 -> 10:30 window)
+                const [sHour, sMin] = shiftConfig.startTime.split(':').map(Number);
+                const thresholdTime = new Date(now);
+                thresholdTime.setHours(sHour, sMin, 0, 0);
+                thresholdTime.setMinutes(thresholdTime.getMinutes() + 150); // + 2.5 hours
+                
+                if (now <= thresholdTime) {
+                    status = "ON_TIME";
+                }
+            }
+        } else {
+            // Legacy fallback if no active shift found
+            const hour = now.getHours();
+            status = (hour >= 6 && (hour < 10 || (hour === 10 && now.getMinutes() <= 30))) ? "ON_TIME" : "LATE";
+        }
 
         // Validate location match
         let isLocationMatched = true;
