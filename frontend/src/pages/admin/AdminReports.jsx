@@ -46,6 +46,9 @@ import {
   Pie,
   PieChart as RePieChart
 } from 'recharts';
+import { MapContainer, TileLayer, Marker, Popup, Polyline } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
+import L from 'leaflet';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -56,11 +59,26 @@ import { format } from 'date-fns';
 import { Printer } from 'lucide-react';
 import jsPDF from 'jspdf';
 
+const formatMinutesToHours = (totalMinutes) => {
+    const absMinutes = Math.abs(totalMinutes);
+    const h = Math.floor(absMinutes / 60);
+    const m = absMinutes % 60;
+    
+    let parts = [];
+    if (h > 0) parts.push(`${h} hour${h > 1 ? 's' : ''}`);
+    if (m > 0) parts.push(`${m} minute${m > 1 ? 's' : ''}`);
+    
+    if (parts.length === 0) return "0 minutes";
+    return parts.join(' and ');
+};
+
 export default function AdminReports() {
   const [activeTab, setActiveTab] = useState('overview');
+  const [subTab, setSubTab] = useState('live-map');
   
   // Data States
   const [reportData, setReportData] = useState(null);
+  const [trackingReportsData, setTrackingReportsData] = useState({});
   const [stores, setStores] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
@@ -332,8 +350,16 @@ export default function AdminReports() {
           setReportData(res.data);
           break;
         case 'location-tracking':
-          res = await adminAPI.getLocationCheckIns();
-          setReportData(res.data);
+          const [locRes, visitRes, devRes] = await Promise.all([
+            adminAPI.getLocationCheckIns(),
+            adminAPI.getTrackingVillageVisits(params),
+            adminAPI.getTrackingTimeDeviation(params)
+          ]);
+          setReportData(locRes.data);
+          setTrackingReportsData({
+            villageVisits: visitRes.data,
+            timeDeviation: devRes.data
+          });
           break;
         case 'vehicle-wise':
           res = await adminAPI.getVehicleAllPerformance(params);
@@ -651,46 +677,201 @@ export default function AdminReports() {
             </div>
         );
 
-      case 'location-tracking':
+      case 'location-tracking': {
+        // Custom icon for markers
+        const agentIcon = new L.Icon({
+            iconUrl: 'https://cdn-icons-png.flaticon.com/512/684/684908.png',
+            iconSize: [32, 32],
+            iconAnchor: [16, 32],
+            popupAnchor: [0, -32]
+        });
+
         return (
-            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in duration-500">
-                <div className="p-6 border-b border-gray-50 flex items-center gap-3">
-                    <div className="p-2.5 rounded-xl bg-rose-50 text-rose-600"><Navigation size={20} /></div>
-                    <h3 className="text-lg font-black text-gray-900 tracking-tight uppercase">Real-time Location Logs</h3>
+            <div className="space-y-6 animate-in fade-in duration-500">
+                {/* Sub Tabs */}
+                <div className="flex gap-2 p-1 bg-gray-100 rounded-2xl w-fit">
+                    <button 
+                        onClick={() => setSubTab('live-map')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTab === 'live-map' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        Live Tracking Map
+                    </button>
+                    <button 
+                        onClick={() => setSubTab('history')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTab === 'history' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        History
+                    </button>
+                    <button 
+                        onClick={() => setSubTab('village-visits')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTab === 'village-visits' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        Village Durations
+                    </button>
+                    <button 
+                        onClick={() => setSubTab('deviation')}
+                        className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${subTab === 'deviation' ? 'bg-white text-rose-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        Time Deviation
+                    </button>
                 </div>
-                <div className="overflow-x-auto">
-                    <table className="w-full text-left">
-                        <thead>
-                            <tr className="bg-gray-50/50">
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Location</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Type</th>
-                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Timestamp</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
+
+                {subTab === 'live-map' && (
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden h-[600px] relative">
+                        <MapContainer center={[20.5937, 78.9629]} zoom={5} style={{ height: '100%', width: '100%' }}>
+                            <TileLayer
+                                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+                            />
                             {Array.isArray(reportData) && reportData.map((log, i) => (
-                                <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                    <td className="px-6 py-4 text-sm font-black text-gray-800">{log.user?.name}</td>
-                                    <td className="px-6 py-4 text-sm font-bold text-gray-600 flex items-center gap-2">
-                                        <MapPin size={12} className="text-rose-500" />
-                                        {log.villageName || 'In-Transit'}
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded bg-gray-100 text-gray-600">
-                                            {log.checkInType}
-                                        </span>
-                                    </td>
-                                    <td className="px-6 py-4 text-xs font-bold text-gray-400">
-                                        {log.createdAt ? format(new Date(log.createdAt), 'hh:mm a') : 'N/A'}
-                                    </td>
-                                </tr>
+                                log.lat && log.long && (
+                                    <Marker key={i} position={[log.lat, log.long]} icon={agentIcon}>
+                                        <Popup>
+                                            <div className="p-2">
+                                                <p className="font-black text-gray-900">{log.user?.name}</p>
+                                                <p className="text-[10px] text-gray-500 uppercase font-bold">{log.villageName || 'In-Transit'}</p>
+                                                {log.subLocation && <p className="text-[9px] text-gray-400 italic mt-0.5 line-clamp-1">{log.subLocation}</p>}
+                                                <p className="text-[10px] text-rose-600 font-black mt-2">
+                                                    Last updated: {log.createdAt ? format(new Date(log.createdAt), 'hh:mm a') : 'N/A'}
+                                                </p>
+                                            </div>
+                                        </Popup>
+                                    </Marker>
+                                )
                             ))}
-                        </tbody>
-                    </table>
-                </div>
+                        </MapContainer>
+                    </div>
+                )}
+
+                {subTab === 'history' && (
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                            <h3 className="text-lg font-black text-gray-900 tracking-tight uppercase">Recent Geo-Logs</h3>
+                            <div className="flex gap-2">
+                                <span className="px-3 py-1 rounded-full bg-rose-50 text-rose-600 text-[10px] font-black uppercase tracking-widest">
+                                    {reportData.length} Total Logs
+                                </span>
+                            </div>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Location</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Type</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Timestamp</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {Array.isArray(reportData) && reportData.map((log, i) => (
+                                        <tr key={i} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-black text-gray-800">{log.user?.name}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-600 flex items-center gap-2">
+                                                <MapPin size={12} className="text-rose-500" />
+                                                <div className="flex flex-col">
+                                                    <span>{log.villageName || 'In-Transit'}</span>
+                                                    {log.subLocation && <span className="text-[10px] text-gray-400 font-normal italic">{log.subLocation}</span>}
+                                                </div>
+                                                <span className="text-[10px] opacity-40 ml-1">({log.lat?.toFixed(4)}, {log.long?.toFixed(4)})</span>
+                                            </td>
+                                            <td className="px-6 py-4">
+                                                <span className={`text-[9px] font-black uppercase px-2 py-0.5 rounded ${log.checkInType === 'SHIFT_START' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-600'}`}>
+                                                    {log.checkInType || 'BREADCRUMB'}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 text-xs font-bold text-gray-400">
+                                                {log.createdAt ? format(new Date(log.createdAt), 'hh:mm a') : 'N/A'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {subTab === 'village-visits' && (
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                            <h3 className="text-lg font-black text-gray-900 tracking-tight uppercase">Village Visit Durations</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Village</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Duration</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Time Range</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {trackingReportsData?.villageVisits?.map(log => (
+                                        <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-black text-gray-800">{log.agentName}</td>
+                                            <td className="px-6 py-4">
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-bold text-gray-600">{log.villageName}</span>
+                                                    {log.subLocation && <span className="text-[10px] text-gray-400 font-medium italic">{log.subLocation}</span>}
+                                                </div>
+                                            </td>
+                                            <td className="px-6 py-4 text-sm font-black text-emerald-600">{log.durationMinutes} mins</td>
+                                            <td className="px-6 py-4 text-xs font-bold text-gray-400">
+                                                {format(new Date(log.startTime), 'hh:mm a')} - {log.endTime ? format(new Date(log.endTime), 'hh:mm a') : 'Active'}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {!trackingReportsData?.villageVisits?.length && (
+                                        <tr>
+                                            <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-400 font-bold">No visits recorded for this period.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {subTab === 'deviation' && (
+                    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                        <div className="p-6 border-b border-gray-50 flex items-center justify-between">
+                            <h3 className="text-lg font-black text-gray-900 tracking-tight uppercase">Shift Time Deviation</h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Expected</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Actual</th>
+                                        <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Deviation</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {trackingReportsData?.timeDeviation?.map(log => (
+                                        <tr key={log.id} className="hover:bg-gray-50 transition-colors">
+                                            <td className="px-6 py-4 text-sm font-black text-gray-800">{log.agentName} ({log.shiftType})</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-600">{log.expectedTime}</td>
+                                            <td className="px-6 py-4 text-sm font-bold text-gray-600">{log.actualTime}</td>
+                                            <td className={`px-6 py-4 text-xs font-black ${log.status === 'LATE' ? 'text-rose-500' : 'text-emerald-500'}`}>
+                                                {log.deviationMinutes > 0 ? `+${formatMinutesToHours(log.deviationMinutes)} (Late)` : `${formatMinutesToHours(log.deviationMinutes)} (Early/On Time)`}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {!trackingReportsData?.timeDeviation?.length && (
+                                        <tr>
+                                            <td colSpan="4" className="px-6 py-8 text-center text-sm text-gray-400 font-bold">No shifts recorded for this period.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
             </div>
         );
+      }
 
       case 'payment-mode':
         const safeData = (reportData && typeof reportData === 'object' && !Array.isArray(reportData)) ? reportData : {};
@@ -877,7 +1058,7 @@ export default function AdminReports() {
 
   return (
     <div className="min-h-screen bg-[#FDFDFD] pb-20">
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-40 backdrop-blur-md bg-opacity-80">
+      <div className="bg-white border-b border-gray-100 sticky top-0 z-30 backdrop-blur-md bg-opacity-80">
         <div className="max-w-[1600px] mx-auto px-6 py-6 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">

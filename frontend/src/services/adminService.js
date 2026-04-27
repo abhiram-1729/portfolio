@@ -70,6 +70,8 @@ export const adminAPI = {
   getSessionReport: (params) => api.get('/admin/reports/sessions', { params }),
   getVehicleAllPerformance: (params) => api.get('/admin/reports/vehicle-all', { params }),
   getDamageReports: (params) => api.get('/damage/reports', { params }),
+  getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
+  getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),
   
   // Settings
   getSettings: (params) => api.get('/admin/settings', { params }).catch(err => {

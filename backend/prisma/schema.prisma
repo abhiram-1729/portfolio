@@ -63,10 +63,22 @@ model Tenant {
   vendorLedger             VendorLedger[]
   vendorPayments           VendorPayment[]
   vendorPaymentAllocations VendorPaymentAllocation[]
+  attendances              Attendance[]
+  // Damage & Deduction Relations
   damageEntries            DamageEntry[]
   damageDeductions         DamageDeduction[]
+  // Tracking Relations
+  shiftLogs                ShiftLog[]
+  villageActivities        VillageActivity[]
+  locationLogs             LocationLog[]
+  // ID Generation
   idSequences              IdSequence[]
-  attendances              Attendance[]
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
 }
 
 model User {
@@ -100,6 +112,8 @@ model User {
   refillRequests     RefillRequest[]
   notifications      Notification[]
   stockTransactions  StockTransaction[]    @relation("UserStockTransactions")
+  shiftLogs          ShiftLog[]
+  attendances        Attendance[]
   dailyPerformance   VgeDailyPerformance[] @relation("UserDailyPerformance")
   monthlySummaries   VgeMonthlySummary[]   @relation("UserMonthlySummary")
   assetAssignments   AssetAssignment[]
@@ -120,9 +134,10 @@ model User {
   deductionsApplied  DamageDeduction[]     @relation("DeductionApplier")
   safeTransactions   SafeTransaction[]
   openedRegisters    StoreCashRegister[]   @relation("OpenedRegisters")
-  approvedRefills    RefillRequest[]       @relation("ApprovedRefills")
   closedRegisters    StoreCashRegister[]   @relation("ClosedRegisters")
-  attendances        Attendance[]
+  villageActivities  VillageActivity[]
+  locationLogs       LocationLog[]
+  approvedRefills    RefillRequest[]       @relation("ApprovedRefills")
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -511,18 +526,21 @@ model RouteAssignment {
 }
 
 model Village {
-  id        String   @id @default(cuid())
-  name      String
-  status    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenantId  String   @default("VK001")
-  latitude  Float?
-  longitude Float?
-  storeId   String?
-  radius    Int      @default(500)
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  store     Store?   @relation(fields: [storeId], references: [id])
+  id         String            @id @default(cuid())
+  name       String
+  latitude   Float?
+  longitude  Float?
+  boundary   Json? // GeoJSON Polygon
+  isPolygon  Boolean           @default(false)
+  status     Boolean           @default(true)
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+  tenantId   String            @default("VK001")
+  storeId    String?
+  radius     Int               @default(500)
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  store      Store?            @relation(fields: [storeId], references: [id])
+  activities VillageActivity[]
 
   @@unique([tenantId, storeId, name])
   @@index([tenantId])
@@ -589,6 +607,8 @@ model BusinessSettings {
   email        String?
   address      String?
   taxRates     String   @default("0,5,12,18")
+  shifts       Json? // Array of { id, name, startTime, endTime, isActive }
+  shiftMode    String   @default("STANDARD")
   updatedAt    DateTime @updatedAt
   tenantId     String   @default("VK001")
   storeId      String?  @unique
@@ -788,26 +808,26 @@ model Notification {
 }
 
 model RefillRequest {
-  id        String       @id @default(cuid())
-  vehicleId String
-  userId    String
-  status    RefillStatus @default(PENDING)
-  createdAt DateTime     @default(now())
-  updatedAt DateTime     @updatedAt
-  tenantId  String       @default("VK001")
-  storeId   String?
-  parentId  String?
-  accuracy  Float?
-  amount    Float?
-  lat       Float?
-  long      Float?
-  photo     String?
+  id           String       @id @default(cuid())
+  vehicleId    String
+  userId       String
+  status       RefillStatus @default(PENDING)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  tenantId     String       @default("VK001")
+  storeId      String?
+  parentId     String?
+  accuracy     Float?
+  amount       Float?
+  lat          Float?
+  long         Float?
+  photo        String?
   approvedById String?
-  vehicle   Vehicle      @relation(fields: [vehicleId], references: [id])
-  user      User         @relation(fields: [userId], references: [id])
-  approvedBy User?       @relation("ApprovedRefills", fields: [approvedById], references: [id])
-  store     Store?       @relation(fields: [storeId], references: [id])
-  items     RefillItem[]
+  vehicle      Vehicle      @relation(fields: [vehicleId], references: [id])
+  user         User         @relation(fields: [userId], references: [id])
+  approvedBy   User?        @relation("ApprovedRefills", fields: [approvedById], references: [id])
+  store        Store?       @relation(fields: [storeId], references: [id])
+  items        RefillItem[]
 
   @@index([tenantId])
   @@index([vehicleId])
@@ -1113,6 +1133,8 @@ model Store {
   tenant                 Tenant                   @relation(fields: [tenantId], references: [id])
   users                  User[]
   vehicles               Vehicle[]
+  shiftLogs              ShiftLog[]
+  attendances            Attendance[]
   orders                 Order[]
   orderReturns           OrderReturn[]
   sessionSales           SessionSales[]
@@ -1157,7 +1179,6 @@ model Store {
   procurementStockLedger ProcurementStockLedger[]
   activityLogs           ActivityLog[]
   safeTransactions       SafeTransaction[]
-  attendances            Attendance[]
 
   @@index([tenantId])
 }
@@ -1669,75 +1690,6 @@ model SessionSales {
   @@index([agentId])
 }
 
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model LocationLog {
-  id        String   @id
-  tenantId  String   @default("VK001")
-  userId    String
-  lat       Float
-  long      Float
-  accuracy  Float?
-  timestamp DateTime @default(now())
-
-  @@index([tenantId])
-  @@index([timestamp])
-  @@index([userId])
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model ShiftLog {
-  id             String    @id
-  tenantId       String    @default("VK001")
-  storeId        String?
-  userId         String
-  vehicleId      String?
-  date           String
-  shift          Int       @default(1)
-  startTime      DateTime  @default(now())
-  endTime        DateTime?
-  startLat       Float
-  startLong      Float
-  startFacePhoto String?
-  endLat         Float?
-  endLong        Float?
-  status         String    @default("STARTED")
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime
-
-  @@index([date])
-  @@index([storeId])
-  @@index([tenantId])
-  @@index([userId])
-}
-
-/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
-model VillageActivity {
-  id          String    @id
-  tenantId    String    @default("VK001")
-  userId      String
-  shiftLogId  String
-  villageId   String?
-  villageName String
-  startTime   DateTime  @default(now())
-  endTime     DateTime?
-  startLat    Float
-  startLong   Float
-  endLat      Float?
-  endLong     Float?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime
-
-  @@index([shiftLogId])
-  @@index([tenantId])
-  @@index([userId])
-}
-
-enum TenantStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
-}
-
 enum ExpensePaymentMode {
   CASH
   UPI
@@ -1873,6 +1825,26 @@ enum RequestStatus {
   COMPLETED
 }
 
+model LocationLog {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("VK001")
+  userId      String
+  lat         Float
+  long        Float
+  accuracy    Float?
+  subLocation String?
+  timestamp   DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+// ─── PROCUREMENT, INVENTORY & ACCOUNTS PAYABLE ─────────────
+
 enum VendorStatus {
   ACTIVE
   INACTIVE
@@ -1960,26 +1932,26 @@ enum AttendanceStatus {
 }
 
 model Attendance {
-  id           String           @id @default(cuid())
-  userId       String
-  tenantId     String           @default("VK001")
-  storeId      String?
-  date         String
-  punchInTime  DateTime
-  punchOutTime DateTime?
-  status       AttendanceStatus @default(ACTIVE)
-  punchInLat   Float?
-  punchInLng   Float?
-  punchOutLat  Float?
-  punchOutLng  Float?
-  totalHours   Float?
-  punchInPhoto String?
-  punchInLocation String?
-  punchOutPhoto String?
+  id               String           @id @default(cuid())
+  userId           String
+  tenantId         String           @default("VK001")
+  storeId          String?
+  date             String
+  punchInTime      DateTime
+  punchOutTime     DateTime?
+  status           AttendanceStatus @default(ACTIVE)
+  punchInLat       Float?
+  punchInLng       Float?
+  punchOutLat      Float?
+  punchOutLng      Float?
+  totalHours       Float?
+  punchInPhoto     String?
+  punchInLocation  String?
+  punchOutPhoto    String?
   punchOutLocation String?
-  notes        String?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  notes            String?
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
 
   user   User   @relation(fields: [userId], references: [id])
   tenant Tenant @relation(fields: [tenantId], references: [id])
@@ -1990,4 +1962,61 @@ model Attendance {
   @@index([userId])
   @@index([date])
   @@index([storeId])
+}
+
+model ShiftLog {
+  id             String    @id @default(cuid())
+  tenantId       String    @default("VK001")
+  storeId        String?
+  userId         String
+  vehicleId      String?
+  date           String // YYYY-MM-DD
+  shift          Int       @default(1) // 1 = Morning, 2 = Afternoon
+  startTime      DateTime  @default(now())
+  endTime        DateTime?
+  startLat       Float
+  startLong      Float
+  startFacePhoto String?
+  endLat         Float?
+  endLong        Float?
+  status         String    @default("STARTED") // STARTED, COMPLETED
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  user       User              @relation(fields: [userId], references: [id])
+  tenant     Tenant            @relation(fields: [tenantId], references: [id])
+  store      Store?            @relation(fields: [storeId], references: [id])
+  activities VillageActivity[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+  @@index([storeId])
+}
+
+model VillageActivity {
+  id          String    @id @default(cuid())
+  tenantId    String    @default("VK001")
+  userId      String
+  shiftLogId  String
+  villageId   String?
+  villageName String
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  startLat    Float
+  startLong   Float
+  endLat      Float?
+  endLong     Float?
+  subLocation String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  shiftLog ShiftLog @relation(fields: [shiftLogId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id])
+  village  Village? @relation(fields: [villageId], references: [id])
+  tenant   Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([shiftLogId])
 }

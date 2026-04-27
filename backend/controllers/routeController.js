@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { format, addDays } from 'date-fns';
+import { reverseGeocode } from '../utils/geoUtils.js';
 
 // Helper: get all active vehicle assignments (used by cron)
 export const getAllActiveAssignments = async () => {
@@ -111,9 +112,32 @@ export const getTomorrowPlan = async (req, res, next) => {
 };
 
 // Utility for coverage type determination
+// Helper: Get shifts configuration for the current store/tenant
+const getShiftsConfig = async (tenantId, storeId) => {
+    let settings = await prisma.businessSettings.findUnique({
+        where: { tenantId_storeId: { tenantId, storeId } }
+    });
+
+    if (!settings && storeId) {
+        settings = await prisma.businessSettings.findUnique({
+            where: { tenantId_storeId: { tenantId, storeId: null } }
+        });
+    }
+
+    if (settings && settings.shifts && Array.isArray(settings.shifts) && settings.shifts.length > 0) {
+        return settings.shifts;
+    }
+
+    // Default shifts if none configured
+    return [
+        { id: 'shift_1', name: 'Morning', startTime: '08:00', endTime: '14:00' },
+        { id: 'shift_2', name: 'Evening', startTime: '14:00', endTime: '20:00' }
+    ];
+};
+
 export const getCoverageType = (date = new Date()) => {
     const hours = date.getHours();
-    return hours < 14 ? 'MORNING' : 'EVENING'; // Split at 2 PM
+    return hours < 14 ? 'MORNING' : 'EVENING'; // Legacy split
 };
 
 // @desc    Mark morning/evening coverage as done for a vehicle
@@ -121,17 +145,15 @@ export const getCoverageType = (date = new Date()) => {
 // @access  Private
 export const markCoverage = async (req, res, next) => {
     try {
-        const { slot } = req.body; // 'MORNING' | 'EVENING'
+        const { slot, shiftId, shiftName } = req.body; // Support both legacy slot and new shiftId/Name
         const vehicleId = req.user.assignedVehicleId;
+        const tenantId = req.user.tenantId;
+        const storeId = req.user.storeId;
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
         if (!vehicleId) {
             res.status(400);
             throw new Error('No vehicle assigned to this user');
-        }
-        if (!['MORNING', 'EVENING'].includes(slot)) {
-            res.status(400);
-            throw new Error('slot must be MORNING or EVENING');
         }
 
         // Get current plan for today
@@ -141,27 +163,38 @@ export const markCoverage = async (req, res, next) => {
             throw new Error('No active plan for today');
         }
 
+        // Fetch shifts to validate and map
+        const shifts = await getShiftsConfig(tenantId, storeId);
+        const activeShift = shifts.find(s => s.id === shiftId || s.name === shiftName || s.name.toUpperCase() === slot);
+        
+        const effectiveShiftName = activeShift ? activeShift.name : slot;
+
         // Upsert DailyCoverage record
         const existing = await prisma.dailyCoverage.findUnique({
             where: { vehicleId_date: { vehicleId, date: dateString } }
         });
 
-        let coverageStatus;
-        if (!existing) {
-            coverageStatus = slot === 'MORNING' ? 'MORNING_DONE' : 'EVENING_DONE';
-        } else if (existing.status === 'MORNING_DONE' && slot === 'EVENING') {
-            coverageStatus = 'BOTH_DONE';
-        } else if (existing.status === 'EVENING_DONE' && slot === 'MORNING') {
-            coverageStatus = 'BOTH_DONE';
-        } else {
-            coverageStatus = existing.status; // Already set
-        }
+        let shiftStatus = existing?.shiftStatus || {};
+        if (typeof shiftStatus !== 'object') shiftStatus = {};
+        
+        // Mark the specific shift as done
+        shiftStatus[effectiveShiftName] = true;
+
+        // Map back to legacy morning/evening if applicable for compatibility
+        const morningDone = effectiveShiftName.toUpperCase() === 'MORNING' || !!shiftStatus['Morning'];
+        const eveningDone = effectiveShiftName.toUpperCase() === 'EVENING' || !!shiftStatus['Evening'];
+
+        // Calculate overall status
+        const allDone = shifts.every(s => shiftStatus[s.name]);
+        const coverageStatus = allDone ? 'BOTH_DONE' : (Object.keys(shiftStatus).length > 0 ? 'PARTIAL' : 'PENDING');
 
         const coverage = await prisma.dailyCoverage.upsert({
             where: { vehicleId_date: { vehicleId, date: dateString } },
             update: {
                 status: coverageStatus,
-                [`${slot.toLowerCase()}Done`]: true,
+                shiftStatus: shiftStatus,
+                morningDone,
+                eveningDone,
                 villageName: plan.villageName,
                 routeId: plan.routeId,
             },
@@ -171,13 +204,15 @@ export const markCoverage = async (req, res, next) => {
                 villageName: plan.villageName,
                 routeId: plan.routeId,
                 status: coverageStatus,
-                morningDone: slot === 'MORNING',
-                eveningDone: slot === 'EVENING',
+                shiftStatus: shiftStatus,
+                morningDone,
+                eveningDone,
             }
         });
 
         res.json({ success: true, coverage });
     } catch (error) {
+        console.error('markCoverage error:', error);
         next(error);
     }
 };
@@ -189,23 +224,26 @@ export const getCoverageStatus = async (req, res, next) => {
     try {
         const vehicleId = req.user.assignedVehicleId;
         const userId = req.user.id;
+        const tenantId = req.user.tenantId;
+        const storeId = req.user.storeId;
         const dateString = format(new Date(), 'yyyy-MM-dd');
 
         if (!vehicleId) return res.json({ vehicleAssigned: false });
 
-        const [coverage, checkIn] = await Promise.all([
+        const [coverage, checkIn, shifts] = await Promise.all([
             prisma.dailyCoverage.findUnique({
                 where: { vehicleId_date: { vehicleId, date: dateString } }
             }),
             prisma.locationCheckIn.findFirst({
                 where: { userId, date: dateString },
                 orderBy: { createdAt: 'desc' }
-            })
+            }),
+            getShiftsConfig(tenantId, storeId)
         ]);
 
         const plan = await fetchPlanForVehicle(vehicleId);
 
-        // Find next working day with a plan (skip empty days like Sunday)
+        // Find next working day with a plan
         let nextPlan = null;
         let nextPlanDate = null;
         for (let i = 1; i <= 6; i++) {
@@ -223,10 +261,12 @@ export const getCoverageStatus = async (req, res, next) => {
             today: plan,
             tomorrow: nextPlan,
             tomorrowLabel: nextPlanDate || 'Tomorrow',
-            coverage: coverage || { morningDone: false, eveningDone: false, status: 'PENDING' },
+            coverage: coverage || { morningDone: false, eveningDone: false, shiftStatus: {}, status: 'PENDING' },
+            shifts: shifts, // Include dynamic shifts in response
             checkIn: checkIn || null
         });
     } catch (error) {
+        console.error('getCoverageStatus error:', error);
         next(error);
     }
 };
@@ -303,7 +343,8 @@ export const locationCheckIn = async (req, res, next) => {
         const now = new Date();
         const hour = now.getHours();
 
-        const status = (hour >= 6 && hour < 9) ? "ON_TIME" : "LATE";
+        // On-time if checked in before 10:30 AM
+        const status = (hour >= 6 && (hour < 10 || (hour === 10 && now.getMinutes() <= 30))) ? "ON_TIME" : "LATE";
 
         // Validate location match
         let isLocationMatched = true;
@@ -318,19 +359,44 @@ export const locationCheckIn = async (req, res, next) => {
             }
         }
 
-        const checkIn = await prisma.locationCheckIn.create({
-            data: {
-                tenantId,
-                userId,
-                date: dateString,
-                latitude,
-                longitude,
-                villageName,
-                status,
-                isLocationMatched,
-                time: now
+        const subLocation = await reverseGeocode(latitude, longitude);
+
+        let checkIn;
+        try {
+            checkIn = await prisma.locationCheckIn.create({
+                data: {
+                    tenantId,
+                    userId,
+                    date: dateString,
+                    latitude,
+                    longitude,
+                    villageName,
+                    subLocation,
+                    status,
+                    isLocationMatched,
+                    time: now
+                }
+            });
+        } catch (prismaError) {
+            if (prismaError.message.includes('Unknown argument') && prismaError.message.includes('subLocation')) {
+                console.warn('[RouteControl] subLocation missing in DB, retrying without it.');
+                checkIn = await prisma.locationCheckIn.create({
+                    data: {
+                        tenantId,
+                        userId,
+                        date: dateString,
+                        latitude,
+                        longitude,
+                        villageName,
+                        status,
+                        isLocationMatched,
+                        time: now
+                    }
+                });
+            } else {
+                throw prismaError;
             }
-        });
+        }
 
         res.json({ success: true, checkIn });
     } catch (error) {
@@ -344,11 +410,25 @@ export const locationCheckIn = async (req, res, next) => {
 export const getAllLocationCheckIns = async (req, res, next) => {
     try {
         const tenantId = req.user.tenantId || "VK001";
-        const checkIns = await prisma.locationCheckIn.findMany({
-            where: { tenantId },
-            include: { user: { select: { name: true, email: true, storeId: true } } },
-            orderBy: { createdAt: 'desc' }
-        });
+        let checkIns;
+        try {
+            checkIns = await prisma.locationCheckIn.findMany({
+                where: { tenantId },
+                include: { user: { select: { name: true, email: true, storeId: true } } },
+                orderBy: { createdAt: 'desc' }
+            });
+        } catch (prismaError) {
+            if (prismaError.message.includes('column') && prismaError.message.includes('subLocation')) {
+                console.warn('[RouteControl] subLocation missing in DB, falling back.');
+                checkIns = await prisma.locationCheckIn.findMany({
+                    where: { tenantId },
+                    include: { user: { select: { name: true, email: true, storeId: true } } },
+                    orderBy: { createdAt: 'desc' }
+                });
+            } else {
+                throw prismaError;
+            }
+        }
         res.json(checkIns);
     } catch (error) {
         next(error);

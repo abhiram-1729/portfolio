@@ -3,6 +3,7 @@ import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, Ch
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { attendanceAPI } from '../services/api';
+import NotificationDropdown from './NotificationDropdown';
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, clearUser } = useUserStore();
@@ -24,6 +25,8 @@ export default function Sidebar({ isOpen, onClose }) {
   const menuItems = [
     { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'SALES' },
     { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'ROUTES' },
+    { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
+    { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'INVENTORY' },
     { 
       name: 'Inventory', 
@@ -99,9 +102,12 @@ export default function Sidebar({ isOpen, onClose }) {
         
         {/* Store Context Layer */}
         <div className="p-6">
-          <div className="flex items-center gap-2 mb-3">
-            <Store size={14} className="text-emerald-600" />
-            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Store Context</span>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+              <Store size={14} className="text-emerald-600" />
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-600">Store Context</span>
+            </div>
+            <NotificationDropdown />
           </div>
           
           <div className="group relative flex items-center gap-4 p-4 bg-emerald-50/50 rounded-2xl border border-emerald-100/50 shadow-sm transition-all hover:bg-emerald-50">

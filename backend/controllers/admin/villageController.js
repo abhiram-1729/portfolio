@@ -3,7 +3,7 @@ import prisma from '../../utils/prisma.js';
 export const createVillage = async (req, res, next) => {
     try {
         console.log('[VillageControl] Create Body:', req.body);
-        const { name, latitude, longitude, storeId: bodyStoreId } = req.body;
+        const { name, latitude, longitude, radius, boundary, isPolygon, storeId: bodyStoreId } = req.body;
         const tenantId = req.user.tenantId || "VK001";
         const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
 
@@ -22,7 +22,10 @@ export const createVillage = async (req, res, next) => {
                 tenantId,
                 storeId,
                 latitude: !isNaN(lat) ? lat : null,
-                longitude: !isNaN(lng) ? lng : null
+                longitude: !isNaN(lng) ? lng : null,
+                radius: radius ? parseInt(radius) : 500,
+                boundary: boundary || null,
+                isPolygon: isPolygon === true || isPolygon === 'true'
             } 
         });
         res.status(201).json(village);
@@ -43,12 +46,42 @@ export const getVillages = async (req, res, next) => {
         const where = { tenantId: req.user.tenantId };
         if (storeId) where.storeId = storeId;
 
-        const villages = await prisma.village.findMany({ 
-            where,
-            orderBy: { name: 'asc' } 
-        });
-        res.json(villages);
+        try {
+            const villages = await prisma.village.findMany({ 
+                where,
+                orderBy: { name: 'asc' } 
+            });
+            res.json(villages);
+        } catch (prismaError) {
+            console.error('[VillageControl] Prisma Error:', prismaError.message);
+            // Check if it's a "column does not exist" error
+            if (prismaError.message.includes('column') && prismaError.message.includes('does not exist')) {
+                console.warn('[VillageControl] Schema mismatch detected. Returning basic village data.');
+                // Fallback: Try to fetch only basic columns if boundary is missing
+                // In Prisma 7, we can't easily exclude, but we can select specifically
+                const basicVillages = await prisma.village.findMany({
+                    where,
+                    select: {
+                        id: true,
+                        name: true,
+                        tenantId: true,
+                        storeId: true,
+                        latitude: true,
+                        longitude: true,
+                        radius: true,
+                        status: true,
+                        createdAt: true,
+                        updatedAt: true
+                        // Exclude boundary and isPolygon if they might be missing
+                    },
+                    orderBy: { name: 'asc' }
+                });
+                return res.json(basicVillages);
+            }
+            throw prismaError;
+        }
     } catch (error) {
+        console.error('[VillageControl] GetVillages Error:', error);
         next(error);
     }
 };
@@ -57,7 +90,7 @@ export const updateVillage = async (req, res, next) => {
     try {
         const { id } = req.params;
         console.log('[VillageControl] Update Body:', req.body, 'ID:', id);
-        const { name, latitude, longitude } = req.body;
+        const { name, latitude, longitude, radius, boundary, isPolygon } = req.body;
         
         // Robust coordinate parsing
         const lat = latitude !== null && latitude !== '' ? parseFloat(latitude) : null;
@@ -68,7 +101,10 @@ export const updateVillage = async (req, res, next) => {
             data: { 
                 name,
                 latitude: !isNaN(lat) ? lat : null,
-                longitude: !isNaN(lng) ? lng : null
+                longitude: !isNaN(lng) ? lng : null,
+                radius: radius ? parseInt(radius) : 500,
+                boundary: boundary || null,
+                isPolygon: isPolygon === true || isPolygon === 'true'
             } 
         });
         res.json(village);

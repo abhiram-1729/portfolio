@@ -14,11 +14,17 @@ import {
   Truck,
   RefreshCw,
   AlertTriangle,
-  X
+  X,
+  Play,
+  Square,
+  Activity
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import api from '../services/api';
 import { useUserStore } from '../store/userStore';
 import * as routeService from '../services/routeService';
+import * as locationService from '../services/locationService';
+import * as shiftService from '../services/shiftService';
 import toast from 'react-hot-toast';
 export default function TodayPlan() {
   const { user } = useUserStore();
@@ -46,15 +52,19 @@ export default function TodayPlan() {
     fetchStatus();
   }, [fetchStatus]);
 
-  const handleMarkCoverage = async (slot) => {
+  const handleMarkCoverage = async (shift) => {
     if (markingSlot) return;
-    setMarkingSlot(slot);
+    setMarkingSlot(shift.id || shift.name);
     try {
-      await routeService.markCoverage(slot);
-      toast.success(`${slot === 'MORNING' ? 'Morning' : 'Evening'} coverage marked!`);
+      await routeService.markCoverage({ 
+        shiftId: shift.id, 
+        shiftName: shift.name,
+        slot: shift.name.toUpperCase() // For backward compatibility
+      });
+      toast.success(`${shift.name} coverage marked!`);
       fetchStatus();
     } catch (err) {
-      toast.error(err.response?.data?.message || `Failed to mark ${slot.toLowerCase()}`);
+      toast.error(err.response?.data?.message || `Failed to mark ${shift.name}`);
     } finally {
       setMarkingSlot(null);
     }
@@ -66,6 +76,73 @@ export default function TodayPlan() {
   };
 
   const [checkingIn, setCheckingIn] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
+  const [activeShift, setActiveShift] = useState(null);
+  const [activeVillageVisit, setActiveVillageVisit] = useState(null);
+  const [villageActionLoading, setVillageActionLoading] = useState(false);
+
+  useEffect(() => {
+    fetchActiveShift();
+  }, []);
+
+  const fetchActiveShift = async () => {
+    try {
+      const { data } = await shiftService.getShiftStatus();
+      setActiveShift(data.activeShift);
+      if (data.activeShift?.activities?.length > 0) {
+        const latest = data.activeShift.activities[0];
+        if (!latest.endTime) setActiveVillageVisit(latest);
+      }
+    } catch (err) {
+      console.error('Failed to fetch shift status');
+    }
+  };
+
+  const handleVillageVisit = async (action) => {
+    if (!activeShift) {
+      toast.error('Start your shift first in the Shift Tracking menu.');
+      return;
+    }
+    
+    setVillageActionLoading(true);
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
+      });
+      const { latitude, longitude, accuracy } = pos.coords;
+
+      if (accuracy > 2000) {
+        toast.error(`GPS accuracy too low (${Math.round(accuracy)}m).`);
+        return;
+      }
+
+      if (action === 'start') {
+        const { data } = await api.post('/village-activities/start', {
+          lat: latitude,
+          lon: longitude,
+          accuracy,
+          villageId: today.villageId,
+          shiftLogId: activeShift.id
+        });
+        setActiveVillageVisit(data.activity);
+        toast.success('Village Visit Started ✅');
+      } else {
+        await api.post('/village-activities/end', {
+          lat: latitude,
+          lon: longitude,
+          accuracy,
+          activityId: activeVillageVisit.id
+        });
+        setActiveVillageVisit(null);
+        toast.success('Village Visit Ended ✅');
+      }
+      fetchActiveShift();
+    } catch (err) {
+      toast.error(err.response?.data?.message || err.message || 'Action failed');
+    } finally {
+      setVillageActionLoading(false);
+    }
+  };
 
   const handleLocationCheckIn = () => {
     if (!hasPlan) return;
@@ -80,13 +157,26 @@ export default function TodayPlan() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
-          const { latitude, longitude } = position.coords;
+          const { latitude, longitude, accuracy } = position.coords;
+          
+          if (accuracy > 2000) {
+            toast.error(`GPS accuracy too low (${Math.round(accuracy)}m). Please move to an open area.`);
+            setCheckingIn(false);
+            return;
+          }
+
+          // Legacy check-in (compatibility)
           await routeService.locationCheckIn({
             latitude,
             longitude,
             villageName: today.villageName
           });
-          toast.success("Location tracked successfully!");
+
+          // Start continuous live tracking
+          locationService.startLiveTracking();
+          setIsTracking(true);
+          
+          toast.success("Location tracking active!");
           fetchStatus();
         } catch (err) {
           toast.error("Failed to track location");
@@ -97,7 +187,8 @@ export default function TodayPlan() {
       (error) => {
         toast.error("Unable to retrieve your location. Please enable location services.");
         setCheckingIn(false);
-      }
+      },
+      { enableHighAccuracy: true }
     );
   };
 
@@ -203,11 +294,11 @@ export default function TodayPlan() {
                 </div>
               </div>
 
-              {statusData.checkIn ? (
-                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border ${statusData.checkIn.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200'}`}>
-                  <CheckCircle2 size={16} strokeWidth={3} />
+              {statusData.checkIn || isTracking ? (
+                <div className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border ${isTracking ? 'bg-blue-100 text-blue-700 border-blue-200' : (statusData.checkIn.status === 'ON_TIME' ? 'bg-emerald-100 text-emerald-700 border-emerald-200' : 'bg-amber-100 text-amber-700 border-amber-200')}`}>
+                  {isTracking ? <Activity size={16} className="animate-pulse" /> : <CheckCircle2 size={16} strokeWidth={3} />}
                   <span className="text-[10px] font-black uppercase tracking-widest">
-                    {statusData.checkIn.status === 'ON_TIME' ? 'On Time' : 'Late'}
+                    {isTracking ? 'Live Tracking' : (statusData.checkIn.status === 'ON_TIME' ? 'On Time' : 'Late')}
                   </span>
                 </div>
               ) : (
@@ -216,11 +307,57 @@ export default function TodayPlan() {
                   disabled={checkingIn}
                   className="bg-blue-600 text-white px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
                 >
-                  {checkingIn ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  {checkingIn ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
                   Turn ON Location
                 </button>
               )}
             </div>
+          </div>
+        )}
+
+        {/* ── Village Visit Controls ─────────────────── */}
+        {hasPlan && (
+          <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm space-y-4">
+             <div className="flex items-center justify-between">
+                <div>
+                   <h4 className="font-black text-gray-900 text-sm">Village Visit</h4>
+                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {activeVillageVisit ? 'Visit in progress...' : 'Ready to start visit?'}
+                   </p>
+                </div>
+                {activeVillageVisit && (
+                   <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black animate-pulse">
+                      LIVE
+                   </div>
+                )}
+             </div>
+
+             <div className="flex gap-3">
+                {!activeVillageVisit ? (
+                   <button 
+                      onClick={() => handleVillageVisit('start')}
+                      disabled={villageActionLoading || !activeShift}
+                      className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                   >
+                      {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                      Start Village Visit
+                   </button>
+                ) : (
+                   <button 
+                      onClick={() => handleVillageVisit('end')}
+                      disabled={villageActionLoading}
+                      className="flex-1 bg-gray-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-gray-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                   >
+                      {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
+                      End Village Visit
+                   </button>
+                )}
+             </div>
+             {!activeShift && (
+                <p className="text-[9px] text-rose-500 font-black uppercase text-center tracking-widest">
+                   ⚠️ Start shift in "Shift Tracking" menu first
+                </p>
+             )}
           </div>
         )}
 
@@ -229,83 +366,50 @@ export default function TodayPlan() {
           <div className="space-y-3">
             <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Coverage Tracking</h4>
 
-            {/* Morning Slot */}
-            <div className={`rounded-2xl p-4 border transition-all ${coverage.morningDone
-              ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
-              : 'bg-white border-gray-100 shadow-sm'
-              }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${coverage.morningDone
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-amber-50 text-amber-500'
-                    }`}>
-                    <Sun size={22} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-gray-900 text-sm">Morning — Part A</h5>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {coverage.morningDone ? 'Completed' : 'Before 2:00 PM'}
-                    </p>
+            {(statusData.shifts || []).map((shift) => {
+              const isDone = coverage.shiftStatus?.[shift.name] || (shift.name.toUpperCase() === 'MORNING' && coverage.morningDone) || (shift.name.toUpperCase() === 'EVENING' && coverage.eveningDone);
+              const isPM = shift.startTime >= '12:00';
+              
+              return (
+                <div key={shift.id || shift.name} className={`rounded-2xl p-4 border transition-all ${isDone
+                  ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
+                  : 'bg-white border-gray-100 shadow-sm'
+                  }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${isDone
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : (isPM ? 'bg-indigo-50 text-indigo-500' : 'bg-amber-50 text-amber-500')
+                        }`}>
+                        {isPM ? <Moon size={22} strokeWidth={2.5} /> : <Sun size={22} strokeWidth={2.5} />}
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-gray-900 text-sm">{shift.name}</h5>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                          {isDone ? 'Completed' : `${shift.startTime} - ${shift.endTime}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isDone ? (
+                      <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
+                        <CheckCircle2 size={16} strokeWidth={3} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Done</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleMarkCoverage(shift)}
+                        disabled={markingSlot === (shift.id || shift.name)}
+                        className={`${isPM ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-amber-500 shadow-amber-500/20'} text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2`}
+                      >
+                        {markingSlot === (shift.id || shift.name) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                        Mark Done
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                {coverage.morningDone ? (
-                  <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
-                    <CheckCircle2 size={16} strokeWidth={3} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Done</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleMarkCoverage('MORNING')}
-                    disabled={markingSlot === 'MORNING'}
-                    className="bg-amber-500 text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {markingSlot === 'MORNING' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    Mark Done
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Evening Slot */}
-            <div className={`rounded-2xl p-4 border transition-all ${coverage.eveningDone
-              ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
-              : 'bg-white border-gray-100 shadow-sm'
-              }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${coverage.eveningDone
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-indigo-50 text-indigo-500'
-                    }`}>
-                    <Moon size={22} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-gray-900 text-sm">Evening — Part B</h5>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {coverage.eveningDone ? 'Completed' : 'After 2:00 PM'}
-                    </p>
-                  </div>
-                </div>
-
-                {coverage.eveningDone ? (
-                  <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
-                    <CheckCircle2 size={16} strokeWidth={3} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Done</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleMarkCoverage('EVENING')}
-                    disabled={markingSlot === 'EVENING'}
-                    className="bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {markingSlot === 'EVENING' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    Mark Done
-                  </button>
-                )}
-              </div>
-            </div>
+              );
+            })}
 
             {/* Completion Status */}
             {coverage.status === 'BOTH_DONE' && (
@@ -314,7 +418,7 @@ export default function TodayPlan() {
                   <CheckCircle2 size={20} strokeWidth={3} />
                   <span className="font-black text-sm uppercase tracking-wider">All Coverage Complete!</span>
                 </div>
-                <p className="text-[10px] text-emerald-100 font-bold">Both morning and evening sessions are done for today.</p>
+                <p className="text-[10px] text-emerald-100 font-bold">All configured shifts are done for today.</p>
               </div>
             )}
           </div>
