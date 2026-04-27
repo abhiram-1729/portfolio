@@ -610,6 +610,8 @@ model BusinessSettings {
   email        String?
   address      String?
   taxRates     String   @default("0,5,12,18")
+  shifts       Json?    // Array of { id, name, startTime, endTime, isActive }
+  shiftMode    String   @default("STANDARD")
   updatedAt    DateTime @updatedAt
   
   tenant       Tenant   @relation(fields: [tenantId], references: [id])
@@ -790,6 +792,7 @@ model DailyCoverage {
   villageName String
   morningDone Boolean  @default(false)
   eveningDone Boolean  @default(false)
+  shiftStatus Json?    // { "shiftId1": true, "shiftId2": false }
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

@@ -42,7 +42,7 @@ export const getSettings = async (req, res) => {
 // Update business settings
 export const updateSettings = async (req, res) => {
   try {
-    const { businessName, gstNo, contactNo, email, address, taxRates, storeId: bodyStoreId } = req.body;
+    const { businessName, gstNo, contactNo, email, address, taxRates, shifts, storeId: bodyStoreId } = req.body;
     const tenantId = req.user.tenantId;
     const storeId = bodyStoreId || req.user.storeId || null;
 
@@ -54,7 +54,9 @@ export const updateSettings = async (req, res) => {
         contactNo,
         email,
         address,
-        taxRates
+        taxRates,
+        shifts: shifts || [],
+        shiftMode: req.body.shiftMode || 'STANDARD'
       },
       create: {
         businessName,
@@ -63,6 +65,8 @@ export const updateSettings = async (req, res) => {
         email,
         address,
         taxRates,
+        shifts: shifts || [],
+        shiftMode: req.body.shiftMode || 'STANDARD',
         tenantId,
         storeId: storeId || null
       }
@@ -71,6 +75,10 @@ export const updateSettings = async (req, res) => {
     res.json({ success: true, data: settings, message: 'Settings updated successfully' });
   } catch (error) {
     console.error('Update settings error:', error);
-    res.status(500).json({ success: false, message: 'Failed to update settings' });
+    res.status(500).json({ 
+      success: false, 
+      message: error.message || 'Failed to update settings',
+      error: process.env.NODE_ENV === 'development' ? error : undefined 
+    });
   }
 };

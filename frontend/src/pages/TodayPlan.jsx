@@ -52,15 +52,19 @@ export default function TodayPlan() {
     fetchStatus();
   }, [fetchStatus]);
 
-  const handleMarkCoverage = async (slot) => {
+  const handleMarkCoverage = async (shift) => {
     if (markingSlot) return;
-    setMarkingSlot(slot);
+    setMarkingSlot(shift.id || shift.name);
     try {
-      await routeService.markCoverage(slot);
-      toast.success(`${slot === 'MORNING' ? 'Morning' : 'Evening'} coverage marked!`);
+      await routeService.markCoverage({ 
+        shiftId: shift.id, 
+        shiftName: shift.name,
+        slot: shift.name.toUpperCase() // For backward compatibility
+      });
+      toast.success(`${shift.name} coverage marked!`);
       fetchStatus();
     } catch (err) {
-      toast.error(err.response?.data?.message || `Failed to mark ${slot.toLowerCase()}`);
+      toast.error(err.response?.data?.message || `Failed to mark ${shift.name}`);
     } finally {
       setMarkingSlot(null);
     }
@@ -362,83 +366,50 @@ export default function TodayPlan() {
           <div className="space-y-3">
             <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest ml-1">Coverage Tracking</h4>
 
-            {/* Morning Slot */}
-            <div className={`rounded-2xl p-4 border transition-all ${coverage.morningDone
-              ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
-              : 'bg-white border-gray-100 shadow-sm'
-              }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${coverage.morningDone
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-amber-50 text-amber-500'
-                    }`}>
-                    <Sun size={22} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-gray-900 text-sm">Morning — Part A</h5>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {coverage.morningDone ? 'Completed' : 'Before 2:00 PM'}
-                    </p>
+            {(statusData.shifts || []).map((shift) => {
+              const isDone = coverage.shiftStatus?.[shift.name] || (shift.name.toUpperCase() === 'MORNING' && coverage.morningDone) || (shift.name.toUpperCase() === 'EVENING' && coverage.eveningDone);
+              const isPM = shift.startTime >= '12:00';
+              
+              return (
+                <div key={shift.id || shift.name} className={`rounded-2xl p-4 border transition-all ${isDone
+                  ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
+                  : 'bg-white border-gray-100 shadow-sm'
+                  }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${isDone
+                        ? 'bg-emerald-100 text-emerald-600'
+                        : (isPM ? 'bg-indigo-50 text-indigo-500' : 'bg-amber-50 text-amber-500')
+                        }`}>
+                        {isPM ? <Moon size={22} strokeWidth={2.5} /> : <Sun size={22} strokeWidth={2.5} />}
+                      </div>
+                      <div>
+                        <h5 className="font-bold text-gray-900 text-sm">{shift.name}</h5>
+                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
+                          {isDone ? 'Completed' : `${shift.startTime} - ${shift.endTime}`}
+                        </p>
+                      </div>
+                    </div>
+
+                    {isDone ? (
+                      <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
+                        <CheckCircle2 size={16} strokeWidth={3} />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Done</span>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => handleMarkCoverage(shift)}
+                        disabled={markingSlot === (shift.id || shift.name)}
+                        className={`${isPM ? 'bg-indigo-500 shadow-indigo-500/20' : 'bg-amber-500 shadow-amber-500/20'} text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2`}
+                      >
+                        {markingSlot === (shift.id || shift.name) ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                        Mark Done
+                      </button>
+                    )}
                   </div>
                 </div>
-
-                {coverage.morningDone ? (
-                  <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
-                    <CheckCircle2 size={16} strokeWidth={3} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Done</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleMarkCoverage('MORNING')}
-                    disabled={markingSlot === 'MORNING'}
-                    className="bg-amber-500 text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-amber-500/20 hover:bg-amber-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {markingSlot === 'MORNING' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    Mark Done
-                  </button>
-                )}
-              </div>
-            </div>
-
-            {/* Evening Slot */}
-            <div className={`rounded-2xl p-4 border transition-all ${coverage.eveningDone
-              ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
-              : 'bg-white border-gray-100 shadow-sm'
-              }`}>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-xl flex items-center justify-center ${coverage.eveningDone
-                    ? 'bg-emerald-100 text-emerald-600'
-                    : 'bg-indigo-50 text-indigo-500'
-                    }`}>
-                    <Moon size={22} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <h5 className="font-bold text-gray-900 text-sm">Evening — Part B</h5>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">
-                      {coverage.eveningDone ? 'Completed' : 'After 2:00 PM'}
-                    </p>
-                  </div>
-                </div>
-
-                {coverage.eveningDone ? (
-                  <div className="flex items-center gap-1.5 bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl">
-                    <CheckCircle2 size={16} strokeWidth={3} />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Done</span>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => handleMarkCoverage('EVENING')}
-                    disabled={markingSlot === 'EVENING'}
-                    className="bg-indigo-500 text-white px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-500/20 hover:bg-indigo-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2"
-                  >
-                    {markingSlot === 'EVENING' ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
-                    Mark Done
-                  </button>
-                )}
-              </div>
-            </div>
+              );
+            })}
 
             {/* Completion Status */}
             {coverage.status === 'BOTH_DONE' && (
@@ -447,7 +418,7 @@ export default function TodayPlan() {
                   <CheckCircle2 size={20} strokeWidth={3} />
                   <span className="font-black text-sm uppercase tracking-wider">All Coverage Complete!</span>
                 </div>
-                <p className="text-[10px] text-emerald-100 font-bold">Both morning and evening sessions are done for today.</p>
+                <p className="text-[10px] text-emerald-100 font-bold">All configured shifts are done for today.</p>
               </div>
             )}
           </div>

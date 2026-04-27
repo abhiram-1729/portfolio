@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle } from 'lucide-react';
+import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Clock } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
@@ -11,7 +11,9 @@ export default function AdminSettings() {
     contactNo: '',
     email: '',
     address: '',
-    taxRates: '0,5,12,18'
+    taxRates: '0,5,12,18',
+    shiftMode: 'STANDARD', // 'STANDARD' | 'MULTI'
+    shifts: []
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -117,6 +119,23 @@ export default function AdminSettings() {
       setLoading(false);
     }
   };
+
+  // Initialize shifts if empty when entering SHIFTS modal
+  useEffect(() => {
+    if (activeModal === 'SHIFTS' && (settings.shifts || []).length === 0) {
+      const isMulti = settings.shiftMode === 'MULTI';
+      setSettings(prev => ({
+        ...prev,
+        shifts: [{
+          id: `shift_${Date.now()}`,
+          name: isMulti ? 'Morning Shift' : 'General Shift',
+          startTime: '09:00',
+          endTime: '18:00',
+          isActive: true
+        }]
+      }));
+    }
+  }, [activeModal, settings.shiftMode]);
 
   const handleUpdateSettings = async (e) => {
     e.preventDefault();
@@ -315,6 +334,14 @@ export default function AdminSettings() {
         { label: 'Low Stock Alerts', action: () => {} },
         { label: 'Daily Sales Report Email', action: () => {} }
       ] 
+    },
+    {
+      title: 'Shift Management',
+      icon: Clock,
+      items: [
+        { label: 'Standard Shift Config', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'STANDARD'})); } },
+        { label: 'Multi-Shift Config', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } }
+      ]
     }
   ];
 
@@ -795,6 +822,162 @@ export default function AdminSettings() {
                 )}
               </div>
             </form>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'SHIFTS') {
+    const isMulti = settings.shiftMode === 'MULTI';
+    
+
+    const handleAddShift = () => {
+      const newShifts = [...(settings.shifts || [])];
+      if (newShifts.length >= 10) return toast.error('Maximum 10 shifts allowed');
+      
+      newShifts.push({
+        id: `shift_${Date.now()}`,
+        name: `Shift ${newShifts.length + 1}`,
+        startTime: '08:00',
+        endTime: '14:00',
+        isActive: true
+      });
+      setSettings({ ...settings, shifts: newShifts });
+    };
+
+    const handleRemoveShift = (id) => {
+      if (!isMulti && settings.shifts.length <= 1) return toast.error('Standard mode requires at least one shift');
+      setSettings({
+        ...settings,
+        shifts: settings.shifts.filter(s => s.id !== id)
+      });
+    };
+
+    const handleShiftChange = (id, field, value) => {
+      setSettings({
+        ...settings,
+        shifts: (settings.shifts || []).map(s => s.id === id ? { ...s, [field]: value } : s)
+      });
+    };
+
+    const validateShifts = () => {
+      const shifts = settings.shifts || [];
+      if (shifts.length === 0) return 'At least one shift is required';
+      
+      for (const shift of shifts) {
+        if (!shift.name && isMulti) return 'Shift name is required';
+        if (shift.startTime >= shift.endTime) return `Shift "${shift.name || 'General'}": End time must be after start time`;
+      }
+
+      if (isMulti) {
+        // Check overlaps
+        const sorted = [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
+        for (let i = 0; i < sorted.length - 1; i++) {
+          if (sorted[i].endTime > sorted[i+1].startTime) {
+            return `Overlap detected between "${sorted[i].name}" and "${sorted[i+1].name}"`;
+          }
+        }
+      }
+      return null;
+    };
+
+    const onSaveShifts = async (e) => {
+      e.preventDefault();
+      const error = validateShifts();
+      if (error) return toast.error(error);
+      handleUpdateSettings(e);
+    };
+
+    return (
+      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
+        {renderHeader(
+          isMulti ? 'Multi-Shift Configuration' : 'Standard Shift Configuration', 
+          isMulti ? 'Flexible Timing & Multiple Sessions' : 'Single Session Management', 
+          Clock, 
+          isMulti ? 'text-violet-600 bg-violet-100' : 'text-emerald-600 bg-emerald-100'
+        )}
+        
+        <div className="space-y-6">
+          <div className={`grid grid-cols-1 ${isMulti ? 'md:grid-cols-2' : ''} gap-6`}>
+            {(settings.shifts || []).map((shift, index) => (
+              <div key={shift.id} className="bg-white rounded-3xl border border-slate-100 shadow-xl p-6 relative group overflow-hidden">
+                <div className={`absolute top-0 left-0 w-1.5 h-full ${isMulti ? 'bg-violet-500' : 'bg-emerald-500'}`} />
+                
+                <div className="flex items-center justify-between mb-6">
+                  <h4 className={`text-[10px] font-black ${isMulti ? 'text-violet-900' : 'text-emerald-900'} uppercase tracking-widest flex items-center gap-2`}>
+                    <span className={`w-5 h-5 rounded-lg ${isMulti ? 'bg-violet-100 text-violet-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center text-[8px] font-black`}>
+                      {index + 1}
+                    </span>
+                    {isMulti ? 'Dynamic Shift Slot' : 'Standard Business Hours'}
+                  </h4>
+                  {isMulti && (
+                    <button onClick={() => handleRemoveShift(shift.id)} className="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                      <Trash2 size={16} />
+                    </button>
+                  )}
+                </div>
+
+                <div className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                      Shift Name {isMulti ? '' : '(Optional)'}
+                    </label>
+                    <input 
+                      type="text" 
+                      placeholder={isMulti ? "e.g., Morning Shift" : "e.g., General Shift"}
+                      value={shift.name} 
+                      onChange={e => handleShiftChange(shift.id, 'name', e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all" 
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Start Time</label>
+                      <input 
+                        type="time" 
+                        value={shift.startTime} 
+                        onChange={e => handleShiftChange(shift.id, 'startTime', e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all" 
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">End Time</label>
+                      <input 
+                        type="time" 
+                        value={shift.endTime} 
+                        onChange={e => handleShiftChange(shift.id, 'endTime', e.target.value)}
+                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all" 
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            {isMulti && (
+              <button 
+                onClick={handleAddShift}
+                className="border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-violet-400 hover:text-violet-500 hover:bg-violet-50/30 transition-all group"
+              >
+                <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-violet-100 transition-colors">
+                  <Plus size={24} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest">Add Another Shift</span>
+              </button>
+            )}
+          </div>
+
+          <div className="pt-6">
+            <button 
+              onClick={onSaveShifts} 
+              disabled={saving} 
+              className={`w-full ${isMulti ? 'bg-slate-900' : 'bg-emerald-600'} text-white font-black py-6 rounded-3xl shadow-2xl transition-all text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-4 active:scale-95 disabled:bg-slate-400`}
+            >
+              {saving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
+              {saving ? 'Syncing...' : `Apply ${isMulti ? 'Multi-Shift' : 'Standard'} Logic`}
+            </button>
           </div>
         </div>
       </div>
