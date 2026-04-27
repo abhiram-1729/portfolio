@@ -127,4 +127,16 @@ export const assetAPI = {
   getCatalog: () => api.get('/assets/catalog'),
 };
 
+export const attendanceAPI = {
+  punchIn: (data) => api.post('/attendance/punch-in', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  punchOut: (data) => api.post('/attendance/punch-out', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getToday: () => api.get('/attendance/today'),
+  getMyHistory: (params) => api.get('/attendance/my-history', { params }),
+  getAll: (params) => api.get('/attendance/all', { params }),
+};
+
 export default api;

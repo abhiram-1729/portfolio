@@ -31,7 +31,8 @@ import {
   ArrowDownCircle,
   ArrowUpCircle,
   CheckSquare,
-  PlusCircle
+  PlusCircle,
+  Clock
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -97,6 +98,7 @@ export default function AdminLayout() {
       ]
     },
     { to: '/admin/activity-logs', icon: HistoryIcon, label: 'Activity Logs', module: 'ADMIN' },
+    { to: '/admin/attendance', icon: Clock, label: 'Attendance', module: 'STAFF' },
     { to: '/admin/reports', icon: BarChart3, label: 'Reports', module: 'REPORTS' },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
     { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },
@@ -163,6 +165,7 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/expenses')) return 'EXPENSES';
     if (pathname.startsWith('/admin/procurement')) return 'PROCUREMENT';
     if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
+    if (pathname.startsWith('/admin/attendance')) return 'STAFF';
     return null;
   };
 

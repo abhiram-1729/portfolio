@@ -48,6 +48,8 @@ import AgentActivityLogs from './pages/AgentActivityLogs';
 import ReportDamage from './pages/ReportDamage';
 import SalesHistory from './pages/SalesHistory';
 import OrderDetail from './pages/OrderDetail';
+import AgentAttendance from './pages/AgentAttendance';
+import AdminAttendance from './pages/admin/AdminAttendance';
 
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
@@ -149,6 +151,7 @@ export default function App() {
           <Route path="report-damage" element={<ReportDamage />} />
           <Route path="sales-history" element={<SalesHistory />} />
           <Route path="order-detail/:id" element={<OrderDetail />} />
+          <Route path="attendance" element={<AgentAttendance />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -175,6 +178,7 @@ export default function App() {
           <Route path="finance-reports" element={<AdminFinanceReports />} />
           <Route path="activity-logs" element={<AdminActivityLogs />} />
           <Route path="damage" element={<AdminDamage />} />
+          <Route path="attendance" element={<AdminAttendance />} />
         </Route>
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>

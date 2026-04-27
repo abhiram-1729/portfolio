@@ -20,6 +20,7 @@ import procurementRoutes from './routes/procurementRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import damageRoutes from './routes/damageRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -67,6 +68,7 @@ apiRouter.use('/procurement', procurementRoutes);
 apiRouter.use('/admin/roles', roleRoutes);
 apiRouter.use('/activities', activityRoutes);
 apiRouter.use('/damage', damageRoutes);
+apiRouter.use('/attendance', attendanceRoutes);
 
 // Mount the apiRouter both WITH and WITHOUT /api prefix
 // This ensures compatibility with proxies that might or might not strip the prefix

@@ -1,13 +1,22 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
+import { attendanceAPI } from '../services/api';
 
 export default function Sidebar({ isOpen, onClose }) {
   const { user, clearUser } = useUserStore();
   const location = useLocation();
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    // Auto punch-out for agents on logout
+    if (user?.role === 'SALES_AGENT') {
+      try {
+        await attendanceAPI.punchOut({});
+      } catch (e) {
+        // Silently ignore — they may have already punched out
+      }
+    }
     clearUser();
     onClose();
   };
@@ -38,6 +47,7 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'My Targets', path: '/targets', icon: Target, color: 'text-amber-600', bg: 'bg-amber-50', module: 'TARGETS' },
     { name: 'My Assets', path: '/my-assets', icon: Box, color: 'text-cyan-600', bg: 'bg-cyan-50', module: 'ASSETS' },
     { name: 'Report Damage', path: '/report-damage', icon: AlertTriangle, color: 'text-red-600', bg: 'bg-red-50', module: 'INVENTORY' },
+    { name: 'My Attendance', path: '/attendance', icon: Clock, color: 'text-teal-600', bg: 'bg-teal-50' },
     { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
     { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
     { 

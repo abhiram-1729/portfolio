@@ -66,6 +66,7 @@ model Tenant {
   damageEntries            DamageEntry[]
   damageDeductions         DamageDeduction[]
   idSequences              IdSequence[]
+  attendances              Attendance[]
 }
 
 model User {
@@ -121,6 +122,7 @@ model User {
   openedRegisters    StoreCashRegister[]   @relation("OpenedRegisters")
   approvedRefills    RefillRequest[]       @relation("ApprovedRefills")
   closedRegisters    StoreCashRegister[]   @relation("ClosedRegisters")
+  attendances        Attendance[]
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -1155,6 +1157,7 @@ model Store {
   procurementStockLedger ProcurementStockLedger[]
   activityLogs           ActivityLog[]
   safeTransactions       SafeTransaction[]
+  attendances            Attendance[]
 
   @@index([tenantId])
 }
@@ -1949,4 +1952,42 @@ enum DeductionMode {
   FULL
   PARTIAL
   WAIVED
+}
+
+enum AttendanceStatus {
+  ACTIVE
+  COMPLETED
+}
+
+model Attendance {
+  id           String           @id @default(cuid())
+  userId       String
+  tenantId     String           @default("VK001")
+  storeId      String?
+  date         String
+  punchInTime  DateTime
+  punchOutTime DateTime?
+  status       AttendanceStatus @default(ACTIVE)
+  punchInLat   Float?
+  punchInLng   Float?
+  punchOutLat  Float?
+  punchOutLng  Float?
+  totalHours   Float?
+  punchInPhoto String?
+  punchInLocation String?
+  punchOutPhoto String?
+  punchOutLocation String?
+  notes        String?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  store  Store? @relation(fields: [storeId], references: [id])
+
+  @@unique([userId, date])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+  @@index([storeId])
 }
