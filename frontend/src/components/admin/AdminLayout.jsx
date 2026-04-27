@@ -32,7 +32,13 @@ import {
   ArrowUpCircle,
   CheckSquare,
   PlusCircle,
-  Clock
+  Clock,
+  Layers,
+  Calendar,
+  Navigation,
+  RotateCcw,
+  FileText,
+  Zap
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -100,7 +106,26 @@ export default function AdminLayout() {
     },
     { to: '/admin/activity-logs', icon: HistoryIcon, label: 'Activity Logs', module: 'ADMIN' },
     { to: '/admin/attendance', icon: Clock, label: 'Attendance', module: 'STAFF' },
-    { to: '/admin/reports', icon: BarChart3, label: 'Reports', module: 'REPORTS' },
+    {
+      label: 'Reports',
+      icon: BarChart3,
+      module: 'REPORTS',
+      subItems: [
+        { to: '/admin/reports/overview', label: 'Overview', icon: BarChart3 },
+        { to: '/admin/reports/item-wise', label: 'Item-wise Sales', icon: Package },
+        { to: '/admin/reports/category-wise', label: 'Category-wise', icon: Layers },
+        { to: '/admin/reports/day-wise', label: 'Day-wise Sales', icon: Calendar },
+        { to: '/admin/reports/route-village', label: 'Route & Village', icon: MapPin },
+        { to: '/admin/reports/agent-performance', label: 'Agent Performance', icon: Users },
+        { to: '/admin/reports/location-tracking', label: 'Location Tracking', icon: Navigation },
+        { to: '/admin/reports/vehicle-wise', label: 'Substore (Vehicle)', icon: Truck },
+        { to: '/admin/reports/payment-mode', label: 'Payment Mode', icon: CreditCard },
+        { to: '/admin/reports/returns', label: 'Return Report', icon: RotateCcw },
+        { to: '/admin/reports/damages', label: 'Damage Report', icon: AlertTriangle },
+        { to: '/admin/reports/sessions', label: 'Session Report', icon: Zap },
+        { to: '/admin/reports/invoices', label: 'Invoice Report', icon: FileText },
+      ]
+    },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
     { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },
     { to: '/admin/assets', icon: Box, label: 'Assets', module: 'ASSETS' },
@@ -143,7 +168,8 @@ export default function AdminLayout() {
     Procurement: location.pathname.startsWith('/admin/procurement'),
     Inventory: location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage'),
     Operation: location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes'),
-    'Return & Stock': location.search.includes('tab=return')
+    'Return & Stock': location.search.includes('tab=return'),
+    Reports: location.pathname.startsWith('/admin/reports')
   });
 
   const toggleMenu = (label) => {
@@ -360,7 +386,7 @@ export default function AdminLayout() {
                               const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
                               isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
                             }
-                          } else if (item.label === 'Operation') {
+                          } else if (item.label === 'Operation' || item.label === 'Reports') {
                             isActive = location.pathname === sub.to;
                           }
 

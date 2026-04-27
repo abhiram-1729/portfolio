@@ -53,6 +53,21 @@ import OrderDetail from './pages/OrderDetail';
 import AgentAttendance from './pages/AgentAttendance';
 import AdminAttendance from './pages/admin/AdminAttendance';
 
+// Admin Reports
+import OverviewReport from './pages/admin/adminreports/OverviewReport';
+import ItemWiseReport from './pages/admin/adminreports/ItemWiseReport';
+import CategoryWiseReport from './pages/admin/adminreports/CategoryWiseReport';
+import DayWiseReport from './pages/admin/adminreports/DayWiseReport';
+import RouteVillageReport from './pages/admin/adminreports/RouteVillageReport';
+import AgentPerformanceReport from './pages/admin/adminreports/AgentPerformanceReport';
+import LocationTrackingReport from './pages/admin/adminreports/LocationTrackingReport';
+import VehicleWiseReport from './pages/admin/adminreports/VehicleWiseReport';
+import PaymentModeReport from './pages/admin/adminreports/PaymentModeReport';
+import ReturnReport from './pages/admin/adminreports/ReturnReport';
+import DamageReport from './pages/admin/adminreports/DamageReport';
+import SessionReport from './pages/admin/adminreports/SessionReport';
+import InvoiceReport from './pages/admin/adminreports/InvoiceReport';
+
 function PrivateRoute({ children }) {
   const { token } = useUserStore();
   return token ? children : <Navigate to="/login" replace />;
@@ -170,7 +185,22 @@ export default function App() {
           <Route path="vehicles" element={<AdminVehicles />} />
           <Route path="inventory" element={<AdminInventory />} />
           <Route path="sales" element={<AdminSales />} />
-          <Route path="reports" element={<AdminReports />} />
+          <Route path="reports">
+            <Route index element={<AdminReports />} />
+            <Route path="overview" element={<OverviewReport />} />
+            <Route path="item-wise" element={<ItemWiseReport />} />
+            <Route path="category-wise" element={<CategoryWiseReport />} />
+            <Route path="day-wise" element={<DayWiseReport />} />
+            <Route path="route-village" element={<RouteVillageReport />} />
+            <Route path="agent-performance" element={<AgentPerformanceReport />} />
+            <Route path="location-tracking" element={<LocationTrackingReport />} />
+            <Route path="vehicle-wise" element={<VehicleWiseReport />} />
+            <Route path="payment-mode" element={<PaymentModeReport />} />
+            <Route path="returns" element={<ReturnReport />} />
+            <Route path="damages" element={<DamageReport />} />
+            <Route path="sessions" element={<SessionReport />} />
+            <Route path="invoices" element={<InvoiceReport />} />
+          </Route>
           <Route path="cash" element={<AdminCashManagement />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
