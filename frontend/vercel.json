@@ -1,4 +1,7 @@
 {
+  "env": {
+    "VITE_GOOGLE_MAPS_API_KEY": "AIzaSyC8jvNYaqaeCvWv0zyANSaWClNxMGgQqi0"
+  },
   "rewrites": [
     {
       "source": "/api/:path*",

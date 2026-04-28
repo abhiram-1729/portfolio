@@ -5,8 +5,8 @@ import {
   Users, Navigation, Truck, CreditCard, RotateCcw, 
   AlertTriangle, Zap, FileText 
 } from 'lucide-react';
-
 import { useUserStore } from '../../store/userStore';
+import StoreSelector from './StoreSelector';
 
 const reportModules = [
   { id: 'overview', name: 'Overview', icon: BarChart3, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Real-time sales & profit trends' },
@@ -25,11 +25,18 @@ const reportModules = [
 ];
 
 export default function AdminReports() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
   const storeId = searchParams.get('storeId');
   const storeName = searchParams.get('storeName');
   const user = useUserStore(s => s.user);
+
+  const isTenantOwner = user?.role === 'TENANT_OWNER';
+
+  const handleSelectStore = (id) => {
+    // Find store name for display
+    setSearchParams({ storeId: id });
+  };
 
   const getBaseLink = (id) => {
     const basePath = location.pathname.endsWith('/') ? location.pathname : `${location.pathname}/`;
@@ -78,29 +85,59 @@ export default function AdminReports() {
       </div>
 
       <div className="max-w-[1600px] mx-auto px-6 py-10">
-        <div className="mb-10">
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase mb-2">Select Audit Module</h2>
-          <div className="h-1.5 w-20 bg-emerald-600 rounded-full" />
+      {/* Store Selection Gateway for Tenant Owners */}
+      {isTenantOwner && !storeId ? (
+        <div className="max-w-4xl mx-auto px-6 py-10">
+          <StoreSelector 
+            onSelect={handleSelectStore}
+            title="Enterprise Analytics"
+            description="Select a branch to view its real-time performance metrics and audit reports."
+          />
         </div>
+      ) : (
+        <div className="max-w-[1600px] mx-auto px-6 py-10">
+          <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight uppercase mb-2">Select Audit Module</h2>
+              <div className="flex items-center gap-3">
+                 <div className="h-1.5 w-20 bg-emerald-600 rounded-full" />
+                 {storeId && (
+                   <span className="text-xs font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-3 py-1 rounded-full">
+                     Active Store ID: {storeId}
+                   </span>
+                 )}
+              </div>
+            </div>
+            {isTenantOwner && (
+              <button 
+                onClick={() => setSearchParams({})}
+                className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-emerald-600 transition-colors flex items-center gap-2"
+              >
+                <RotateCcw size={14} /> Change Store
+              </button>
+            )}
+          </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {filteredModules.map((module) => (
-            <Link 
-              key={module.id} 
-              to={getBaseLink(module.id)}
-              className="group bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col h-full"
-            >
-              <div className={`w-14 h-14 rounded-2xl ${module.bg} ${module.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
-                <module.icon size={28} strokeWidth={2.5} />
-              </div>
-              <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2 group-hover:text-emerald-600 transition-colors">{module.name}</h3>
-              <p className="text-xs font-medium text-gray-400 leading-relaxed mb-6">{module.desc}</p>
-              <div className="mt-auto flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
-                View Report <BarChart3 size={12} />
-              </div>
-            </Link>
-          ))}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {filteredModules.map((module) => (
+              <Link 
+                key={module.id} 
+                to={getBaseLink(module.id)}
+                className="group bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:scale-[1.02] transition-all duration-300 flex flex-col h-full"
+              >
+                <div className={`w-14 h-14 rounded-2xl ${module.bg} ${module.color} flex items-center justify-center mb-6 group-hover:scale-110 transition-transform`}>
+                  <module.icon size={28} strokeWidth={2.5} />
+                </div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight mb-2 group-hover:text-emerald-600 transition-colors">{module.name}</h3>
+                <p className="text-xs font-medium text-gray-400 leading-relaxed mb-6">{module.desc}</p>
+                <div className="mt-auto flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 opacity-0 group-hover:opacity-100 transition-all transform translate-x-[-10px] group-hover:translate-x-0">
+                  View Report <BarChart3 size={12} />
+                </div>
+              </Link>
+            ))}
+          </div>
         </div>
+      )}
       </div>
     </div>
   );

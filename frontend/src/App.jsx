@@ -218,7 +218,22 @@ export default function App() {
           <Route path="stores" element={<TenantStores />} />
           <Route path="users" element={<AdminUsers type="staff" />} />
           <Route path="vehicles" element={<AdminVehicles />} />
-          <Route path="reports" element={<AdminReports />} />
+          <Route path="reports">
+            <Route index element={<AdminReports />} />
+            <Route path="overview" element={<OverviewReport />} />
+            <Route path="item-wise" element={<ItemWiseReport />} />
+            <Route path="category-wise" element={<CategoryWiseReport />} />
+            <Route path="day-wise" element={<DayWiseReport />} />
+            <Route path="route-village" element={<RouteVillageReport />} />
+            <Route path="agent-performance" element={<AgentPerformanceReport />} />
+            <Route path="location-tracking" element={<LocationTrackingReport />} />
+            <Route path="vehicle-wise" element={<VehicleWiseReport />} />
+            <Route path="payment-mode" element={<PaymentModeReport />} />
+            <Route path="returns" element={<ReturnReport />} />
+            <Route path="damages" element={<DamageReport />} />
+            <Route path="sessions" element={<SessionReport />} />
+            <Route path="invoices" element={<InvoiceReport />} />
+          </Route>
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
           {/* Tenant specifically wants to manage Admins */}
