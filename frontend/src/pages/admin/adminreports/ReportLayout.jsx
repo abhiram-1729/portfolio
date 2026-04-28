@@ -28,8 +28,8 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
-               <div className="p-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200"><Icon size={24} strokeWidth={2.5} /></div>
-               <h1 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">{title} <span className="text-emerald-600">REPORT</span></h1>
+               <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-200"><Icon size={20} strokeWidth={2.5} /></div>
+               <h1 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">{title} <span className="text-emerald-600">REPORT</span></h1>
             </div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-1">Enterprise Analytics & Sales Audit Suite</p>
           </div>
@@ -41,7 +41,7 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 pt-10 pb-10">
+      <div className="max-w-[1600px] mx-auto px-6 pt-32 pb-10">
         <div className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase mb-2">{title}</h2>
