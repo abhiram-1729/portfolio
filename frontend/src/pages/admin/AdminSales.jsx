@@ -79,6 +79,18 @@ export default function AdminSales() {
   const [sessionData, setSessionData] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
+  // ── New Tab & Analytics States ──
+  const [activeTab, setActiveTab] = useState('All'); // 'All', 'Admins', 'Agent', 'Customer'
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'analytics'
+  const [analyticsData, setAnalyticsData] = useState({
+    trends: [],
+    topProducts: [],
+    agentPerf: [],
+    topCustomers: []
+  });
+  const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+
+
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
   const location = useLocation();
@@ -117,6 +129,67 @@ export default function AdminSales() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterDate, storeFilterId]);
+
+  // Aggregated Customer List for the "Customer" Tab
+  const customerList = React.useMemo(() => {
+    if (activeTab !== 'Customer') return [];
+    const customerMap = {};
+    sales.forEach(s => {
+      if (!s.mobile) return;
+      const key = s.mobile;
+      if (!customerMap[key]) {
+        customerMap[key] = { 
+          name: s.customerName || 'Walk-in', 
+          mobile: s.mobile, 
+          totalSpent: 0, 
+          orderCount: 0, 
+          lastOrderDate: s.createdAt,
+          paymentModes: new Set()
+        };
+      }
+      customerMap[key].totalSpent += s.totalAmount;
+      customerMap[key].orderCount += 1;
+      if (new Date(s.createdAt) > new Date(customerMap[key].lastOrderDate)) {
+        customerMap[key].lastOrderDate = s.createdAt;
+      }
+      if (s.paymentMode) customerMap[key].paymentModes.add(s.paymentMode);
+    });
+    
+    let result = Object.values(customerMap).sort((a, b) => b.totalSpent - a.totalSpent);
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(c => c.name.toLowerCase().includes(q) || c.mobile.includes(q));
+    }
+    return result;
+  }, [sales, activeTab, searchQuery]);
+
+  const fetchAnalytics = async () => {
+    setLoadingAnalytics(true);
+    try {
+      const [trends, products, agents] = await Promise.all([
+        adminAPI.getTrendsReport({ days: 7 }),
+        adminAPI.getTopProducts(),
+        adminAPI.getAgentPerformance({ storeId: storeFilterId })
+      ]);
+
+      setAnalyticsData({
+        trends: trends.data || [],
+        topProducts: products.data || [],
+        agentPerf: agents.data || [],
+        topCustomers: customerList.slice(0, 5)
+      });
+    } catch (err) {
+      toast.error('Failed to load analytics data');
+    } finally {
+      setLoadingAnalytics(false);
+    }
+  };
+
+  useEffect(() => {
+    if (viewMode === 'analytics') {
+      fetchAnalytics();
+    }
+  }, [viewMode, storeFilterId]);
 
   // ── Fetch enriched order when opening detail view ──
   const openOrderDetail = async (sale) => {
@@ -238,6 +311,7 @@ export default function AdminSales() {
   useEffect(() => {
     fetchSessionData();
   }, [storeFilterId]);
+
 
   const exportHistoryToExcel = () => {
     const data = listToRender.map(s => {
@@ -490,14 +564,25 @@ export default function AdminSales() {
   // Apply Store filter mathematically to sales
   const listToRender = sales.filter(s => {
     if (storeFilterId && s.storeId !== storeFilterId) return false;
+    
+    // Tab filtering
+    if (activeTab === 'Admins') {
+      const adminRoles = ['ADMIN', 'SUPER_ADMIN', 'TENANT_OWNER'];
+      if (!adminRoles.includes(s.user?.role)) return false;
+    } else if (activeTab === 'Agent') {
+      if (s.user?.role !== 'SALES_AGENT') return false;
+    }
+
     const query = searchQuery.toLowerCase();
     const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
     const customerName = s.customerName ? s.customerName.toLowerCase() : '';
     return invoiceStr.includes(query) || (s.mobile && s.mobile.includes(searchQuery)) || customerName.includes(query);
   });
 
-  const totalPages = Math.ceil(listToRender.length / ITEMS_PER_PAGE);
-  const paginatedSales = listToRender.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  // Gatekeeper removed for Tenant Owners to allow "All Stores" sales view
+
+  const totalPages = Math.ceil((activeTab === 'Customer' ? customerList.length : listToRender.length) / ITEMS_PER_PAGE);
+  const paginatedData = (activeTab === 'Customer' ? customerList : listToRender).slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
   return (
     <div className="main-content-to-print space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -538,6 +623,20 @@ export default function AdminSales() {
         {can('SALES', 'CREATE') && !viewingOrder && (
           <div className="flex items-center gap-3 no-print">
             <button
+              onClick={() => setViewMode(prev => prev === 'analytics' ? 'list' : 'analytics')}
+              className={`px-6 py-3 rounded-2xl transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm border ${viewMode === 'analytics' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'}`}
+            >
+              {viewMode === 'analytics' ? (
+                <>
+                  <FileText size={18} /> Sales List
+                </>
+              ) : (
+                <>
+                  <BarChart3 size={18} /> Analytics
+                </>
+              )}
+            </button>
+            <button
               onClick={exportHistoryToExcel}
               className="bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm"
             >
@@ -546,6 +645,30 @@ export default function AdminSales() {
           </div>
         )}
       </div>
+
+      {viewMode === 'list' && !viewingOrder && (
+        <div className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 w-fit no-print">
+          {[
+            { id: 'All', icon: ShoppingCart, label: 'All Sales' },
+            { id: 'Admins', icon: Shield, label: 'Admins' },
+            { id: 'Agent', icon: User, label: 'Agents' },
+            { id: 'Customer', icon: User, label: 'Customers' },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => { setActiveTab(tab.id); setCurrentPage(1); }}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                activeTab === tab.id
+                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-50'
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <tab.icon size={14} />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       {viewingOrder ? (
         /* ========== SALES DETAIL FULL PAGE VIEW ========== */
@@ -1095,6 +1218,11 @@ export default function AdminSales() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {viewMode === 'list' && !viewingOrder && (
+        <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
               <Search size={20} className="text-gray-400" />
@@ -1141,59 +1269,78 @@ export default function AdminSales() {
                     </div>
                   </div>
 
-                  {/* Mobile View */}
                   <div className="space-y-4 md:hidden no-print">
-                    {paginatedSales.map((sale) => (
-                      <div key={sale.id} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                        <div className="flex justify-between items-start">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                              <ShoppingCart size={20} />
+                    {paginatedData.map((item) => (
+                      <div key={item.id || item.mobile} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
+                        {activeTab === 'Customer' ? (
+                          <div className="flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black">
+                                {item.name.charAt(0)}
+                              </div>
+                              <div>
+                                <h3 className="text-sm font-black text-gray-900 uppercase">{item.name}</h3>
+                                <p className="text-[10px] text-gray-400 font-bold">{item.mobile}</p>
+                              </div>
                             </div>
-                            <div>
-                              <div className="flex items-center gap-2">
-                                <h3 className="text-sm font-bold text-gray-900 uppercase">
-                                  {sale.displayId || (sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6)}`)}
-                                </h3>
-                                <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${sale.coverageType === 'MORNING' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
-                                  {sale.coverageType || 'N/A'}
+                            <div className="text-right">
+                              <p className="text-sm font-black text-emerald-700">₹{item.totalSpent.toLocaleString()}</p>
+                              <p className="text-[9px] font-bold text-gray-400 uppercase">{item.orderCount} Orders</p>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <div className="flex justify-between items-start">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
+                                  <ShoppingCart size={20} />
+                                </div>
+                                <div>
+                                  <div className="flex items-center gap-2">
+                                    <h3 className="text-sm font-bold text-gray-900 uppercase">
+                                      {item.displayId || (item.orderNumber ? `VK-${item.orderNumber}` : `VK-${String(item.id).replace(/\D/g, '').slice(0, 6)}`)}
+                                    </h3>
+                                    <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md ${item.coverageType === 'MORNING' ? 'bg-amber-50 text-amber-600 border border-amber-100' : 'bg-indigo-50 text-indigo-600 border border-indigo-100'}`}>
+                                      {item.coverageType || 'N/A'}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">
+                                    {format(new Date(item.createdAt), 'dd MMM yyyy, hh:mm a')}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="flex flex-col items-end">
+                                <span className="text-lg font-bold text-gray-900">₹{item.totalAmount.toLocaleString()}</span>
+                                <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-bold uppercase">
+                                  {item.paymentMode || 'Pending'}
                                 </span>
                               </div>
-                              <p className="text-[10px] text-gray-400 font-bold uppercase mt-1">
-                                {format(new Date(sale.createdAt), 'dd MMM yyyy, hh:mm a')}
-                              </p>
                             </div>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-lg font-bold text-gray-900">₹{sale.totalAmount.toLocaleString()}</span>
-                            <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded-full font-bold uppercase">
-                              {sale.paymentMode || 'Pending'}
-                            </span>
-                          </div>
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-4 border-t border-gray-50 pt-4">
-                          <div className="flex flex-col gap-1">
-                            <div className="flex items-center gap-2">
-                              <User size={12} className="text-gray-400" />
-                              <span className="text-[10px] font-black text-gray-700 uppercase tracking-tight">
-                                Sold By: {sale.user?.name || sale.userName || 'System'}
-                              </span>
+                            <div className="grid grid-cols-2 gap-4 border-t border-gray-50 pt-4">
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-2">
+                                  <User size={12} className="text-gray-400" />
+                                  <span className="text-[10px] font-black text-gray-700 uppercase tracking-tight">
+                                    Sold By: {item.user?.name || item.userName || 'System'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Truck size={12} className="text-gray-400" />
+                                  <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
+                                    {item.vehicle?.vehicleNumber || 'No Vehicle'}
+                                  </span>
+                                </div>
+                              </div>
+                              <div className="flex items-center justify-end gap-1 text-emerald-600 group cursor-pointer">
+                                <button onClick={() => openOrderDetail(item)} className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
+                                  Details
+                                  <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                                </button>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Truck size={12} className="text-gray-400" />
-                              <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                                {sale.vehicle?.vehicleNumber || 'No Vehicle'}
-                              </span>
-                            </div>
-                          </div>
-                          <div className="flex items-center justify-end gap-1 text-emerald-600 group cursor-pointer">
-                            <button onClick={() => openOrderDetail(sale)} className="flex items-center gap-1 text-xs font-bold uppercase tracking-wider">
-                              Details
-                              <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
-                            </button>
-                          </div>
-                        </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
@@ -1203,63 +1350,121 @@ export default function AdminSales() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-gray-50/50">
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Invoice ID</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Date & Time</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Sold By</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Amount</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Payment</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 no-print text-right">Actions</th>
+                          {activeTab === 'Customer' ? (
+                            <>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer Name</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Mobile Number</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Total Orders</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Total Spent</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Last Purchase</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 no-print text-right">Actions</th>
+                            </>
+                          ) : (
+                            <>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Invoice ID</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Date & Time</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Sold By</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Amount</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Payment</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 no-print text-right">Actions</th>
+                            </>
+                          )}
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 text-sm">
-                        {(window.matchMedia && window.matchMedia('print').matches ? listToRender : paginatedSales).map((sale) => (
-                          <tr key={sale.id} className="hover:bg-gray-50/30 transition-colors group">
-                            <td className="px-6 py-4">
-                              <span className="font-black text-gray-900 uppercase">
-                                {sale.displayId || (sale.orderNumber ? `VK-${sale.orderNumber}` : `VK-${String(sale.id).replace(/\D/g, '').slice(0, 6)}`)}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <span className="text-xs text-gray-600 font-bold">
-                                {format(new Date(sale.createdAt), 'dd-MM-yy, HH:mm')}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className="font-bold text-gray-800 uppercase text-[10px]">{sale.customerName || 'Walk-in'}</span>
-                                <span className="text-[9px] text-gray-400 font-bold">{sale.mobile || 'N/A'}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col min-w-[120px]">
-                                <span className="font-bold text-gray-800 whitespace-nowrap truncate uppercase text-[10px]">
-                                  {sale.user?.name || sale.userName || 'System'}
-                                </span>
-                                <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest whitespace-nowrap truncate">
-                                  {sale.vehicle?.vehicleNumber || 'No Vehicle'}
-                                </span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="font-black text-emerald-700">₹{sale.totalAmount.toFixed(0)}</span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-[9px] bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-black uppercase tracking-widest border border-emerald-100">
-                                {sale.paymentMode || 'Cash'}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 whitespace-nowrap no-print">
-                              <div className="flex items-center justify-end">
-                                <button
-                                  onClick={() => openOrderDetail(sale)}
-                                  className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all whitespace-nowrap"
-                                >
-                                  View
-                                  <ChevronRight size={14} />
-                                </button>
-                              </div>
-                            </td>
+                        {paginatedData.map((item) => (
+                          <tr key={item.id || item.mobile} className="hover:bg-gray-50/30 transition-colors group">
+                            {activeTab === 'Customer' ? (
+                              <>
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 bg-emerald-50 text-emerald-600 rounded-lg flex items-center justify-center font-black text-xs">
+                                      {item.name.charAt(0)}
+                                    </div>
+                                    <span className="font-black text-gray-900 uppercase">{item.name}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="text-xs text-gray-600 font-bold flex items-center gap-1.5">
+                                    <Smartphone size={12} className="text-gray-400" />
+                                    {item.mobile}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="text-xs font-black text-indigo-600 bg-indigo-50 px-2 py-1 rounded-lg border border-indigo-100">
+                                    {item.orderCount} Orders
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-black text-emerald-700">₹{item.totalSpent.toLocaleString()}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="text-[10px] text-gray-400 font-bold uppercase">
+                                    {format(new Date(item.lastOrderDate), 'dd MMM yyyy')}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button 
+                                    onClick={() => {
+                                      setSearchQuery(item.mobile);
+                                      setActiveTab('All');
+                                    }}
+                                    className="text-[10px] font-black text-emerald-600 hover:underline uppercase tracking-widest"
+                                  >
+                                    View History
+                                  </button>
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-6 py-4">
+                                  <span className="font-black text-gray-900 uppercase">
+                                    {item.displayId || (item.orderNumber ? `VK-${item.orderNumber}` : `VK-${String(item.id).replace(/\D/g, '').slice(0, 6)}`)}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                  <span className="text-xs text-gray-600 font-bold">
+                                    {format(new Date(item.createdAt), 'dd-MM-yy, HH:mm')}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col">
+                                    <span className="font-bold text-gray-800 uppercase text-[10px]">{item.customerName || 'Walk-in'}</span>
+                                    <span className="text-[9px] text-gray-400 font-bold">{item.mobile || 'N/A'}</span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col min-w-[120px]">
+                                    <span className="font-bold text-gray-800 whitespace-nowrap truncate uppercase text-[10px]">
+                                      {item.user?.name || item.userName || 'System'}
+                                    </span>
+                                    <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest whitespace-nowrap truncate">
+                                      {item.vehicle?.vehicleNumber || 'No Vehicle'}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="font-black text-emerald-700">₹{item.totalAmount.toFixed(0)}</span>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <span className="text-[9px] bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-black uppercase tracking-widest border border-emerald-100">
+                                    {item.paymentMode || 'Cash'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap no-print">
+                                  <div className="flex items-center justify-end">
+                                    <button
+                                      onClick={() => openOrderDetail(item)}
+                                      className="flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-600 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all whitespace-nowrap"
+                                    >
+                                      View
+                                      <ChevronRight size={14} />
+                                    </button>
+                                  </div>
+                                </td>
+                              </>
+                            )}
                           </tr>
                         ))}
                       </tbody>
@@ -1318,7 +1523,7 @@ export default function AdminSales() {
               </>
             )}
           </div>
-        </div>
+        </>
       )}
 
       {/* ========== PROFESSIONAL PRINTABLE INVOICE TEMPLATE (MIRRORS PDF DESIGN) ========== */}
@@ -1509,6 +1714,159 @@ export default function AdminSales() {
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {viewMode === 'analytics' && !viewingOrder && (
+        <div className="space-y-8 animate-in fade-in duration-500">
+          <div className="bg-emerald-600 rounded-[2.5rem] p-8 text-white flex items-center justify-between shadow-xl shadow-emerald-100">
+            <div className="flex items-center gap-6">
+              <div className="w-16 h-16 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/30">
+                <BarChart3 size={32} />
+              </div>
+              <div>
+                <h2 className="text-3xl font-black tracking-tight uppercase">Professional Sales Analytics</h2>
+                <p className="text-xs font-bold text-emerald-100 uppercase tracking-widest mt-1 opacity-80">Deep Insights & Business Intelligence</p>
+              </div>
+            </div>
+            <div className="hidden md:block text-right">
+              <p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest">Store Performance</p>
+              <p className="text-xl font-black">7-Day Realtime Matrix</p>
+            </div>
+          </div>
+
+          {loadingAnalytics ? (
+            <div className="py-20 flex flex-col items-center justify-center gap-4">
+              <Loader2 className="animate-spin text-emerald-600" size={48} />
+              <p className="text-gray-500 font-black uppercase tracking-widest text-xs">Crunching Business Data...</p>
+            </div>
+          ) : (
+            <>
+              {/* Analytics Content */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Customer Insights Card */}
+                <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-6">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center shadow-sm"><User size={24} /></div>
+                      <div>
+                        <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Top Performing Customers</h3>
+                        <p className="text-[9px] font-bold text-gray-400 uppercase">High Lifetime Value</p>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-4 py-1.5 rounded-full uppercase tracking-widest">Revenue Drivers</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {analyticsData.topCustomers.map((cust, i) => (
+                      <div key={i} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl hover:bg-emerald-50/30 transition-all group border border-transparent hover:border-emerald-100">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs font-black text-emerald-200 w-4">#0{i + 1}</span>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 uppercase tracking-tight group-hover:text-emerald-700 transition-colors">{cust.name}</p>
+                            <p className="text-[9px] font-bold text-gray-400">{cust.mobile}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xs font-black text-emerald-700">₹{cust.totalSpent.toLocaleString()}</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{cust.orders} Orders</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Sales Trend Column */}
+                <div className="space-y-6">
+                  <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white space-y-4 shadow-xl shadow-slate-200 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 p-6 opacity-10"><BarChart3 size={80} /></div>
+                    <p className="text-[10px] font-black text-emerald-400 uppercase tracking-[0.2em]">Weekly Performance</p>
+                    <h4 className="text-4xl font-black tracking-tighter">
+                      ₹{analyticsData.trends.reduce((sum, t) => sum + t.revenue, 0).toLocaleString()}
+                    </h4>
+                    <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400">
+                      <CheckCircle2 size={12} className="text-emerald-400" /> Total 7D Gross Revenue
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-6">
+                    <div className="flex items-center gap-2">
+                      <Tag size={18} className="text-emerald-600" />
+                      <p className="text-[10px] font-black text-gray-900 uppercase tracking-[0.2em]">Product Performance</p>
+                    </div>
+                    <div className="space-y-5">
+                      {analyticsData.topProducts.slice(0, 4).map((prod, i) => (
+                        <div key={i} className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <p className="text-[10px] font-black text-gray-900 uppercase tracking-tight truncate w-32">{prod.name}</p>
+                            <p className="text-[10px] font-black text-emerald-600">₹{prod.totalRevenue.toLocaleString()}</p>
+                          </div>
+                          <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden border border-gray-100">
+                            <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${Math.min(100, (prod.totalRevenue / (analyticsData.topProducts[0]?.totalRevenue || 1)) * 100)}%` }}></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Agent Performance Leaderboard */}
+              <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
+                <div className="px-8 py-6 border-b border-gray-50 flex items-center justify-between bg-emerald-600 text-white">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/30"><Shield size={24} /></div>
+                    <div>
+                      <h3 className="text-lg font-black uppercase tracking-tight">Agent Performance Leaderboard</h3>
+                      <p className="text-[10px] font-bold text-emerald-100 uppercase tracking-widest opacity-80">Real-time VGE Revenue Distribution</p>
+                    </div>
+                  </div>
+                </div>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50/50">
+                        <th className="px-10 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sales Representative</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Daily Target</th>
+                        <th className="px-8 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Current Achievement</th>
+                        <th className="px-10 py-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Performance Index</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {analyticsData.agentPerf.map((agent, idx) => (
+                        <tr key={idx} className="hover:bg-emerald-50/20 transition-colors">
+                          <td className="px-10 py-5">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black text-sm border border-emerald-100">
+                                {agent.name.charAt(0)}
+                              </div>
+                              <div>
+                                <p className="text-sm font-black text-gray-900 uppercase tracking-tight">{agent.name}</p>
+                                <p className="text-[9px] font-bold text-gray-400 uppercase">Verified Agent</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-8 py-5 text-center font-bold text-gray-500 text-sm">
+                            ₹{agent.dailyTarget.toLocaleString()}
+                          </td>
+                          <td className="px-8 py-5 text-center">
+                            <span className="text-sm font-black text-emerald-700 bg-emerald-50 px-3 py-1 rounded-lg">₹{agent.totalSales.toLocaleString()}</span>
+                          </td>
+                          <td className="px-10 py-5 text-right">
+                            <div className="flex items-center justify-end gap-4">
+                              <div className="w-32 h-2 bg-gray-100 rounded-full overflow-hidden border border-gray-100">
+                                <div className={`h-full rounded-full transition-all duration-1000 ${agent.percentage >= 100 ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'bg-emerald-400'}`} style={{ width: `${Math.min(100, agent.percentage)}%` }}></div>
+                              </div>
+                              <span className="text-xs font-black text-gray-900 min-w-[40px]">{agent.percentage}%</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
