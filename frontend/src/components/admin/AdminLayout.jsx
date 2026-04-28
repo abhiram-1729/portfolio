@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   X,
+  Shield,
   ShoppingCart,
   Coins,
   MapPin,
@@ -87,6 +88,7 @@ export default function AdminLayout() {
         { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES', section: 'ROUTES' },
       ]
     },
+    { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
       label: 'Inventory',
@@ -255,12 +257,14 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/procurement')) return 'PROCUREMENT';
     if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
     if (pathname.startsWith('/admin/attendance')) return 'STAFF';
+    if (pathname.startsWith('/admin/privileges')) return 'ADMIN';
     return null;
   };
 
   const currentModule = getRequiredModule(location.pathname);
   
   const isAuthorizedRoute = () => {
+    if (location.pathname.startsWith('/admin/privileges')) return true; // Explicitly allow privileges if in Admin portal
     if (!currentModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
     if (location.pathname.startsWith('/admin/reports')) {

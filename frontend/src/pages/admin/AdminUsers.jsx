@@ -155,20 +155,26 @@ export default function AdminUsers({ type }) {
       SUPERVISOR: { label: 'Sup', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: UserCog },
       HELPER: { label: 'Helper', color: 'bg-slate-50 text-slate-700 border-slate-100', icon: Users },
     };
+
+    // If there's a custom role, we use its name as the primary label
+    if (customRole?.name) {
+      const isSystemAdmin = customRole.portalType === 'ADMIN' || customRole.portalType === 'SUPERVISOR';
+      return (
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${isSystemAdmin ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+          {isSystemAdmin ? <ShieldCheck size={8} /> : <Truck size={8} />}
+          {customRole.name}
+        </span>
+      );
+    }
+
     const r = roles[roleName] || { label: roleName, color: 'bg-gray-50 text-gray-700 border-gray-100', icon: User };
     const Icon = r.icon;
+    
     return (
-      <div className="flex flex-col gap-1 items-center">
-        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${r.color}`}>
-          <Icon size={8} />
-          {r.label}
-        </span>
-        {customRole?.name && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[8px] font-black border border-emerald-100 bg-emerald-50 text-emerald-600 uppercase tracking-tighter">
-            <ShieldCheck size={7} /> {customRole.name}
-          </span>
-        )}
-      </div>
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${r.color}`}>
+        <Icon size={8} />
+        {r.label}
+      </span>
     );
   };
 
@@ -228,7 +234,8 @@ export default function AdminUsers({ type }) {
       if (
         !u.name?.toLowerCase().includes(searchLower) &&
         !u.mobile?.includes(searchTerm) &&
-        !u.role?.toLowerCase().includes(searchLower)
+        !u.role?.toLowerCase().includes(searchLower) &&
+        !u.customRole?.name?.toLowerCase().includes(searchLower)
       ) {
         return false;
       }
@@ -804,6 +811,16 @@ export default function AdminUsers({ type }) {
               >
                 Agents
               </button>
+
+              {relevantCustomRoles.map(role => (
+                <button
+                  key={role.id}
+                  onClick={() => setActiveTab(role.id)}
+                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === role.id ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+                >
+                  {role.name}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-2 mt-2">

@@ -211,6 +211,7 @@ export default function App() {
           <Route path="activity-logs" element={<AdminActivityLogs />} />
           <Route path="damage" element={<AdminDamage />} />
           <Route path="attendance" element={<AdminAttendance />} />
+          <Route path="privileges" element={<TenantPrivileges />} />
         </Route>
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
@@ -234,11 +235,11 @@ export default function App() {
             <Route path="sessions" element={<SessionReport />} />
             <Route path="invoices" element={<InvoiceReport />} />
           </Route>
+          <Route path="privileges" element={<TenantPrivileges />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
           {/* Tenant specifically wants to manage Admins */}
           <Route path="admins" element={<AdminUsers type="admin" />} /> 
-          <Route path="privileges" element={<TenantPrivileges />} />
           <Route path="activity-logs" element={<TenantActivityLogs />} />
         </Route>
 

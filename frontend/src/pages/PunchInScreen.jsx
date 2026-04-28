@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { attendanceAPI } from '../services/api';
-import { Fingerprint, Clock, MapPin, Loader2, Camera, RefreshCw, CheckCircle2 } from 'lucide-react';
+import { Fingerprint, Clock, MapPin, Loader2, Camera, RefreshCw, CheckCircle2, ArrowLeft } from 'lucide-react';
+import { useUserStore } from '../store/userStore';
 import toast from 'react-hot-toast';
 
 export default function PunchInScreen({ onPunchIn }) {
@@ -183,12 +184,30 @@ export default function PunchInScreen({ onPunchIn }) {
     }
   };
 
+  const handleBackToLogin = () => {
+    // Clear user and redirect to login
+    const { clearUser } = useUserStore.getState();
+    clearUser();
+    window.location.href = '/login';
+  };
+
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-slate-50 relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
         <div className="absolute top-[-15%] left-[-15%] w-[60vw] h-[60vw] rounded-full bg-emerald-100/50 blur-[140px] animate-pulse" />
         <div className="absolute bottom-[-15%] right-[-15%] w-[50vw] h-[50vw] rounded-full bg-orange-100/30 blur-[120px]" />
+      </div>
+
+      {/* Back Button */}
+      <div className="absolute top-6 left-6 z-50">
+        <button
+          onClick={handleBackToLogin}
+          className="flex items-center gap-2 px-4 py-2.5 bg-white/80 backdrop-blur-md border border-gray-100 rounded-2xl text-slate-600 text-[10px] font-black uppercase tracking-widest shadow-sm hover:bg-white hover:text-emerald-600 transition-all active:scale-95"
+        >
+          <ArrowLeft size={16} strokeWidth={3} />
+          Back to Login
+        </button>
       </div>
 
       <div className="z-10 w-full max-w-sm flex flex-col items-center">

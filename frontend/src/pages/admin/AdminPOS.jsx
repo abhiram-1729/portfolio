@@ -29,7 +29,8 @@ import {
   Home, 
   Share2, 
   Download, 
-  ChevronLeft 
+  ChevronLeft,
+  Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
@@ -132,7 +133,10 @@ export default function AdminPOS() {
         upiAmount: selectedPaymentMode === 'CASH_UPI' ? parseFloat(splitAmounts.upi) : undefined,
       });
 
-      setLastOrder(order);
+      // Fetch populated order for correct invoice data
+      const { data: fullOrder } = await ordersAPI.getById(order.id);
+
+      setLastOrder(fullOrder);
       setCheckoutStep('SUCCESS');
       clearCart();
     } catch (err) {
@@ -173,11 +177,12 @@ export default function AdminPOS() {
     if (!order) return null;
     const currentSettings = bizSettings || settings || { businessName: 'VillagKart' };
 
+    // Load logo as base64
     let logoBase64 = null;
     try {
       logoBase64 = await loadImageAsBase64(villagKartLogo);
     } catch {
-      console.warn('Could not load logo');
+      console.warn('Could not load logo, continuing without it');
     }
 
     const pdf = new jsPDF('p', 'mm', 'a4');
@@ -186,54 +191,343 @@ export default function AdminPOS() {
     const contentWidth = pageWidth - margin * 2;
     let y = 20;
 
+    // ── Colors ──
     const emerald = [5, 150, 105];
     const darkText = [15, 23, 42];
     const grayText = [100, 116, 139];
     const lightLine = [226, 232, 240];
     const orangeAccent = [234, 88, 12];
 
+    // ══════════════════════════════════════
+    // HEADER — Company branding
+    // ══════════════════════════════════════
     const headerHeight = 55;
     pdf.setFillColor(255, 255, 255);
     pdf.rect(0, 0, pageWidth, headerHeight, 'F');
 
+    // Logo
+    const logoWidth = 30;
+    const logoHeight = 30; 
+    const logoX = margin;
+    const logoY = 5;
     if (logoBase64) {
-      pdf.addImage(logoBase64, 'PNG', margin, 5, 30, 30);
+      pdf.addImage(logoBase64, 'PNG', logoX, logoY, logoWidth, logoHeight);
     }
 
+    // Slogans
     pdf.setTextColor(...darkText);
     pdf.setFont('helvetica', 'bold');
     pdf.setFontSize(5);
-    pdf.text('Shop any Time, Save Everytime', margin + 1.5, 37);
+    const text1 = 'Shop any Time,';
+    const text2 = 'Save Everytime';
+    const textYPosition = logoY + logoHeight + 2;
+    const textBaseX = margin + 1.5; 
+    pdf.text(text1, textBaseX, textYPosition);
+    const text1Width = pdf.getTextWidth(`${text1} `);
+    pdf.text(` ${text2}`, textBaseX + text1Width - pdf.getTextWidth(' '), textYPosition);
 
+    // Invoice label (right-aligned)
     pdf.setFontSize(28);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(...darkText);
     pdf.text('INVOICE', pageWidth - margin, 20, { align: 'right' });
 
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Tax Invoice / Bill of Supply', pageWidth - margin, 27, { align: 'right' });
+
+    // Orange accent strip
     pdf.setFillColor(...orangeAccent);
     pdf.rect(0, headerHeight, pageWidth, 2, 'F');
 
     y = headerHeight + 10;
+
+    // ══════════════════════════════════════
+    // INVOICE META — Two columns
+    // ══════════════════════════════════════
     const invoiceNo = getInvoiceNumber(order);
-    
+    const orderDate = new Date(order.createdAt || Date.now());
+    const dateStr = orderDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = orderDate.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true });
+
+    // Left column - Seller Details
     pdf.setTextColor(...grayText);
     pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
     pdf.text('INVOICE NUMBER', margin, y);
     pdf.setTextColor(...darkText);
     pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
     pdf.text(`#VK-${invoiceNo}`, margin, y + 6);
 
-    y += 40;
-    // (Simplified table for now to keep it lean, or just the full one if needed)
-    // Actually, I'll just use a simpler version to avoid massive code duplication in AdminPOS
-    pdf.text('Order Details', margin, y);
-    y += 10;
-    order.items?.forEach((item, i) => {
-        pdf.text(`${i+1}. ${item.product?.name || 'Product'} x ${item.quantity}`, margin, y);
-        y += 7;
+    // Seller Info
+    let sellerY = y + 15;
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(7);
+    pdf.text('SOLD BY:', margin, sellerY);
+    pdf.setTextColor(...darkText);
+    pdf.setFontSize(8.5);
+    pdf.text(currentSettings.businessName.toUpperCase(), margin, sellerY + 4.5);
+
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(...grayText);
+    let sellerDetailsY = sellerY + 9;
+    if (currentSettings.gstNo) {
+      pdf.text(`GSTIN: ${currentSettings.gstNo}`, margin, sellerDetailsY);
+      sellerDetailsY += 4;
+    }
+    if (currentSettings.contactNo) {
+      pdf.text(`Ph: ${currentSettings.contactNo}`, margin, sellerDetailsY);
+      sellerDetailsY += 4;
+    }
+    if (currentSettings.address) {
+      const splitAddr = pdf.splitTextToSize(currentSettings.address, contentWidth * 0.45);
+      pdf.text(splitAddr, margin, sellerDetailsY);
+      sellerDetailsY += (splitAddr.length * 3.5);
+    }
+
+    const leftColBottom = sellerDetailsY + 2;
+
+    // Right column
+    const paymentLabel = order.paymentMode === 'CASH' ? 'Cash' : order.paymentMode === 'UPI' ? 'UPI' : order.paymentMode === 'CASH_UPI' ? 'Split (Cash+UPI)' : 'Card';
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('PAYMENT METHOD', pageWidth - margin, y, { align: 'right' });
+    pdf.setTextColor(...darkText);
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(paymentLabel, pageWidth - margin, y + 6, { align: 'right' });
+
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(8);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('DATE & TIME', pageWidth - margin, y + 16, { align: 'right' });
+    pdf.setTextColor(...darkText);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(`${dateStr} | ${timeStr}`, pageWidth - margin, y + 22, { align: 'right' });
+
+    if (order.customerName || order.mobile) {
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('BILL TO / CUSTOMER', pageWidth - margin, y + 32, { align: 'right' });
+      pdf.setTextColor(...darkText);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'normal');
+      let customerInfo = '';
+      if (order.customerName && order.mobile) {
+        customerInfo = `${order.customerName.toUpperCase()} (${order.mobile})`;
+      } else {
+        customerInfo = order.customerName ? order.customerName.toUpperCase() : order.mobile;
+      }
+      pdf.text(customerInfo, pageWidth - margin, y + 38, { align: 'right' });
+    }
+
+    y = Math.max(leftColBottom, y + 46);
+
+    // Divider
+    pdf.setDrawColor(...lightLine);
+    pdf.setLineWidth(0.5);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    // ══════════════════════════════════════
+    // ITEMS TABLE
+    // ══════════════════════════════════════
+    const colX = {
+      sno: margin,
+      item: margin + 10,
+      qty: margin + contentWidth * 0.40,
+      gst: margin + contentWidth * 0.52,
+      mrp: margin + contentWidth * 0.62,
+      price: margin + contentWidth * 0.74,
+      amount: pageWidth - margin,
+    };
+
+    const maxPageHeight = pdf.internal.pageSize.getHeight() - 20;
+
+    const drawTableHeaders = (currentY) => {
+      pdf.setFillColor(248, 250, 252);
+      pdf.rect(margin, currentY - 4, contentWidth, 10, 'F');
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(7.5);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('S.NO', colX.sno, currentY + 2);
+      pdf.text('ITEM DESCRIPTION', colX.item, currentY + 2);
+      pdf.text('QTY', colX.qty, currentY + 2);
+      pdf.text('GST', colX.gst, currentY + 2);
+      pdf.text('MRP', colX.mrp, currentY + 2);
+      pdf.text('VK PRICE', colX.price, currentY + 2);
+      pdf.text('AMOUNT', colX.amount, currentY + 2, { align: 'right' });
+      return currentY + 10;
+    };
+
+    y = drawTableHeaders(y);
+
+    const items = order.items || [];
+    items.forEach((item, index) => {
+      const itemName = item.product?.name || `Product ${item.productId?.slice(-6) || ''}`;
+      const qty = item.quantity || 0;
+      const price = item.price || 0;
+      const mrpValue = item.mrp || price;
+      const amount = qty * price;
+      const gstRate = item.gst || 0;
+      const itemTaxable = amount / (1 + gstRate / 100);
+      const itemGstAmt = amount - itemTaxable;
+
+      if (y > maxPageHeight - 10) {
+        pdf.addPage();
+        y = 20;
+        pdf.setTextColor(...grayText);
+        pdf.setFontSize(8);
+        pdf.setFont('helvetica', 'italic');
+        pdf.text(`Invoice #VK-${invoiceNo} (Continued)`, margin, y);
+        pdf.setFillColor(...orangeAccent);
+        pdf.rect(margin, y + 2, contentWidth, 0.5, 'F');
+        y += 12;
+        y = drawTableHeaders(y);
+      }
+
+      if (index % 2 === 0) pdf.setFillColor(255, 255, 255);
+      else pdf.setFillColor(249, 250, 251);
+      pdf.rect(margin, y - 4, contentWidth, 9, 'F');
+
+      pdf.setTextColor(...darkText);
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(`${index + 1}`, colX.sno, y + 1);
+
+      const maxNameWidth = colX.qty - colX.item - 5;
+      let displayName = itemName;
+      while (pdf.getTextWidth(displayName) > maxNameWidth && displayName.length > 3) {
+        displayName = displayName.slice(0, -4) + '...';
+      }
+      pdf.text(displayName, colX.item, y + 1);
+      pdf.text(`${qty}`, colX.qty, y + 1);
+      pdf.text(`${itemGstAmt.toFixed(2)}`, colX.gst, y + 1);
+
+      pdf.setTextColor(...grayText);
+      pdf.setFontSize(7);
+      pdf.text(`Rs.${mrpValue.toFixed(2)}`, colX.mrp, y + 1, { align: 'left' });
+
+      const isItemFree = price === 0;
+      pdf.setTextColor(...(isItemFree ? orangeAccent : emerald));
+      pdf.setFontSize(isItemFree ? 7 : 8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text(isItemFree ? 'GIFT/FREE' : `Rs.${price.toFixed(2)}`, colX.price, y + 1);
+
+      pdf.setTextColor(...darkText);
+      pdf.setFontSize(9);
+      pdf.text(isItemFree ? 'Rs.0.00' : `Rs.${amount.toFixed(2)}`, colX.amount, y + 1, { align: 'right' });
+
+      y += 9;
     });
 
-    y += 10;
+    y += 2;
+    pdf.setDrawColor(...emerald);
+    pdf.setLineWidth(0.8);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 8;
+
+    // TOTALS
+    if (y > maxPageHeight - 65) {
+      pdf.addPage();
+      y = 20;
+      y += 12;
+    }
+    const totalsX = margin + contentWidth * 0.55;
+    const startY = y;
+    let rightY = startY;
+
+    const subTotalMRP = order.items?.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) || order.totalAmount;
+    const savings = subTotalMRP - order.totalAmount;
+
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(9);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Subtotal (MRP)', totalsX, rightY);
+    pdf.setTextColor(...darkText);
+    pdf.text(`Rs.${subTotalMRP.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    rightY += 7;
+
+    if (savings > 0) {
+      pdf.setFillColor(255, 247, 237);
+      pdf.roundedRect(totalsX - 3, rightY - 5, (pageWidth - margin) - totalsX + 6, 9, 1, 1, 'F');
+      pdf.setTextColor(...orangeAccent);
+      pdf.setFontSize(10);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('TOTAL SAVINGS', totalsX, rightY + 1.5);
+      pdf.setFontSize(11);
+      pdf.text(`- Rs.${savings.toFixed(2)}`, colX.amount, rightY + 1.5, { align: 'right' });
+      rightY += 9;
+    }
+
+    const totalTax = order.items?.reduce((sum, item) => {
+      const rate = item.gst || 0;
+      if (rate === 0) return sum;
+      const taxable = (item.price * item.quantity) / (1 + rate / 100);
+      return sum + ((item.price * item.quantity) - taxable);
+    }, 0) || 0;
+
+    pdf.setTextColor(...grayText);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Taxable Value', totalsX, rightY);
+    pdf.setTextColor(...darkText);
+    pdf.text(`Rs.${(order.totalAmount - totalTax).toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    rightY += 7;
+
+    pdf.setTextColor(...grayText);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(`Total GST (Incl.)`, totalsX, rightY);
+    pdf.setTextColor(...darkText);
+    pdf.text(`Rs.${totalTax.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    rightY += 4;
+
+    pdf.setDrawColor(...lightLine);
+    pdf.line(totalsX, rightY, pageWidth - margin, rightY);
+    rightY += 7;
+
+    pdf.setFillColor(...emerald);
+    pdf.roundedRect(totalsX - 3, rightY - 5, (pageWidth - margin) - totalsX + 6, 14, 2, 2, 'F');
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('TOTAL', totalsX, rightY + 3);
     pdf.setFontSize(14);
-    pdf.text(`Total: Rs.${order.totalAmount.toFixed(2)}`, pageWidth - margin, y, { align: 'right' });
+    pdf.text(`Rs.${order.totalAmount?.toFixed(2)}`, colX.amount, rightY + 4, { align: 'right' });
+    rightY += 15;
+
+    // Payment Status Badge
+    const badgeWidth = (totalsX - margin) - 15;
+    pdf.setFillColor(236, 253, 245);
+    pdf.roundedRect(margin, startY, badgeWidth, 18, 3, 3, 'F');
+    pdf.setDrawColor(167, 243, 208);
+    pdf.roundedRect(margin, startY, badgeWidth, 18, 3, 3, 'S');
+    pdf.setTextColor(...emerald);
+    pdf.setFontSize(10);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('PAYMENT STATUS', margin + badgeWidth / 2, startY + 7, { align: 'center' });
+    pdf.setFontSize(11);
+    pdf.text('PAID', margin + badgeWidth / 2, startY + 13, { align: 'center' });
+
+    y = Math.max(startY + 25, rightY + 5);
+
+    // FOOTER
+    pdf.setDrawColor(...lightLine);
+    pdf.line(margin, y, pageWidth - margin, y);
+    y += 12;
+    pdf.setTextColor(...emerald);
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Thanks for shopping in VillagKart', pageWidth / 2, y, { align: 'center' });
+    y += 6;
+    pdf.setTextColor(...grayText);
+    pdf.setFontSize(7);
+    pdf.text('This is a computer-generated invoice and does not require a signature.', pageWidth / 2, y, { align: 'center' });
+    y += 4;
+    pdf.text(`Generated on ${new Date().toLocaleString('en-IN')}`, pageWidth / 2, y, { align: 'center' });
 
     return pdf;
   };
@@ -250,6 +544,128 @@ export default function AdminPOS() {
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handlePrintReceipt = () => {
+    if (!lastOrder) return;
+    
+    const bizSettings = settings || { businessName: 'VillagKart' };
+    const invoiceNo = getInvoiceNumber(lastOrder);
+    const dateStr = new Date(lastOrder.createdAt || Date.now()).toLocaleString('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'short'
+    });
+
+    const subTotalMRP = lastOrder.items?.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) || lastOrder.totalAmount;
+    const savings = subTotalMRP - lastOrder.totalAmount;
+
+    const printWindow = window.open('', '_blank', 'width=300,height=600');
+    
+    const receiptHTML = `
+      <html>
+        <head>
+          <title>Receipt #VK-${invoiceNo}</title>
+          <style>
+            @page { size: 80mm auto; margin: 0; }
+            body { 
+              width: 70mm; 
+              font-family: 'Courier New', Courier, monospace; 
+              font-size: 11px; 
+              padding: 5mm; 
+              margin: 0 auto;
+              color: #000;
+            }
+            .center { text-align: center; }
+            .bold { font-weight: bold; }
+            .header { font-size: 14px; margin-bottom: 2px; }
+            .subheader { font-size: 9px; margin-bottom: 5px; }
+            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .item-row { display: flex; justify-content: space-between; margin-bottom: 4px; }
+            .item-name { flex: 1; padding-right: 5px; }
+            .item-qty { width: 30px; text-align: center; }
+            .item-amt { width: 60px; text-align: right; }
+            .totals { margin-top: 10px; }
+            .total-row { display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; margin-top: 4px; }
+            .savings-box { 
+              border: 1px solid #000; 
+              padding: 8px; 
+              margin: 10px 0; 
+              text-align: center; 
+              font-size: 13px; 
+              font-weight: bold;
+              text-transform: uppercase;
+            }
+            .footer { margin-top: 15px; font-size: 9px; }
+          </style>
+        </head>
+        <body>
+          <div class="center bold header">${bizSettings.businessName.toUpperCase()}</div>
+          ${bizSettings.address ? `<div class="center subheader">${bizSettings.address}</div>` : ''}
+          ${bizSettings.gstNo ? `<div class="center subheader">GSTIN: ${bizSettings.gstNo}</div>` : ''}
+          ${bizSettings.contactNo ? `<div class="center subheader">Ph: ${bizSettings.contactNo}</div>` : ''}
+          
+          <div class="divider"></div>
+          <div class="item-row">
+            <span>Bill No: #VK-${invoiceNo}</span>
+          </div>
+          <div class="item-row">
+            <span>Date: ${dateStr}</span>
+          </div>
+          <div class="divider"></div>
+          
+          <div class="item-row bold">
+            <span class="item-name">ITEM</span>
+            <span class="item-qty">QTY</span>
+            <span class="item-amt">AMT</span>
+          </div>
+          <div class="divider"></div>
+          
+          ${lastOrder.items.map(item => `
+            <div class="item-row">
+              <span class="item-name">${(item.product?.name || 'Product').slice(0, 18)}</span>
+              <span class="item-qty">${item.quantity}</span>
+              <span class="item-amt">${(item.price * item.quantity).toFixed(2)}</span>
+            </div>
+          `).join('')}
+          
+          <div class="divider"></div>
+          
+          <div class="total-row">
+            <span>TOTAL AMOUNT</span>
+            <span>Rs.${lastOrder.totalAmount.toFixed(2)}</span>
+          </div>
+          <div class="item-row" style="font-size: 9px; margin-top: 4px;">
+            <span>Payment: ${lastOrder.paymentMode}</span>
+            <span>Status: PAID</span>
+          </div>
+
+          ${savings > 0 ? `
+            <div class="savings-box">
+              YOU SAVED: Rs.${savings.toFixed(2)}
+            </div>
+          ` : ''}
+          
+          <div class="divider"></div>
+          <div class="center footer">
+            <div class="bold">Thanks for shopping!</div>
+            <div>Please Visit Again</div>
+            <div style="margin-top: 5px; font-size: 7px;">${new Date().toLocaleString()}</div>
+          </div>
+        </body>
+      </html>
+    `;
+
+    printWindow.document.write(receiptHTML);
+    printWindow.document.close();
+    
+    // Auto print and close
+    printWindow.onload = () => {
+      printWindow.focus();
+      printWindow.print();
+      setTimeout(() => {
+        printWindow.close();
+      }, 500);
+    };
   };
 
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
@@ -691,16 +1107,22 @@ export default function AdminPOS() {
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <button onClick={resetPOS} className="w-full bg-white text-gray-900 font-black text-xs py-4 rounded-2xl border border-gray-200 hover:bg-gray-50 transition-all flex items-center justify-center gap-2">
-                        <Home size={16} /> New Sale
+                    <div className="grid grid-cols-3 gap-3">
+                      <button onClick={resetPOS} className="w-full bg-white text-gray-900 font-black text-[10px] py-4 rounded-2xl border border-gray-200 hover:bg-gray-50 transition-all flex flex-col items-center justify-center gap-1">
+                        <Home size={16} /> NEW
                       </button>
                       <button 
                          onClick={handleDownloadPDF} 
                          disabled={isDownloading}
-                         className="w-full bg-emerald-600 text-white font-black text-xs py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex items-center justify-center gap-2 disabled:opacity-50"
+                         className="w-full bg-white text-emerald-700 font-black text-[10px] py-4 rounded-2xl border border-emerald-100 hover:bg-emerald-50 transition-all flex flex-col items-center justify-center gap-1 disabled:opacity-50"
                       >
-                        <Download size={16} /> {isDownloading ? '...' : 'PDF'}
+                        <Download size={16} /> PDF
+                      </button>
+                      <button 
+                         onClick={handlePrintReceipt}
+                         className="w-full bg-emerald-600 text-white font-black text-[10px] py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 flex flex-col items-center justify-center gap-1"
+                      >
+                        <Printer size={16} /> PRINT
                       </button>
                     </div>
                     <button 
@@ -952,20 +1374,33 @@ export default function AdminPOS() {
                         <p className="text-[10px] font-bold text-gray-400 mt-1">Order #VK-{getInvoiceNumber(lastOrder)}</p>
                       </div>
 
-                      <div className="w-full grid grid-cols-2 gap-3 pt-4">
+                      <div className="w-full grid grid-cols-3 gap-3 pt-4">
+                        <button 
+                          onClick={handleDownloadPDF} 
+                          disabled={isDownloading}
+                          className="w-full bg-white text-emerald-700 font-black text-[10px] py-4 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center gap-1 disabled:opacity-50"
+                        >
+                          <Download size={16} /> PDF
+                        </button>
+                        <button 
+                          onClick={handlePrintReceipt}
+                          className="w-full bg-white text-emerald-700 font-black text-[10px] py-4 rounded-2xl border border-emerald-100 flex flex-col items-center justify-center gap-1"
+                        >
+                          <Printer size={16} /> PRINT
+                        </button>
                         <button 
                           onClick={() => { resetPOS(); setIsCartOpen(false); }} 
-                          className="w-full bg-white text-gray-900 font-black text-xs py-4 rounded-2xl border border-gray-200"
+                          className="w-full bg-emerald-600 text-white font-black text-[10px] py-4 rounded-2xl shadow-lg shadow-emerald-600/20 flex flex-col items-center justify-center gap-1"
                         >
-                          New Sale
-                        </button>
-                        <button 
-                           onClick={() => { resetPOS(); setIsCartOpen(false); navigate('/admin/sales'); }} 
-                           className="w-full bg-emerald-600 text-white font-black text-xs py-4 rounded-2xl shadow-lg shadow-emerald-600/20"
-                        >
-                          History
+                          <CheckCircle size={16} /> DONE
                         </button>
                       </div>
+                      <button 
+                         onClick={() => { resetPOS(); setIsCartOpen(false); navigate('/admin/sales'); }} 
+                         className="w-full bg-gray-50 text-gray-400 font-black text-[10px] py-3 rounded-xl uppercase tracking-widest"
+                      >
+                        View History
+                      </button>
                     </div>
                   )}
                 </div>

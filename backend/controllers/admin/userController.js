@@ -21,7 +21,11 @@ export const getUsers = async (req, res) => {
 
     const users = await prisma.user.findMany({
       where: filter,
-      include: { assignedVehicle: true, store: true }
+      include: { 
+        assignedVehicle: true, 
+        store: true,
+        customRole: true 
+      }
     });
     res.json(users);
   } catch (error) {

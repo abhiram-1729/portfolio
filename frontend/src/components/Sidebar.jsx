@@ -56,8 +56,8 @@ export default function Sidebar({ isOpen, onClose }) {
       shouldShow: () => {
         if (!user?.customRoleId) return true;
         const sections = user?.permissions?.CASH_SECTIONS;
-        if (sections) return (sections['CASH_WALLET'] || []).includes('READ');
-        return user?.permissions?.CASH_TARGET_SECTIONS?.includes('CASH_WALLET');
+        if (sections) return (sections['RECONCILIATION'] || []).includes('READ');
+        return user?.permissions?.CASH_TARGET_SECTIONS?.includes('RECONCILIATION');
       }
     },
     {
@@ -70,8 +70,8 @@ export default function Sidebar({ isOpen, onClose }) {
       shouldShow: () => {
         if (!user?.customRoleId) return true;
         const sections = user?.permissions?.CASH_SECTIONS;
-        if (sections) return (sections['CASH_WALLET'] || []).includes('READ');
-        return user?.permissions?.CASH_TARGET_SECTIONS?.includes('CASH_WALLET');
+        if (sections) return (sections['LIVE_CASH'] || []).includes('READ');
+        return user?.permissions?.CASH_TARGET_SECTIONS?.includes('LIVE_CASH');
       }
     },
     { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50', module: 'REPORTS' },
@@ -137,7 +137,7 @@ export default function Sidebar({ isOpen, onClose }) {
     // Hide administrative modules for Agents
     if (user?.role === 'SALES_AGENT' && item.isAdmin) return false;
     if (item.shouldShow && !item.shouldShow()) return false;
-    if (!item.module || user?.role === 'TENANT_OWNER') return true;
+    if (!item.module || user?.role === 'TENANT_OWNER' || user?.role === 'SALES_AGENT' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
     // Granular checks for top-level modules - PRIORITIZE SECTION VISIBILITY OVER MODULE READ
     if (item.module === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {
