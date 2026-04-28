@@ -30,7 +30,7 @@ const prisma = basePrisma.$extends({
       async $allOperations({ model, operation, args, query }) {
         try {
           const tenantId = getTenantId();
-          
+
           // Skip isolation for Tenant model itself
           if (model === 'Tenant') {
             return query(args);
@@ -47,7 +47,7 @@ const prisma = basePrisma.$extends({
               const modelName = model.charAt(0).toLowerCase() + model.slice(1);
               if (basePrisma[modelName]) {
                 const refinedWhere = { ...args.where, tenantId };
-                
+
                 // Flatten composite unique keys for findFirst compatibility
                 // (e.g., { vehicleId_date: { vehicleId, date } } -> { vehicleId, date })
                 for (const key in args.where) {
@@ -68,11 +68,11 @@ const prisma = basePrisma.$extends({
                 });
               }
             }
-            
+
             // Injection for Write operations
             if (operation === 'create' || operation === 'upsert') {
               const relationalMandatory = ['Order', 'User', 'Store', 'Tenant']; // Models where scalars are hidden in CreateInput (mostly Order)
-              
+
               const h_clean = (modelName, obj) => {
                 if (!obj || typeof obj !== 'object') return obj;
                 const data = { ...obj };
@@ -88,7 +88,7 @@ const prisma = basePrisma.$extends({
                     data.tenantId = tId;
                   }
                 }
-                
+
                 // Handle Store Isolation
                 const sId = data.storeId || null;
                 if (sId && modelName !== 'Tenant') {
@@ -136,13 +136,13 @@ const prisma = basePrisma.$extends({
                 });
               }
             }
-            
+
             if (['findMany', 'findFirst', 'count', 'groupBy', 'aggregate', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
-               const where = args.where || {};
-               const hasUniqueKey = Object.keys(where).some(k => k.includes('_'));
-               if (!where.tenantId && !hasUniqueKey) {
-                 args.where = { ...where, tenantId };
-               }
+              const where = args.where || {};
+              const hasUniqueKey = Object.keys(where).some(k => k.includes('_'));
+              if (!where.tenantId && !hasUniqueKey) {
+                args.where = { ...where, tenantId };
+              }
             }
           }
 

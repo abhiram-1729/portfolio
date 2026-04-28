@@ -15,7 +15,6 @@ import OpeningCashEntry from './pages/OpeningCashEntry';
 import ClosingCashEntry from './pages/ClosingCashEntry';
 import AgentInventory from './pages/AgentInventory';
 import TodayPlan from './pages/TodayPlan';
-import ShiftTracking from './pages/ShiftTracking';
 import RefillStock from './pages/RefillStock';
 import AdminLayout from './components/admin/AdminLayout';
 import AgentLayout from './components/AgentLayout';
@@ -161,7 +160,6 @@ export default function App() {
           <Route path="closing-cash" element={<ClosingCashEntry />} />
           <Route path="agent-inventory/:vehicleId" element={<AgentInventory />} />
           <Route path="today-plan" element={<TodayPlan />} />
-          <Route path="shift-tracking" element={<ShiftTracking />} />
           <Route path="refill-stock" element={<RefillStock />} />
           <Route path="targets" element={<VgeTargets />} />
           <Route path="my-assets" element={<AgentAssets />} />

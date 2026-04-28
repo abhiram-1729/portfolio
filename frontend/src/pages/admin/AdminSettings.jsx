@@ -3,6 +3,7 @@ import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Sa
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
+import AdminLateEntryConfig from './AdminLateEntryConfig';
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState({
@@ -17,7 +18,15 @@ export default function AdminSettings() {
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeModal, setActiveModal] = useState(null); // 'TAX' | 'BUSINESS' | 'UNITS' | 'CATEGORIES'
+  const [activeModal, setActiveModal] = useState(null); // 'TAX' | 'BUSINESS' | 'UNITS' | 'CATEGORIES' | 'SHIFTS'
+  const [isCreatingShift, setIsCreatingShift] = useState(false);
+  const [editingShiftId, setEditingShiftId] = useState(null);
+  const [shiftForm, setShiftForm] = useState({
+    type: 'STANDARD',
+    name: '',
+    isActive: true,
+    sessions: [{ startTime: '09:00', endTime: '18:00' }]
+  });
 
   // Units State
   const [units, setUnits] = useState([]);
@@ -352,8 +361,8 @@ export default function AdminSettings() {
       title: 'Shift Management',
       icon: Clock,
       items: [
-        { label: 'Standard Shift Config', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'STANDARD'})); } },
-        { label: 'Multi-Shift Config', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } }
+        { label: 'Configure Timing & Shifts', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } },
+        { label: 'Late Entry Rules', action: () => setActiveModal('LATE_RULES') }
       ]
     }
   ];
@@ -842,157 +851,328 @@ export default function AdminSettings() {
   }
 
   if (activeModal === 'SHIFTS') {
-    const isMulti = settings.shiftMode === 'MULTI';
-    
+    const formatTime12h = (time24) => {
+      if (!time24) return 'N/A';
+      const [hours, minutes] = time24.split(':');
+      const h = parseInt(hours);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${minutes} ${ampm}`;
+    };
 
-    const handleAddShift = () => {
-      const newShifts = [...(settings.shifts || [])];
-      if (newShifts.length >= 10) return toast.error('Maximum 10 shifts allowed');
+    const handleAddSession = () => {
+      if (shiftForm.sessions.length >= 5) return toast.error('Maximum 5 sessions allowed');
+      setShiftForm({
+        ...shiftForm,
+        sessions: [...shiftForm.sessions, { startTime: '14:00', endTime: '18:00' }]
+      });
+    };
+
+    const handleRemoveSession = (index) => {
+      if (shiftForm.sessions.length <= 1) return;
+      setShiftForm({
+        ...shiftForm,
+        sessions: shiftForm.sessions.filter((_, i) => i !== index)
+      });
+    };
+
+    const handleSessionChange = (index, field, value) => {
+      const newSessions = [...shiftForm.sessions];
+      newSessions[index][field] = value;
+      setShiftForm({ ...shiftForm, sessions: newSessions });
+    };
+
+    const validateShiftForm = () => {
+      if (!shiftForm.name) return 'Shift name is required';
+      if (!shiftForm.type) return 'Shift type is required';
       
-      newShifts.push({
-        id: `shift_${Date.now()}`,
-        name: `Shift ${newShifts.length + 1}`,
-        startTime: '08:00',
-        endTime: '14:00',
-        isActive: true
-      });
-      setSettings({ ...settings, shifts: newShifts });
-    };
-
-    const handleRemoveShift = (id) => {
-      if (!isMulti && settings.shifts.length <= 1) return toast.error('Standard mode requires at least one shift');
-      setSettings({
-        ...settings,
-        shifts: settings.shifts.filter(s => s.id !== id)
-      });
-    };
-
-    const handleShiftChange = (id, field, value) => {
-      setSettings({
-        ...settings,
-        shifts: (settings.shifts || []).map(s => s.id === id ? { ...s, [field]: value } : s)
-      });
-    };
-
-    const validateShifts = () => {
-      const shifts = settings.shifts || [];
-      if (shifts.length === 0) return 'At least one shift is required';
-      
-      for (const shift of shifts) {
-        if (!shift.name && isMulti) return 'Shift name is required';
-        if (shift.startTime >= shift.endTime) return `Shift "${shift.name || 'General'}": End time must be after start time`;
-      }
-
-      if (isMulti) {
-        // Check overlaps
-        const sorted = [...shifts].sort((a, b) => a.startTime.localeCompare(b.startTime));
-        for (let i = 0; i < sorted.length - 1; i++) {
-          if (sorted[i].endTime > sorted[i+1].startTime) {
-            return `Overlap detected between "${sorted[i].name}" and "${sorted[i+1].name}"`;
+      for (let i = 0; i < shiftForm.sessions.length; i++) {
+        const s = shiftForm.sessions[i];
+        if (s.startTime >= s.endTime) return `Session ${i + 1}: End time must be after start time`;
+        
+        // Overlap check
+        for (let j = i + 1; j < shiftForm.sessions.length; j++) {
+          const s2 = shiftForm.sessions[j];
+          if (s.startTime < s2.endTime && s.endTime > s2.startTime) {
+            return `Overlap detected between Session ${i + 1} and Session ${j + 1}`;
           }
         }
       }
       return null;
     };
 
-    const onSaveShifts = async (e) => {
+    const handleSaveShift = async (e) => {
       e.preventDefault();
-      const error = validateShifts();
+      const error = validateShiftForm();
       if (error) return toast.error(error);
-      handleUpdateSettings(e);
+
+      setSaving(true);
+      try {
+        // Calculate overall start/end for backward compatibility
+        const allStarts = shiftForm.sessions.map(s => s.startTime).sort();
+        const allEnds = shiftForm.sessions.map(s => s.endTime).sort();
+        
+        const newShift = {
+          id: editingShiftId || `shift_${Date.now()}`,
+          name: shiftForm.name,
+          type: shiftForm.type,
+          startTime: allStarts[0],
+          endTime: allEnds[allEnds.length - 1],
+          sessions: shiftForm.sessions,
+          isActive: shiftForm.isActive
+        };
+
+        const updatedShifts = editingShiftId 
+          ? settings.shifts.map(s => s.id === editingShiftId ? newShift : s)
+          : [...(settings.shifts || []), newShift];
+        const { data } = await adminAPI.updateSettings({ 
+          ...settings, 
+          shifts: updatedShifts, 
+          storeId: currentUser?.storeId 
+        });
+
+        if (data.success) {
+          setSettings({ ...settings, shifts: updatedShifts });
+          toast.success(editingShiftId ? 'Shift Updated ✅' : 'Shift Configuration Saved ✅');
+          setIsCreatingShift(false);
+          setEditingShiftId(null);
+          setShiftForm({ type: 'STANDARD', name: '', isActive: true, sessions: [{ startTime: '09:00', endTime: '18:00' }] });
+        }
+      } catch (err) {
+        toast.error('Failed to save shift');
+      } finally {
+        setSaving(false);
+      }
     };
 
-    return (
-      <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700">
-        {renderHeader(
-          isMulti ? 'Multi-Shift Configuration' : 'Standard Shift Configuration', 
-          isMulti ? 'Flexible Timing & Multiple Sessions' : 'Single Session Management', 
-          Clock, 
-          isMulti ? 'text-violet-600 bg-violet-100' : 'text-emerald-600 bg-emerald-100'
-        )}
-        
-        <div className="space-y-6">
-          <div className={`grid grid-cols-1 ${isMulti ? 'md:grid-cols-2' : ''} gap-6`}>
-            {(settings.shifts || []).map((shift, index) => (
-              <div key={shift.id} className="bg-white rounded-3xl border border-slate-100 shadow-xl p-6 relative group overflow-hidden">
-                <div className={`absolute top-0 left-0 w-1.5 h-full ${isMulti ? 'bg-violet-500' : 'bg-emerald-500'}`} />
-                
-                <div className="flex items-center justify-between mb-6">
-                  <h4 className={`text-[10px] font-black ${isMulti ? 'text-violet-900' : 'text-emerald-900'} uppercase tracking-widest flex items-center gap-2`}>
-                    <span className={`w-5 h-5 rounded-lg ${isMulti ? 'bg-violet-100 text-violet-600' : 'bg-emerald-100 text-emerald-600'} flex items-center justify-center text-[8px] font-black`}>
-                      {index + 1}
-                    </span>
-                    {isMulti ? 'Dynamic Shift Slot' : 'Standard Business Hours'}
-                  </h4>
-                  {isMulti && (
-                    <button onClick={() => handleRemoveShift(shift.id)} className="p-2 text-rose-300 hover:text-rose-500 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                      <Trash2 size={16} />
-                    </button>
-                  )}
-                </div>
+    const handleDeleteShift = async (id) => {
+      if (!confirm('Are you sure you want to delete this shift?')) return;
+      const updatedShifts = settings.shifts.filter(s => s.id !== id);
+      try {
+        await adminAPI.updateSettings({ ...settings, shifts: updatedShifts, storeId: currentUser?.storeId });
+        setSettings({ ...settings, shifts: updatedShifts });
+        toast.success('Shift deleted');
+      } catch (err) {
+        toast.error('Failed to delete shift');
+      }
+    };
 
-                <div className="space-y-5">
-                  <div className="space-y-2">
-                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
-                      Shift Name {isMulti ? '' : '(Optional)'}
-                    </label>
+    const handleEditShift = (shift) => {
+      setShiftForm({
+        type: shift.type || (shift.sessions?.length > 1 ? 'MULTI_SESSION' : 'STANDARD'),
+        name: shift.name,
+        isActive: shift.isActive !== undefined ? shift.isActive : true,
+        sessions: shift.sessions || [{ startTime: shift.startTime, endTime: shift.endTime }]
+      });
+      setEditingShiftId(shift.id);
+      setIsCreatingShift(true);
+    };
+
+    if (isCreatingShift) {
+      return (
+        <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-20">
+          <div className="flex items-center justify-between">
+             <div className="flex items-center gap-4">
+                <button onClick={() => { setIsCreatingShift(false); setEditingShiftId(null); }} className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-rose-600 transition-all shadow-sm">
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{editingShiftId ? 'Edit Shift Configuration' : 'Create Shift Configuration'}</h2>
+                  <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">{editingShiftId ? 'Update Operational Parameters' : 'Define Operational Parameters'}</p>
+                </div>
+             </div>
+          </div>
+
+          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden p-8 md:p-12 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Shift Type</label>
+                  <select 
+                    value={shiftForm.type} 
+                    onChange={e => {
+                      const type = e.target.value;
+                      setShiftForm({ 
+                        ...shiftForm, 
+                        type, 
+                        sessions: type === 'STANDARD' ? [{ startTime: '09:00', endTime: '18:00' }] : [{ startTime: '09:00', endTime: '13:00' }, { startTime: '15:00', endTime: '19:00' }]
+                      });
+                    }}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-black text-slate-900 appearance-none outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all cursor-pointer"
+                  >
+                    <option value="STANDARD">Standard Shift (Full Day)</option>
+                    <option value="MULTI_SESSION">Multi-Session Shift (Split)</option>
+                  </select>
+               </div>
+
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Shift Name</label>
+                  <div className="flex gap-4">
                     <input 
                       type="text" 
-                      placeholder={isMulti ? "e.g., Morning Shift" : "e.g., General Shift"}
-                      value={shift.name} 
-                      onChange={e => handleShiftChange(shift.id, 'name', e.target.value)}
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all" 
+                      placeholder="e.g., General Operations Shift" 
+                      value={shiftForm.name} 
+                      onChange={e => setShiftForm({ ...shiftForm, name: e.target.value })}
+                      className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all" 
                     />
+                    <button 
+                      type="button"
+                      onClick={() => setShiftForm({...shiftForm, isActive: !shiftForm.isActive})}
+                      className={`px-6 rounded-2xl border flex items-center gap-2 transition-all ${shiftForm.isActive ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-500'}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${shiftForm.isActive ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{shiftForm.isActive ? 'Active' : 'Inactive'}</span>
+                    </button>
                   </div>
+               </div>
+            </div>
 
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Start Time</label>
-                      <input 
-                        type="time" 
-                        value={shift.startTime} 
-                        onChange={e => handleShiftChange(shift.id, 'startTime', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all" 
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">End Time</label>
-                      <input 
-                        type="time" 
-                        value={shift.endTime} 
-                        onChange={e => handleShiftChange(shift.id, 'endTime', e.target.value)}
-                        className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all" 
-                      />
-                    </div>
-                  </div>
-                </div>
+            <div className="pt-6 border-t border-gray-50">
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Clock size={16} className="text-violet-600" /> Time Configuration
+                </h4>
+                {shiftForm.type === 'MULTI_SESSION' && (
+                  <button onClick={handleAddSession} className="text-[10px] font-black text-violet-600 uppercase tracking-widest hover:underline flex items-center gap-1">
+                    <Plus size={14} /> Add Session
+                  </button>
+                )}
               </div>
-            ))}
 
-            {isMulti && (
-              <button 
-                onClick={handleAddShift}
-                className="border-2 border-dashed border-slate-200 rounded-3xl p-8 flex flex-col items-center justify-center gap-3 text-slate-400 hover:border-violet-400 hover:text-violet-500 hover:bg-violet-50/30 transition-all group"
-              >
-                <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center group-hover:bg-violet-100 transition-colors">
-                  <Plus size={24} />
-                </div>
-                <span className="text-[10px] font-black uppercase tracking-widest">Add Another Shift</span>
-              </button>
-            )}
-          </div>
+              <div className="space-y-6">
+                {shiftForm.sessions.map((session, idx) => (
+                  <div key={idx} className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative group animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {shiftForm.type === 'STANDARD' ? 'Operational Hours' : `Session ${idx + 1}`}
+                      </span>
+                      {shiftForm.type === 'MULTI_SESSION' && shiftForm.sessions.length > 1 && (
+                        <button onClick={() => handleRemoveSession(idx)} className="text-rose-400 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Start Time</label>
+                        <input type="time" value={session.startTime} onChange={e => handleSessionChange(idx, 'startTime', e.target.value)}
+                          className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-black focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">End Time</label>
+                        <input type="time" value={session.endTime} onChange={e => handleSessionChange(idx, 'endTime', e.target.value)}
+                          className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-black focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
 
-          <div className="pt-6">
-            <button 
-              onClick={onSaveShifts} 
-              disabled={saving} 
-              className={`w-full ${isMulti ? 'bg-slate-900' : 'bg-emerald-600'} text-white font-black py-6 rounded-3xl shadow-2xl transition-all text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-4 active:scale-95 disabled:bg-slate-400`}
-            >
-              {saving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
-              {saving ? 'Syncing...' : `Apply ${isMulti ? 'Multi-Shift' : 'Standard'} Logic`}
-            </button>
+            <div className="p-6 bg-violet-50 rounded-3xl border border-violet-100 flex items-center justify-between gap-4">
+               <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-violet-600 shadow-sm">
+                   <FileText size={18} />
+                 </div>
+                 <div>
+                   <p className="text-[10px] font-black text-violet-900 uppercase tracking-widest mb-0.5">Configuration Summary</p>
+                   <p className="text-xs font-bold text-violet-600 italic">
+                     {shiftForm.sessions.length > 1 
+                       ? `Split shift with ${shiftForm.sessions.length} active sessions` 
+                       : `Standard continuous shift: ${formatTime12h(shiftForm.sessions[0].startTime)} to ${formatTime12h(shiftForm.sessions[0].endTime)}`}
+                   </p>
+                 </div>
+               </div>
+               <div className="flex gap-3">
+                 <button onClick={() => { setIsCreatingShift(false); setEditingShiftId(null); }} className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">Cancel</button>
+                 <button onClick={handleSaveShift} disabled={saving} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:bg-violet-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {editingShiftId ? 'Update Shift' : 'Save Shift'}
+                 </button>
+               </div>
+            </div>
           </div>
         </div>
+      );
+    }
+
+    return (
+      <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Shift Configuration</h2>
+            <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">Manage Operational Sessions</p>
+          </div>
+          <button 
+            onClick={() => setIsCreatingShift(true)}
+            className="bg-emerald-600 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+          >
+            <Plus size={18} strokeWidth={3} /> Create Shift
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(settings.shifts || []).map((shift) => (
+            <div key={shift.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl p-6 relative group overflow-hidden hover:border-emerald-200 transition-all">
+              <div className="absolute top-0 right-0 p-4 flex gap-2">
+                <button onClick={() => handleEditShift(shift)} className="p-2 text-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                  <Edit size={18} />
+                </button>
+                <button onClick={() => handleDeleteShift(shift.id)} className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                  <Trash2 size={18} />
+                </button>
+              </div>
+              
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 mb-6 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                <Clock size={24} />
+              </div>
+
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="text-sm font-black text-gray-900">{shift.name}</h4>
+                <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${shift.isActive !== false ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-500'}`}>
+                  {shift.isActive !== false ? 'Active' : 'Inactive'}
+                </div>
+              </div>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4">
+                {shift.type === 'MULTI_SESSION' ? 'Multi-Session Shift' : 'Standard Shift'}
+              </p>
+
+              <div className="space-y-2 border-t border-gray-50 pt-4">
+                 {(shift.sessions || [{startTime: shift.startTime, endTime: shift.endTime}]).map((s, i) => (
+                   <div key={i} className="flex items-center justify-between text-[11px] font-bold text-gray-500">
+                      <span>{shift.type === 'MULTI_SESSION' ? `Session ${i+1}` : 'Timing'}</span>
+                      <span className="text-gray-900 font-black">{formatTime12h(s.startTime)} - {formatTime12h(s.endTime)}</span>
+                   </div>
+                 ))}
+              </div>
+            </div>
+          ))}
+          {(!settings.shifts || settings.shifts.length === 0) && (
+            <div className="col-span-full py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+               <Clock size={48} className="mx-auto text-gray-200 mb-4" />
+               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No shifts configured yet</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'LATE_RULES') {
+    return (
+      <div className="space-y-6 pb-20">
+        <div className="flex items-center gap-4 mb-8">
+          <button 
+            onClick={() => setActiveModal(null)}
+            className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 transition-all shadow-sm group"
+          >
+            <ArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Late Entry Rules</h2>
+            <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1 italic">Attendance Policy Configuration</p>
+          </div>
+        </div>
+        <AdminLateEntryConfig />
       </div>
     );
   }

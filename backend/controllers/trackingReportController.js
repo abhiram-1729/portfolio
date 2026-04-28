@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { format, differenceInMinutes } from 'date-fns';
+import { getShiftsConfig } from './shiftController.js';
 
 /**
  * @desc    Get Village Visit Duration Report
@@ -124,11 +125,23 @@ export const getTimeDeviationReport = async (req, res, next) => {
       include: { user: { select: { name: true } } }
     });
 
+    // Fetch shifts once for this store/tenant context to avoid repeated DB calls in map
+    // (In a multi-store report, we might need a more complex cache, but this handles most cases)
+    const shifts = await getShiftsConfig(tenantId, storeId || logs[0]?.storeId);
+
     const report = logs.map(log => {
-      // Shift 1: 5:45 AM, Shift 2: 3:30 PM
-      const expectedTime = log.shift === 1 ? '05:45' : '15:30';
+      // Find the specific shift config from the dynamic list
+      const shiftConfig = shifts.find((s, idx) =>
+        s.id === log.shift ||
+        s.id === `shift_${log.shift}` ||
+        (idx + 1) === log.shift ||
+        s.name.toUpperCase() === (log.shift === 1 ? 'MORNING' : 'EVENING')
+      );
+
+      // Default fallback if config not found
+      const expectedTime = shiftConfig?.startTime || (log.shift === 1 ? '05:45' : '15:30');
       const actualTime = format(new Date(log.startTime), 'HH:mm');
-      
+
       // Basic deviation calculation
       const [exH, exM] = expectedTime.split(':').map(Number);
       const [acH, acM] = actualTime.split(':').map(Number);
@@ -137,7 +150,7 @@ export const getTimeDeviationReport = async (req, res, next) => {
       return {
         id: log.id,
         agentName: log.user.name,
-        shiftType: log.shift === 1 ? 'Morning' : 'Evening',
+        shiftType: shiftConfig?.name || (log.shift === 1 ? 'Morning' : 'Evening'),
         expectedTime,
         actualTime,
         deviationMinutes: deviation,

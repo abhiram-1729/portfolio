@@ -3,6 +3,28 @@ import { isWithinRadius } from '../utils/geoUtils.js';
 import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
 
+export const getShiftsConfig = async (tenantId, storeId) => {
+  let settings = await prisma.businessSettings.findUnique({
+    where: { tenantId_storeId: { tenantId, storeId } }
+  });
+
+  if (!settings && storeId) {
+    settings = await prisma.businessSettings.findUnique({
+      where: { tenantId_storeId: { tenantId, storeId: null } }
+    });
+  }
+
+  if (settings && settings.shifts && Array.isArray(settings.shifts) && settings.shifts.length > 0) {
+    return settings.shifts;
+  }
+
+  // Default shifts if none configured
+  return [
+    { id: 'shift_1', name: 'Morning', startTime: '08:00', endTime: '14:00' },
+    { id: 'shift_2', name: 'Evening', startTime: '14:00', endTime: '20:00' }
+  ];
+};
+
 /**
  * @desc    Start a new shift
  * @route   POST /api/shifts/start
@@ -73,19 +95,38 @@ export const startShift = async (req, res, next) => {
     });
 
     // 5. Late Start Notification Check
+    const shifts = await getShiftsConfig(req.user.tenantId, req.user.storeId);
+    
+    // Find config by ID (string) or by 1-based index (Int)
+    const activeShiftConfig = shifts.find((s, idx) => 
+        s.id === shiftType || 
+        s.id === `shift_${shiftType}` || 
+        (idx + 1) === shiftType ||
+        s.name.toUpperCase() === (shiftType === 1 ? 'MORNING' : 'EVENING')
+    );
+    
     const shiftTime = new Date();
-    const hours = shiftTime.getHours();
-    const minutes = shiftTime.getMinutes();
+    const currentTimeStr = format(shiftTime, 'HH:mm');
     let isLate = false;
     let expectedTime = '';
-    const shiftName = shiftType === 1 ? 'MORNING' : 'EVENING';
+    const shiftName = activeShiftConfig ? activeShiftConfig.name : (shiftType === 1 ? 'MORNING' : 'EVENING');
 
-    if (shiftType === 1 && (hours > 5 || (hours === 5 && minutes > 45))) {
-        isLate = true;
-        expectedTime = '05:45 AM';
-    } else if (shiftType === 2 && (hours > 15 || (hours === 15 && minutes > 30))) {
-        isLate = true;
-        expectedTime = '03:30 PM';
+    if (activeShiftConfig && activeShiftConfig.startTime) {
+        if (currentTimeStr > activeShiftConfig.startTime) {
+            isLate = true;
+            expectedTime = activeShiftConfig.startTime;
+        }
+    } else {
+        // Fallback to legacy hardcoded times
+        const hours = shiftTime.getHours();
+        const minutes = shiftTime.getMinutes();
+        if (shiftType === 1 && (hours > 5 || (hours === 5 && minutes > 45))) {
+            isLate = true;
+            expectedTime = '05:45 AM';
+        } else if (shiftType === 2 && (hours > 15 || (hours === 15 && minutes > 30))) {
+            isLate = true;
+            expectedTime = '03:30 PM';
+        }
     }
 
     if (isLate) {
@@ -172,21 +213,36 @@ export const getShiftStatus = async (req, res, next) => {
     const userId = req.user.id;
     const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-    const activeShift = await prisma.shiftLog.findFirst({
-      where: {
-        userId,
-        date: dateStr,
-        status: 'STARTED'
-      },
-      include: {
-        activities: {
-          orderBy: { startTime: 'desc' },
-          take: 1
+    const [activeShift, attendance, shifts] = await Promise.all([
+      prisma.shiftLog.findFirst({
+        where: {
+          userId,
+          date: dateStr,
+          status: 'STARTED'
+        },
+        orderBy: { startTime: 'desc' },
+        include: {
+          activities: {
+            orderBy: { startTime: 'desc' },
+            take: 1
+          }
         }
-      }
-    });
+      }),
+      prisma.attendance.findUnique({
+        where: { userId_date: { userId, date: dateStr } }
+      }),
+      getShiftsConfig(req.user.tenantId, req.user.storeId)
+    ]);
 
-    res.json({ activeShift });
+    res.json({ 
+      activeShift, 
+      attendance: attendance ? {
+        isLate: attendance.isLate,
+        lateMinutes: attendance.lateMinutes,
+        punchInTime: attendance.punchInTime
+      } : null,
+      shifts 
+    });
   } catch (error) {
     console.error('getShiftStatus error:', error);
     next(error);

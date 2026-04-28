@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { uploadToSupabase } from '../utils/supabaseService.js';
+import lateEntryEngine from '../services/lateEntryEngine.js';
 
 // Helper: get today's date string in YYYY-MM-DD format (IST)
 const getTodayIST = () => {
@@ -59,6 +60,13 @@ export const punchIn = async (req, res, next) => {
         status: 'ACTIVE',
       }
     });
+
+    // Run Late Detection Engine
+    try {
+      await lateEntryEngine.detectAndRecord(userId, new Date(), date);
+    } catch (leError) {
+      console.error('Late Detection Engine Error:', leError);
+    }
 
     res.status(201).json({
       success: true,

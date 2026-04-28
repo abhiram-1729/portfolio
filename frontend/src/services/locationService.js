@@ -8,11 +8,15 @@ const PENDING_LOGS_KEY = 'vk_pending_location_logs';
  */
 export const logLocation = async (data) => {
   try {
+    const token = localStorage.getItem('token');
     if (!navigator.onLine) {
       queueLog(data);
       return { status: 'queued' };
     }
-    return await axios.post(`${API_URL}/location/log`, data, { withCredentials: true });
+    return await axios.post(`${API_URL}/location/log`, data, { 
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true 
+    });
   } catch (error) {
     queueLog(data);
     return { status: 'queued' };
@@ -36,18 +40,21 @@ export const syncPendingLogs = async () => {
   if (pending.length === 0) return;
 
   const successfulSyncs = [];
-  
+  const token = localStorage.getItem('token');
+
   for (const log of pending) {
     try {
-      await axios.post(`${API_URL}/location/log`, log, { withCredentials: true });
+      await axios.post(`${API_URL}/location/log`, log, { 
+        headers: { Authorization: `Bearer ${token}` },
+        withCredentials: true 
+      });
       successfulSyncs.push(log);
     } catch (error) {
       console.error('Failed to sync log:', error);
-      break; // Stop syncing if server is down
+      break; 
     }
   }
 
-  // Remove successful syncs
   const remaining = pending.filter(p => !successfulSyncs.includes(p));
   localStorage.setItem(PENDING_LOGS_KEY, JSON.stringify(remaining));
 };
@@ -56,21 +63,26 @@ export const syncPendingLogs = async () => {
  * Start periodic location tracking
  */
 let trackingInterval = null;
-export const startLiveTracking = (intervalMs = 60000) => {
+export const startLiveTracking = (intervalMs = 30000) => {
   if (trackingInterval) return;
 
-  trackingInterval = setInterval(() => {
+  const captureLocation = () => {
     if (!navigator.geolocation) return;
-
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const { latitude, longitude, accuracy } = position.coords;
         logLocation({ lat: latitude, lon: longitude, accuracy });
       },
       (error) => console.error('GPS Error:', error),
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
-    
+  };
+
+  // Immediate capture on start
+  captureLocation();
+  
+  trackingInterval = setInterval(() => {
+    captureLocation();
     syncPendingLogs();
   }, intervalMs);
 };

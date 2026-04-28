@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { attendanceAPI } from '../../services/api';
-import { Clock, Users, UserCheck, UserX, Timer, TrendingUp, CalendarDays, Search, LogIn, LogOut, Truck, ChevronLeft, ChevronRight, AlertCircle, Activity, Camera, X, MapPin } from 'lucide-react';
+import { Clock, Users, UserCheck, UserX, Timer, TrendingUp, CalendarDays, Search, LogIn, LogOut, Truck, ChevronLeft, ChevronRight, AlertCircle, Activity, Camera, X, MapPin, Settings, FileText } from 'lucide-react';
+import AdminLateEntryReport from './AdminLateEntryReport';
+import AdminLateEntryConfig from './AdminLateEntryConfig';
 
 export default function AdminAttendance() {
   const [records, setRecords] = useState([]);
@@ -8,6 +10,7 @@ export default function AdminAttendance() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [photoModal, setPhotoModal] = useState(null); // { url, agentName, type, time, lat, lng }
+  const [activeTab, setActiveTab] = useState('live'); // 'live' | 'late-reports'
 
   // Default date = today IST
   const now = new Date();
@@ -172,264 +175,304 @@ export default function AdminAttendance() {
         </div>
         <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
           <button
-            onClick={() => setViewMode('daily')}
+            onClick={() => setActiveTab('live')}
             className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              viewMode === 'daily' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+              activeTab === 'live' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
             }`}
-          >Daily</button>
+          >Live Tracker</button>
           <button
-            onClick={() => setViewMode('range')}
+            onClick={() => setActiveTab('late-reports')}
             className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              viewMode === 'range' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+              activeTab === 'late-reports' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
             }`}
-          >Date Range</button>
+          >Late Reports</button>
         </div>
       </div>
 
-      {/* Date Controls */}
-      {viewMode === 'daily' ? (
-        <div className="flex items-center justify-between bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <button onClick={() => changeDate(-1)} className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all active:scale-95">
-            <ChevronLeft size={18} strokeWidth={3} />
-          </button>
-          <div className="flex items-center gap-3">
-            <CalendarDays size={18} className="text-emerald-600" />
-            <div className="text-center">
-              <input type="date" value={selectedDate} max={todayStr} onChange={(e) => setSelectedDate(e.target.value)}
-                className="text-lg font-black text-gray-900 tracking-tight bg-transparent border-none focus:outline-none cursor-pointer" />
-              <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{formatDisplayDate(selectedDate)}</p>
-            </div>
+      {activeTab === 'late-reports' && <AdminLateEntryReport />}
+
+      {activeTab === 'live' && (
+        <>
+          <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm w-fit">
+            <button
+              onClick={() => setViewMode('daily')}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                viewMode === 'daily' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >Daily</button>
+            <button
+              onClick={() => setViewMode('range')}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                viewMode === 'range' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >Date Range</button>
           </div>
-          <button onClick={() => changeDate(1)} disabled={selectedDate >= todayStr}
-            className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
-            <ChevronRight size={18} strokeWidth={3} />
-          </button>
-        </div>
-      ) : (
-        <div className="flex flex-col sm:flex-row items-center gap-3 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
-          <div className="flex items-center gap-2 flex-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">From</label>
-            <input type="date" value={startDate} max={todayStr} onChange={(e) => setStartDate(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
-          </div>
-          <div className="flex items-center gap-2 flex-1">
-            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">To</label>
-            <input type="date" value={endDate} max={todayStr} onChange={(e) => setEndDate(e.target.value)}
-              className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
-          </div>
-        </div>
+        </>
       )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-        {statCards.map((card) => (
-          <div key={card.label} className={`${card.bg} rounded-2xl p-4 border ${card.border} transition-all hover:shadow-md`}>
-            <div className="flex items-center gap-2 mb-2">
-              <div className={`w-7 h-7 ${card.iconBg} rounded-lg flex items-center justify-center`}>
-                <card.icon size={14} className={card.text} strokeWidth={2.5} />
+      {activeTab === 'live' && (
+        <>
+          {/* Date Controls */}
+          {viewMode === 'daily' ? (
+            <div className="flex items-center justify-between bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <button onClick={() => changeDate(-1)} className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all active:scale-95">
+                <ChevronLeft size={18} strokeWidth={3} />
+              </button>
+              <div className="flex items-center gap-3">
+                <CalendarDays size={18} className="text-emerald-600" />
+                <div className="text-center">
+                  <input type="date" value={selectedDate} max={todayStr} onChange={(e) => setSelectedDate(e.target.value)}
+                    className="text-lg font-black text-gray-900 tracking-tight bg-transparent border-none focus:outline-none cursor-pointer" />
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{formatDisplayDate(selectedDate)}</p>
+                </div>
+              </div>
+              <button onClick={() => changeDate(1)} disabled={selectedDate >= todayStr}
+                className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-500 hover:bg-emerald-50 hover:text-emerald-600 transition-all active:scale-95 disabled:opacity-30 disabled:cursor-not-allowed">
+                <ChevronRight size={18} strokeWidth={3} />
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col sm:flex-row items-center gap-3 bg-white rounded-2xl p-4 border border-gray-100 shadow-sm">
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">From</label>
+                <input type="date" value={startDate} max={todayStr} onChange={(e) => setStartDate(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
+              </div>
+              <div className="flex items-center gap-2 flex-1">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">To</label>
+                <input type="date" value={endDate} max={todayStr} onChange={(e) => setEndDate(e.target.value)}
+                  className="flex-1 px-3 py-2 rounded-xl border border-gray-200 text-sm font-bold text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500" />
               </div>
             </div>
-            <p className="text-2xl font-black text-gray-900 mb-0.5">{card.value}</p>
-            <p className={`text-[9px] font-black uppercase tracking-widest ${card.text}`}>{card.label}</p>
-          </div>
-        ))}
-      </div>
+          )}
 
-      {/* Search */}
-      <div className="relative">
-        <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" strokeWidth={2.5} />
-        <input type="text" placeholder="Search by agent name, mobile or vehicle..."
-          value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-bold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm" />
-      </div>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+            {statCards.map((card) => (
+              <div key={card.label} className={`${card.bg} rounded-2xl p-4 border ${card.border} transition-all hover:shadow-md`}>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className={`w-7 h-7 ${card.iconBg} rounded-lg flex items-center justify-center`}>
+                    <card.icon size={14} className={card.text} strokeWidth={2.5} />
+                  </div>
+                </div>
+                <p className="text-2xl font-black text-gray-900 mb-0.5">{card.value}</p>
+                <p className={`text-[9px] font-black uppercase tracking-widest ${card.text}`}>{card.label}</p>
+              </div>
+            ))}
+          </div>
 
-      {/* Records */}
-      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-3 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+          {/* Search */}
+          <div className="relative">
+            <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" strokeWidth={2.5} />
+            <input type="text" placeholder="Search by agent name, mobile or vehicle..."
+              value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-11 pr-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-bold text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 shadow-sm" />
           </div>
-        ) : filteredRecords.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16">
-            <AlertCircle size={48} className="text-gray-200 mb-3" />
-            <p className="text-sm font-bold text-gray-400">No attendance records found</p>
-            <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mt-1">
-              {searchTerm ? 'Try a different search' : 'No one has punched in on this date'}
-            </p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table */}
-            <div className="hidden md:block overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-gray-100">
-                    <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vehicle</th>
-                    {viewMode === 'range' && <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>}
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Punch In</th>
-                    <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Photo</th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Punch Out</th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Hours</th>
-                    <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredRecords.map((record) => (
-                    <tr key={record.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
-                            {record.user?.name?.charAt(0) || '?'}
-                          </div>
-                          <div>
-                            <p className="text-sm font-black text-gray-900 tracking-tight">{record.user?.name || 'Unknown'}</p>
-                            <p className="text-[10px] font-bold text-gray-400">{record.user?.mobile}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <Truck size={13} className="text-gray-400" />
-                          <span className="text-xs font-bold text-gray-600">{record.user?.assignedVehicle?.vehicleNumber || '—'}</span>
-                        </div>
-                      </td>
-                      {viewMode === 'range' && (
-                        <td className="px-4 py-4 text-xs font-bold text-gray-600">{record.date}</td>
-                      )}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
-                          <LogIn size={13} className="text-emerald-500" />
-                          <span className="text-sm font-black text-gray-900">{formatTime(record.punchInTime)}</span>
-                        </div>
-                        {record.punchInLocation ? (
-                          <p className="text-[9px] font-bold text-gray-400 mt-0.5 leading-tight w-48" title={record.punchInLocation}>📍 {record.punchInLocation}</p>
-                        ) : record.punchInLat ? (
-                          <p className="text-[9px] font-bold text-gray-300 mt-0.5">📍 {record.punchInLat?.toFixed(4)}, {record.punchInLng?.toFixed(4)}</p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {record.punchInPhoto ? (
-                            <button
-                              onClick={() => openPhoto(record, 'in')}
-                              className="group relative w-10 h-10 rounded-xl overflow-hidden border-2 border-emerald-200 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md"
-                            >
-                              <img src={record.punchInPhoto} alt="In" className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-emerald-600/0 group-hover:bg-emerald-600/20 transition-all flex items-center justify-center">
-                                <Camera size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+
+          {/* Records */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-3 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+              </div>
+            ) : filteredRecords.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-16">
+                <AlertCircle size={48} className="text-gray-200 mb-3" />
+                <p className="text-sm font-bold text-gray-400">No attendance records found</p>
+                <p className="text-[10px] font-bold text-gray-300 uppercase tracking-widest mt-1">
+                  {searchTerm ? 'Try a different search' : 'No one has punched in on this date'}
+                </p>
+              </div>
+            ) : (
+              <>
+                {/* Desktop Table */}
+                <div className="hidden md:block overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-100">
+                        <th className="px-6 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Vehicle</th>
+                        {viewMode === 'range' && <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Date</th>}
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Punch In</th>
+                        <th className="px-4 py-4 text-center text-[10px] font-black text-gray-400 uppercase tracking-widest">Photo</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Punch Out</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Hours</th>
+                        <th className="px-4 py-4 text-left text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredRecords.map((record) => (
+                        <tr key={record.id} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
+                                {record.user?.name?.charAt(0) || '?'}
                               </div>
+                              <div>
+                                <p className="text-sm font-black text-gray-900 tracking-tight">{record.user?.name || 'Unknown'}</p>
+                                <p className="text-[10px] font-bold text-gray-400">{record.user?.mobile}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <Truck size={13} className="text-gray-400" />
+                              <span className="text-xs font-bold text-gray-600">{record.user?.assignedVehicle?.vehicleNumber || '—'}</span>
+                            </div>
+                          </td>
+                          {viewMode === 'range' && (
+                            <td className="px-4 py-4 text-xs font-bold text-gray-600">{record.date}</td>
+                          )}
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <LogIn size={13} className="text-emerald-500" />
+                              <span className="text-sm font-black text-gray-900">{formatTime(record.punchInTime)}</span>
+                              {record.isLate && (
+                                <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[8px] font-black uppercase tracking-tighter">
+                                  Late {record.lateMinutes}m
+                                </span>
+                              )}
+                            </div>
+                            {record.punchInLocation ? (
+                              <p className="text-[9px] font-bold text-gray-400 mt-0.5 leading-tight w-48" title={record.punchInLocation}>📍 {record.punchInLocation}</p>
+                            ) : record.punchInLat ? (
+                              <p className="text-[9px] font-bold text-gray-300 mt-0.5">📍 {record.punchInLat?.toFixed(4)}, {record.punchInLng?.toFixed(4)}</p>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-4 text-center">
+                            <div className="flex items-center justify-center gap-1">
+                              {record.punchInPhoto ? (
+                                <button
+                                  onClick={() => openPhoto(record, 'in')}
+                                  className="group relative w-10 h-10 rounded-xl overflow-hidden border-2 border-emerald-200 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md"
+                                >
+                                  <img src={record.punchInPhoto} alt="In" className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-emerald-600/0 group-hover:bg-emerald-600/20 transition-all flex items-center justify-center">
+                                    <Camera size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </button>
+                              ) : (
+                                <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                  <Camera size={12} className="text-gray-300" />
+                                </div>
+                              )}
+                              {record.punchOutPhoto ? (
+                                <button
+                                  onClick={() => openPhoto(record, 'out')}
+                                  className="group relative w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-200 hover:border-orange-500 transition-all shadow-sm hover:shadow-md"
+                                >
+                                  <img src={record.punchOutPhoto} alt="Out" className="w-full h-full object-cover" />
+                                  <div className="absolute inset-0 bg-orange-600/0 group-hover:bg-orange-600/20 transition-all flex items-center justify-center">
+                                    <Camera size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                  </div>
+                                </button>
+                              ) : null}
+                            </div>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex items-center gap-2">
+                              <LogOut size={13} className="text-orange-500" />
+                              <span className="text-sm font-black text-gray-900">{formatTime(record.punchOutTime)}</span>
+                            </div>
+                            {record.punchOutLocation ? (
+                              <p className="text-[9px] font-bold text-gray-400 mt-0.5 leading-tight w-48" title={record.punchOutLocation}>📍 {record.punchOutLocation}</p>
+                            ) : record.punchOutLat ? (
+                              <p className="text-[9px] font-bold text-gray-300 mt-0.5">📍 {record.punchOutLat?.toFixed(4)}, {record.punchOutLng?.toFixed(4)}</p>
+                            ) : null}
+                          </td>
+                          <td className="px-4 py-4">
+                            <span className="text-sm font-black text-gray-900">{record.totalHours ? `${record.totalHours}h` : '—'}</span>
+                          </td>
+                          <td className="px-4 py-4">
+                            <div className="flex flex-col gap-1 items-start">
+                              <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                                record.status === 'COMPLETED'
+                                  ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                                  : 'bg-amber-50 text-amber-600 border border-amber-100'
+                              }`}>{record.status === 'COMPLETED' ? 'Done' : 'Active'}</span>
+                              {record.isLate && (
+                                <span className="px-2 py-0.5 bg-red-50 text-red-600 rounded text-[8px] font-black uppercase">Late Entry</span>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Cards */}
+                <div className="md:hidden divide-y divide-gray-50">
+                  {filteredRecords.map((record) => (
+                    <div key={record.id} className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          {record.punchInPhoto ? (
+                            <button onClick={() => openPhoto(record, 'in')} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-emerald-200 shadow-sm">
+                              <img src={record.punchInPhoto} alt="In" className="w-full h-full object-cover" />
                             </button>
                           ) : (
-                            <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
-                              <Camera size={12} className="text-gray-300" />
+                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
+                              {record.user?.name?.charAt(0) || '?'}
                             </div>
                           )}
-                          {record.punchOutPhoto ? (
-                            <button
-                              onClick={() => openPhoto(record, 'out')}
-                              className="group relative w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-200 hover:border-orange-500 transition-all shadow-sm hover:shadow-md"
-                            >
-                              <img src={record.punchOutPhoto} alt="Out" className="w-full h-full object-cover" />
-                              <div className="absolute inset-0 bg-orange-600/0 group-hover:bg-orange-600/20 transition-all flex items-center justify-center">
-                                <Camera size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                              </div>
-                            </button>
-                          ) : null}
+                          <div>
+                            <p className="text-sm font-black text-gray-900 tracking-tight">{record.user?.name}</p>
+                            <p className="text-[10px] font-bold text-gray-400">{record.user?.assignedVehicle?.vehicleNumber || 'No Vehicle'}</p>
+                          </div>
                         </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-col items-end gap-1">
+                          <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                            record.status === 'COMPLETED'
+                              ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
+                              : 'bg-amber-50 text-amber-600 border border-amber-100'
+                          }`}>{record.status === 'COMPLETED' ? 'Done' : 'Active'}</span>
+                          {record.isLate && (
+                            <span className="px-2 py-0.5 bg-red-100 text-red-600 rounded text-[8px] font-black uppercase">Late</span>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2 flex-1">
+                          <LogIn size={13} className="text-emerald-500" />
+                          <div>
+                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">In</p>
+                            <p className="text-xs font-black text-gray-900">{formatTime(record.punchInTime)}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 flex-1">
                           <LogOut size={13} className="text-orange-500" />
-                          <span className="text-sm font-black text-gray-900">{formatTime(record.punchOutTime)}</span>
+                          <div>
+                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Out</p>
+                            <p className="text-xs font-black text-gray-900">{formatTime(record.punchOutTime)}</p>
+                          </div>
                         </div>
-                        {record.punchOutLocation ? (
-                          <p className="text-[9px] font-bold text-gray-400 mt-0.5 leading-tight w-48" title={record.punchOutLocation}>📍 {record.punchOutLocation}</p>
-                        ) : record.punchOutLat ? (
-                          <p className="text-[9px] font-bold text-gray-300 mt-0.5">📍 {record.punchOutLat?.toFixed(4)}, {record.punchOutLng?.toFixed(4)}</p>
-                        ) : null}
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className="text-sm font-black text-gray-900">{record.totalHours ? `${record.totalHours}h` : '—'}</span>
-                      </td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                          record.status === 'COMPLETED'
-                            ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                            : 'bg-amber-50 text-amber-600 border border-amber-100'
-                        }`}>{record.status === 'COMPLETED' ? 'Done' : 'Active'}</span>
-                      </td>
-                    </tr>
+                        <div className="flex items-center gap-2">
+                          <Timer size={13} className="text-purple-500" />
+                          <div>
+                            <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Hrs</p>
+                            <p className="text-xs font-black text-gray-900">{record.totalHours ? `${record.totalHours}h` : '—'}</p>
+                          </div>
+                        </div>
+                      </div>
+                      {record.punchInLocation ? (
+                        <p className="text-[9px] font-bold text-gray-400 mt-2 leading-tight">📍 In: {record.punchInLocation}</p>
+                      ) : record.punchInLat ? (
+                        <p className="text-[9px] font-bold text-gray-300 mt-2">📍 In: {record.punchInLat?.toFixed(4)}, {record.punchInLng?.toFixed(4)}</p>
+                      ) : null}
+                      {record.punchOutLocation ? (
+                        <p className="text-[9px] font-bold text-gray-400 mt-1 leading-tight">📍 Out: {record.punchOutLocation}</p>
+                      ) : record.punchOutLat ? (
+                        <p className="text-[9px] font-bold text-gray-300 mt-1">📍 Out: {record.punchOutLat?.toFixed(4)}, {record.punchOutLng?.toFixed(4)}</p>
+                      ) : null}
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* Mobile Cards */}
-            <div className="md:hidden divide-y divide-gray-50">
-              {filteredRecords.map((record) => (
-                <div key={record.id} className="p-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      {record.punchInPhoto ? (
-                        <button onClick={() => openPhoto(record, 'in')} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-emerald-200 shadow-sm">
-                          <img src={record.punchInPhoto} alt="In" className="w-full h-full object-cover" />
-                        </button>
-                      ) : (
-                        <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
-                          {record.user?.name?.charAt(0) || '?'}
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-sm font-black text-gray-900 tracking-tight">{record.user?.name}</p>
-                        <p className="text-[10px] font-bold text-gray-400">{record.user?.assignedVehicle?.vehicleNumber || 'No Vehicle'}</p>
-                      </div>
-                    </div>
-                    <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                      record.status === 'COMPLETED'
-                        ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                        : 'bg-amber-50 text-amber-600 border border-amber-100'
-                    }`}>{record.status === 'COMPLETED' ? 'Done' : 'Active'}</span>
-                  </div>
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-2 flex-1">
-                      <LogIn size={13} className="text-emerald-500" />
-                      <div>
-                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">In</p>
-                        <p className="text-xs font-black text-gray-900">{formatTime(record.punchInTime)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 flex-1">
-                      <LogOut size={13} className="text-orange-500" />
-                      <div>
-                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Out</p>
-                        <p className="text-xs font-black text-gray-900">{formatTime(record.punchOutTime)}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Timer size={13} className="text-purple-500" />
-                      <div>
-                        <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">Hrs</p>
-                        <p className="text-xs font-black text-gray-900">{record.totalHours ? `${record.totalHours}h` : '—'}</p>
-                      </div>
-                    </div>
-                  </div>
-                  {record.punchInLocation ? (
-                    <p className="text-[9px] font-bold text-gray-400 mt-2 leading-tight">📍 In: {record.punchInLocation}</p>
-                  ) : record.punchInLat ? (
-                    <p className="text-[9px] font-bold text-gray-300 mt-2">📍 In: {record.punchInLat?.toFixed(4)}, {record.punchInLng?.toFixed(4)}</p>
-                  ) : null}
-                  {record.punchOutLocation ? (
-                    <p className="text-[9px] font-bold text-gray-400 mt-1 leading-tight">📍 Out: {record.punchOutLocation}</p>
-                  ) : record.punchOutLat ? (
-                    <p className="text-[9px] font-bold text-gray-300 mt-1">📍 Out: {record.punchOutLat?.toFixed(4)}, {record.punchOutLng?.toFixed(4)}</p>
-                  ) : null}
                 </div>
-              ))}
-            </div>
-          </>
-        )}
-      </div>
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }

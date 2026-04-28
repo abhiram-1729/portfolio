@@ -5,6 +5,10 @@ export const adminAPI = {
   getDashboardStats: (params) => api.get('/admin/dashboard', { params }),
   getLocationCheckIns: () => api.get('/routes/all-location-check-ins'),
 
+  // Tracking
+  getLiveLocations: (params) => api.get('/location/live', { params }),
+  getBreadcrumbHistory: (params) => api.get('/location/history', { params }),
+
   // Users
   getUsers: (params) => api.get('/admin/users', { params }),
   createUser: (data) => api.post('/admin/users', data),
@@ -72,7 +76,7 @@ export const adminAPI = {
   getDamageReports: (params) => api.get('/damage/reports', { params }),
   getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
   getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),
-  
+
   // Settings
   getSettings: (params) => api.get('/admin/settings', { params }).catch(err => {
     if (err.response?.status === 404) {
@@ -94,7 +98,7 @@ export const adminAPI = {
   createCategory: (data) => api.post('/admin/categories', data),
   updateCategory: (id, data) => api.put(`/admin/categories/${id}`, data),
   deleteCategory: (id) => api.delete(`/admin/categories/${id}`),
-  
+
   // Sub-Categories
   getSubCategories: (params) => api.get('/admin/sub-categories', { params }),
   createSubCategory: (data) => api.post('/admin/sub-categories', data),
@@ -156,12 +160,11 @@ export const adminAPI = {
   updateRole: (id, data) => api.put(`/admin/roles/${id}`, data),
   deleteRole: (id) => api.delete(`/admin/roles/${id}`),
   assignRole: (data) => api.put('/admin/roles/assign', data),
-  
+
   // Media / Uploads
   uploadProductImage: (data) => api.post('/admin/upload-image', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 };
-
 
 export default adminAPI;
