@@ -205,7 +205,9 @@ export default function AdminUsers({ type }) {
 
   const filteredUsers = React.useMemo(() => {
     return users.filter(u => {
-      // Role Filter based on tab
+
+
+      // 1. Role Filter based on tab
       const userIsAdmin = u.role === 'ADMIN' || u.customRole?.portalType === 'ADMIN' || u.customRole?.portalType === 'SUPERVISOR';
 
       const roleMatches = activeTab === 'all'
@@ -798,7 +800,7 @@ export default function AdminUsers({ type }) {
 
               <button
                 onClick={() => setActiveTab('agent')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-blue-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
               >
                 Agents
               </button>

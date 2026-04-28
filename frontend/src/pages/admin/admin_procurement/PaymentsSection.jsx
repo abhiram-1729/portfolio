@@ -83,7 +83,7 @@ const PaymentsSection = ({ can }) => {
             className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2.5 text-xs font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300 shadow-sm" 
           />
         </div>
-        {can('PROCUREMENT', 'UPDATE') && (
+        {can('PROCUREMENT', 'CREATE', 'PAYMENTS') && (
           <button onClick={openForm}
             className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0">
             <Plus size={14} strokeWidth={3} /> Record Payment

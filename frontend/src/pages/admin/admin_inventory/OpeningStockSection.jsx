@@ -82,7 +82,7 @@ const OpeningStockSection = ({
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400">Product Detail</th>
                 <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Category</th>
                 <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Current Store Stock</th>
-                {can && can('INVENTORY', 'UPDATE') && (
+                {can && can('INVENTORY', 'UPDATE', 'MASTER') && (
                   <th className="px-6 py-5 text-[10px] font-black uppercase tracking-widest text-indigo-600 text-center bg-indigo-50/30">Set Opening Stock</th>
                 )}
                 <th className="px-8 py-5 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
@@ -111,7 +111,7 @@ const OpeningStockSection = ({
                       <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">In Warehouse</span>
                     </div>
                   </td>
-                  {can && can('INVENTORY', 'UPDATE') && (
+                  {can && can('INVENTORY', 'UPDATE', 'MASTER') && (
                     <td className="px-6 py-5 text-center bg-indigo-50/10">
                       <div className="flex justify-center">
                         <div className="relative">
@@ -133,7 +133,7 @@ const OpeningStockSection = ({
                     </td>
                   )}
                   <td className="px-8 py-5 text-right">
-                    {can && can('INVENTORY', 'UPDATE') && (
+                    {can && can('INVENTORY', 'UPDATE', 'MASTER') && (
                       <button
                         onClick={() => handleUpdateStock(item.id, stockInputs[item.id], 'set')}
                         disabled={processingItems.has(item.id) || !stockInputs[item.id]}

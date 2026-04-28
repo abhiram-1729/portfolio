@@ -147,6 +147,18 @@ export default function AdminCashManagementContent() {
 
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
+  const canViewCashSection = (sectionKey) => {
+    if (can('CASH', 'READ', sectionKey)) return true;
+    // Fallback for legacy roles
+    return user?.permissions?.CASH_TARGET_SECTIONS?.includes(sectionKey);
+  };
+
+  const availableTabs = [
+    { key: 'reconciliation', label: 'Daily Reconciliation', section: 'RECONCILIATION' },
+    { key: 'live', label: 'Live Cash Status', section: 'LIVE_CASH' },
+    { key: 'ledger', label: 'Audit Ledger', section: 'AUDIT_LEDGER' }
+  ].filter(tab => canViewCashSection(tab.section));
+
   const handleDenominationChange = (value, denom, type = 'assign') => {
     const qty = Math.max(0, parseInt(value) || 0);
     if (type === 'assign') {
@@ -231,6 +243,12 @@ export default function AdminCashManagementContent() {
   useEffect(() => {
     if (activeTab === 'ledger') fetchLedger();
   }, [date, activeTab]);
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some(t => t.key === activeTab)) {
+      setActiveTab(availableTabs[0].key);
+    }
+  }, [availableTabs, activeTab]);
 
   useEffect(() => {
     if (showOpenStoreModal) {
@@ -568,7 +586,7 @@ export default function AdminCashManagementContent() {
 
   return (
     <>
-      {showDepositModal ? (
+      {showDepositModal && canViewCashSection('SHIFT_DEPOSIT') ? (
         <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300 min-h-[calc(100vh-6rem)] relative z-20">
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10 px-8 py-5 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-4">
@@ -696,7 +714,7 @@ export default function AdminCashManagementContent() {
                       <button onClick={() => handlePrintShiftReport(shift, shiftAgents.map(a => ({ vehicle: a.vehicle?.vehicleNumber, agentName: a.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT')?.name || 'N/A', closing: a.shiftDetails[shiftKey].closing })), aggregatedDenominations, totalCashCollected)} className="px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border-2 border-emerald-100 hover:bg-emerald-100 transition-all flex items-center gap-2">
                         <Printer size={18} /> Print Report
                       </button>
-                      {!isDeposited && (
+                      {!isDeposited && can('CASH', 'CREATE', 'SHIFT_DEPOSIT') && (
                         <button onClick={() => handleInitiateDeposit(shift)} disabled={!hasCompletions || isSubmitting} className={`px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all ${shift === 1 ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : 'bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/20'} disabled:opacity-50`}>
                           {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />} Approve & Submit
                         </button>
@@ -725,7 +743,7 @@ export default function AdminCashManagementContent() {
                   className="bg-white border border-gray-100 pl-12 pr-6 py-3.5 rounded-2xl text-sm font-black text-gray-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer"
                 />
               </div>
-              {can('CASH', 'CREATE') && (
+              {can('CASH', 'CREATE', 'RECONCILIATION') && (
                 <button 
                   onClick={() => {
                     if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') return toast.error('Initialize Safe first');
@@ -739,57 +757,62 @@ export default function AdminCashManagementContent() {
             </div>
           </div>
 
-          <StoreSafeHeader 
-            storeRegisterData={storeRegisterData} summaries={summaries} user={user}
-            setShowOpenStoreModal={setShowOpenStoreModal} setShowDepositModal={setShowDepositModal}
-            setShowSafeMovementModal={setShowSafeMovementModal} setShowBankModal={setShowBankModal}
-            setShowCloseStoreModal={setShowCloseStoreModal} setShowEditStoreModal={setShowEditStoreModal}
-            setSafeMovementData={setSafeMovementData} setBankData={setBankData} setStoreDenomData={setStoreDenomData}
-            isShiftDeposited={isShiftDeposited} setActiveTab={setActiveTab}
-            setEditingDeposit={setEditingDeposit} setDepositData={setDepositData}
-            setShowEditDepositModal={setShowEditDepositModal} handleDeleteDeposit={handleDeleteDeposit} toast={toast}
-            can={can}
-          />
+          {canViewCashSection('STORE_SAFE') || canViewCashSection('SHIFT_DEPOSIT') || canViewCashSection('LIVE_CASH') ? (
+            <StoreSafeHeader 
+              storeRegisterData={storeRegisterData} summaries={summaries} user={user}
+              setShowOpenStoreModal={setShowOpenStoreModal} setShowDepositModal={setShowDepositModal}
+              setShowSafeMovementModal={setShowSafeMovementModal} setShowBankModal={setShowBankModal}
+              setShowCloseStoreModal={setShowCloseStoreModal} setShowEditStoreModal={setShowEditStoreModal}
+              setSafeMovementData={setSafeMovementData} setBankData={setBankData} setStoreDenomData={setStoreDenomData}
+              isShiftDeposited={isShiftDeposited} setActiveTab={setActiveTab}
+              setEditingDeposit={setEditingDeposit} setDepositData={setDepositData}
+              setShowEditDepositModal={setShowEditDepositModal} handleDeleteDeposit={handleDeleteDeposit} toast={toast}
+              can={can}
+              canViewCashSection={canViewCashSection}
+            />
+          ) : null}
 
           <SimulatorTools resetStoreCashRegister={resetStoreCashRegister} fetchStoreRegister={fetchStoreRegister} date={date} setDate={setDate} toast={toast} />
 
-          <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl w-fit">
-                {['reconciliation', 'live', 'ledger'].map(tab => (
-                  <button 
-                    key={tab} onClick={() => setActiveTab(tab)}
-                    className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
-                  >
-                    {tab === 'reconciliation' ? 'Daily Reconciliation' : tab === 'live' ? 'Live Cash Status' : 'Audit Ledger'}
-                  </button>
-                ))}
+          {availableTabs.length > 0 && (
+            <div className="space-y-6">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl w-fit">
+                  {availableTabs.map(tab => (
+                    <button 
+                      key={tab.key} onClick={() => setActiveTab(tab.key)}
+                      className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab.key ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="relative w-full md:w-80">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <input 
+                    type="text" placeholder="Search vehicle or agent..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
+                    className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none shadow-sm"
+                  />
+                </div>
               </div>
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-                <input 
-                  type="text" placeholder="Search vehicle or agent..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none shadow-sm"
-                />
-              </div>
-            </div>
 
-            {activeTab === 'reconciliation' && (
-              <DailyReconciliationTab 
-                loading={loading} filteredSummaries={filteredSummaries} storeRegisterData={storeRegisterData}
-                handleOpenView={setViewingSummary} handleOpenEdit={handleOpenEdit} setDeletingSummary={setDeletingSummary}
-                setShowDeleteModal={setShowDeleteModal} can={can}
-                setViewingAgentDenoms={setViewingAgentDenoms}
-              />
-            )}
-            {activeTab === 'live' && <LiveCashTab filteredSummaries={filteredSummaries} handleOpenView={setViewingSummary} />}
-            {activeTab === 'ledger' && (
-              <AuditLedgerTab 
-                ledgerLoading={ledgerLoading} ledgerData={ledgerData} ledgerFilter={ledgerFilter} 
-                setLedgerFilter={setLedgerFilter} date={date} setViewingOrder={setViewingOrder} setPreviewImage={setPreviewImage} 
-              />
-            )}
-          </div>
+              {activeTab === 'reconciliation' && (
+                <DailyReconciliationTab 
+                  loading={loading} filteredSummaries={filteredSummaries} storeRegisterData={storeRegisterData}
+                  handleOpenView={setViewingSummary} handleOpenEdit={handleOpenEdit} setDeletingSummary={setDeletingSummary}
+                  setShowDeleteModal={setShowDeleteModal} can={can}
+                  setViewingAgentDenoms={setViewingAgentDenoms}
+                />
+              )}
+              {activeTab === 'live' && <LiveCashTab filteredSummaries={filteredSummaries} handleOpenView={setViewingSummary} />}
+              {activeTab === 'ledger' && (
+                <AuditLedgerTab 
+                  ledgerLoading={ledgerLoading} ledgerData={ledgerData} ledgerFilter={ledgerFilter} 
+                  setLedgerFilter={setLedgerFilter} date={date} setViewingOrder={setViewingOrder} setPreviewImage={setPreviewImage} 
+                />
+              )}
+            </div>
+          )}
         </div>
       )}
 

@@ -138,7 +138,7 @@ const GRNSection = ({ can }) => {
               </tbody>
             </table>
           </div>
-          {can('PROCUREMENT', 'UPDATE') ? (
+          {can('PROCUREMENT', 'CREATE', 'GRN') ? (
             <button onClick={handleSubmitGRN} disabled={submitting}
               className="w-full bg-emerald-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 disabled:opacity-50 transition-all">
               {submitting ? 'Processing...' : 'Submit Goods Receipt'}

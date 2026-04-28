@@ -131,7 +131,7 @@ const PurchaseOrdersSection = ({ can }) => {
             ))}
           </div>
         </div>
-        {can('PROCUREMENT', 'CREATE') && (
+        {can('PROCUREMENT', 'CREATE', 'PO') && (
           <button onClick={openForm}
             className="flex items-center gap-1.5 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 hover:-translate-y-0.5 transition-all shadow-xl shadow-emerald-600/20 active:translate-y-0">
             <Plus size={14} strokeWidth={3} /> Create Purchase Order
@@ -176,16 +176,16 @@ const PurchaseOrdersSection = ({ can }) => {
               </div>
               {/* Status Actions */}
               <div className="flex gap-1.5 pt-1">
-                {po.status === 'CREATED' && can('PROCUREMENT', 'UPDATE') && (
+                {po.status === 'CREATED' && can('PROCUREMENT', 'UPDATE', 'PO') && (
                   <>
                     <button onClick={() => updateStatus(po.id, 'APPROVED')} className="text-[9px] font-black bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-emerald-100">Approve</button>
                     <button onClick={() => updateStatus(po.id, 'CANCELLED')} className="text-[9px] font-black bg-red-50 text-red-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-red-100">Cancel</button>
                   </>
                 )}
-                {po.status === 'APPROVED' && can('PROCUREMENT', 'UPDATE') && (
+                {po.status === 'APPROVED' && can('PROCUREMENT', 'UPDATE', 'PO') && (
                   <button onClick={() => updateStatus(po.id, 'ORDERED')} className="text-[9px] font-black bg-purple-50 text-purple-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-purple-100">Mark Ordered</button>
                 )}
-                {po.status === 'DELIVERED' && can('PROCUREMENT', 'UPDATE') && (
+                {po.status === 'DELIVERED' && can('PROCUREMENT', 'UPDATE', 'PO') && (
                   <button onClick={() => updateStatus(po.id, 'CLOSED')} className="text-[9px] font-black bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg uppercase tracking-widest hover:bg-gray-200">Close PO</button>
                 )}
               </div>

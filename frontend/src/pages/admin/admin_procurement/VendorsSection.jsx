@@ -211,7 +211,7 @@ const VendorsSection = ({ can }) => {
                 statusFilter === s ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'
               }`}>{s || 'All'}</button>
           ))}
-          {can('PROCUREMENT', 'CREATE') && (
+          {can('PROCUREMENT', 'CREATE', 'VENDORS') && (
             <button onClick={() => { setShowForm(true); setEditVendor(null); setForm({ vendorName: '', mobile: '', email: '', address: '', gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0' }); }}
               className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
               <Plus size={16} /> Add Vendor
@@ -275,15 +275,15 @@ const VendorsSection = ({ can }) => {
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={() => openLedger(v.id)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all" title="View Ledger"><BookOpen size={14} /></button>
-                        {can('PROCUREMENT', 'UPDATE') && (
+                        {can('PROCUREMENT', 'UPDATE', 'VENDORS') && (
                           <>
                             <button onClick={() => openEdit(v)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all" title="Edit"><Edit3 size={14} /></button>
-                            {can('PROCUREMENT', 'TOGGLE_STATUS') && (
+                            {can('PROCUREMENT', 'TOGGLE_STATUS', 'VENDORS') && (
                               <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
                                 {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
                               </button>
                             )}
-                            {can('PROCUREMENT', 'DELETE') && (
+                            {can('PROCUREMENT', 'DELETE', 'VENDORS') && (
                               <button onClick={() => handleDeleteVendor(v.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all" title="Delete"><Trash2 size={14} /></button>
                             )}
                           </>
@@ -311,15 +311,15 @@ const VendorsSection = ({ can }) => {
                   <span className={`text-sm font-black ${v.currentBalance > 0 ? 'text-red-600' : 'text-gray-400'}`}>₹{Math.abs(v.currentBalance).toLocaleString()} {v.currentBalance > 0 ? 'DR' : v.currentBalance < 0 ? 'CR' : ''}</span>
                   <div className="flex gap-1.5">
                     <button onClick={() => openLedger(v.id)} className="p-2 bg-blue-50 text-blue-600 rounded-lg"><BookOpen size={14} /></button>
-                    {can('PROCUREMENT', 'UPDATE') && (
+                    {can('PROCUREMENT', 'UPDATE', 'VENDORS') && (
                       <button onClick={() => openEdit(v)} className="p-2 bg-gray-50 text-gray-600 rounded-lg"><Edit3 size={14} /></button>
                     )}
-                    {can('PROCUREMENT', 'TOGGLE_STATUS') && (
+                    {can('PROCUREMENT', 'TOGGLE_STATUS', 'VENDORS') && (
                       <button onClick={() => handleToggleStatus(v.id)} className="p-2 rounded-lg bg-gray-50">
                         {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
                       </button>
                     )}
-                    {can('PROCUREMENT', 'DELETE') && (
+                    {can('PROCUREMENT', 'DELETE', 'VENDORS') && (
                       <button onClick={() => handleDeleteVendor(v.id)} className="p-2 bg-rose-50 text-rose-600 rounded-lg"><Trash2 size={14} /></button>
                     )}
                   </div>

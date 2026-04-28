@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import {
   Users, ClipboardList, Truck, Receipt, BookOpen,
   CreditCard, BarChart3, Link2
@@ -17,21 +17,42 @@ import PaymentsSection from './admin_procurement/PaymentsSection';
 import ReportsSection from './admin_procurement/ReportsSection';
 
 const TABS = [
-  { key: 'vendors', label: 'Vendors', icon: Users },
-  { key: 'mapping', label: 'Item Mapping', icon: Link2 },
-  { key: 'po', label: 'Purchase Orders', icon: ClipboardList },
-  { key: 'grn', label: 'Goods Receipt', icon: Truck },
-  { key: 'purchases', label: 'Purchases', icon: Receipt },
-  { key: 'ledger', label: 'Stock Ledger', icon: BookOpen },
-  { key: 'payments', label: 'Payments', icon: CreditCard },
-  { key: 'reports', label: 'Reports', icon: BarChart3 },
+  { key: 'vendors', label: 'Vendors', icon: Users, section: 'VENDORS' },
+  { key: 'mapping', label: 'Item Mapping', icon: Link2, section: 'MAPPING' },
+  { key: 'po', label: 'Purchase Orders', icon: ClipboardList, section: 'PO' },
+  { key: 'grn', label: 'Goods Receipt', icon: Truck, section: 'GRN' },
+  { key: 'purchases', label: 'Purchases', icon: Receipt, section: 'PURCHASES' },
+  { key: 'ledger', label: 'Stock Ledger', icon: BookOpen, section: 'LEDGER' },
+  { key: 'payments', label: 'Payments', icon: CreditCard, section: 'PAYMENTS' },
+  { key: 'reports', label: 'Reports', icon: BarChart3, section: 'REPORTS' },
 ];
 
 // ─── MAIN COMPONENT ─────────────────────────────────────
 export default function AdminProcurement() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const activeTab = searchParams.get('tab') || 'vendors';
+  const user = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
+
+  const canViewSection = (sectionKey) => {
+    if (!user?.customRoleId || user?.role === 'TENANT_OWNER') return true;
+    
+    // Check granular permissions first
+    const granularPerms = user?.permissions?.PROCUREMENT_SECTIONS?.[sectionKey];
+    if (granularPerms?.includes('READ')) return true;
+
+    // Fallback for legacy roles
+    if (!user?.permissions?.PROCUREMENT_TARGET_SECTIONS) return true;
+    return user.permissions.PROCUREMENT_TARGET_SECTIONS.includes(sectionKey);
+  };
+
+  const availableTabs = TABS.filter(tab => canViewSection(tab.section));
+
+  useEffect(() => {
+    if (availableTabs.length > 0 && !availableTabs.some(t => t.key === activeTab)) {
+      setSearchParams({ tab: availableTabs[0].key });
+    }
+  }, [availableTabs, activeTab, setSearchParams]);
 
   return (
     <div className="space-y-6">
@@ -43,14 +64,14 @@ export default function AdminProcurement() {
 
       {/* Tab Content */}
       <div className="animate-in fade-in duration-500">
-        {activeTab === 'vendors' && <VendorsSection can={can} />}
-        {activeTab === 'mapping' && <MappingSection can={can} />}
-        {activeTab === 'po' && <PurchaseOrdersSection can={can} />}
-        {activeTab === 'grn' && <GRNSection can={can} />}
-        {activeTab === 'purchases' && <PurchasesSection can={can} />}
-        {activeTab === 'ledger' && <StockLedgerSection />}
-        {activeTab === 'payments' && <PaymentsSection can={can} />}
-        {activeTab === 'reports' && <ReportsSection />}
+        {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} />}
+        {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} />}
+        {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} />}
+        {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} />}
+        {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} />}
+        {activeTab === 'ledger' && canViewSection('LEDGER') && <StockLedgerSection />}
+        {activeTab === 'payments' && canViewSection('PAYMENTS') && <PaymentsSection can={can} />}
+        {activeTab === 'reports' && canViewSection('REPORTS') && <ReportsSection />}
       </div>
     </div>
   );

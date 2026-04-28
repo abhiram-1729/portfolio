@@ -120,7 +120,7 @@ const ReturnSection = ({
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">In Vehicle</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
-            {can && can('INVENTORY', 'UPDATE') && (
+            {can && can('INVENTORY', 'UPDATE', 'RETURN') && (
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/10">Return Qty</th>
             )}
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Return Value</th>
@@ -155,7 +155,7 @@ const ReturnSection = ({
                 <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
                   <span className="text-[11px] font-black text-emerald-600">{item.stock || 0}</span>
                 </td>
-                {can && can('INVENTORY', 'UPDATE') && (
+                {can && can('INVENTORY', 'UPDATE', 'RETURN') && (
                   <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-emerald-50/5">
                     <div className="flex flex-col items-center justify-center gap-1">
                       <input

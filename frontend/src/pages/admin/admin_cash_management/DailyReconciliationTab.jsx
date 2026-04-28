@@ -124,7 +124,7 @@ const DailyReconciliationTab = ({
                       <div className="flex items-center justify-end gap-1.5 text-gray-400">
                         <button onClick={() => handleOpenView(summary)} className="p-2 hover:bg-emerald-50 rounded-xl hover:text-emerald-600 transition-all"><Eye size={18} /></button>
                         <>
-                          {can('CASH', 'UPDATE') && (
+                          {can('CASH', 'UPDATE', 'RECONCILIATION') && (
                             <button
                               onClick={() => {
                                 if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') {
@@ -139,7 +139,7 @@ const DailyReconciliationTab = ({
                               <Pencil size={18} />
                             </button>
                           )}
-                          {can('CASH', 'DELETE') && (
+                          {can('CASH', 'DELETE', 'RECONCILIATION') && (
                             <button onClick={() => { setDeletingSummary(summary); setShowDeleteModal(true); }} className="p-2 hover:bg-rose-50 rounded-xl hover:text-rose-600 transition-all"><Trash2 size={18} /></button>
                           )}
                         </>

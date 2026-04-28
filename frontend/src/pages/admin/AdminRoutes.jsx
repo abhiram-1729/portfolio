@@ -40,7 +40,19 @@ export default function AdminRoutes() {
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('villages'); // 'villages', 'routes', 'assignments'
+  const currentUser = useUserStore(s => s.user);
+  const can = useUserStore(s => s.can);
+
+  const getInitialTab = () => {
+    if (!currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
+    const sections = currentUser.permissions.ROUTE_TARGET_SECTIONS;
+    if (sections.includes('VILLAGES')) return 'villages';
+    if (sections.includes('ROUTES')) return 'routes';
+    if (sections.includes('ASSIGNMENTS')) return 'assignments';
+    return 'villages';
+  };
+
+  const [activeTab, setActiveTab] = useState(getInitialTab());
   const [villagePage, setVillagePage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
@@ -78,8 +90,6 @@ export default function AdminRoutes() {
   const [searchParams, setSearchParams] = useSearchParams();
   const storeId = searchParams.get('storeId');
   const location = useLocation();
-  const currentUser = useUserStore(s => s.user);
-  const can = useUserStore(s => s.can);
 
   const fetchData = async () => {
     setIsVillagesLoading(true);
@@ -355,24 +365,30 @@ export default function AdminRoutes() {
         </div>
 
         <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
-          <button
-            onClick={() => setActiveTab('villages')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'villages' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Villages
-          </button>
-          <button
-            onClick={() => setActiveTab('routes')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'routes' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Routes
-          </button>
-          <button
-            onClick={() => setActiveTab('assignments')}
-            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'assignments' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-          >
-            Assignments
-          </button>
+          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
+            <button
+              onClick={() => setActiveTab('villages')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'villages' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Villages
+            </button>
+          )}
+          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
+            <button
+              onClick={() => setActiveTab('routes')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'routes' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Routes
+            </button>
+          )}
+          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
+            <button
+              onClick={() => setActiveTab('assignments')}
+              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'assignments' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+            >
+              Assignments
+            </button>
+          )}
         </div>
       </div>
 

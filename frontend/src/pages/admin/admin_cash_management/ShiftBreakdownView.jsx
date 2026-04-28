@@ -310,7 +310,7 @@ const ShiftBreakdownView = ({
                       </div>
                     )}
 
-                    {can('CASH', 'UPDATE') && (
+                    {can('CASH', 'UPDATE', 'RECONCILIATION') && (
                       <div className="flex gap-3 pt-2">
                         <button
                           onClick={() => {
@@ -624,7 +624,7 @@ const ShiftBreakdownView = ({
                           </div>
                         )}
 
-                        {can('CASH', 'UPDATE') && (
+                        {can('CASH', 'UPDATE', 'RECONCILIATION') && (
                           <div className="flex gap-3 pt-2">
                             <button
                               onClick={() => {

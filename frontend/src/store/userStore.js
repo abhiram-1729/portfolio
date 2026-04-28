@@ -37,7 +37,7 @@ export const useUserStore = create(
         }
       },
 
-      can: (module, action) => {
+      can: (module, action, section) => {
         const user = get().user;
         if (!user) return false;
         
@@ -47,9 +47,13 @@ export const useUserStore = create(
         // Standard Admins (Global, no custom role) bypass everything
         if (user.role === 'ADMIN' && !user.customRoleId) return true;
 
+        // If a specific section is provided, check its granular permissions
+        if (section) {
+          const sectionPerms = user.permissions?.[`${module}_SECTIONS`]?.[section] || [];
+          return sectionPerms.includes(action);
+        }
+
         const perms = user.permissions?.[module] || [];
-        // If searching for READ, and they have ANY permission for that module, they can "read" it
-        // Or strictly check if action is included
         return perms.includes(action);
       },
 

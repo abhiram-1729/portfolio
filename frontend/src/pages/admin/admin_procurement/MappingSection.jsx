@@ -116,7 +116,7 @@ const MappingSection = ({ can }) => {
                 </div>
               )}
             </div>
-            {selectedVendor && can('PROCUREMENT', 'UPDATE') && (
+            {selectedVendor && can('PROCUREMENT', 'UPDATE', 'MAPPING') && (
               <button onClick={saveMappings} disabled={saving}
                 className="flex items-center gap-1.5 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 hover:-translate-y-0.5 transition-all active:translate-y-0 disabled:opacity-50">
                 {saving ? <Loader2 size={12} className="animate-spin" /> : <CheckCircle2 size={12} />} Save Changes

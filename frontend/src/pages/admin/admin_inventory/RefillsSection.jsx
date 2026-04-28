@@ -208,7 +208,7 @@ const RefillsSection = ({
                         <div key={item.id} className={`bg-white p-3.5 rounded-[1.5rem] border transition-all duration-300 ${!isSelected ? 'border-gray-100 opacity-40 grayscale' : 'border-indigo-100 shadow-sm'}`}>
                           {/* Integrated Top: Info + Toggle */}
                           <div className="flex items-center gap-3 mb-2.5">
-                            {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE') && (
+                            {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE', 'REFILLS') && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
                                 className={`shrink-0 transition-all ${isSelected ? 'text-indigo-600' : 'text-gray-300'}`}
@@ -216,8 +216,8 @@ const RefillsSection = ({
                                 {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                               </button>
                             )}
-                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-black shrink-0 ${allRejected ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                allApproved ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-black shrink-0 ${req.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                                req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
                                   'bg-emerald-50 text-emerald-600 border-emerald-200'
                                 }`}>
                               <Package size={16} />
@@ -241,7 +241,7 @@ const RefillsSection = ({
                             <div className="flex items-center gap-2">
                               {/* Qty Adj */}
                               <div className="flex-1 flex items-center justify-between bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
-                                {can && can('INVENTORY', 'UPDATE') ? (
+                                {can && can('INVENTORY', 'UPDATE', 'REFILLS') ? (
                                   <>
                                     <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1) }))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
                                     <input
@@ -260,7 +260,7 @@ const RefillsSection = ({
                               </div>
 
                               {/* Quick Actions */}
-                              {can && can('INVENTORY', 'UPDATE') && (
+                              {can && can('INVENTORY', 'UPDATE', 'REFILLS') && (
                                 <div className="flex gap-1.5 shrink-0">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}

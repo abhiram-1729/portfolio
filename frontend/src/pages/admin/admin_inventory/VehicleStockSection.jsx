@@ -167,7 +167,7 @@ const VehicleStockSection = ({
                       <Barcode size={14} />
                     </button>
                   </div>
-                  {can && can('INVENTORY', 'UPDATE') && (
+                  {can && can('INVENTORY', 'UPDATE', 'AUDITS') && (
                     isAuditMode ? (
                       <>
                         <button

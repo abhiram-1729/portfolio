@@ -6,6 +6,8 @@ import {
   AlertTriangle, Zap, FileText 
 } from 'lucide-react';
 
+import { useUserStore } from '../../store/userStore';
+
 const reportModules = [
   { id: 'overview', name: 'Overview', icon: BarChart3, color: 'text-emerald-600', bg: 'bg-emerald-50', desc: 'Real-time sales & profit trends' },
   { id: 'item-wise', name: 'Item-wise Sales', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50', desc: 'SKU level performance audit' },
@@ -27,12 +29,39 @@ export default function AdminReports() {
   const location = useLocation();
   const storeId = searchParams.get('storeId');
   const storeName = searchParams.get('storeName');
+  const user = useUserStore(s => s.user);
 
   const getBaseLink = (id) => {
     const basePath = location.pathname.endsWith('/') ? location.pathname : `${location.pathname}/`;
     const query = storeId ? `?storeId=${storeId}&storeName=${storeName || ''}` : '';
     return `${basePath}${id}${query}`;
   };
+
+  const filteredModules = reportModules.filter(module => {
+    if (!user?.customRoleId || user?.role === 'TENANT_OWNER') return true;
+    
+    const sectionMap = {
+      'overview': 'OVERVIEW',
+      'item-wise': 'ITEM_WISE',
+      'category-wise': 'CATEGORY_WISE',
+      'day-wise': 'DAY_WISE',
+      'route-village': 'ROUTE_VILLAGE',
+      'agent-performance': 'AGENT_PERFORMANCE',
+      'location-tracking': 'LOCATION_TRACKING',
+      'vehicle-wise': 'VEHICLE_WISE',
+      'payment-mode': 'PAYMENT_MODE',
+      'returns': 'RETURN',
+      'damages': 'DAMAGE',
+      'sessions': 'SESSION',
+      'invoices': 'INVOICE'
+    };
+    
+    const reqSection = sectionMap[module.id];
+    if (reqSection && user?.permissions?.REPORT_TARGET_SECTIONS) {
+      return user.permissions.REPORT_TARGET_SECTIONS.includes(reqSection);
+    }
+    return true;
+  });
 
   return (
     <div className="min-h-screen bg-[#FDFDFD] pb-20">
@@ -55,7 +84,7 @@ export default function AdminReports() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {reportModules.map((module) => (
+          {filteredModules.map((module) => (
             <Link 
               key={module.id} 
               to={getBaseLink(module.id)}

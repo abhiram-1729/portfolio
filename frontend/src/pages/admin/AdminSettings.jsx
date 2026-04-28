@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock } from 'lucide-react';
+import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
@@ -289,43 +289,56 @@ export default function AdminSettings() {
     }
   };
 
+  const hasPermission = (sectionKey) => {
+    if (!currentUser?.customRoleId) return true;
+    const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS || [];
+    return targetSections.includes(sectionKey);
+  };
+
   const sections = [
     { 
-      title: 'Inventory Settings', 
+      title: 'Inventory Management', 
       icon: Package, 
       items: [
-        { label: 'Unit Management', action: () => setActiveModal('UNITS') },
-        { label: 'Category Management', action: () => setActiveModal('CATEGORIES') },
+        { label: 'Measurement Units', action: () => setActiveModal('UNITS') },
+        { label: 'Product Categories', action: () => setActiveModal('CATEGORIES') },
         { label: 'Sub-Category Management', action: () => setActiveModal('SUB_CATEGORIES') },
         { label: 'Asset Type Management', action: () => setActiveModal('ASSET_CATEGORIES') }
-      ] 
+      ]
     },
     { 
       title: 'Payment Settings', 
       icon: CreditCard, 
       items: [
-        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon') },
-        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon') },
-        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon') }
-      ] 
+        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
+        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
+        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' }
+      ].filter(item => hasPermission(item.key))
     },
     { 
-      title: 'Business Details', 
+      title: 'Business Profile', 
       icon: Store, 
       items: [
-        { label: 'Tax Settings (GST)', action: () => setActiveModal('TAX') },
-        { label: 'Business Profile Details', action: () => setActiveModal('BUSINESS') },
-        { label: 'Currency Options', action: () => toast.error('This feature is coming soon') }
-      ] 
+        { label: 'Basic Information', action: () => setActiveModal('BUSINESS_PROFILE') },
+        { label: 'Contact Details', action: () => setActiveModal('BUSINESS_PROFILE') }
+      ]
+    },
+    { 
+      title: 'Tax Settings', 
+      icon: Receipt, 
+      items: [
+        { label: 'GST Configuration', action: () => setActiveModal('TAX_SETTINGS') },
+        { label: 'Tax Slabs & Rules', action: () => setActiveModal('TAX_SETTINGS') }
+      ]
     },
     { 
       title: 'Invoice Format', 
       icon: FileText, 
       items: [
-        { label: 'Header/Footer Text', action: () => toast.error('Coming soon') },
-        { label: 'Upload Logo', action: () => toast.error('Coming soon') },
-        { label: 'Sequential Numbering', action: () => toast.error('Coming soon') }
-      ] 
+        { label: 'Header/Footer Text', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
+        { label: 'Upload Logo', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
+        { label: 'Sequential Numbering', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' }
+      ].filter(item => hasPermission(item.key))
     },
     { 
       title: 'Notifications', 
@@ -333,7 +346,7 @@ export default function AdminSettings() {
       items: [
         { label: 'Low Stock Alerts', action: () => {} },
         { label: 'Daily Sales Report Email', action: () => {} }
-      ] 
+      ]
     },
     {
       title: 'Shift Management',

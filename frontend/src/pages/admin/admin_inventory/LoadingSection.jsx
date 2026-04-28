@@ -119,7 +119,7 @@ const LoadingSection = ({
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
-            {can && can('INVENTORY', 'UPDATE') && (
+            {can && can('INVENTORY', 'UPDATE', 'LOADING') && (
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/10">Load Qty</th>
             )}
             <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
@@ -159,7 +159,7 @@ const LoadingSection = ({
                     {item.stock || 0}
                   </span>
                 </td>
-                {can && can('INVENTORY', 'UPDATE') && (
+                {can && can('INVENTORY', 'UPDATE', 'LOADING') && (
                   <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-emerald-50/5">
                     <div className="flex flex-col items-center gap-1">
                       <input

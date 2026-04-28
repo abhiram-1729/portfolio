@@ -43,7 +43,23 @@ const RESPONSIBILITY_LABELS = {
 export default function AdminDamage() {
   const [searchParams] = useSearchParams();
   const storeId = searchParams.get('storeId');
-  const user = useUserStore(s => s.user);
+  const { user, can } = useUserStore();
+
+  if (!can('INVENTORY', 'READ', 'DAMAGE')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border border-gray-100 shadow-sm mt-8">
+        <Ban size={48} className="text-gray-300 mb-4" />
+        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Access Denied</h2>
+        <p className="text-gray-500 mt-1 font-bold text-sm">You do not have permission to view Damage management.</p>
+        <button 
+          onClick={() => window.history.back()}
+          className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-all"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   const [activeTab, setActiveTab] = useState('entries');
   const [entries, setEntries] = useState([]);
@@ -376,7 +392,7 @@ export default function AdminDamage() {
                         >
                           <Eye size={16} />
                         </button>
-                        {(entry.status === 'PENDING' || entry.status === 'UNDER_REVIEW') && (
+                        {can('INVENTORY', 'UPDATE', 'DAMAGE') && (entry.status === 'PENDING' || entry.status === 'UNDER_REVIEW') && (
                           <button 
                             onClick={() => openReview(entry)} 
                             className="p-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-500 hover:text-emerald-700 hover:bg-white hover:shadow-md transition-all" 
@@ -385,7 +401,7 @@ export default function AdminDamage() {
                             <Shield size={16} />
                           </button>
                         )}
-                        {entry.status === 'APPROVED' && !entry.deduction && entry.adminResponsibility && entry.adminResponsibility !== 'NOT_RESPONSIBLE' && (
+                        {can('INVENTORY', 'UPDATE', 'DAMAGE') && entry.status === 'APPROVED' && !entry.deduction && entry.adminResponsibility && entry.adminResponsibility !== 'NOT_RESPONSIBLE' && (
                           <button 
                             onClick={() => openDeduction(entry)} 
                             className="p-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-500 hover:text-amber-700 hover:bg-white hover:shadow-md transition-all" 
@@ -487,7 +503,7 @@ export default function AdminDamage() {
                   <p className="text-sm font-bold text-red-600">₹{(d.deductionAmount || 0).toFixed(0)}</p>
                 </div>
               </div>
-              {d.status === 'PENDING' && (
+              {can('INVENTORY', 'UPDATE', 'DAMAGE') && d.status === 'PENDING' && (
                 <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
                   <button onClick={() => handleDeductionStatusChange(d.id, 'APPLIED')} className="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-xs font-bold hover:bg-emerald-100 flex items-center justify-center gap-2">
                     <CheckCircle size={14} /> Apply to Payroll

@@ -11,7 +11,7 @@ const StoreSafeHeader = ({
   setSafeMovementData, setBankData, setStoreDenomData,
   isShiftDeposited, setActiveTab,
   setEditingDeposit, setDepositData, setShowEditDepositModal,
-  handleDeleteDeposit, toast, can
+  handleDeleteDeposit, toast, can, canViewCashSection
 }) => {
   return (
     <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden group">
@@ -100,7 +100,7 @@ const StoreSafeHeader = ({
 
         <div className="flex items-center gap-3">
           {!storeRegisterData?.storeRegister ? (
-            can('CASH', 'CREATE') && (
+            can('CASH', 'CREATE', 'STORE_SAFE') && (
               <button
                 onClick={() => setShowOpenStoreModal(true)}
                 className="bg-white hover:bg-emerald-50 text-emerald-950 px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-2xl active:scale-95 border-b-4 border-emerald-100"
@@ -110,7 +110,7 @@ const StoreSafeHeader = ({
             )
           ) : storeRegisterData.storeRegister.status === 'OPEN' ? (
             <div className="flex items-center gap-3">
-              {can('CASH', 'UPDATE') && (
+              {can('CASH', 'UPDATE', 'SHIFT_DEPOSIT') && (
                 <div className="flex flex-col gap-1.5">
                   <button
                     onClick={() => {
@@ -138,20 +138,20 @@ const StoreSafeHeader = ({
                 </div>
               )}
 
-              {can('CASH', 'UPDATE') && (
+              {canViewCashSection('STORE_SAFE') && can('CASH', 'CREATE', 'STORE_SAFE') && (
                 <button
                   onClick={() => {
-                    setSafeMovementData(prev => ({ ...prev, type: 'DEPOSIT', amount: 0, denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } }));
+                    setSafeMovementData({ amount: '', type: 'DEPOSIT', description: '', denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } });
                     setShowSafeMovementModal(true);
                   }}
-                  className="bg-sky-500/10 hover:bg-sky-500/20 text-sky-400 border border-sky-500/20 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-900/20 active:scale-95 flex items-center gap-2 border border-emerald-500/50"
                 >
                   <Vault size={16} strokeWidth={3} />
                   Move to Safe
                 </button>
               )}
 
-              {can('CASH', 'UPDATE') && (
+              {can('CASH', 'CREATE', 'STORE_SAFE') && (
                 <button
                   onClick={() => {
                     setBankData(prev => ({ ...prev, adminId: user?.id, depositedBy: user?.name || '' }));
@@ -164,7 +164,7 @@ const StoreSafeHeader = ({
                 </button>
               )}
 
-              {can('CASH', 'UPDATE') && (
+              {can('CASH', 'UPDATE', 'STORE_SAFE') && (
                 <button
                   onClick={() => setShowCloseStoreModal(true)}
                   className="bg-white hover:bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
@@ -178,7 +178,7 @@ const StoreSafeHeader = ({
             <div className="flex items-center gap-3">
               <div className="px-6 py-3 bg-emerald-950/50 rounded-2xl border border-emerald-800 text-emerald-300 text-xs font-black uppercase tracking-widest flex items-center gap-3">
                 Safe Closed: Diff ₹{storeRegisterData.storeRegister.closingDifference?.toFixed(2)}
-                {can('CASH', 'UPDATE') && (
+                {canViewCashSection('STORE_SAFE') && can('CASH', 'UPDATE', 'STORE_SAFE') && (
                   <button
                     onClick={() => {
                       setStoreDenomData({
@@ -201,162 +201,176 @@ const StoreSafeHeader = ({
       {storeRegisterData?.storeRegister && (
         <div className="space-y-6 mt-6">
           <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 relative z-10">
-            <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50 group relative">
-              <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Opening Cash</p>
-              <div className="flex items-center justify-between">
-                <p className="text-xl font-black text-white">₹{Math.abs(storeRegisterData.storeRegister.openingCash || 0).toFixed(2)}</p>
-                {can('CASH', 'UPDATE') && (
-                  <button
-                    onClick={() => {
-                      setStoreDenomData({
-                        amount: storeRegisterData.storeRegister.openingCash,
-                        denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                      });
-                      setShowEditStoreModal(true);
-                    }}
-                    className="p-1.5 bg-emerald-800/50 text-emerald-400 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <Pencil size={12} />
-                  </button>
-                )}
+            {canViewCashSection('STORE_SAFE') && (
+              <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50 group relative">
+                <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Opening Cash</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xl font-black text-white">₹{Math.abs(storeRegisterData.storeRegister.openingCash || 0).toFixed(2)}</p>
+                  {can('CASH', 'UPDATE', 'STORE_SAFE') && (
+                    <button
+                      onClick={() => {
+                        setStoreDenomData({
+                          amount: storeRegisterData.storeRegister.openingCash,
+                          denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                        });
+                        setShowEditStoreModal(true);
+                      }}
+                      className="p-1.5 bg-emerald-800/50 text-emerald-400 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                  )}
+                </div>
               </div>
-            </div>
-            <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
-              <p className="text-[10px] font-black tracking-widest uppercase text-amber-500 mb-1">Agent Outflow</p>
-              <p className="text-xl font-black text-amber-400">-₹{Math.abs(storeRegisterData?.liveMetrics?.assignedOut || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
-              <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Agent Inflow</p>
-              <p className="text-xl font-black text-emerald-400">+₹{Math.abs(storeRegisterData?.liveMetrics?.receivedIn || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
-              <p className="text-[10px] font-black tracking-widest uppercase text-rose-500 mb-1">Bank Transfer</p>
-              <p className="text-xl font-black text-rose-400">₹{Math.abs(storeRegisterData?.liveMetrics?.bankTransferred || 0).toFixed(2)}</p>
-            </div>
+            )}
+            {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (
+              <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
+                <p className="text-[10px] font-black tracking-widest uppercase text-amber-500 mb-1">Agent Outflow</p>
+                <p className="text-xl font-black text-amber-400">-₹{Math.abs(storeRegisterData?.liveMetrics?.assignedOut || 0).toFixed(2)}</p>
+              </div>
+            )}
+            {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (
+              <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
+                <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Agent Inflow</p>
+                <p className="text-xl font-black text-emerald-400">+₹{Math.abs(storeRegisterData?.liveMetrics?.receivedIn || 0).toFixed(2)}</p>
+              </div>
+            )}
+            {canViewCashSection('STORE_SAFE') && (
+              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
+                <p className="text-[10px] font-black tracking-widest uppercase text-rose-500 mb-1">Bank Transfer</p>
+                <p className="text-xl font-black text-rose-400">₹{Math.abs(storeRegisterData?.liveMetrics?.bankTransferred || 0).toFixed(2)}</p>
+              </div>
+            )}
 
-            <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-5">
-                <ShoppingCart size={40} className="text-sky-400" />
-              </div>
-              <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Counter Cash (Available)</p>
-              <p className="text-xl font-black text-sky-400">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-emerald-900 rounded-2xl p-4 shadow-xl border-b-4 border-emerald-950 relative overflow-hidden group">
-              <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                <Vault size={40} className="text-white" />
-              </div>
-              <div className="relative z-10">
-                <div className="flex items-center justify-between mb-1">
-                  <p className="text-[10px] font-black tracking-widest uppercase text-emerald-400">Store Chest (Safe)</p>
-                  <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-500/30">Secure</span>
+            {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (
+              <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-2 opacity-5">
+                  <ShoppingCart size={40} className="text-sky-400" />
                 </div>
-                <p className="text-xl font-black text-white tabular-nums">
-                  ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
-                </p>
-                <div className="mt-2 pt-2 border-t border-emerald-800/50 flex items-center justify-between">
-                  <span className="text-[8px] font-bold text-emerald-500 uppercase">Total Cash</span>
-                  <span className="text-[10px] font-black text-emerald-300">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</span>
+                <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Counter Cash (Available)</p>
+                <p className="text-xl font-black text-sky-400">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
+              </div>
+            )}
+            {canViewCashSection('STORE_SAFE') && (
+              <div className="bg-emerald-900 rounded-2xl p-4 shadow-xl border-b-4 border-emerald-950 relative overflow-hidden group">
+                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
+                  <Vault size={40} className="text-white" />
+                </div>
+                <div className="relative z-10">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-[10px] font-black tracking-widest uppercase text-emerald-400">Store Chest (Safe)</p>
+                    <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-500/30">Secure</span>
+                  </div>
+                  <p className="text-xl font-black text-white tabular-nums">
+                    ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
+                  </p>
+                  <div className="mt-2 pt-2 border-t border-emerald-800/50 flex items-center justify-between">
+                    <span className="text-[8px] font-bold text-emerald-500 uppercase">Total Cash</span>
+                    <span className="text-[10px] font-black text-emerald-300">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
 
-          <div className="bg-emerald-950/30 rounded-3xl p-5 border border-emerald-800/30 relative z-10">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                <Clock size={12} /> Today's Shift Safekeeping
-              </h3>
-              <p className="text-[9px] font-bold text-emerald-500/40 uppercase tracking-tighter">Reflecting from Collections Report</p>
-            </div>
+          {canViewCashSection('SHIFT_DEPOSIT') && (
+            <div className="bg-emerald-950/30 rounded-3xl p-5 border border-emerald-800/30 relative z-10">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
+                  <Clock size={12} /> Today's Shift Safekeeping
+                </h3>
+                <p className="text-[9px] font-bold text-emerald-500/40 uppercase tracking-tighter">Reflecting from Collections Report</p>
+              </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {[1, 2].map(shiftNum => {
-                const depositRecord = storeRegisterData.storeDeposits?.find(d => d.shift === shiftNum);
-                const expectedAmount = storeRegisterData.shiftCollections?.find(c => c.shift === shiftNum)?._sum.actualCash || 0;
-                const isMismatched = depositRecord && Math.abs(depositRecord.amount - expectedAmount) > 0.1;
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {[1, 2].map(shiftNum => {
+                  const depositRecord = storeRegisterData.storeDeposits?.find(d => d.shift === shiftNum);
+                  const expectedAmount = storeRegisterData.shiftCollections?.find(c => c.shift === shiftNum)?._sum.actualCash || 0;
+                  const isMismatched = depositRecord && Math.abs(depositRecord.amount - expectedAmount) > 0.1;
 
-                return (
-                  <div key={shiftNum} className={`p-4 rounded-2xl border transition-all ${depositRecord
-                    ? (isMismatched ? 'bg-amber-950/40 border-amber-800/50' : 'bg-emerald-900/50 border-emerald-800/50')
-                    : (expectedAmount > 0 ? 'bg-emerald-950/10 border-emerald-900/20 border-dashed border-2' : 'bg-gray-900/10 border-gray-800/20 opacity-30')
-                    }`}>
-                    <div className="flex items-start justify-between">
-                      <div className="flex items-start gap-3">
-                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${depositRecord ? 'bg-emerald-800/50 text-emerald-400' : 'bg-gray-800/30 text-gray-600'
-                          }`}>
-                          S{shiftNum}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center flex-wrap gap-2">
-                            <p className="text-sm font-black text-white">
-                              ₹{(depositRecord?.amount || expectedAmount).toLocaleString()}
+                  return (
+                    <div key={shiftNum} className={`p-4 rounded-2xl border transition-all ${depositRecord
+                      ? (isMismatched ? 'bg-amber-950/40 border-amber-800/50' : 'bg-emerald-900/50 border-emerald-800/50')
+                      : (expectedAmount > 0 ? 'bg-emerald-950/10 border-emerald-900/20 border-dashed border-2' : 'bg-gray-900/10 border-gray-800/20 opacity-30')
+                      }`}>
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${depositRecord ? 'bg-emerald-800/50 text-emerald-400' : 'bg-gray-800/30 text-gray-600'
+                            }`}>
+                            S{shiftNum}
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center flex-wrap gap-2">
+                              <p className="text-sm font-black text-white">
+                                ₹{(depositRecord?.amount || expectedAmount).toLocaleString()}
+                              </p>
+                              {isMismatched && (
+                                <div className="flex items-center gap-1 text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
+                                  <AlertTriangle size={8} /> Mismatch
+                                </div>
+                              )}
+                              {!depositRecord && expectedAmount > 0 && (
+                                <span className="text-[8px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full uppercase font-black tracking-tighter">Draft</span>
+                              )}
+                            </div>
+                            <p className="text-[9px] font-medium text-emerald-500/60 uppercase tracking-wider mt-1 leading-relaxed">
+                              {depositRecord ? depositRecord.description : (expectedAmount > 0 ? 'Pending Safe Deposit' : 'No collections reported')}
                             </p>
                             {isMismatched && (
-                              <div className="flex items-center gap-1 text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
-                                <AlertTriangle size={8} /> Mismatch
-                              </div>
-                            )}
-                            {!depositRecord && expectedAmount > 0 && (
-                              <span className="text-[8px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full uppercase font-black tracking-tighter">Draft</span>
+                              <p className="text-[8px] font-bold text-rose-400 mt-1 flex items-center gap-1">
+                                <AlertCircle size={8} /> Needs Refresh: Expected ₹{expectedAmount.toLocaleString()}
+                              </p>
                             )}
                           </div>
-                          <p className="text-[9px] font-medium text-emerald-500/60 uppercase tracking-wider mt-1 leading-relaxed">
-                            {depositRecord ? depositRecord.description : (expectedAmount > 0 ? 'Pending Safe Deposit' : 'No collections reported')}
-                          </p>
-                          {isMismatched && (
-                            <p className="text-[8px] font-bold text-rose-400 mt-1 flex items-center gap-1">
-                              <AlertCircle size={8} /> Needs Refresh: Expected ₹{expectedAmount.toLocaleString()}
-                            </p>
-                          )}
                         </div>
+
+                        {depositRecord && (
+                          <div className="flex items-center gap-1">
+                            {can('CASH', 'UPDATE', 'SHIFT_DEPOSIT') && (
+                              <button
+                                onClick={() => {
+                                  setEditingDeposit(depositRecord);
+                                  setDepositData({
+                                    shift: depositRecord.shift,
+                                    description: depositRecord.description,
+                                    amount: depositRecord.amount,
+                                    denominations: depositRecord.denominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                                  });
+                                  setShowEditDepositModal(true);
+                                }}
+                                className="p-1.5 text-emerald-500/50 hover:text-sky-400 hover:bg-sky-400/10 rounded-lg transition-all"
+                              >
+                                <Pencil size={13} />
+                              </button>
+                            )}
+                            {can('CASH', 'DELETE', 'SHIFT_DEPOSIT') && (
+                              <button
+                                onClick={() => handleDeleteDeposit(depositRecord.id)}
+                                className="p-1.5 text-emerald-500/50 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-all"
+                              >
+                                <AlertCircle size={13} />
+                              </button>
+                            )}
+                          </div>
+                        )}
+                        {!depositRecord && expectedAmount > 0 && (
+                          <button
+                            onClick={() => setActiveTab('reconciliation')}
+                            className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 p-1.5 rounded-xl transition-all"
+                            title="Go to Deposit"
+                          >
+                            <ArrowRight size={14} />
+                          </button>
+                        )}
                       </div>
-
-                      {depositRecord && (
-                        <div className="flex items-center gap-1">
-                          {can('CASH', 'UPDATE') && (
-                            <button
-                              onClick={() => {
-                                setEditingDeposit(depositRecord);
-                                setDepositData({
-                                  shift: depositRecord.shift,
-                                  description: depositRecord.description,
-                                  amount: depositRecord.amount,
-                                  denominations: depositRecord.denominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                                });
-                                setShowEditDepositModal(true);
-                              }}
-                              className="p-1.5 text-emerald-500/50 hover:text-sky-400 hover:bg-sky-400/10 rounded-lg transition-all"
-                            >
-                              <Pencil size={13} />
-                            </button>
-                          )}
-                          {can('CASH', 'DELETE') && (
-                            <button
-                              onClick={() => handleDeleteDeposit(depositRecord.id)}
-                              className="p-1.5 text-emerald-500/50 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-all"
-                            >
-                              <AlertCircle size={13} />
-                            </button>
-                          )}
-                        </div>
-                      )}
-                      {!depositRecord && expectedAmount > 0 && (
-                        <button
-                          onClick={() => setActiveTab('reconciliation')}
-                          className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 p-1.5 rounded-xl transition-all"
-                          title="Go to Deposit"
-                        >
-                          <ArrowRight size={14} />
-                        </button>
-                      )}
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
-          </div>
+          )}
 
-          {(storeRegisterData?.liveMetrics?.totalStoreSalesUPI > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCard > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCount?.HYBRID > 0) && (
+          {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (storeRegisterData?.liveMetrics?.totalStoreSalesUPI > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCard > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCount?.HYBRID > 0) && (
             <div className="bg-emerald-950/30 rounded-3xl p-5 border border-emerald-800/30 relative z-10">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">

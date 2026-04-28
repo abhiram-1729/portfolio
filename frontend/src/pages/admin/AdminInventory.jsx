@@ -1330,7 +1330,7 @@ export default function AdminInventory() {
                   onChange={handleZipUpload}
                   disabled={isUploading}
                 />
-                {can('INVENTORY', 'CREATE') && (
+                {can('INVENTORY', 'CREATE', 'MASTER') && (
                   <button
                     onClick={() => setShowBulkUploadModal(true)}
                     disabled={isUploading}
@@ -1341,7 +1341,7 @@ export default function AdminInventory() {
                     <span className="hidden md:block">Bulk Upload</span>
                   </button>
                 )}
-                {can('INVENTORY', 'CREATE') && (
+                {can('INVENTORY', 'CREATE', 'MASTER') && (
                   <button
                     onClick={() => setShowZipImportModal(true)}
                     disabled={isUploading}
@@ -1352,7 +1352,7 @@ export default function AdminInventory() {
                     <span className="hidden md:block">Zip Import</span>
                   </button>
                 )}
-                {can('INVENTORY', 'CREATE') && (
+                {can('INVENTORY', 'CREATE', 'MASTER') && (
                   <button
                     onClick={() => { setIsCreateView(true); setModalTab('info'); }}
                     className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"

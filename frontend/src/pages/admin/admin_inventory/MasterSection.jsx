@@ -119,7 +119,7 @@ const MasterSection = ({
           </div>
         </div>
         <div className="flex items-center gap-1">
-          {can('INVENTORY', 'TOGGLE_STATUS') && (
+          {can('INVENTORY', 'TOGGLE_STATUS', 'MASTER') && (
             <button
               onClick={() => handleToggleStatus(item)}
               className={`text-xs font-bold p-2 rounded-lg flex items-center gap-1 transition-colors ${item.status === 'INACTIVE' ? 'text-emerald-600 hover:bg-emerald-50' : 'text-orange-600 hover:bg-orange-50'}`}
@@ -129,7 +129,7 @@ const MasterSection = ({
             </button>
           )}
           <div className="w-px h-4 bg-gray-200 mx-1 border-r border-gray-100" />
-          {can('INVENTORY', 'UPDATE') && (
+          {can('INVENTORY', 'UPDATE', 'MASTER') && (
             <button
               onClick={() => openEditModal(item)}
               className="text-gray-600 text-xs font-bold p-2 hover:bg-gray-100 rounded-lg flex items-center gap-1"
@@ -137,7 +137,7 @@ const MasterSection = ({
               <Pencil size={14} />
             </button>
           )}
-          {can('INVENTORY', 'DELETE') && (
+          {can('INVENTORY', 'DELETE', 'MASTER') && (
             <button
               onClick={() => handleDeleteItem(item)}
               title="Delete Item"
@@ -257,7 +257,7 @@ const MasterSection = ({
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1 transition-all">
-                    {can('INVENTORY', 'UPDATE') && (
+                    {can('INVENTORY', 'UPDATE', 'MASTER') && (
                       <button
                         onClick={() => openEditModal(item)}
                         className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
@@ -266,7 +266,7 @@ const MasterSection = ({
                         <Pencil size={16} />
                       </button>
                     )}
-                    {can('INVENTORY', 'DELETE') && (
+                    {can('INVENTORY', 'DELETE', 'MASTER') && (
                       <button
                         onClick={() => handleDeleteItem(item)}
                         disabled={deletingId === item.id}
