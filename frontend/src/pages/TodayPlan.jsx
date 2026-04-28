@@ -28,6 +28,7 @@ import * as routeService from '../services/routeService';
 import * as locationService from '../services/locationService';
 import * as shiftService from '../services/shiftService';
 import toast from 'react-hot-toast';
+
 export default function TodayPlan() {
   const { user } = useUserStore();
   const navigate = useNavigate();
@@ -58,8 +59,8 @@ export default function TodayPlan() {
     if (markingSlot) return;
     setMarkingSlot(shift.id || shift.name);
     try {
-      await routeService.markCoverage({ 
-        shiftId: shift.id, 
+      await routeService.markCoverage({
+        shiftId: shift.id,
         shiftName: shift.name,
         slot: shift.name.toUpperCase() // For backward compatibility
       });
@@ -78,9 +79,11 @@ export default function TodayPlan() {
   };
 
   const [checkingIn, setCheckingIn] = useState(false);
+  const [isTracking, setIsTracking] = useState(false);
   const [activeShift, setActiveShift] = useState(null);
   const [availableShifts, setAvailableShifts] = useState([]);
   const [activeVillageVisit, setActiveVillageVisit] = useState(null);
+  const [attendance, setAttendance] = useState(null);
   const [villageActionLoading, setVillageActionLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -93,6 +96,7 @@ export default function TodayPlan() {
       const { data } = await shiftService.getShiftStatus();
       setActiveShift(data.activeShift);
       setAvailableShifts(data.shifts || []);
+      setAttendance(data.attendance);
       if (data.activeShift?.activities?.length > 0) {
         const latest = data.activeShift.activities[0];
         if (!latest.endTime) setActiveVillageVisit(latest);
@@ -102,6 +106,15 @@ export default function TodayPlan() {
     }
   };
 
+  const formatTime12h = (time24) => {
+    if (!time24) return 'N/A';
+    const [hours, minutes] = time24.split(':');
+    const h = parseInt(hours);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    return `${h12}:${minutes} ${ampm}`;
+  };
+
   const handleStartShift = async (type) => {
     setActionLoading(true);
     try {
@@ -109,7 +122,7 @@ export default function TodayPlan() {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
       });
       const coords = pos.coords;
-      
+
       if (coords.accuracy > 2000) {
         throw new Error(`GPS accuracy too low (${Math.round(coords.accuracy)}m).`);
       }
@@ -124,6 +137,7 @@ export default function TodayPlan() {
 
       toast.success('Shift Started ✅');
       locationService.startLiveTracking();
+      setIsTracking(true);
       fetchActiveShift();
       fetchStatus();
     } catch (err) {
@@ -141,7 +155,7 @@ export default function TodayPlan() {
         navigator.geolocation.getCurrentPosition(resolve, reject, { enableHighAccuracy: true });
       });
       const coords = pos.coords;
-      
+
       await shiftService.endShift({
         shiftLogId: activeShift.id,
         lat: coords.latitude,
@@ -151,6 +165,7 @@ export default function TodayPlan() {
 
       toast.success('Shift Ended ✅');
       locationService.stopLiveTracking();
+      setIsTracking(false);
       setActiveShift(null);
       fetchActiveShift();
       fetchStatus();
@@ -166,7 +181,7 @@ export default function TodayPlan() {
       toast.error('Start your shift first in the Shift Tracking menu.');
       return;
     }
-    
+
     setVillageActionLoading(true);
     try {
       const pos = await new Promise((resolve, reject) => {
@@ -209,7 +224,7 @@ export default function TodayPlan() {
 
   const handleLocationCheckIn = () => {
     if (!hasPlan) return;
-    
+
     if (!activeShift) {
       toast.error('Please start your shift in the "Shift Tracking" menu first.');
       return;
@@ -227,6 +242,7 @@ export default function TodayPlan() {
       async (position) => {
         try {
           const { latitude, longitude, accuracy } = position.coords;
+          console.log('[TodayPlan] GPS Signal:', { latitude, longitude, accuracy });
           
           if (accuracy > 2000) {
             toast.error(`GPS accuracy too low (${Math.round(accuracy)}m). Please move to an open area.`);
@@ -234,30 +250,38 @@ export default function TodayPlan() {
             return;
           }
 
-          // Legacy check-in (compatibility)
-          await routeService.locationCheckIn({
-            latitude,
-            longitude,
-            villageName: today.villageName
-          });
+          // Attempt Manual Check-in (Don't block live tracking if this fails)
+          try {
+            await routeService.locationCheckIn({
+              latitude,
+              longitude,
+              villageName: today.villageName
+            });
+            console.log('[TodayPlan] Manual Check-in Success');
+          } catch (checkInErr) {
+            console.error('[TodayPlan] Manual Check-in Failed:', checkInErr.message);
+          }
 
           // Start continuous live tracking
+          console.log('[TodayPlan] Starting Live Tracking...');
           locationService.startLiveTracking();
           setIsTracking(true);
           
-          toast.success("Location tracking active!");
-          fetchStatus();
+          toast.success("Location ON! You are now visible to Admin.");
+          fetchActiveShift(); // Refresh to show "Live Tracking" status
         } catch (err) {
-          toast.error("Failed to track location");
+          console.error('[TodayPlan] Tracking Activation Error:', err);
+          toast.error("Failed to sync location. Please try again.");
         } finally {
           setCheckingIn(false);
         }
       },
       (error) => {
-        toast.error("Unable to retrieve your location. Please enable location services.");
+        console.error('[TodayPlan] GPS Error:', error);
+        toast.error("GPS Error: " + error.message);
         setCheckingIn(false);
       },
-      { enableHighAccuracy: true }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
   };
 
@@ -289,7 +313,7 @@ export default function TodayPlan() {
   const { today, tomorrow, tomorrowLabel, coverage, shifts: configShifts } = statusData;
   const hasPlan = today && !today.message && !today.noVillage;
   const hasTomorrow = tomorrow && !tomorrow.message && !tomorrow.noVillage;
-  
+
   const currentTime = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
   const currentShift = (configShifts || []).find(s => currentTime >= s.startTime && currentTime <= s.endTime) || (configShifts ? configShifts[0] : null);
   const sessionName = currentShift ? currentShift.name : (new Date().getHours() < 14 ? 'Morning' : 'Evening');
@@ -311,15 +335,15 @@ export default function TodayPlan() {
             </div>
 
             <div className="grid grid-cols-1 gap-3">
-              {availableShifts.map((shift, idx) => (
-                <button 
+              {availableShifts.filter(s => s.isActive !== false).map((shift, idx) => (
+                <button
                   key={shift.id || idx}
                   onClick={() => handleStartShift(idx + 1)}
                   disabled={actionLoading}
                   className={`w-full ${idx % 2 === 0 ? 'bg-emerald-600' : 'bg-indigo-600'} text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50`}
                 >
                   {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                  Start {shift.name} ({shift.startTime})
+                  Start {shift.name} ({formatTime12h(shift.startTime)})
                 </button>
               ))}
             </div>
@@ -334,12 +358,24 @@ export default function TodayPlan() {
                 <h4 className="text-xs font-black text-gray-900 uppercase tracking-tight">
                   On Duty: {availableShifts[activeShift.shift - 1]?.name || (activeShift.shift === 1 ? 'Morning' : 'Evening')}
                 </h4>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                  Started at {activeShift.startTime ? new Date(activeShift.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}
-                </p>
+                <div className="flex items-center gap-2">
+                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">
+                    Started at {activeShift.startTime ? new Date(activeShift.startTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'N/A'}
+                  </p>
+                  {attendance?.isLate && (
+                    <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[8px] font-black uppercase">
+                      Late {attendance.lateMinutes}m
+                    </span>
+                  )}
+                  {!attendance?.isLate && attendance?.punchInTime && (
+                    <span className="px-1.5 py-0.5 bg-emerald-100 text-emerald-600 rounded text-[8px] font-black uppercase">
+                      On Time
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleEndShift}
               disabled={actionLoading}
               className="bg-gray-100 text-gray-400 p-2.5 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all active:scale-90"
@@ -369,7 +405,6 @@ export default function TodayPlan() {
         {/* ── Today's Village Card ──────────────────────── */}
         {hasPlan ? (
           <div className="bg-gradient-to-br from-emerald-600 via-emerald-700 to-teal-700 rounded-3xl p-6 shadow-2xl shadow-emerald-600/20 relative overflow-hidden">
-            {/* Decorative circles */}
             <div className="absolute -top-10 -right-10 w-40 h-40 bg-white/5 rounded-full" />
             <div className="absolute -bottom-16 -left-8 w-32 h-32 bg-white/5 rounded-full" />
 
@@ -412,9 +447,36 @@ export default function TodayPlan() {
                 </div>
                 <div>
                   <h4 className="font-black text-gray-900 text-sm">Location reached?</h4>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                    {statusData.checkIn ? `Checked in at ${new Date(statusData.checkIn.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Track your arrival'}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                      {statusData.checkIn ? `Checked in at ${new Date(statusData.checkIn.time).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : 'Track your arrival'}
+                    </p>
+                    {!statusData.checkIn && activeShift && (
+                      <span className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase ${
+                        (function() {
+                          const now = new Date();
+                          const shift = availableShifts[activeShift.shift - 1];
+                          if (!shift?.startTime) return 'bg-gray-100 text-gray-400';
+                          const [h, m] = shift.startTime.split(':').map(Number);
+                          const threshold = new Date();
+                          threshold.setHours(h, m, 0, 0);
+                          threshold.setMinutes(threshold.getMinutes() + 150); // 2.5 hours
+                          return now <= threshold ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600';
+                        })() === 'bg-emerald-100 text-emerald-600' ? 'bg-emerald-100 text-emerald-600' : 'bg-red-100 text-red-600'
+                      }`}>
+                        {(function() {
+                          const now = new Date();
+                          const shift = availableShifts[activeShift.shift - 1];
+                          if (!shift?.startTime) return 'Checking...';
+                          const [h, m] = shift.startTime.split(':').map(Number);
+                          const threshold = new Date();
+                          threshold.setHours(h, m, 0, 0);
+                          threshold.setMinutes(threshold.getMinutes() + 150); // 2.5 hours
+                          return now <= threshold ? 'On Time' : 'Running Late';
+                        })()}
+                      </span>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -447,46 +509,46 @@ export default function TodayPlan() {
         {/* ── Village Visit Controls ─────────────────── */}
         {hasPlan && (
           <div className="bg-white rounded-[2rem] p-5 border border-gray-100 shadow-sm space-y-4">
-             <div className="flex items-center justify-between">
-                <div>
-                   <h4 className="font-black text-gray-900 text-sm">Village Visit</h4>
-                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      {activeVillageVisit ? 'Visit in progress...' : 'Ready to start visit?'}
-                   </p>
-                </div>
-                {activeVillageVisit && (
-                   <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black animate-pulse">
-                      LIVE
-                   </div>
-                )}
-             </div>
-
-             <div className="flex gap-3">
-                {!activeVillageVisit ? (
-                   <button 
-                      onClick={() => handleVillageVisit('start')}
-                      disabled={villageActionLoading || !activeShift}
-                      className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                   >
-                      {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
-                      Start Village Visit
-                   </button>
-                ) : (
-                   <button 
-                      onClick={() => handleVillageVisit('end')}
-                      disabled={villageActionLoading}
-                      className="flex-1 bg-gray-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-gray-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
-                   >
-                      {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
-                      End Village Visit
-                   </button>
-                )}
-             </div>
-             {!activeShift && (
-                <p className="text-[9px] text-rose-500 font-black uppercase text-center tracking-widest">
-                   ⚠️ Start shift in "Shift Tracking" menu first
+            <div className="flex items-center justify-between">
+              <div>
+                <h4 className="font-black text-gray-900 text-sm">Village Visit</h4>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                  {activeVillageVisit ? 'Visit in progress...' : 'Ready to start visit?'}
                 </p>
-             )}
+              </div>
+              {activeVillageVisit && (
+                <div className="px-3 py-1 rounded-full bg-emerald-50 text-emerald-600 text-[10px] font-black animate-pulse">
+                  LIVE
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              {!activeVillageVisit ? (
+                <button
+                  onClick={() => handleVillageVisit('start')}
+                  disabled={villageActionLoading || !activeShift}
+                  className="flex-1 bg-emerald-600 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Play size={14} />}
+                  Start Village Visit
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleVillageVisit('end')}
+                  disabled={villageActionLoading}
+                  className="flex-1 bg-gray-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-gray-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {villageActionLoading ? <Loader2 size={14} className="animate-spin" /> : <Square size={14} />}
+                  End Village Visit
+                </button>
+              )}
+            </div>
+            {!activeShift && (
+              <p className="text-[9px] text-rose-500 font-black uppercase text-center tracking-widest">
+                ⚠️ Start shift in "Shift Tracking" menu first
+              </p>
+            )}
           </div>
         )}
 
@@ -498,7 +560,7 @@ export default function TodayPlan() {
             {(statusData.shifts || []).map((shift) => {
               const isDone = coverage.shiftStatus?.[shift.name] || (shift.name.toUpperCase() === 'MORNING' && coverage.morningDone) || (shift.name.toUpperCase() === 'EVENING' && coverage.eveningDone);
               const isPM = shift.startTime >= '12:00';
-              
+
               return (
                 <div key={shift.id || shift.name} className={`rounded-2xl p-4 border transition-all ${isDone
                   ? 'bg-emerald-50/80 border-emerald-200 shadow-sm'
@@ -577,7 +639,6 @@ export default function TodayPlan() {
           )}
         </div>
       </div>
-
     </div>
   );
 }

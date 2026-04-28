@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { attendanceAPI } from '../services/api';
-import { Clock, CalendarDays, ChevronLeft, ChevronRight, Timer, CheckCircle2, AlertCircle, TrendingUp, LogIn, LogOut } from 'lucide-react';
+import { Clock, CalendarDays, ChevronLeft, ChevronRight, Timer, CheckCircle2, AlertCircle, TrendingUp, LogIn, LogOut, Info, FileText } from 'lucide-react';
+import lateEntryService from '../services/lateEntryService';
+import { toast } from 'react-hot-toast';
 
 export default function AgentAttendance() {
   const [records, setRecords] = useState([]);
@@ -11,6 +13,10 @@ export default function AgentAttendance() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
+  const [leaveBalance, setLeaveBalance] = useState(null);
+  const [showWaiverModal, setShowWaiverModal] = useState(false);
+  const [selectedLateId, setSelectedLateId] = useState(null);
+  const [waiverReason, setWaiverReason] = useState('');
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -19,7 +25,10 @@ export default function AgentAttendance() {
     try {
       const { data } = await attendanceAPI.getMyHistory({ month, year });
       setRecords(data.records || []);
-      setSummary(data.summary || null);
+      setSummary({
+        ...data.summary,
+        totalLates: (data.records || []).filter(r => r.isLate && !r.isWaived).length
+      });
     } catch (err) {
       console.error('Failed to fetch attendance history:', err);
     } finally {
@@ -29,7 +38,33 @@ export default function AgentAttendance() {
 
   useEffect(() => {
     fetchHistory();
+    fetchLeaveBalance();
   }, [month, year]);
+
+  const fetchLeaveBalance = async () => {
+    try {
+      const { data } = await lateEntryService.getLeaveBalance(null, `${year}-${String(month).padStart(2, '0')}`);
+      setLeaveBalance(data);
+    } catch (err) {
+      console.error('Failed to fetch leave balance:', err);
+    }
+  };
+
+  const handleWaiverRequest = async () => {
+    if (!waiverReason) return toast.error('Please provide a reason');
+    try {
+      await lateEntryService.requestException({ 
+        lateEntryId: selectedLateId, 
+        reason: waiverReason 
+      });
+      toast.success('Waiver requested successfully');
+      setShowWaiverModal(false);
+      setWaiverReason('');
+      fetchHistory();
+    } catch (err) {
+      toast.error('Failed to submit waiver request');
+    }
+  };
 
   const prevMonth = () => {
     if (month === 1) {
@@ -108,6 +143,15 @@ export default function AgentAttendance() {
       bg: 'bg-amber-50',
       text: 'text-amber-600',
       border: 'border-amber-100'
+    },
+    {
+      label: 'Total Lates',
+      value: summary?.totalLates || 0,
+      icon: AlertCircle,
+      color: 'rose',
+      bg: 'bg-rose-50',
+      text: 'text-rose-600',
+      border: 'border-rose-100'
     }
   ];
 
@@ -142,17 +186,41 @@ export default function AgentAttendance() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-3 mb-5">
+      <div className="grid grid-cols-3 gap-2 mb-5">
         {statCards.map((card) => (
-          <div key={card.label} className={`${card.bg} rounded-2xl p-4 border ${card.border}`}>
-            <div className="flex items-center gap-2 mb-2">
-              <card.icon size={14} className={card.text} strokeWidth={2.5} />
-              <span className={`text-[9px] font-black uppercase tracking-widest ${card.text}`}>{card.label}</span>
+          <div key={card.label} className={`${card.bg} rounded-2xl p-3 border ${card.border} flex flex-col justify-between`}>
+            <div className="flex items-center gap-1.5 mb-1.5">
+              <card.icon size={12} className={card.text} strokeWidth={2.5} />
+              <span className={`text-[8px] font-black uppercase tracking-widest ${card.text}`}>{card.label}</span>
             </div>
-            <p className="text-2xl font-black text-slate-900">{card.value}</p>
+            <p className="text-lg font-black text-slate-900">{card.value}</p>
           </div>
         ))}
       </div>
+
+      {/* Leave Balance Section */}
+      {leaveBalance && (
+        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 mb-5 text-white shadow-lg">
+          <div className="flex items-center gap-2 mb-3">
+            <Info size={14} className="text-blue-400" />
+            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Monthly Leave Balance</h3>
+          </div>
+          <div className="grid grid-cols-3 gap-4">
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase">Half Days</p>
+              <p className="text-xl font-black">{leaveBalance.halfDays || 0}</p>
+            </div>
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase">LOP Days</p>
+              <p className="text-xl font-black text-red-400">{leaveBalance.lopDays || 0}</p>
+            </div>
+            <div>
+              <p className="text-[8px] font-bold text-slate-400 uppercase">Remaining</p>
+              <p className="text-xl font-black text-emerald-400">{leaveBalance.annualLeave + leaveBalance.casualLeave + leaveBalance.sickLeave}</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Records List */}
       <div className="space-y-2">
@@ -172,14 +240,29 @@ export default function AgentAttendance() {
                 <div className="flex items-center gap-2">
                   <CalendarDays size={14} className="text-slate-400" />
                   <span className="text-sm font-black text-slate-900 tracking-tight">{formatDate(record.date)}</span>
+                  {record.isLate && (
+                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold">
+                      LATE ({record.lateMinutes}m)
+                    </span>
+                  )}
                 </div>
-                <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                  record.status === 'COMPLETED' 
-                    ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                    : 'bg-amber-50 text-amber-600 border border-amber-100'
-                }`}>
-                  {record.status === 'COMPLETED' ? 'Completed' : 'Active'}
-                </span>
+                <div className="flex items-center gap-2">
+                  {record.isLate && !record.exceptionId && (
+                    <button 
+                      onClick={() => { setSelectedLateId(record.id); setShowWaiverModal(true); }}
+                      className="text-[9px] font-bold text-blue-600 underline"
+                    >
+                      Request Waiver
+                    </button>
+                  )}
+                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                    record.status === 'COMPLETED' 
+                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                      : 'bg-amber-50 text-amber-600 border border-amber-100'
+                  }`}>
+                    {record.status === 'COMPLETED' ? 'Completed' : 'Active'}
+                  </span>
+                </div>
               </div>
               <div className="flex items-center gap-4">
                 <div className="flex items-center gap-2 flex-1">
@@ -214,6 +297,44 @@ export default function AgentAttendance() {
           ))
         )}
       </div>
+
+      {/* Waiver Modal */}
+      {showWaiverModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
+            <h3 className="text-lg font-black text-slate-900 mb-2">Request Waiver</h3>
+            <p className="text-sm text-slate-500 mb-4">Please provide a reason why this late mark should be ignored.</p>
+            
+            <select 
+              className="w-full p-3 rounded-xl bg-slate-50 border border-slate-100 mb-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
+              value={waiverReason}
+              onChange={(e) => setWaiverReason(e.target.value)}
+            >
+              <option value="">Select Reason</option>
+              <option value="CLIENT_VISIT">Client Visit</option>
+              <option value="WFH">Work From Home</option>
+              <option value="BIOMETRIC_FAILURE">Device Failure</option>
+              <option value="EMERGENCY">Personal Emergency</option>
+              <option value="OTHER">Other</option>
+            </select>
+
+            <div className="flex gap-2">
+              <button 
+                onClick={() => setShowWaiverModal(false)}
+                className="flex-1 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleWaiverRequest}
+                className="flex-1 py-3 rounded-xl font-bold bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all"
+              >
+                Submit
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

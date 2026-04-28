@@ -147,7 +147,7 @@ export const markCoverage = async (req, res, next) => {
         // Fetch shifts to validate and map
         const shifts = await getShiftsConfig(tenantId, storeId);
         const activeShift = shifts.find(s => s.id === shiftId || s.name === shiftName || s.name.toUpperCase() === slot);
-        
+
         const effectiveShiftName = activeShift ? activeShift.name : slot;
 
         // Upsert DailyCoverage record
@@ -157,7 +157,7 @@ export const markCoverage = async (req, res, next) => {
 
         let shiftStatus = existing?.shiftStatus || {};
         if (typeof shiftStatus !== 'object') shiftStatus = {};
-        
+
         // Mark the specific shift as done
         shiftStatus[effectiveShiftName] = true;
 
@@ -323,10 +323,10 @@ export const locationCheckIn = async (req, res, next) => {
         const dateString = format(new Date(), 'yyyy-MM-dd');
         const now = new Date();
         const currentTimeStr = format(now, 'HH:mm');
-        
+
         // Dynamic Status Calculation based on Shift
         let status = "LATE";
-        
+
         // 1. Find active shift
         const activeShift = await prisma.shiftLog.findFirst({
             where: { userId, date: dateString, status: 'STARTED' }
@@ -334,9 +334,9 @@ export const locationCheckIn = async (req, res, next) => {
 
         if (activeShift) {
             const shifts = await getShiftsConfig(tenantId, req.user.storeId);
-            const shiftConfig = shifts.find((s, idx) => 
-                s.id === activeShift.shift || 
-                s.id === `shift_${activeShift.shift}` || 
+            const shiftConfig = shifts.find((s, idx) =>
+                s.id === activeShift.shift ||
+                s.id === `shift_${activeShift.shift}` ||
                 (idx + 1) === activeShift.shift
             );
 
@@ -346,7 +346,7 @@ export const locationCheckIn = async (req, res, next) => {
                 const thresholdTime = new Date(now);
                 thresholdTime.setHours(sHour, sMin, 0, 0);
                 thresholdTime.setMinutes(thresholdTime.getMinutes() + 150); // + 2.5 hours
-                
+
                 if (now <= thresholdTime) {
                     status = "ON_TIME";
                 }
@@ -449,15 +449,15 @@ export const getAllLocationCheckIns = async (req, res, next) => {
 // Helper: calculate distance between two points in meters
 const getDistance = (lat1, lon1, lat2, lon2) => {
     const R = 6371e3; // metres
-    const φ1 = lat1 * Math.PI/180;
-    const φ2 = lat2 * Math.PI/180;
-    const Δφ = (lat2-lat1) * Math.PI/180;
-    const Δλ = (lon2-lon1) * Math.PI/180;
+    const φ1 = lat1 * Math.PI / 180;
+    const φ2 = lat2 * Math.PI / 180;
+    const Δφ = (lat2 - lat1) * Math.PI / 180;
+    const Δλ = (lon2 - lon1) * Math.PI / 180;
 
-    const a = Math.sin(Δφ/2) * Math.sin(Δφ/2) +
-            Math.cos(φ1) * Math.cos(φ2) *
-            Math.sin(Δλ/2) * Math.sin(Δλ/2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+        Math.cos(φ1) * Math.cos(φ2) *
+        Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
     return R * c; // in metres
 };

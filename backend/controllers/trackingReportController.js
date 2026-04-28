@@ -131,9 +131,9 @@ export const getTimeDeviationReport = async (req, res, next) => {
 
     const report = logs.map(log => {
       // Find the specific shift config from the dynamic list
-      const shiftConfig = shifts.find((s, idx) => 
-        s.id === log.shift || 
-        s.id === `shift_${log.shift}` || 
+      const shiftConfig = shifts.find((s, idx) =>
+        s.id === log.shift ||
+        s.id === `shift_${log.shift}` ||
         (idx + 1) === log.shift ||
         s.name.toUpperCase() === (log.shift === 1 ? 'MORNING' : 'EVENING')
       );
@@ -141,7 +141,7 @@ export const getTimeDeviationReport = async (req, res, next) => {
       // Default fallback if config not found
       const expectedTime = shiftConfig?.startTime || (log.shift === 1 ? '05:45' : '15:30');
       const actualTime = format(new Date(log.startTime), 'HH:mm');
-      
+
       // Basic deviation calculation
       const [exH, exM] = expectedTime.split(':').map(Number);
       const [acH, acM] = actualTime.split(':').map(Number);

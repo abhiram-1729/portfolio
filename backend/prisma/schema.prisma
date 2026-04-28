@@ -73,6 +73,10 @@ model Tenant {
   locationLogs             LocationLog[]
   // ID Generation
   idSequences              IdSequence[]
+  lateConfigs              LateEntryConfig[]
+  lateEntries              LateEntry[]
+  lateExceptions           LateEntryException[]
+  leaveBalances            LeaveBalance[]
 }
 
 enum TenantStatus {
@@ -138,6 +142,10 @@ model User {
   villageActivities  VillageActivity[]
   locationLogs       LocationLog[]
   approvedRefills    RefillRequest[]       @relation("ApprovedRefills")
+  lateEntries        LateEntry[]
+  lateExceptions     LateEntryException[]  @relation("UserExceptions")
+  approvedExceptions LateEntryException[]  @relation("ApprovedBy")
+  leaveBalances      LeaveBalance[]
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -1181,6 +1189,8 @@ model Store {
   procurementStockLedger ProcurementStockLedger[]
   activityLogs           ActivityLog[]
   safeTransactions       SafeTransaction[]
+  lateConfigs            LateEntryConfig[]
+  lateEntries            LateEntry[]
 
   @@index([tenantId])
 }
@@ -1954,10 +1964,18 @@ model Attendance {
   notes            String?
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
+  isLate           Boolean          @default(false)
+  lateMinutes      Int?
+  graceApplied     Int?
+  shiftStartTime   String?
+  lateEntryConfigId String?
+  exceptionId      String?
 
   user   User   @relation(fields: [userId], references: [id])
   tenant Tenant @relation(fields: [tenantId], references: [id])
   store  Store? @relation(fields: [storeId], references: [id])
+  lateEntryConfig LateEntryConfig? @relation(fields: [lateEntryConfigId], references: [id])
+  lateEntry       LateEntry?
 
   @@unique([userId, date])
   @@index([tenantId])
@@ -2021,4 +2039,102 @@ model VillageActivity {
   @@index([tenantId])
   @@index([userId])
   @@index([shiftLogId])
+}
+
+model LateEntryConfig {
+  id              String    @id @default(cuid())
+  tenantId        String    @default("VK001")
+  storeId         String?
+  scope           String    @default("COMPANY") // COMPANY | DEPARTMENT | SHIFT | ROLE
+  scopeValue      String?   // e.g. "SALES_AGENT", shift id, dept name
+  graceMins       Int       @default(10)
+  penaltyType     String    @default("COUNT") // COUNT | TIME | PROGRESSIVE
+  rules           Json      // array of rule objects
+  isActive        Boolean   @default(true)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  store           Store?    @relation(fields: [storeId], references: [id])
+  lateEntries     LateEntry[]
+  attendances     Attendance[]
+
+  @@index([tenantId])
+  @@index([storeId])
+}
+
+model LateEntry {
+  id              String      @id @default(cuid())
+  tenantId        String      @default("VK001")
+  storeId         String?
+  userId          String
+  attendanceId    String      @unique
+  configId        String?
+  date            String
+  shiftStart      String      // "09:00"
+  checkinTime     DateTime
+  lateMinutes     Int
+  monthlyCount    Int         // running count in that month
+  penaltyApplied  String      @default("NONE") // NONE | WARNING | HALF_DAY | FULL_DAY | LOP
+  penaltyValue    Float       @default(0)
+  isWaived        Boolean     @default(false)
+  waivedById      String?
+  waivedReason    String?
+  notified        Boolean     @default(false)
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  
+  user            User        @relation(fields: [userId], references: [id])
+  attendance      Attendance  @relation(fields: [attendanceId], references: [id])
+  config          LateEntryConfig? @relation(fields: [configId], references: [id])
+  tenant          Tenant      @relation(fields: [tenantId], references: [id])
+  store           Store?      @relation(fields: [storeId], references: [id])
+  exception       LateEntryException?
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+  @@index([storeId])
+}
+
+model LateEntryException {
+  id            String    @id @default(cuid())
+  tenantId      String    @default("VK001")
+  lateEntryId   String    @unique
+  userId        String
+  reason        String    // MANAGER_APPROVED | WFH | CLIENT_VISIT | BIOMETRIC_FAILURE | OTHER
+  description   String?
+  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedById  String?
+  approvedAt    DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  lateEntry     LateEntry @relation(fields: [lateEntryId], references: [id])
+  user          User      @relation("UserExceptions", fields: [userId], references: [id])
+  approvedBy    User?     @relation("ApprovedBy", fields: [approvedById], references: [id])
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+model LeaveBalance {
+  id            String    @id @default(cuid())
+  tenantId      String    @default("VK001")
+  userId        String
+  month         String    // "2026-04"
+  annualLeave   Float     @default(0)
+  sickLeave     Float     @default(0)
+  casualLeave   Float     @default(0)
+  lopDays       Float     @default(0)
+  halfDays      Float     @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  
+  user          User      @relation(fields: [userId], references: [id])
+  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, month])
+  @@index([tenantId])
 }

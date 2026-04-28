@@ -29,6 +29,9 @@ export const isWithinRadius = (pointLat, pointLon, centerLat, centerLon, radiusI
   return distance <= radiusInMeters;
 };
 
+const geoCache = new Map(); // Simple in-memory cache: "lat,lon" -> { address, expiry }
+const CACHE_TTL = 10 * 60 * 1000; // 10 minutes cache
+
 /**
  * Get place name from coordinates using Nominatim (OpenStreetMap)
  * @param {number} lat 
@@ -38,34 +41,66 @@ export const isWithinRadius = (pointLat, pointLon, centerLat, centerLon, radiusI
 export const reverseGeocode = async (lat, lon) => {
   if (!lat || !lon) return null;
   
+  // 1. Check Cache (Precision: 4 decimal places ~11m)
+  const cacheKey = `${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const cached = geoCache.get(cacheKey);
+  if (cached && (Date.now() < cached.expiry)) {
+    return cached.address;
+  }
+
   try {
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000); // 3s timeout
+    const timeout = setTimeout(() => controller.abort(), 10000); // Increased to 10s
 
     const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lon}&zoom=18&addressdetails=1`, {
       headers: {
-        'User-Agent': 'VillagKart-SalesTracker/1.0'
+        'User-Agent': 'VillagKart-SalesTracker/1.1 (shivm@villagkart.com)',
+        'Accept-Language': 'en'
       },
       signal: controller.signal
     });
     
     clearTimeout(timeout);
+    
+    if (!response.ok) {
+      throw new Error(`Nominatim API error: ${response.status}`);
+    }
+
     const data = await response.json();
     
     if (data && data.display_name) {
-      // Try to get a specific place name or road, otherwise fallback to display_name
-      const address = data.address;
-      const place = address.amenity || address.shop || address.building || address.road || address.suburb || address.neighbourhood;
-      const city = address.city || address.town || address.village || address.county;
+      const address = data.address || {};
       
-      if (place && city) {
-        return `${place}, ${city}`;
-      }
-      return data.display_name.split(',').slice(0, 2).join(', '); // Return first two parts for brevity
+      // Build a concise address
+      const parts = [];
+      const place = address.amenity || address.shop || address.building || address.office || address.tourism || address.leisure;
+      const road = address.road || address.pedestrian || address.highway;
+      const area = address.suburb || address.neighbourhood || address.residential || address.village;
+      const city = address.city || address.town || address.village || address.district;
+
+      if (place) parts.push(place);
+      if (road) parts.push(road);
+      if (area && !parts.includes(area)) parts.push(area);
+      if (city && !parts.includes(city)) parts.push(city);
+
+      let result = parts.length > 0 ? parts.join(', ') : data.display_name.split(',').slice(0, 3).join(', ');
+      
+      // Clean up duplicates if any
+      result = [...new Set(result.split(', '))].join(', ');
+
+      // Update Cache
+      geoCache.set(cacheKey, { address: result, expiry: Date.now() + CACHE_TTL });
+      
+      return result;
     }
     return null;
   } catch (error) {
-    console.error('[GeoUtils] Reverse geocode error:', error.name === 'AbortError' ? 'Timeout' : error.message);
+    const errorMsg = error.name === 'AbortError' ? 'Timeout (10s)' : error.message;
+    console.error(`[GeoUtils] Reverse geocode failed for ${lat},${lon}:`, errorMsg);
+    
+    // Return most recent cache entry for this area even if expired, as a fallback
+    if (cached) return cached.address;
+    
     return null;
   }
 };

@@ -61,6 +61,22 @@ export const admin = (req, res, next) => {
     }
 };
 
+export const authorize = (...roles) => {
+  return (req, res, next) => {
+    if (!req.user || !roles.includes(req.user.role)) {
+      // Check custom role portal type too for backward/forward compatibility
+      const pType = req.user?.customRole?.portalType;
+      if (roles.includes(pType)) {
+        return next();
+      }
+      
+      res.status(403);
+      return next(new Error('Not authorized to access this route'));
+    }
+    next();
+  };
+};
+
 // Permission check middleware factory
 // Usage: checkPermission('INVENTORY', 'CREATE')
 export const checkPermission = (moduleName, action) => {

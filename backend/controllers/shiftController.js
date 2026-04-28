@@ -213,7 +213,7 @@ export const getShiftStatus = async (req, res, next) => {
     const userId = req.user.id;
     const dateStr = format(new Date(), 'yyyy-MM-dd');
 
-    const [activeShift, shifts] = await Promise.all([
+    const [activeShift, attendance, shifts] = await Promise.all([
       prisma.shiftLog.findFirst({
         where: {
           userId,
@@ -228,10 +228,21 @@ export const getShiftStatus = async (req, res, next) => {
           }
         }
       }),
+      prisma.attendance.findUnique({
+        where: { userId_date: { userId, date: dateStr } }
+      }),
       getShiftsConfig(req.user.tenantId, req.user.storeId)
     ]);
 
-    res.json({ activeShift, shifts });
+    res.json({ 
+      activeShift, 
+      attendance: attendance ? {
+        isLate: attendance.isLate,
+        lateMinutes: attendance.lateMinutes,
+        punchInTime: attendance.punchInTime
+      } : null,
+      shifts 
+    });
   } catch (error) {
     console.error('getShiftStatus error:', error);
     next(error);

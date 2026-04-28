@@ -1,5 +1,6 @@
 import prisma from '../utils/prisma.js';
 import { reverseGeocode } from '../utils/geoUtils.js';
+import { getIO } from '../services/socketService.js';
 
 /**
  * @desc    Log current location (Breadcrumb)
@@ -20,7 +21,7 @@ export const logLocation = async (req, res, next) => {
 
     const subLocation = await reverseGeocode(lat, lon);
 
-    await prisma.locationLog.create({
+    const log = await prisma.locationLog.create({
       data: {
         tenantId: req.user.tenantId,
         userId,
@@ -29,8 +30,22 @@ export const logLocation = async (req, res, next) => {
         accuracy,
         subLocation,
         timestamp: new Date()
+      },
+      include: {
+        user: { select: { name: true } }
       }
     });
+
+    // Real-time update via Socket.IO
+    try {
+      const io = getIO();
+      io.to(`role:ADMIN`).emit('locationUpdate', {
+        ...log,
+        long: log.long // Ensure consistency with frontend 'long' property
+      });
+    } catch (ioError) {
+      console.warn('[Socket] Could not emit location update:', ioError.message);
+    }
 
     res.status(201).json({ status: 'success' });
   } catch (error) {
@@ -67,6 +82,45 @@ export const getLiveLocations = async (req, res, next) => {
     });
 
     res.json(latestLogs);
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @desc    Get location history for current day (Breadcrumbs)
+ * @route   GET /api/location/history
+ * @access  Admin
+ */
+export const getLocationHistory = async (req, res, next) => {
+  try {
+    const { storeId, date } = req.query;
+    const tenantId = req.user.tenantId;
+
+    // Default to today IST
+    const start = date ? new Date(date) : new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
+    end.setHours(23, 59, 59, 999);
+
+    const logs = await prisma.locationLog.findMany({
+      where: {
+        tenantId,
+        timestamp: {
+          gte: start,
+          lte: end
+        },
+        user: storeId ? { storeId } : {}
+      },
+      orderBy: { timestamp: 'asc' },
+      include: {
+        user: {
+          select: { id: true, name: true }
+        }
+      }
+    });
+
+    res.json(logs);
   } catch (error) {
     next(error);
   }
