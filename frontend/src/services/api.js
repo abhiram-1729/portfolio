@@ -40,25 +40,17 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Logic: If we are on the Success page, DON'T redirect immediately.
-      // This prevents the 'Redirect to Login' issue where a background fetch fails.
       if (window.location.pathname.includes('/success')) {
         console.warn('[API Interceptor] 401 Error on Success page. Skipping logout to preserve order view.');
         return Promise.reject(error);
       }
       
-      // If we are ALREADY on the login page, don't hard refresh the browser
       if (window.location.pathname.includes('/login')) {
         console.warn('[API Interceptor] 401 Error during login attempt. Relaying error to component.');
         return Promise.reject(error);
       }
 
-      // 🛡️ CRITICAL FIX: To prevent infinite reload loops, we MUST clear the Zustand persisted storage
-      // simply doing localStorage.removeItem('token') is not enough because Zustand 'user-storage' 
-      // will restore it on the next page load.
       useUserStore.getState().clearUser();
-      
-      // Force a clean redirect to login
       window.location.href = '/login';
     }
     return Promise.reject(error);
@@ -67,6 +59,7 @@ api.interceptors.response.use(
 
 export const authAPI = {
   login: (data) => api.post('/auth/login', data),
+  register: (data) => api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/password', data),
@@ -93,12 +86,10 @@ export const ordersAPI = {
   completePayment: (data) => api.post('/orders/complete-payment', data),
   getById: (id) => api.get(`/orders/${id}`),
   getMyHistory: (params) => api.get('/orders/my-history', { params }),
-  // V2.0 — Order Mutations
   editItem: (orderId, itemId, data) => api.put(`/orders/${orderId}/items/${itemId}`, data),
   removeItem: (orderId, itemId) => api.delete(`/orders/${orderId}/items/${itemId}`),
   returnItems: (orderId, data) => api.post(`/orders/${orderId}/return`, data),
   cancelOrder: (orderId, data) => api.post(`/orders/${orderId}/cancel`, data),
-  // V2.0 — Reports & Session
   getSessionSales: (params) => api.get('/orders/session-sales', { params }),
   getReturnReport: (params) => api.get('/orders/return-report', { params }),
   getItemWiseReport: (params) => api.get('/orders/item-wise-report', { params }),
@@ -137,6 +128,11 @@ export const attendanceAPI = {
   getToday: () => api.get('/attendance/today'),
   getMyHistory: (params) => api.get('/attendance/my-history', { params }),
   getAll: (params) => api.get('/attendance/all', { params }),
+};
+
+export const storeAPI = {
+  create: (data) => api.post('/tenant/stores', data),
+  getMyStores: () => api.get('/tenant/stores'),
 };
 
 export default api;

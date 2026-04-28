@@ -21,6 +21,7 @@ import {
   Briefcase,
   Store,
   Shield,
+  PlayCircle,
   History as HistoryIcon
 } from 'lucide-react';
 
@@ -56,6 +57,7 @@ export default function TenantLayout() {
     { to: '/tenant/reports', icon: BarChart3, label: 'Analytics' },
     { to: '/tenant/activity-logs', icon: HistoryIcon, label: 'Audit Trail' },
     { to: '/tenant/notifications', icon: Bell, label: 'System Logs' },
+    { to: '/tenant/onboarding', icon: PlayCircle, label: 'Onboarding' },
     { to: '/tenant/settings', icon: Settings, label: 'Org Settings' },
   ];
 

@@ -5,6 +5,9 @@ import { useUserStore } from './store/userStore';
 import { useCartStore } from './store/cartStore';
 import { useNotificationStore } from './store/notificationStore';
 import Login from './pages/Login';
+import Register from './pages/Register';
+import LandingPage from './pages/LandingPage';
+import CreateBusiness from './pages/CreateBusiness';
 import SalesEntry from './pages/SalesEntry';
 import InvoicePreview from './pages/InvoicePreview';
 import PaymentScreen from './pages/PaymentScreen';
@@ -51,6 +54,7 @@ import SalesHistory from './pages/SalesHistory';
 import OrderDetail from './pages/OrderDetail';
 import AgentAttendance from './pages/AgentAttendance';
 import AdminAttendance from './pages/admin/AdminAttendance';
+import TenantOnboarding from './pages/tenant/TenantOnboarding';
 
 // Admin Reports
 import OverviewReport from './pages/admin/adminreports/OverviewReport';
@@ -83,7 +87,7 @@ function AdminRoute({ children }) {
     user?.portalType === 'SUPERVISOR';
 
   if (!isAuthorized) {
-     return <Navigate to="/" replace />;
+     return <Navigate to="/home" replace />;
   }
   return children;
 }
@@ -91,7 +95,7 @@ function AdminRoute({ children }) {
 function TenantRoute({ children }) {
   const { token, user } = useUserStore();
   if (!token) return <Navigate to="/login" replace />;
-  if (user?.role !== 'TENANT_OWNER') return <Navigate to="/" replace />;
+  if (user?.role !== 'TENANT_OWNER') return <Navigate to="/home" replace />;
   return children;
 }
 
@@ -117,12 +121,10 @@ export default function App() {
   }, [token, init, disconnectSocket]);
 
   useEffect(() => {
-    // 🛡️ Anti-leak protection: If the logged-in user doesn't own this cart storage (e.g. they switched accounts in the same browser), wipe it immediately.
     if (user && user.id !== cartOwnerId) {
       clearCart();
       setCartOwner(user.id);
     } else if (!user && cartOwnerId) {
-      // If logged out entirely, clear the owner
       setCartOwner(null);
     }
   }, [user, cartOwnerId, clearCart, setCartOwner]);
@@ -142,10 +144,12 @@ export default function App() {
       />
       <Routes>
         <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
+        <Route path="/register" element={token ? <Navigate to="/" replace /> : <Register />} />
+        <Route path="/home" element={<LandingPage />} />
+        <Route path="/create-business" element={<TenantRoute><CreateBusiness /></TenantRoute>} />
         
-        {/* Root Route: If not logged in, show Login. If logged in, wrap in Layout */}
         <Route path="/" element={
-          !token ? <Login /> : 
+          !token ? <Navigate to="/home" replace /> : 
           (user?.portalType === 'ADMIN' || user?.role === 'ADMIN') ? <Navigate to="/admin" replace /> :
           (user?.portalType === 'SUPERVISOR') ? <Navigate to="/admin" replace /> : 
           (user?.portalType === 'HELPER') ? <PrivateRoute><AgentLayout /></PrivateRoute> :
@@ -175,7 +179,6 @@ export default function App() {
         <Route path="/payment" element={<PrivateRoute><PaymentScreen /></PrivateRoute>} />
         <Route path="/success/:id" element={<PrivateRoute><SuccessScreen /></PrivateRoute>} />
         
-        {/* Admin Routes */}
           <Route path="/admin" element={<AdminRoute><AdminLayout /></AdminRoute>}>
             <Route index element={<AdminDashboard />} />
             <Route path="pos" element={<AdminPOS />} />
@@ -213,7 +216,6 @@ export default function App() {
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="privileges" element={<TenantPrivileges />} />
         </Route>
-        {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
           <Route index element={<TenantDashboard />} />
           <Route path="stores" element={<TenantStores />} />
@@ -238,12 +240,12 @@ export default function App() {
           <Route path="privileges" element={<TenantPrivileges />} />
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
-          {/* Tenant specifically wants to manage Admins */}
           <Route path="admins" element={<AdminUsers type="admin" />} /> 
           <Route path="activity-logs" element={<TenantActivityLogs />} />
+          <Route path="onboarding" element={<TenantOnboarding />} />
         </Route>
 
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="*" element={<Navigate to="/home" replace />} />
       </Routes>
     </BrowserRouter>
   );

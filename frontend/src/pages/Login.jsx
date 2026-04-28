@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { Lock, Phone } from 'lucide-react';
+import { Lock, Phone, ArrowLeft } from 'lucide-react';
 import toast from 'react-hot-toast';
 import logo from '../assets/VillagKart_Logo.png';
 
@@ -144,6 +144,16 @@ export default function Login() {
               </span>
             </button>
           </form>
+
+          <div className="mt-8 flex justify-center">
+            <Link 
+              to="/home" 
+              className="flex items-center gap-2 text-emerald-600 hover:text-emerald-800 font-black text-xs uppercase tracking-[0.2em] transition-all group"
+            >
+              <ArrowLeft size={14} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" />
+              Back to Home
+            </Link>
+          </div>
         </div>
 
         {/* Footer Info */}

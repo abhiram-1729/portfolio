@@ -73,6 +73,73 @@ export const loginUser = async (req, res, next) => {
     }
 };
 
+// @desc    Register a new user (Tenant Owner)
+// @route   POST /api/auth/register
+// @access  Public
+export const registerUser = async (req, res, next) => {
+    try {
+        const { name, surname, mobile, gender, password, email } = req.body;
+
+        if (!mobile || !password || !name) {
+            res.status(400);
+            throw new Error('Please provide name, mobile and password');
+        }
+
+        const userExists = await prisma.user.findUnique({ where: { mobile } });
+        if (userExists) {
+            res.status(400);
+            throw new Error('User with this mobile number already exists');
+        }
+
+        // Generate a unique tenant code
+        const tenantCount = await prisma.tenant.count();
+        const tenantCode = `VK${String(tenantCount + 1).padStart(3, '0')}`;
+
+        // Create Tenant first
+        const tenant = await prisma.tenant.create({
+            data: {
+                name: `${name}'s Business`,
+                code: tenantCode,
+                contactPhone: mobile,
+                contactEmail: email || null,
+            }
+        });
+
+        // Hash password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+
+        // Create User
+        const user = await prisma.user.create({
+            data: {
+                name: `${name} ${surname || ''}`.trim(),
+                mobile,
+                email: email || `${mobile}@villagkart.com`, // Email is unique in schema, provide fallback
+                password: hashedPassword,
+                role: 'TENANT_OWNER',
+                tenantId: tenant.id,
+                status: 'ACTIVE'
+            },
+            include: { tenant: true }
+        });
+
+        const token = generateToken(user.id, user.role, null, user.tenantId);
+
+        res.status(201).json({
+            id: user.id,
+            tenantId: user.tenantId,
+            tenantName: user.tenant?.name,
+            name: user.name,
+            mobile: user.mobile,
+            role: user.role,
+            token: token,
+        });
+
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc    Logout user / clear cookie or token (using token so frontend clears it)
 // @route   POST /api/auth/logout
 // @access  Private
