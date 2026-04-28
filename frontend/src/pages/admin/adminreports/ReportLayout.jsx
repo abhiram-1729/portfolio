@@ -24,8 +24,8 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
 
   return (
     <div className="min-h-screen bg-[#FDFDFD] pb-20">
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-30 backdrop-blur-md bg-opacity-80">
-        <div className="max-w-[1600px] mx-auto px-6 py-6 flex items-center justify-between">
+      <div className="bg-white border-b border-gray-100 sticky top-[64px] z-40 backdrop-blur-md bg-opacity-80">
+        <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div>
             <div className="flex items-center gap-3 mb-1">
                <div className="p-2.5 rounded-2xl bg-emerald-600 text-white shadow-lg shadow-emerald-200"><Icon size={24} strokeWidth={2.5} /></div>
@@ -41,7 +41,7 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
         </div>
       </div>
 
-      <div className="max-w-[1600px] mx-auto px-6 py-10">
+      <div className="max-w-[1600px] mx-auto px-6 pt-10 pb-10">
         <div className="mb-8 flex items-end justify-between">
           <div>
             <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase mb-2">{title}</h2>
