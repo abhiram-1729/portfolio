@@ -117,13 +117,24 @@ class LateEntryEngine {
 
     if (!settings || !settings.shifts) return null;
 
-    // Simple heuristic: pick the first active shift or "Morning"
-    // In a real app, this would match based on routeAssignment or user's assigned shift
-    const shifts = settings.shifts;
-    if (Array.isArray(shifts) && shifts.length > 0) {
-      return shifts[0]; 
-    }
-    return null;
+    const shifts = Array.isArray(settings.shifts) ? settings.shifts : [];
+    if (shifts.length === 0) return null;
+
+    // Pick the shift that matches the current time best
+    const now = new Date();
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Find the shift where startTime <= currentTime <= endTime
+    const activeShift = shifts.find(s => {
+      const [startH, startM] = s.startTime.split(':').map(Number);
+      const [endH, endM] = (s.endTime || '23:59').split(':').map(Number);
+      const startMin = startH * 60 + startM;
+      const endMin = endH * 60 + endM;
+      
+      return currentMinutes >= startMin - 60 && currentMinutes <= endMin; // Allow 1 hour buffer before start
+    });
+
+    return activeShift || shifts[0];
   }
 
   async _getLateEntryConfig(tenantId, storeId, user) {
@@ -183,19 +194,37 @@ class LateEntryEngine {
     const rules = config.rules;
     if (!Array.isArray(rules)) return { penaltyApplied: 'NONE', penaltyValue: 0 };
 
-    if (config.penaltyType === 'COUNT') {
-      const matchedRule = [...rules]
+    // Support PROGRESSIVE logic: multiple rules can exist. 
+    // We pick the most severe penalty that applies.
+    
+    let matchedRule = null;
+
+    if (config.penaltyType === 'COUNT' || config.penaltyType === 'PROGRESSIVE') {
+      const countRule = [...rules]
+        .filter(r => r.threshold !== undefined)
         .sort((a, b) => b.threshold - a.threshold)
         .find(r => count >= r.threshold);
       
-      if (matchedRule) {
-        return { penaltyApplied: matchedRule.penalty, penaltyValue: matchedRule.value };
+      if (countRule) matchedRule = countRule;
+    } 
+    
+    // If no count rule matched, or if we want to check time-based as well
+    if (config.penaltyType === 'TIME' || (config.penaltyType === 'PROGRESSIVE' && !matchedRule)) {
+      const timeRule = [...rules]
+        .filter(r => r.minMins !== undefined)
+        .sort((a, b) => b.minMins - a.minMins)
+        .find(r => lateMinutes >= r.minMins);
+      
+      if (timeRule) {
+        // If we already have a count rule, pick the one with higher penalty value
+        if (!matchedRule || timeRule.value > matchedRule.value) {
+          matchedRule = timeRule;
+        }
       }
-    } else if (config.penaltyType === 'TIME') {
-      const matchedRule = rules.find(r => lateMinutes >= r.minMins && lateMinutes <= (r.maxMins || 999999));
-      if (matchedRule) {
-        return { penaltyApplied: matchedRule.penalty, penaltyValue: matchedRule.value };
-      }
+    }
+    
+    if (matchedRule) {
+      return { penaltyApplied: matchedRule.penalty, penaltyValue: matchedRule.value };
     }
     
     return { penaltyApplied: 'NONE', penaltyValue: 0 };

@@ -43,9 +43,15 @@ const AdminLateEntryConfig = () => {
   };
 
   const addRule = () => {
-    const newRule = config.penaltyType === 'COUNT' 
-      ? { threshold: 3, penalty: 'HALF_DAY', value: 0.5 }
-      : { minMins: 30, maxMins: 60, penalty: 'HALF_DAY', value: 0.5 };
+    let newRule;
+    if (config.penaltyType === 'COUNT') {
+      newRule = { threshold: 3, penalty: 'HALF_DAY', value: 0.5 };
+    } else if (config.penaltyType === 'TIME') {
+      newRule = { minMins: 30, maxMins: 60, penalty: 'HALF_DAY', value: 0.5 };
+    } else {
+      // PROGRESSIVE
+      newRule = { threshold: 1, minMins: 15, penalty: 'WARNING', value: 0 };
+    }
     
     setConfig({ ...config, rules: [...config.rules, newRule] });
   };
@@ -98,6 +104,7 @@ const AdminLateEntryConfig = () => {
               >
                 <option value="COUNT">Count-based (e.g., 3rd time late)</option>
                 <option value="TIME">Time-based (e.g., 30 mins late)</option>
+                <option value="PROGRESSIVE">Progressive (Multi-tier hybrid)</option>
               </select>
             </div>
           </div>
@@ -185,7 +192,7 @@ const AdminLateEntryConfig = () => {
                         onChange={(e) => updateRule(index, 'threshold', e.target.value)}
                       />
                     </div>
-                  ) : (
+                  ) : config.penaltyType === 'TIME' ? (
                     <div className="flex-1 flex items-center gap-2">
                       <span className="text-sm text-gray-600">Between</span>
                       <input 
@@ -202,6 +209,26 @@ const AdminLateEntryConfig = () => {
                         onChange={(e) => updateRule(index, 'maxMins', e.target.value)}
                       />
                       <span className="text-sm text-gray-600">mins late</span>
+                    </div>
+                  ) : (
+                    // PROGRESSIVE
+                    <div className="flex-1 flex flex-col gap-2">
+                       <div className="flex items-center gap-2">
+                          <span className="text-[10px] uppercase font-bold text-gray-400">If Count ≥</span>
+                          <input 
+                            type="number"
+                            className="w-14 px-2 py-1 rounded border text-xs"
+                            value={rule.threshold ?? ''}
+                            onChange={(e) => updateRule(index, 'threshold', e.target.value)}
+                          />
+                          <span className="text-[10px] uppercase font-bold text-gray-400">OR Mins ≥</span>
+                          <input 
+                            type="number"
+                            className="w-14 px-2 py-1 rounded border text-xs"
+                            value={rule.minMins ?? ''}
+                            onChange={(e) => updateRule(index, 'minMins', e.target.value)}
+                          />
+                       </div>
                     </div>
                   )}
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Navigation, MapPin, Loader2, Zap, Users, ShieldCheck, UserMinus, Monitor, RefreshCw } from 'lucide-react';
+import { Navigation, MapPin, Loader2, Zap, Users, ShieldCheck, UserMinus, Monitor, RefreshCw, ChevronDown, History, ChevronRight } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, InfoWindow, Polyline, CircleF, MarkerClusterer } from '@react-google-maps/api';
 import { format, formatDistanceToNow } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
@@ -29,6 +29,14 @@ export default function LocationTrackingReport() {
     const [isLoading, setIsLoading] = useState(false);
     const [subTab, setSubTab] = useState('live-map'); // 'live-map' | 'history'
     const [historyTab, setHistoryTab] = useState('logs'); // 'logs' | 'visits' | 'deviation'
+    const [expandedAgents, setExpandedAgents] = useState({});
+
+    const toggleAgentExpand = (userId) => {
+        setExpandedAgents(prev => ({
+            ...prev,
+            [userId]: !prev[userId]
+        }));
+    };
     const [searchParams] = useSearchParams();
     const [activeAgent, setActiveAgent] = useState(null);
     const [selectedHistoryPoint, setSelectedHistoryPoint] = useState(null);
@@ -446,54 +454,104 @@ export default function LocationTrackingReport() {
                                         Last Refreshed: {format(lastSync, 'hh:mm:ss a')}
                                     </div>
                                 </div>
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="bg-gray-50/50">
-                                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Agent</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Village</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sub-Location / Landmark</th>
-                                                <th className="px-6 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Timestamp</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {(function() {
-                                                const grouped = breadcrumbHistory.reduce((acc, log) => {
-                                                    const uid = log.userId;
-                                                    if (!acc[uid]) acc[uid] = [];
-                                                    acc[uid].push(log);
-                                                    return acc;
-                                                }, {});
-                                                
-                                                const filteredLogs = Object.values(grouped).flatMap(userLogs => 
-                                                    userLogs.sort((a, b) => new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt)).slice(0, 2)
-                                                ).sort((a, b) => new Date(b.timestamp || b.createdAt) - new Date(a.timestamp || a.createdAt));
+                                <div className="divide-y divide-gray-50">
+                                    {(function() {
+                                        const grouped = breadcrumbHistory.reduce((acc, log) => {
+                                            const uid = log.userId;
+                                            if (!acc[uid]) acc[uid] = [];
+                                            acc[uid].push(log);
+                                            return acc;
+                                        }, {});
 
-                                                return filteredLogs.map((log, i) => (
-                                                    <tr key={i} className="hover:bg-gray-50 transition-colors">
-                                                        <td className="px-6 py-4 text-sm font-black text-gray-800">{log.user?.name}</td>
-                                                        <td className="px-6 py-4 text-sm font-bold text-gray-600">
-                                                            <div className="flex items-center gap-2">
-                                                                <MapPin size={12} className="text-rose-500" />
-                                                                <span>{log.villageName || 'In-Transit'}</span>
+                                        const sortedGroups = Object.entries(grouped).sort((a, b) => {
+                                            const latestA = new Date(a[1][0].time || a[1][0].createdAt || a[1][0].timestamp);
+                                            const latestB = new Date(b[1][0].time || b[1][0].createdAt || b[1][0].timestamp);
+                                            return latestB - latestA;
+                                        });
+
+                                        return sortedGroups.map(([userId, logs]) => {
+                                            const isExpanded = expandedAgents[userId];
+                                            const latestLog = logs[0];
+                                            
+                                            return (
+                                                <div key={userId} className="group transition-all">
+                                                    <button 
+                                                        onClick={() => toggleAgentExpand(userId)}
+                                                        className="w-full flex items-center justify-between p-5 hover:bg-gray-50 transition-colors text-left"
+                                                    >
+                                                        <div className="flex items-center gap-4">
+                                                            <div className="w-10 h-10 rounded-2xl bg-emerald-100 flex items-center justify-center text-emerald-600 font-black shadow-sm group-hover:scale-110 transition-transform">
+                                                                {latestLog.user?.name?.[0]}
                                                             </div>
-                                                        </td>
-                                                        <td className="px-6 py-4 text-[11px] font-medium text-gray-500 italic max-w-[200px] truncate">
-                                                            {log.subLocation || '---'}
-                                                        </td>
-                                                        <td className="px-6 py-4 text-xs font-bold text-gray-400">
-                                                            {format(new Date(log.time || log.createdAt || log.timestamp), 'hh:mm a')}
-                                                        </td>
-                                                    </tr>
-                                                ));
-                                            })()}
-                                            {breadcrumbHistory.length === 0 && (
-                                                <tr>
-                                                    <td colSpan="4" className="px-6 py-20 text-center text-gray-400 font-bold uppercase text-[10px] tracking-widest opacity-50">No geo-logs recorded for this period</td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
+                                                            <div>
+                                                                <h4 className="text-sm font-black text-gray-900 tracking-tight">{latestLog.user?.name}</h4>
+                                                                <div className="flex items-center gap-2 mt-0.5">
+                                                                    <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 rounded-full">
+                                                                        <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                                                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{logs.length} Recent Logs</span>
+                                                                    </div>
+                                                                    <span className="text-[9px] font-bold text-gray-300">•</span>
+                                                                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest italic">
+                                                                        Last ping {formatDistanceToNow(new Date(latestLog.time || latestLog.createdAt || latestLog.timestamp), { addSuffix: true })}
+                                                                    </span>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <div className={`p-2 rounded-xl bg-gray-50 text-gray-400 transition-all ${isExpanded ? 'rotate-180 text-emerald-600 bg-emerald-50' : ''}`}>
+                                                            <ChevronDown size={18} strokeWidth={3} />
+                                                        </div>
+                                                    </button>
+
+                                                    {isExpanded && (
+                                                        <div className="px-5 pb-5 animate-in slide-in-from-top-2 duration-300">
+                                                            <div className="rounded-2xl border border-gray-100 bg-gray-50/30 overflow-hidden">
+                                                                <table className="w-full text-left border-collapse">
+                                                                    <thead>
+                                                                        <tr className="bg-gray-100/50">
+                                                                            <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Village</th>
+                                                                            <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Landmark / Sub-Location</th>
+                                                                            <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Time</th>
+                                                                        </tr>
+                                                                    </thead>
+                                                                    <tbody className="divide-y divide-gray-100">
+                                                                        {logs.slice(0, 5).map((log, idx) => (
+                                                                            <tr key={idx} className="hover:bg-white transition-colors">
+                                                                                <td className="px-4 py-3">
+                                                                                    <div className="flex items-center gap-2">
+                                                                                        <div className="w-6 h-6 rounded-lg bg-rose-50 flex items-center justify-center">
+                                                                                            <MapPin size={12} className="text-rose-500" />
+                                                                                        </div>
+                                                                                        <span className="text-xs font-black text-gray-700">{log.villageName || 'In-Transit'}</span>
+                                                                                    </div>
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-[10px] font-bold text-gray-500 italic truncate max-w-[200px]">
+                                                                                    {log.subLocation || '---'}
+                                                                                </td>
+                                                                                <td className="px-4 py-3 text-[10px] font-black text-gray-400">
+                                                                                    {format(new Date(log.time || log.createdAt || log.timestamp), 'hh:mm:ss a')}
+                                                                                </td>
+                                                                            </tr>
+                                                                        ))}
+                                                                    </tbody>
+                                                                </table>
+                                                                {logs.length > 5 && (
+                                                                    <div className="px-4 py-2 bg-gray-100/50 text-center">
+                                                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest italic">Showing latest 5 of {logs.length} logs</span>
+                                                                    </div>
+                                                                )}
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        });
+                                    })()}
+                                    {breadcrumbHistory.length === 0 && (
+                                        <div className="py-20 text-center bg-gray-50/30">
+                                            <History size={40} className="mx-auto text-gray-200 mb-3 opacity-50" />
+                                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest opacity-50">No geo-logs recorded for this period</p>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}

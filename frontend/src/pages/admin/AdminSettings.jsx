@@ -957,6 +957,19 @@ export default function AdminSettings() {
       }
     };
 
+    const handleToggleShiftStatus = async (id) => {
+      const updatedShifts = settings.shifts.map(s => 
+        s.id === id ? { ...s, isActive: s.isActive === false } : s
+      );
+      try {
+        await adminAPI.updateSettings({ ...settings, shifts: updatedShifts, storeId: currentUser?.storeId });
+        setSettings({ ...settings, shifts: updatedShifts });
+        toast.success('Shift status updated');
+      } catch (err) {
+        toast.error('Failed to update status');
+      }
+    };
+
     const handleEditShift = (shift) => {
       setShiftForm({
         type: shift.type || (shift.sessions?.length > 1 ? 'MULTI_SESSION' : 'STANDARD'),
@@ -1128,9 +1141,17 @@ export default function AdminSettings() {
 
               <div className="flex items-center justify-between mb-1">
                 <h4 className="text-sm font-black text-gray-900">{shift.name}</h4>
-                <div className={`px-2 py-0.5 rounded-full border text-[8px] font-black uppercase tracking-widest ${shift.isActive !== false ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-500'}`}>
+                <button 
+                  onClick={() => handleToggleShiftStatus(shift.id)}
+                  className={`px-3 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 ${
+                    shift.isActive !== false 
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100' 
+                      : 'bg-rose-50 border-rose-100 text-rose-500 hover:bg-rose-100'
+                  }`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${shift.isActive !== false ? 'bg-emerald-500' : 'bg-rose-500'} ${shift.isActive !== false ? 'animate-pulse' : ''}`}></div>
                   {shift.isActive !== false ? 'Active' : 'Inactive'}
-                </div>
+                </button>
               </div>
               <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4">
                 {shift.type === 'MULTI_SESSION' ? 'Multi-Session Shift' : 'Standard Shift'}

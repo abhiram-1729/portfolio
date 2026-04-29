@@ -6,6 +6,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
   BarChart, Bar, Cell, PieChart, Pie, Legend 
 } from 'recharts';
+import { Edit, X, Save, User, Clock, Calendar, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 const AdminLateEntryReport = () => {
   const [records, setRecords] = useState([]);
@@ -17,6 +18,18 @@ const AdminLateEntryReport = () => {
   });
   const [stats, setStats] = useState({ dailyTrend: [], penaltyDistribution: [], exceptions: [] });
   const [topOffenders, setTopOffenders] = useState([]);
+  const [editingRecord, setEditingRecord] = useState(null);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [editForm, setEditForm] = useState({
+    userId: '',
+    date: '',
+    shiftStart: '',
+    checkinTime: '',
+    lateMinutes: '',
+    penaltyApplied: '',
+    penaltyValue: '',
+    isWaived: false
+  });
 
   useEffect(() => {
     fetchReport();
@@ -58,6 +71,34 @@ const AdminLateEntryReport = () => {
       }
     } catch (err) {
       toast.error('Failed to update exception');
+    }
+  };
+
+  const handleEdit = (record) => {
+    setEditingRecord(record);
+    setEditForm({
+      userId: record.userId,
+      date: record.date,
+      shiftStart: record.shiftStart,
+      checkinTime: record.checkinTime ? format(new Date(record.checkinTime), "yyyy-MM-dd'T'HH:mm") : '',
+      lateMinutes: record.lateMinutes,
+      penaltyApplied: record.penaltyApplied,
+      penaltyValue: record.penaltyValue,
+      isWaived: record.isWaived
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdate = async () => {
+    try {
+      const res = await lateEntryService.updateRecord(editingRecord.id, editForm);
+      if (res.success) {
+        toast.success('Late entry updated');
+        setShowEditModal(false);
+        fetchReport();
+      }
+    } catch (err) {
+      toast.error('Failed to update record');
     }
   };
 
@@ -162,6 +203,7 @@ const AdminLateEntryReport = () => {
                 <th className="px-6 py-4">Check-In</th>
                 <th className="px-6 py-4">Late Mins</th>
                 <th className="px-6 py-4">Penalty</th>
+                <th className="px-6 py-4">Waiver Reason</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
               </tr>
@@ -179,7 +221,7 @@ const AdminLateEntryReport = () => {
                   <td className="px-6 py-4 text-gray-600 text-sm">{format(new Date(record.checkinTime), 'HH:mm')}</td>
                   <td className="px-6 py-4">
                     <span className="px-2 py-1 bg-red-50 text-red-600 rounded text-xs font-bold">
-                      {record.lateMinutes} mins
+                      {record.lateMinutes < 60 ? `${record.lateMinutes} mins` : `${Math.floor(record.lateMinutes / 60)} hr ${record.lateMinutes % 60 > 0 ? `${record.lateMinutes % 60} mins` : ''}`}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -188,33 +230,58 @@ const AdminLateEntryReport = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {record.isWaived ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase">Waived</span>
-                    ) : record.exception?.status === 'PENDING' ? (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase">Pending Appr.</span>
+                    {record.exception ? (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">{record.exception.reason?.replace('_', ' ')}</span>
+                        {record.exception.description && (
+                          <span className="text-[9px] text-slate-400 italic truncate max-w-[150px]" title={record.exception.description}>
+                            "{record.exception.description}"
+                          </span>
+                        )}
+                      </div>
+                    ) : record.isWaived && record.waivedReason ? (
+                      <span className="text-[10px] text-slate-400 italic">"{record.waivedReason}"</span>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-[10px] font-bold uppercase">Applied</span>
+                      <span className="text-[10px] text-slate-300">---</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
-                    {record.exception?.status === 'PENDING' && (
-                      <div className="flex items-center gap-2">
-                        <button 
-                          onClick={() => handleReview(record.exception.id, 'APPROVED')}
-                          className="p-1 text-green-600 hover:bg-green-50 rounded"
-                          title="Approve Exception"
-                        >
-                          ✅
-                        </button>
-                        <button 
-                          onClick={() => handleReview(record.exception.id, 'REJECTED')}
-                          className="p-1 text-red-600 hover:bg-red-50 rounded"
-                          title="Reject Exception"
-                        >
-                          ❌
-                        </button>
-                      </div>
+                    {record.isWaived ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase w-fit">Waived</span>
+                    ) : record.exception?.status === 'PENDING' ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase w-fit">Pending Appr.</span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-[10px] font-bold uppercase w-fit">Applied</span>
                     )}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      <button 
+                        onClick={() => handleEdit(record)}
+                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                        title="Edit Record"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      {record.exception?.status === 'PENDING' && (
+                        <>
+                          <button 
+                            onClick={() => handleReview(record.exception.id, 'APPROVED')}
+                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            title="Approve Exception"
+                          >
+                            ✅
+                          </button>
+                          <button 
+                            onClick={() => handleReview(record.exception.id, 'REJECTED')}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Reject Exception"
+                          >
+                            ❌
+                          </button>
+                        </>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -222,6 +289,133 @@ const AdminLateEntryReport = () => {
           </table>
         </div>
       </div>
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden">
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center text-blue-600">
+                  <Edit size={20} />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 tracking-tight">Edit Late Entry</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Update record manually</p>
+                </div>
+              </div>
+              <button onClick={() => setShowEditModal(false)} className="p-2 hover:bg-slate-100 rounded-full text-slate-400 transition-colors">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="p-8 space-y-6 max-h-[70vh] overflow-y-auto">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Employee Name</label>
+                  <div className="px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 flex items-center gap-2">
+                    <User size={14} className="text-slate-400" />
+                    {editingRecord?.user?.name}
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date</label>
+                  <input 
+                    type="date"
+                    value={editForm.date}
+                    onChange={e => setEditForm({...editForm, date: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Shift Start</label>
+                  <input 
+                    type="text"
+                    value={editForm.shiftStart}
+                    onChange={e => setEditForm({...editForm, shiftStart: e.target.value})}
+                    placeholder="e.g. 09:00 AM"
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-In Time</label>
+                  <input 
+                    type="datetime-local"
+                    value={editForm.checkinTime}
+                    onChange={e => setEditForm({...editForm, checkinTime: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Late Minutes</label>
+                  <input 
+                    type="number"
+                    value={editForm.lateMinutes}
+                    onChange={e => setEditForm({...editForm, lateMinutes: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Waive Status</label>
+                  <button 
+                    onClick={() => setEditForm({...editForm, isWaived: !editForm.isWaived})}
+                    className={`w-full px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${editForm.isWaived ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
+                  >
+                    {editForm.isWaived ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
+                    {editForm.isWaived ? 'Waived' : 'Active'}
+                  </button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penalty Type</label>
+                  <select 
+                    value={editForm.penaltyApplied}
+                    onChange={e => setEditForm({...editForm, penaltyApplied: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all appearance-none"
+                  >
+                    <option value="WARNING">Warning</option>
+                    <option value="HALF_DAY">Half Day</option>
+                    <option value="FULL_DAY">Full Day</option>
+                    <option value="LOP">LOP</option>
+                  </select>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penalty Value (Days)</label>
+                  <input 
+                    type="number"
+                    step="0.5"
+                    value={editForm.penaltyValue}
+                    onChange={e => setEditForm({...editForm, penaltyValue: e.target.value})}
+                    className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 bg-slate-50 border-t border-gray-100 flex gap-3">
+              <button 
+                onClick={() => setShowEditModal(false)}
+                className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleUpdate}
+                className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 flex items-center justify-center gap-2"
+              >
+                <Save size={16} /> Save Changes
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
