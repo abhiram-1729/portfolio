@@ -17,20 +17,27 @@ export const procurementAPI = {
   getPurchaseOrders: (params) => api.get('/procurement/purchase-orders', { params }),
   createPurchaseOrder: (data) => api.post('/procurement/purchase-orders', data),
   getPurchaseOrderById: (id) => api.get(`/procurement/purchase-orders/${id}`),
+  updatePurchaseOrder: (id, data) => api.put(`/procurement/purchase-orders/${id}`, data),
+  deletePurchaseOrder: (id) => api.delete(`/procurement/purchase-orders/${id}`),
   updatePOStatus: (id, data) => api.put(`/procurement/purchase-orders/${id}/status`, data),
 
   // ─── GOODS RECEIPT NOTES ─────────────────────────────────────
   getGRNs: (params) => api.get('/procurement/grn', { params }),
   createGRN: (data) => api.post('/procurement/grn', data),
+  updateGRN: (id, data) => api.put(`/procurement/grn/${id}`, data),
+  deleteGRN: (id) => api.delete(`/procurement/grn/${id}`),
 
   // ─── PURCHASES (INVOICES) ─────────────────────────────────────
   getPurchases: (params) => api.get('/procurement/purchases', { params }),
   createPurchase: (data) => api.post('/procurement/purchases', data),
   getPurchaseById: (id) => api.get(`/procurement/purchases/${id}`),
+  updatePurchase: (id, data) => api.put(`/procurement/purchases/${id}`, data),
+  deletePurchase: (id) => api.delete(`/procurement/purchases/${id}`),
 
   // ─── PAYMENTS ─────────────────────────────────────
   getPayments: (params) => api.get('/procurement/payments', { params }),
   createPayment: (data) => api.post('/procurement/payments', data),
+  deletePayment: (id) => api.delete(`/procurement/payments/${id}`),
   getOutstandingInvoices: (vendorId) => api.get(`/procurement/payments/outstanding/${vendorId}`),
 
   // ─── REPORTS ─────────────────────────────────────

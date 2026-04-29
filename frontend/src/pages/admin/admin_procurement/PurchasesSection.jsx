@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Receipt, Plus, Search, Loader2, X, Package
+  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
@@ -96,24 +96,61 @@ const PurchasesSection = ({ can }) => {
     }));
   };
 
+  const handleEdit = (p) => {
+    setForm({
+      id: p.id,
+      vendorId: p.vendorId,
+      invoiceNumber: p.invoiceNumber,
+      invoiceDate: format(new Date(p.invoiceDate), 'yyyy-MM-dd'),
+      transportCharges: String(p.transportCharges),
+      otherCharges: String(p.otherCharges),
+      remarks: p.remarks || '',
+      items: p.items.map(i => ({ productId: i.productId, quantity: String(i.quantity), price: String(i.price) }))
+    });
+    openForm();
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this purchase invoice? This will revert stock and vendor balance.')) return;
+    try {
+      await procurementAPI.deletePurchase(id);
+      toast.success('Purchase invoice deleted');
+      const { data } = await procurementAPI.getPurchases();
+      setPurchases(data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error deleting purchase');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.vendorId || !form.invoiceNumber || form.items.length === 0) {
       return toast.error('Fill all required fields');
     }
+    if (form.items.some(i => !i.productId || !i.quantity || i.quantity <= 0)) {
+      return toast.error('Please select a product and valid quantity for all items');
+    }
     try {
-      await procurementAPI.createPurchase({
+      const payload = {
         ...form,
         items: form.items.map(i => ({ productId: i.productId, quantity: parseInt(i.quantity), price: parseFloat(i.price) }))
-      });
-      toast.success('Purchase invoice created');
+      };
+
+      if (form.id) {
+        await procurementAPI.updatePurchase(form.id, payload);
+        toast.success('Purchase invoice updated');
+      } else {
+        await procurementAPI.createPurchase(payload);
+        toast.success('Purchase invoice created');
+      }
+
       setShowForm(false);
       setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] });
       // Reload
       const { data } = await procurementAPI.getPurchases();
       setPurchases(data);
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Error creating purchase');
+      toast.error(err.response?.data?.message || 'Error saving purchase');
     }
   };
 
@@ -137,7 +174,7 @@ const PurchasesSection = ({ can }) => {
           />
         </div>
         {can('PROCUREMENT', 'CREATE', 'PURCHASES') && (
-          <button onClick={openForm}
+          <button onClick={() => { setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] }); openForm(); }}
             className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0">
             <Plus size={14} strokeWidth={3} /> New Purchase
           </button>
@@ -158,7 +195,7 @@ const PurchasesSection = ({ can }) => {
             p.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
             p.vendor?.vendorName.toLowerCase().includes(search.toLowerCase())
           ).map(p => (
-            <div key={p.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 space-y-4 hover:border-emerald-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300">
+            <div key={p.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 space-y-4 hover:border-emerald-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300 relative">
               <div className="flex items-start justify-between">
                 <div>
                   <div className="flex items-center gap-2">
@@ -168,11 +205,21 @@ const PurchasesSection = ({ can }) => {
                   </div>
                   <p className="text-[10px] text-gray-400 font-bold">{p.vendor?.vendorName} • {format(new Date(p.invoiceDate), 'dd MMM yyyy')}</p>
                 </div>
-                <div className="text-right">
-                  <span className="text-base font-black text-gray-900">₹{p.totalAmount.toLocaleString()}</span>
-                  {p.paidAmount > 0 && p.paidAmount < p.totalAmount && (
-                    <p className="text-[10px] text-emerald-600 font-bold">Paid: ₹{p.paidAmount.toLocaleString()}</p>
-                  )}
+                <div className="flex flex-col items-end gap-1">
+                  <div className="text-right">
+                    <span className="text-base font-black text-gray-900">₹{p.totalAmount.toLocaleString()}</span>
+                    {p.paidAmount > 0 && p.paidAmount < p.totalAmount && (
+                      <p className="text-[10px] text-emerald-600 font-bold">Paid: ₹{p.paidAmount.toLocaleString()}</p>
+                    )}
+                  </div>
+                  <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {can('PROCUREMENT', 'UPDATE', 'PURCHASES') && (
+                      <button onClick={() => handleEdit(p)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100" title="Edit"><Edit3 size={12} /></button>
+                    )}
+                    {can('PROCUREMENT', 'DELETE', 'PURCHASES') && (
+                      <button onClick={() => handleDelete(p.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Delete"><Trash2 size={12} /></button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -321,7 +368,7 @@ const PurchasesSection = ({ can }) => {
             </div>
               </div>
               <button className="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
-                Create Purchase Invoice
+                {form.id ? 'Update Purchase Invoice' : 'Create Purchase Invoice'}
               </button>
             </form>
           </div>

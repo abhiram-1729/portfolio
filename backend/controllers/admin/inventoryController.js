@@ -21,9 +21,15 @@ export const getItems = async (req, res) => {
     const where = { tenantId: req.user.tenantId };
     
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
-      where.storeId = storeId;
+      where.OR = [
+        { storeId: storeId },
+        { storeId: null }
+      ];
     } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      where.storeId = req.user.storeId;
+      where.OR = [
+        { storeId: req.user.storeId },
+        { storeId: null }
+      ];
     }
 
     const items = await prisma.product.findMany({
@@ -579,11 +585,13 @@ export const returnStock = async (req, res) => {
           }
         });
 
-        // Update vehicle stock
-        await tx.vehicleStock.updateMany({
+        // Update vehicle stock (use update with composite key)
+        await tx.vehicleStock.update({
           where: {
-            vehicleId,
-            productId: item.productId
+            vehicleId_productId: {
+              vehicleId,
+              productId: item.productId
+            }
           },
           data: {
             quantity: { decrement: Math.floor(q) },
