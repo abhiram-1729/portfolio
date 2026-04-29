@@ -20,12 +20,12 @@ export default function AgentAssets() {
   const [issuePhotos, setIssuePhotos] = useState([]);
 
   // Request form
-  const [requestForm, setRequestForm] = useState({ 
-    type: 'NEW_ASSET', 
-    assetId: '', 
-    assetUnitId: '', 
+  const [requestForm, setRequestForm] = useState({
+    type: 'NEW_ASSET',
+    assetId: '',
+    assetUnitId: '',
     description: '',
-    priority: 'MEDIUM' 
+    priority: 'MEDIUM'
   });
 
   useEffect(() => {
@@ -120,17 +120,15 @@ export default function AgentAssets() {
       <div className="flex p-1 bg-gray-100 rounded-2xl">
         <button
           onClick={() => setActiveTab('assets')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-            activeTab === 'assets' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'
-          }`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'assets' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'
+            }`}
         >
           <Box size={16} /> My Gear
         </button>
         <button
           onClick={() => setActiveTab('requests')}
-          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-            activeTab === 'requests' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'
-          }`}
+          className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === 'requests' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'
+            }`}
         >
           <History size={16} /> Status
         </button>
@@ -180,9 +178,8 @@ export default function AgentAssets() {
                       onClick={() => setExpandedId(isExpanded ? null : assignment.id)}
                       className="w-full p-4 flex items-center gap-3 text-left"
                     >
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${
-                        asset?.assetType === 'ELECTRONIC' ? 'bg-blue-50' : 'bg-amber-50'
-                      }`}>
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${asset?.assetType === 'ELECTRONIC' ? 'bg-blue-50' : 'bg-amber-50'
+                        }`}>
                         {asset?.image ? (
                           <img src={asset.image} alt={asset.name} className="w-full h-full rounded-2xl object-cover" />
                         ) : (
@@ -214,9 +211,9 @@ export default function AgentAssets() {
                             <AlertTriangle size={14} /> Issue
                           </button>
                           <button
-                            onClick={() => { 
-                              setRequestForm({ ...requestForm, type: 'REPLACEMENT', assetId: asset?.id, assetUnitId: unit?.id }); 
-                              setShowRequestModal(true); 
+                            onClick={() => {
+                              setRequestForm({ ...requestForm, type: 'REPLACEMENT', assetId: asset?.id, assetUnitId: unit?.id });
+                              setShowRequestModal(true);
                             }}
                             className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 font-black text-[10px] uppercase tracking-wider rounded-xl border border-blue-100"
                           >
@@ -246,22 +243,20 @@ export default function AgentAssets() {
                 <div key={req.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                        req.type === 'REPLACEMENT' ? 'bg-orange-50 text-orange-500' :
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${req.type === 'REPLACEMENT' ? 'bg-orange-50 text-orange-500' :
                         req.type === 'NEW_ASSET' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'
-                      }`}>
+                        }`}>
                         {req.type === 'REPLACEMENT' ? <RefreshCcw size={16} /> :
-                         req.type === 'NEW_ASSET' ? <Plus size={16} /> : <MessageSquare size={16} />}
+                          req.type === 'NEW_ASSET' ? <Plus size={16} /> : <MessageSquare size={16} />}
                       </div>
                       <span className="text-xs font-black text-gray-900 uppercase tracking-tight">
                         {req.type.replace('_', ' ')}
                       </span>
                     </div>
-                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm ${
-                      req.status === 'PENDING' ? 'bg-amber-100 text-amber-600' :
+                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm ${req.status === 'PENDING' ? 'bg-amber-100 text-amber-600' :
                       req.status === 'APPROVED' ? 'bg-blue-100 text-blue-600' :
-                      req.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
-                    }`}>{req.status}</span>
+                        req.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                      }`}>{req.status}</span>
                   </div>
 
                   <div className="bg-gray-50 p-3 rounded-xl">
@@ -282,9 +277,8 @@ export default function AgentAssets() {
 
                   <div className="flex items-center justify-between text-[9px] font-bold">
                     <span className="text-gray-400">{new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</span>
-                    <span className={`uppercase ${
-                      req.priority === 'HIGH' || req.priority === 'CRITICAL' ? 'text-red-500' : 'text-gray-400'
-                    }`}>Priority: {req.priority}</span>
+                    <span className={`uppercase ${req.priority === 'HIGH' || req.priority === 'CRITICAL' ? 'text-red-500' : 'text-gray-400'
+                      }`}>Priority: {req.priority}</span>
                   </div>
                 </div>
               ))}
@@ -300,7 +294,7 @@ export default function AgentAssets() {
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-black text-gray-900 uppercase">
                 {requestForm.type === 'REPLACEMENT' ? 'Request Replacement' :
-                 requestForm.type === 'NEW_ASSET' ? 'Request New Asset' : 'New Requirement'}
+                  requestForm.type === 'NEW_ASSET' ? 'Request New Asset' : 'New Requirement'}
               </h3>
               <button onClick={() => setShowRequestModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400 transition-colors"><X size={20} /></button>
             </div>
@@ -309,8 +303,8 @@ export default function AgentAssets() {
               {requestForm.type === 'NEW_ASSET' && (
                 <div className="space-y-1">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Asset Type</label>
-                  <select 
-                    value={requestForm.assetId} 
+                  <select
+                    value={requestForm.assetId}
                     onChange={e => setRequestForm({ ...requestForm, assetId: e.target.value })}
                     required
                     className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-emerald-500/20 truncate"
@@ -350,9 +344,8 @@ export default function AgentAssets() {
                       key={p}
                       type="button"
                       onClick={() => setRequestForm({ ...requestForm, priority: p })}
-                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${
-                        requestForm.priority === p ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-400 border-gray-200'
-                      }`}
+                      className={`py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all border ${requestForm.priority === p ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-400 border-gray-200'
+                        }`}
                     >
                       {p}
                     </button>
@@ -362,12 +355,12 @@ export default function AgentAssets() {
 
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Description / Reason</label>
-                <textarea 
-                  value={requestForm.description} 
-                  onChange={e => setRequestForm({ ...requestForm, description: e.target.value })} 
-                  rows="4" 
+                <textarea
+                  value={requestForm.description}
+                  onChange={e => setRequestForm({ ...requestForm, description: e.target.value })}
+                  rows="4"
                   placeholder={requestForm.type === 'NEW_REQUIREMENT' ? "Describe what you need..." : "Why do you need this?"}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 resize-none font-medium" 
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-3 text-sm focus:ring-2 focus:ring-emerald-500/20 resize-none font-medium"
                 />
               </div>
 

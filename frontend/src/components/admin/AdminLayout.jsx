@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, Outlet, useNavigate, useSearchParams } from 'react-router-dom';
+import { NavLink, Link, Outlet, useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import {
   LayoutDashboard,
   Users,
@@ -10,6 +10,7 @@ import {
   LogOut,
   Menu,
   X,
+  Shield,
   ShoppingCart,
   Coins,
   MapPin,
@@ -20,9 +21,25 @@ import {
   PieChart,
   Store,
   ChevronDown,
+  ChevronRight,
   ClipboardList,
   History as HistoryIcon,
-  AlertTriangle
+  AlertTriangle,
+  Link2,
+  BookOpen,
+  CreditCard,
+  Grid,
+  ArrowDownCircle,
+  ArrowUpCircle,
+  CheckSquare,
+  PlusCircle,
+  Clock,
+  Layers,
+  Calendar,
+  Navigation,
+  RotateCcw,
+  FileText,
+  Zap
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -43,9 +60,10 @@ export default function AdminLayout() {
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
   const [searchParams] = useSearchParams();
+  const location = useLocation();
   const activeStoreId = searchParams.get('storeId');
   const activeStoreName = searchParams.get('storeName');
-  
+
   const displayStoreName = activeStoreName || user?.storeName || user?.tenantName || 'VillagKart';
 
   const appendParams = (path) => {
@@ -59,74 +77,328 @@ export default function AdminLayout() {
     navigate('/login');
   };
 
-  const navItems = [
+  const rawNavItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
-    { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
-    { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
-    { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES' },
-    { to: '/admin/inventory', icon: Package, label: 'Inventory', module: 'INVENTORY' },
+    {
+      label: 'Operation',
+      icon: ClipboardList,
+      subItems: [
+        { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
+        { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
+        { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES', section: 'ROUTES' },
+      ]
+    },
+    { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
+    {
+      label: 'Inventory',
+      icon: Package,
+      module: 'INVENTORY',
+      subItems: [
+        { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid, section: 'MASTER' },
+        { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package, section: 'STORE_STOCK' },
+        { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck, section: 'VEHICLE_STOCK' },
+        { to: '/admin/inventory?tab=return&sub=loading', label: 'Loading', icon: ArrowUpCircle, section: 'LOADING' },
+        { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle, section: 'RETURN' },
+        { to: '/admin/inventory?tab=return&sub=refills', label: 'Refills', icon: Package, section: 'REFILLS' },
+        { to: '/admin/damage', label: 'Damage', icon: AlertTriangle, section: 'DAMAGE' },
+        { to: '/admin/inventory?tab=return&sub=audits', label: 'Audit History', icon: CheckSquare, section: 'AUDITS' },
+      ]
+    },
     { to: '/admin/activity-logs', icon: HistoryIcon, label: 'Activity Logs', module: 'ADMIN' },
-    { to: '/admin/reports', icon: BarChart3, label: 'Reports', module: 'REPORTS' },
+    { to: '/admin/attendance', icon: Clock, label: 'Attendance', module: 'STAFF' },
+    {
+      label: 'Reports',
+      icon: BarChart3,
+      module: 'REPORTS',
+      subItems: [
+        { to: '/admin/reports/overview', label: 'Overview', icon: BarChart3, section: 'OVERVIEW' },
+        { to: '/admin/reports/item-wise', label: 'Item-wise Sales', icon: Package, section: 'ITEM_WISE' },
+        { to: '/admin/reports/category-wise', label: 'Category-wise', icon: Layers, section: 'CATEGORY_WISE' },
+        { to: '/admin/reports/day-wise', label: 'Day-wise Sales', icon: Calendar, section: 'DAY_WISE' },
+        { to: '/admin/reports/route-village', label: 'Route & Village', icon: MapPin, section: 'ROUTE_VILLAGE' },
+        { to: '/admin/reports/agent-performance', label: 'Agent Performance', icon: Users, section: 'AGENT_PERFORMANCE' },
+        { to: '/admin/reports/location-tracking', label: 'Location Tracking', icon: Navigation, section: 'LOCATION_TRACKING' },
+        { to: '/admin/reports/vehicle-wise', label: 'Substore (Vehicle)', icon: Truck, section: 'VEHICLE_WISE' },
+        { to: '/admin/reports/payment-mode', label: 'Payment Mode', icon: CreditCard, section: 'PAYMENT_MODE' },
+        { to: '/admin/reports/returns', label: 'Return Report', icon: RotateCcw, section: 'RETURN' },
+        { to: '/admin/reports/damages', label: 'Damage Report', icon: AlertTriangle, section: 'DAMAGE' },
+        { to: '/admin/reports/sessions', label: 'Session Report', icon: Zap, section: 'SESSION' },
+        { to: '/admin/reports/invoices', label: 'Invoice Report', icon: FileText, section: 'INVOICE' },
+      ]
+    },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
     { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },
     { to: '/admin/assets', icon: Box, label: 'Assets', module: 'ASSETS' },
     { to: '/admin/expenses', icon: Receipt, label: 'Expenses', module: 'EXPENSES' },
-    { to: '/admin/procurement', icon: ClipboardList, label: 'Procurement', module: 'PROCUREMENT' },
-    { to: '/admin/damage', icon: AlertTriangle, label: 'Damage', module: 'INVENTORY' },
+    {
+      label: 'Procurement',
+      icon: ClipboardList,
+      module: 'PROCUREMENT',
+      subItems: [
+        { to: '/admin/procurement?tab=vendors', icon: Users, label: 'Vendors', section: 'VENDORS' },
+        { to: '/admin/procurement?tab=mapping', icon: Link2, label: 'Item Mapping', section: 'MAPPING' },
+        { to: '/admin/procurement?tab=po', icon: ClipboardList, label: 'Purchase Orders', section: 'PO' },
+        { to: '/admin/procurement?tab=grn', icon: Truck, label: 'Goods Receipt', section: 'GRN' },
+        { to: '/admin/procurement?tab=purchases', icon: Receipt, label: 'Purchases', section: 'PURCHASES' },
+        { to: '/admin/procurement?tab=ledger', icon: BookOpen, label: 'Stock Ledger', section: 'LEDGER' },
+        { to: '/admin/procurement?tab=payments', icon: CreditCard, label: 'Payments', section: 'PAYMENTS' },
+        { to: '/admin/procurement?tab=reports', icon: BarChart3, label: 'Reports', section: 'REPORTS' },
+      ]
+    },
     { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
-    { to: '/admin/notifications', icon: Bell, label: 'Notifications', module: 'NOTIFICATIONS' },
-    { to: '/admin/settings', icon: Settings, label: 'Settings', module: 'SETTINGS' },
-  ].filter(item => {
-    // If no specific module or if user is owner/full admin, show all
-    if (!item.module || user?.role === 'TENANT_OWNER' || user?.role === 'ADMIN') return true;
+  ];
+
+  const navItems = rawNavItems.map(item => {
+    if (item.subItems) {
+      const filteredSubItems = item.subItems.filter(sub => {
+        const requiredModule = sub.module || item.module;
+        if (!requiredModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+        
+        // 1. Prioritize Section-Level Gating (REPORTS bypass module READ)
+        if (sub.section) {
+          if (requiredModule === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {
+            return user.permissions.REPORT_TARGET_SECTIONS.includes(sub.section);
+          }
+          
+          if (requiredModule === 'INVENTORY') {
+            const sections = user?.permissions?.INVENTORY_SECTIONS;
+            if (sections) return (sections[sub.section] || []).includes('READ');
+            if (user?.permissions?.INVENTORY_TARGET_SECTIONS) return user.permissions.INVENTORY_TARGET_SECTIONS.includes(sub.section);
+            return false;
+          }
+
+          if (requiredModule === 'PROCUREMENT') {
+            const sections = user?.permissions?.PROCUREMENT_SECTIONS;
+            if (sections) return (sections[sub.section] || []).includes('READ');
+            if (user?.permissions?.PROCUREMENT_TARGET_SECTIONS) return user.permissions.PROCUREMENT_TARGET_SECTIONS.includes(sub.section);
+            return false;
+          }
+
+          if (requiredModule === 'ROUTES' && user?.permissions?.ROUTE_TARGET_SECTIONS) {
+            return user.permissions.ROUTE_TARGET_SECTIONS.includes(sub.section);
+          }
+        }
+
+        // 2. Fallback to Module-level READ check
+        const hasModuleRead = (user?.permissions?.[requiredModule] || []).includes('READ');
+        if (!hasModuleRead) return false;
+
+        return true;
+      });
+      return { ...item, subItems: filteredSubItems };
+    }
+    return item;
+  }).filter(item => {
+    if (item.subItems) return item.subItems.length > 0;
+    if (!item.module || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
     
-    // Check custom permissions
-    const perms = user?.permissions?.[item.module] || [];
-    return perms.includes('READ');
+    const hasModuleRead = (user?.permissions?.[item.module] || []).includes('READ');
+    if (!hasModuleRead) return false;
+
+    // Granular checks for top-level modules
+    if (item.module === 'CASH') {
+      const sections = user?.permissions?.CASH_SECTIONS;
+      if (sections) {
+        return Object.values(sections).some(perms => (perms || []).includes('READ'));
+      }
+      if (user?.permissions?.CASH_TARGET_SECTIONS) {
+        return user.permissions.CASH_TARGET_SECTIONS.length > 0;
+      }
+    }
+    if (item.module === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {
+      return user.permissions.REPORT_TARGET_SECTIONS.length > 0;
+    }
+    if (item.module === 'PROCUREMENT') {
+      const sections = user?.permissions?.PROCUREMENT_SECTIONS;
+      if (sections) return Object.values(sections).some(perms => (perms || []).includes('READ'));
+      if (user?.permissions?.PROCUREMENT_TARGET_SECTIONS) {
+        return user.permissions.PROCUREMENT_TARGET_SECTIONS.length > 0;
+      }
+    }
+    if (item.module === 'INVENTORY') {
+      const sections = user?.permissions?.INVENTORY_SECTIONS;
+      if (sections) {
+        return Object.values(sections).some(perms => (perms || []).includes('READ'));
+      }
+      if (user?.permissions?.INVENTORY_TARGET_SECTIONS) {
+        return user.permissions.INVENTORY_TARGET_SECTIONS.length > 0;
+      }
+    }
+
+    return true;
   });
 
+  const [openMenus, setOpenMenus] = React.useState({
+    Procurement: location.pathname.startsWith('/admin/procurement'),
+    Inventory: location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage'),
+    Operation: location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes'),
+    'Return & Stock': location.search.includes('tab=return'),
+    Reports: location.pathname.startsWith('/admin/reports')
+  });
+
+  const toggleMenu = (label) => {
+    setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
+  };
+
+  const getRequiredModule = (pathname) => {
+    if (pathname === '/admin') return 'DASHBOARD';
+    if (pathname.startsWith('/admin/users')) return 'STAFF';
+    if (pathname.startsWith('/admin/vehicles')) return 'VEHICLES';
+    if (pathname.startsWith('/admin/routes')) return 'ROUTES';
+    if (pathname.startsWith('/admin/sales')) return 'SALES';
+    if (pathname.startsWith('/admin/inventory')) return 'INVENTORY';
+    if (pathname.startsWith('/admin/damage')) return 'INVENTORY';
+    if (pathname.startsWith('/admin/reports') || pathname.startsWith('/admin/finance-reports')) return 'REPORTS';
+    if (pathname.startsWith('/admin/cash')) return 'CASH';
+    if (pathname.startsWith('/admin/targets')) return 'TARGETS';
+    if (pathname.startsWith('/admin/assets')) return 'ASSETS';
+    if (pathname.startsWith('/admin/expenses')) return 'EXPENSES';
+    if (pathname.startsWith('/admin/procurement')) return 'PROCUREMENT';
+    if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
+    if (pathname.startsWith('/admin/attendance')) return 'STAFF';
+    if (pathname.startsWith('/admin/privileges')) return 'ADMIN';
+    return null;
+  };
+
+  const currentModule = getRequiredModule(location.pathname);
+  
+  const isAuthorizedRoute = () => {
+    if (location.pathname.startsWith('/admin/privileges')) return true; // Explicitly allow privileges if in Admin portal
+    if (!currentModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+
+    if (location.pathname.startsWith('/admin/reports')) {
+      if (user?.permissions?.REPORT_TARGET_SECTIONS?.length > 0) return true;
+      const pathMap = {
+        '/admin/reports/overview': 'OVERVIEW', '/admin/reports/item-wise': 'ITEM_WISE',
+        '/admin/reports/category-wise': 'CATEGORY_WISE', '/admin/reports/day-wise': 'DAY_WISE',
+        '/admin/reports/route-village': 'ROUTE_VILLAGE', '/admin/reports/agent-performance': 'AGENT_PERFORMANCE',
+        '/admin/reports/location-tracking': 'LOCATION_TRACKING', '/admin/reports/vehicle-wise': 'VEHICLE_WISE',
+        '/admin/reports/payment-mode': 'PAYMENT_MODE', '/admin/reports/returns': 'RETURN',
+        '/admin/reports/damages': 'DAMAGE', '/admin/reports/sessions': 'SESSION', '/admin/reports/invoices': 'INVOICE'
+      };
+      const reqSection = pathMap[location.pathname];
+      if (reqSection && user?.permissions?.REPORT_TARGET_SECTIONS?.includes(reqSection)) return true;
+    }
+
+    if (location.pathname.startsWith('/admin/procurement')) {
+      const sections = user?.permissions?.PROCUREMENT_SECTIONS;
+      if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
+      if (user?.permissions?.PROCUREMENT_TARGET_SECTIONS?.length > 0) return true;
+      
+      const tab = searchParams.get('tab') || 'vendors';
+      const tabMap = { 'vendors': 'VENDORS', 'mapping': 'MAPPING', 'po': 'PO', 'grn': 'GRN', 'purchases': 'PURCHASES', 'ledger': 'LEDGER', 'payments': 'PAYMENTS', 'reports': 'REPORTS' };
+      if (sections && tabMap[tab] && (sections[tabMap[tab]] || []).includes('READ')) return true;
+      if (user?.permissions?.PROCUREMENT_TARGET_SECTIONS?.includes(tabMap[tab])) return true;
+    }
+
+    if (location.pathname === '/admin/inventory' || location.pathname === '/admin/damage' || location.pathname.startsWith('/admin/inventory')) {
+      const sections = user?.permissions?.INVENTORY_SECTIONS;
+      if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
+      if (user?.permissions?.INVENTORY_TARGET_SECTIONS?.length > 0) return true;
+
+      const tab = searchParams.get('tab') || (location.pathname === '/admin/damage' ? 'return' : 'master');
+      const sub = searchParams.get('sub') || (location.pathname === '/admin/damage' ? 'damage' : 'loading');
+      const tabMap = { 'master': 'MASTER', 'inventory': 'STORE_STOCK', 'vehicle-stock': 'VEHICLE_STOCK' };
+      const subTabMap = { 'loading': 'LOADING', 'return': 'RETURN', 'refills': 'REFILLS', 'damage': 'DAMAGE', 'audits': 'AUDITS', 'tracking': 'VEHICLE_STOCK' };
+      
+      if (sections) {
+        if (tabMap[tab] && (sections[tabMap[tab]] || []).includes('READ')) return true;
+        if (tab === 'return' && (sections[subTabMap[sub]] || []).includes('READ')) return true;
+      }
+      if (user?.permissions?.INVENTORY_TARGET_SECTIONS) {
+         if (tabMap[tab] && user.permissions.INVENTORY_TARGET_SECTIONS.includes(tabMap[tab])) return true;
+         if (tab === 'return' && user.permissions.INVENTORY_TARGET_SECTIONS.includes(subTabMap[sub])) return true;
+      }
+    }
+
+    if (location.pathname.startsWith('/admin/cash')) {
+      const sections = user?.permissions?.CASH_SECTIONS;
+      if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
+      if (user?.permissions?.CASH_TARGET_SECTIONS?.length > 0) return true;
+    }
+
+    const perms = user?.permissions?.[currentModule] || [];
+    const hasModuleRead = perms.includes('READ');
+    if (!hasModuleRead) return false;
+
+    return true;
+  };
+
+
+  const isPOS = location.pathname === '/admin/pos';
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0 md:pl-64">
+    <div className={cn(
+      "min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0",
+      !isPOS && "md:pl-64"
+    )}>
       {/* Header */}
-      <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="VillagKart" className="h-10 w-auto" />
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
-            <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
+      {!isPOS && (
+      <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="VillagKart" className="h-10 w-auto" />
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
+              <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
+            </div>
+          </div>
+          <div className="flex items-center gap-4 relative">
+            {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
+              <Link
+                to={appendParams('/admin/pos')}
+                className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
+                title="Point of Sale"
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+                  <PlusCircle size={18} strokeWidth={3} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
+              </Link>
+            )}
+
+            <NotificationPopover
+              isOpen={isNotifOpen}
+              onClose={() => setIsNotifOpen(false)}
+            />
+            <button
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
+            >
+              <Bell size={22} strokeWidth={2.5} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-red-500/10 z-10 transition-all">
+                  {unreadCount}
+                </span>
+              )}
+            </button>
+
+            {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
+              <button
+                onClick={() => navigate('/admin/settings')}
+                className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50"
+                title="Admin Settings"
+              >
+                <Settings size={22} strokeWidth={2.5} />
+              </button>
+            )}
+
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
+            >
+              <LogOut size={20} />
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-4 relative">
-          <NotificationPopover 
-            isOpen={isNotifOpen} 
-            onClose={() => setIsNotifOpen(false)} 
-          />
-          <button
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
-            className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
-          >
-            <Bell size={22} strokeWidth={2.5} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-red-500/10 z-10 transition-all">
-                {unreadCount}
-              </span>
-            )}
-          </button>
-          
-          <button
-            onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
       </header>
+      )}
 
 
       {/* Desktop Sidebar - Non-scrollable Single Screen */}
-      <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-40">
+      {!isPOS && (
+        <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-40">
         {/* Sidebar Header: Store Info */}
         <div className="p-6">
           <div className="flex flex-col gap-4">
@@ -148,26 +420,148 @@ export default function AdminLayout() {
         <div className="flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           <nav className="space-y-0.5 pb-6">
             <p className="px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Management</p>
-            {navItems.map((item) => (
-              <NavLink
-                key={item.to}
-                to={appendParams(item.to)}
-                end={item.end}
-                className={({ isActive }) => cn(
-                  "flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
-                  isActive
-                    ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200"
-                    : "text-gray-500 hover:bg-gray-50 hover:text-gray-900"
-                )}
-              >
-                {({ isActive }) => (
-                  <>
-                    <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
-                    {item.label}
-                  </>
-                )}
-              </NavLink>
-            ))}
+            {navItems.map((item) => {
+              const hasSubItems = item.subItems && item.subItems.length > 0;
+              const isMenuOpen = openMenus[item.label];
+
+              if (hasSubItems) {
+                return (
+                  <div key={item.label} className="space-y-1">
+                    <button
+                      onClick={() => toggleMenu(item.label)}
+                      className={cn(
+                        "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
+                        (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
+                          ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
+                          ((location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes')) && item.label === 'Operation')
+                          ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
+                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <item.icon size={16} strokeWidth={2.5} />
+                        {item.label}
+                      </div>
+                      <ChevronDown
+                        size={14}
+                        className={cn("transition-transform duration-200", isMenuOpen ? "rotate-0" : "-rotate-90")}
+                      />
+                    </button>
+                    {isMenuOpen && (
+                      <div className="pl-4 space-y-1 animate-in slide-in-from-top-1 duration-200 border-l border-emerald-50 ml-6">
+                        {item.subItems.map((sub) => {
+                          const hasNestedItems = sub.subItems && sub.subItems.length > 0;
+                          const isNestedOpen = openMenus[sub.label];
+
+                          if (hasNestedItems) {
+                            const isNestedActive = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return';
+                            return (
+                              <div key={sub.label} className="space-y-0.5">
+                                <button
+                                  onClick={() => toggleMenu(sub.label)}
+                                  className={cn(
+                                    "flex items-center justify-between gap-3 px-4 py-1.5 w-full rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                    isNestedActive ? "text-emerald-600" : "text-gray-400 hover:text-gray-600"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-3">
+                                    <sub.icon size={14} strokeWidth={2.5} />
+                                    {sub.label}
+                                  </div>
+                                  <ChevronDown
+                                    size={12}
+                                    className={cn("transition-transform duration-200", isNestedOpen ? "rotate-0" : "-rotate-90")}
+                                  />
+                                </button>
+                                {isNestedOpen && (
+                                  <div className="pl-4 space-y-0.5 border-l border-emerald-50 ml-6 animate-in slide-in-from-top-1">
+                                    {sub.subItems.map(nested => {
+                                      const isTarget = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return' && searchParams.get('sub') === new URLSearchParams(nested.to.split('?')[1]).get('sub');
+                                      return (
+                                        <NavLink
+                                          key={nested.to}
+                                          to={appendParams(nested.to)}
+                                          className={cn(
+                                            "flex items-center gap-3 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
+                                            isTarget
+                                              ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                              : "text-gray-400 hover:text-gray-600"
+                                          )}
+                                        >
+                                          <nested.icon size={12} strokeWidth={isTarget ? 3 : 2.5} />
+                                          {nested.label}
+                                        </NavLink>
+                                      );
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          const isProcurement = location.pathname === '/admin/procurement';
+                          const isInventoryPath = location.pathname === '/admin/inventory';
+                          const isDamagePath = location.pathname === '/admin/damage';
+
+                          let isActive = false;
+                          if (isProcurement && item.label === 'Procurement') {
+                            isActive = searchParams.get('tab') === new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                          } else if (item.label === 'Inventory') {
+                            if (sub.to === '/admin/damage') {
+                              isActive = isDamagePath;
+                            } else if (isInventoryPath) {
+                              const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                              const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
+                              isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
+                            }
+                          } else if (item.label === 'Operation' || item.label === 'Reports') {
+                            isActive = location.pathname === sub.to;
+                          }
+
+                          return (
+                            <NavLink
+                              key={sub.to}
+                              to={appendParams(sub.to)}
+                              className={cn(
+                                "flex items-center gap-3 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                isActive
+                                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                  : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                              )}
+                            >
+                              <sub.icon size={14} strokeWidth={isActive ? 3 : 2.5} />
+                              {sub.label}
+                              {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-white animate-pulse" />}
+                            </NavLink>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
+              return (
+                <NavLink
+                  key={item.to}
+                  to={appendParams(item.to)}
+                  end={item.end}
+                  className={({ isActive }) => cn(
+                    "flex items-center gap-3 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all duration-200 rounded-r-xl rounded-l-none border-l-4",
+                    isActive
+                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 border-emerald-600"
+                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-transparent"
+                  )}
+                >
+                  {({ isActive }) => (
+                    <>
+                      <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
+                      {item.label}
+                    </>
+                  )}
+                </NavLink>
+              );
+            })}
           </nav>
         </div>
 
@@ -182,7 +576,7 @@ export default function AdminLayout() {
               <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
             </div>
           </div>
-          <button 
+          <button
             onClick={handleLogout}
             className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100"
           >
@@ -191,18 +585,38 @@ export default function AdminLayout() {
           </button>
         </div>
       </aside>
+      )}
 
       {/* Main Content */}
       <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
-        <Outlet />
+        {isAuthorizedRoute() ? (
+          <Outlet />
+        ) : (
+          <div className="flex flex-col items-center justify-center min-h-[60vh] bg-white rounded-[2rem] border border-gray-100 shadow-sm animate-in fade-in zoom-in-95 duration-300">
+            <div className="w-20 h-20 bg-rose-50 rounded-full flex items-center justify-center text-rose-500 mb-6 border-8 border-rose-50/50">
+              <AlertTriangle size={32} strokeWidth={2.5} />
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight mb-2">Access Denied</h2>
+            <p className="text-gray-500 font-medium tracking-wide text-center max-w-sm mb-8">
+              You do not have the required privileges to view this section. Please contact your administrator.
+            </p>
+            <button 
+              onClick={() => navigate('/admin')}
+              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
+            >
+              Return to Dashboard
+            </button>
+          </div>
+        )}
       </main>
 
       {/* Mobile Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-3 md:hidden">
+      {!isPOS && (
+        <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-3 md:hidden">
         {navItems.slice(0, 5).map((item) => (
           <NavLink
-            key={item.to}
-            to={appendParams(item.to)}
+            key={item.to || item.label}
+            to={appendParams(item.to || '#')}
             end={item.end}
             className={({ isActive }) => cn(
               "flex flex-col items-center gap-1 transition-all duration-200 min-w-[64px]",
@@ -229,6 +643,7 @@ export default function AdminLayout() {
           <span className="text-[10px] font-medium">Menu</span>
         </button>
       </nav>
+      )}
 
       {/* Mobile Overlay Menu */}
       {isMobileMenuOpen && (
@@ -246,27 +661,60 @@ export default function AdminLayout() {
                 <X size={20} className="text-gray-500" />
               </button>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              {navItems.slice(5).map((item) => (
-                <NavLink
-                  key={item.to}
-                  to={appendParams(item.to)}
-                  onClick={() => setIsMobileMenuOpen(false)}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium border transition-all duration-200",
-                    isActive
-                      ? "bg-emerald-50 text-emerald-600 border-emerald-100"
-                      : "bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100"
-                  )}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              ))}
+            <div className="grid grid-cols-2 gap-3 max-h-[60vh] overflow-y-auto pr-1">
+              {navItems.slice(5).map((item) => {
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+
+                if (hasSubItems) {
+                  return (
+                    <div key={item.label} className="col-span-2 space-y-2 mt-2">
+                      <div className="flex items-center gap-2 px-2 py-1">
+                        <item.icon size={16} className="text-emerald-600" />
+                        <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{item.label}</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        {item.subItems.map((sub) => (
+                          <NavLink
+                            key={sub.to}
+                            to={appendParams(sub.to)}
+                            onClick={() => setIsMobileMenuOpen(false)}
+                            className={({ isActive }) => cn(
+                              "flex items-center gap-3 px-4 py-3 rounded-xl text-xs font-bold border transition-all",
+                              isActive
+                                ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                                : "bg-gray-50 text-gray-500 border-transparent"
+                            )}
+                          >
+                            <sub.icon size={16} />
+                            {sub.label}
+                          </NavLink>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={appendParams(item.to)}
+                    onClick={() => setIsMobileMenuOpen(false)}
+                    className={({ isActive }) => cn(
+                      "flex items-center gap-3 px-4 py-4 rounded-xl text-sm font-medium border transition-all duration-200",
+                      isActive
+                        ? "bg-emerald-50 text-emerald-600 border-emerald-100"
+                        : "bg-gray-50 text-gray-600 border-transparent hover:bg-gray-100"
+                    )}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon size={20} strokeWidth={isActive ? 2.5 : 2} />
+                        {item.label}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         </div>

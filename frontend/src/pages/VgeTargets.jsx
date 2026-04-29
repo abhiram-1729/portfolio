@@ -5,13 +5,13 @@ import toast from 'react-hot-toast';
 import io from 'socket.io-client';
 
 const LEVEL_CONFIG = {
-  NONE:       { label: 'Unranked',   color: 'gray',    icon: Target,     gradient: 'from-gray-400 to-gray-500' },
-  STARTER:    { label: 'Starter',    color: 'blue',    icon: Zap,        gradient: 'from-blue-400 to-blue-600' },
-  PERFORMER:  { label: 'Performer',  color: 'indigo',  icon: TrendingUp, gradient: 'from-indigo-400 to-indigo-600' },
-  ACHIEVER:   { label: 'Achiever',   color: 'purple',  icon: Award,      gradient: 'from-purple-400 to-purple-600' },
-  CHAMPION:   { label: 'Champion',   color: 'amber',   icon: Trophy,     gradient: 'from-amber-400 to-amber-600' },
-  STAR:       { label: 'Star',       color: 'orange',  icon: Star,       gradient: 'from-orange-400 to-orange-600' },
-  SUPER_STAR: { label: 'Super Star', color: 'rose',    icon: Crown,      gradient: 'from-rose-400 to-rose-600' },
+  NONE: { label: 'Unranked', color: 'gray', icon: Target, gradient: 'from-gray-400 to-gray-500' },
+  STARTER: { label: 'Starter', color: 'blue', icon: Zap, gradient: 'from-blue-400 to-blue-600' },
+  PERFORMER: { label: 'Performer', color: 'indigo', icon: TrendingUp, gradient: 'from-indigo-400 to-indigo-600' },
+  ACHIEVER: { label: 'Achiever', color: 'purple', icon: Award, gradient: 'from-purple-400 to-purple-600' },
+  CHAMPION: { label: 'Champion', color: 'amber', icon: Trophy, gradient: 'from-amber-400 to-amber-600' },
+  STAR: { label: 'Star', color: 'orange', icon: Star, gradient: 'from-orange-400 to-orange-600' },
+  SUPER_STAR: { label: 'Super Star', color: 'rose', icon: Crown, gradient: 'from-rose-400 to-rose-600' },
 };
 
 const DYNAMIC_GRADIENTS = [
@@ -96,18 +96,18 @@ export default function VgeTargets() {
   const getLevelInfo = (levelName) => {
     const key = levelName?.toUpperCase().replace(/\s+/g, '_') || 'NONE';
     if (LEVEL_CONFIG[key]) return LEVEL_CONFIG[key];
-    
+
     // Fallback for custom dynamically named levels
     const nameStr = levelName || 'None';
     const hash = nameStr.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
     const gradIndex = hash % DYNAMIC_GRADIENTS.length;
     const iconIndex = hash % ICONS.length;
-    
+
     return {
-       label: nameStr,
-       color: 'custom',
-       gradient: DYNAMIC_GRADIENTS[gradIndex],
-       icon: ICONS[iconIndex]
+      label: nameStr,
+      color: 'custom',
+      gradient: DYNAMIC_GRADIENTS[gradIndex],
+      icon: ICONS[iconIndex]
     };
   };
 
@@ -160,11 +160,10 @@ export default function VgeTargets() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${
-              activeTab === tab.id
-                ? 'bg-white text-gray-900 shadow-sm'
-                : 'text-gray-400 hover:text-gray-600'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab === tab.id
+              ? 'bg-white text-gray-900 shadow-sm'
+              : 'text-gray-400 hover:text-gray-600'
+              }`}
           >
             <tab.icon size={14} />
             {tab.label}
@@ -177,28 +176,28 @@ export default function VgeTargets() {
         <div className="space-y-5 animate-in fade-in duration-300">
           {/* Earnings Potential Summary Card */}
           <div className={`bg-gradient-to-br ${perf.vgeType === 'FREELANCER' ? 'from-indigo-600 to-indigo-800' : 'from-emerald-600 to-emerald-800'} rounded-[2.5rem] p-6 text-white shadow-xl shadow-emerald-500/10`}>
-             <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Monthly Payout Projection</p>
-                  <p className="text-3xl font-black tracking-tight">
-                    ₹{( (perf.vgeType === 'FREELANCER' ? 0 : perf.baseSalary) + (perf.totalIncentive * 30)).toLocaleString()}
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                  <TrendingUp size={24} />
-                </div>
-             </div>
-             <div className="flex items-center gap-3">
-                <div className="flex-1 bg-white/10 backdrop-blur px-3 py-2 rounded-xl border border-white/10">
-                   <p className="text-[8px] font-black uppercase opacity-60">Base Pay</p>
-                   <p className="text-sm font-black">₹{perf.vgeType === 'FREELANCER' ? '0' : (perf.baseSalary || 0).toLocaleString()}</p>
-                </div>
-                <div className="flex-1 bg-white/10 backdrop-blur px-3 py-2 rounded-xl border border-white/10">
-                   <p className="text-[8px] font-black uppercase opacity-60">Est. Incentives</p>
-                   <p className="text-sm font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
-                </div>
-             </div>
-             <p className="text-[9px] font-bold opacity-60 mt-4 italic text-center">"Earn more today to increase your monthly estimate!"</p>
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70">Monthly Payout Projection</p>
+                <p className="text-3xl font-black tracking-tight">
+                  ₹{((perf.vgeType === 'FREELANCER' ? 0 : perf.baseSalary) + (perf.totalIncentive * 30)).toLocaleString()}
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+                <TrendingUp size={24} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 bg-white/10 backdrop-blur px-3 py-2 rounded-xl border border-white/10">
+                <p className="text-[8px] font-black uppercase opacity-60">Base Pay</p>
+                <p className="text-sm font-black">₹{perf.vgeType === 'FREELANCER' ? '0' : (perf.baseSalary || 0).toLocaleString()}</p>
+              </div>
+              <div className="flex-1 bg-white/10 backdrop-blur px-3 py-2 rounded-xl border border-white/10">
+                <p className="text-[8px] font-black uppercase opacity-60">Est. Incentives</p>
+                <p className="text-sm font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
+              </div>
+            </div>
+            <p className="text-[9px] font-bold opacity-60 mt-4 italic text-center">"Earn more today to increase your monthly estimate!"</p>
           </div>
 
           {/* Sales Progress Card */}
@@ -260,48 +259,46 @@ export default function VgeTargets() {
 
             {/* Dynamic Level Ladder */}
             <div className="space-y-2">
-              {(perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).map((rule, idx) => {
+              {(perf.rules || []).sort((a, b) => (a.salesFrom || 0) - (b.salesFrom || 0)).map((rule, idx) => {
                 const config = getLevelInfo(rule.name);
                 const isActive = perf.level === rule.name;
-                
+
                 // Logic to check if this level is already surpassed (using simple index for sorted rules)
-                const currentIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
+                const currentIdx = (perf.rules || []).sort((a, b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
                 const isReached = currentIdx >= idx;
-                
+
                 const Icon = config.icon || Target;
 
                 return (
-                  <div key={rule.id || idx} className={`flex flex-col gap-2 p-3 rounded-2xl transition-all ${
-                    isActive ? `bg-gradient-to-r ${config.gradient} text-white shadow-md` :
+                  <div key={rule.id || idx} className={`flex flex-col gap-2 p-3 rounded-2xl transition-all ${isActive ? `bg-gradient-to-r ${config.gradient} text-white shadow-md` :
                     isReached ? 'bg-gray-50 text-gray-600 border border-gray-100' : 'bg-white border border-gray-100 text-gray-400 opacity-60'
-                  }`}>
+                    }`}>
                     <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
-                        isActive ? 'bg-white/20' : isReached ? 'bg-gray-200' : 'bg-gray-50 text-gray-300'
-                      }`}>
+                      <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${isActive ? 'bg-white/20' : isReached ? 'bg-gray-200' : 'bg-gray-50 text-gray-300'
+                        }`}>
                         <Icon size={18} />
                       </div>
                       <div className="flex-1 min-w-0">
-                         <div className="flex items-center justify-between">
-                            <span className="text-sm font-black tracking-tight">{rule.name}</span>
-                            <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
-                              ₹{Number(rule.salesFrom || 0).toLocaleString()} +
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-black tracking-tight">{rule.name}</span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${isActive ? 'bg-white/20' : 'bg-gray-100'}`}>
+                            ₹{Number(rule.salesFrom || 0).toLocaleString()} +
+                          </span>
+                        </div>
+
+                        {/* Config Details */}
+                        <div className="flex items-center gap-2 mt-1 flex-wrap">
+                          {rule.salesValue > 0 && (
+                            <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-emerald-600'}`}>
+                              • {rule.salesType === 'PERCENTAGE' ? `${rule.salesValue}%` : `₹${rule.salesValue}`} per ₹{rule.salesSlab || 0} sales
                             </span>
-                         </div>
-                         
-                         {/* Config Details */}
-                         <div className="flex items-center gap-2 mt-1 flex-wrap">
-                           {rule.salesValue > 0 && (
-                             <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-emerald-600'}`}>
-                               • {rule.salesType === 'PERCENTAGE' ? `${rule.salesValue}%` : `₹${rule.salesValue}`} per ₹{rule.salesSlab || 0} sales
-                             </span>
-                           )}
-                           {rule.appsRate > 0 && (
-                             <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-blue-500'}`}>
-                               • ₹{rule.appsRate} per {rule.appsSlab || 0} apps
-                             </span>
-                           )}
-                         </div>
+                          )}
+                          {rule.appsRate > 0 && (
+                            <span className={`text-[9px] font-bold ${isActive ? 'text-white/80' : 'text-blue-500'}`}>
+                              • ₹{rule.appsRate} per {rule.appsSlab || 0} apps
+                            </span>
+                          )}
+                        </div>
                       </div>
                       {isReached && !isActive && <span className="text-[12px] font-black uppercase tracking-widest opacity-50 shrink-0">✓</span>}
                       {isActive && <Flame size={16} className="animate-pulse shrink-0" />}
@@ -430,12 +427,10 @@ export default function VgeTargets() {
               const rankColors = ['text-amber-500', 'text-gray-400', 'text-orange-400'];
 
               return (
-                <div key={entry.userId} className={`bg-white rounded-[2rem] p-5 border shadow-sm flex items-center gap-4 ${
-                  isTop3 ? 'border-emerald-100' : 'border-gray-100'
-                }`}>
-                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${
-                    isTop3 ? `bg-gradient-to-br ${entryLevel.gradient} text-white` : 'bg-gray-100 text-gray-500'
+                <div key={entry.userId} className={`bg-white rounded-[2rem] p-5 border shadow-sm flex items-center gap-4 ${isTop3 ? 'border-emerald-100' : 'border-gray-100'
                   }`}>
+                  <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-lg ${isTop3 ? `bg-gradient-to-br ${entryLevel.gradient} text-white` : 'bg-gray-100 text-gray-500'
+                    }`}>
                     {isTop3 ? <Medal size={20} /> : `#${entry.rank}`}
                   </div>
                   <div className="flex-1 min-w-0">
@@ -464,39 +459,39 @@ export default function VgeTargets() {
         <div className="space-y-6 animate-in fade-in duration-300">
           {/* CTC Awareness Card */}
           <div className={`bg-gradient-to-br ${perf.vgeType === 'FREELANCER' ? 'from-blue-600 to-blue-800' : 'from-emerald-600 to-emerald-800'} rounded-[2.5rem] p-6 text-white shadow-xl`}>
-             <div className="flex items-center justify-between mb-6">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-white/70">{perf.vgeType === 'FREELANCER' ? 'Project Earnings' : 'Monthly Compensation'}</p>
-                  <p className="text-3xl font-black tracking-tight">
-                    ₹{( (perf.vgeType === 'FREELANCER' ? 0 : perf.baseSalary) + (perf.totalIncentive * 30)).toLocaleString()} 
-                    <span className="text-xs font-bold opacity-60 ml-2">{perf.vgeType === 'FREELANCER' ? 'Est. Monthly' : 'Est. CTC'}</span>
-                  </p>
-                </div>
-                <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
-                  <TrendingUp size={24} />
-                </div>
-             </div>
-             
-             <div className="grid grid-cols-2 gap-4">
-                <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Fixed Salary</p>
-                  <p className="text-xl font-black">₹{perf.vgeType === 'FREELANCER' ? '0' : perf.baseSalary?.toLocaleString()}</p>
-                  <p className="text-[10px] font-bold opacity-60 mt-1">{perf.vgeType === 'FREELANCER' ? 'Not Applicable' : 'Guaranteed Base'}</p>
-                </div>
-                <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
-                  <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Incentives (Est.)</p>
-                  <p className="text-xl font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
-                  <p className="text-[10px] font-bold opacity-60 mt-1">App Commissions</p>
-                </div>
-             </div>
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-widest opacity-70 text-white/70">{perf.vgeType === 'FREELANCER' ? 'Project Earnings' : 'Monthly Compensation'}</p>
+                <p className="text-3xl font-black tracking-tight">
+                  ₹{((perf.vgeType === 'FREELANCER' ? 0 : perf.baseSalary) + (perf.totalIncentive * 30)).toLocaleString()}
+                  <span className="text-xs font-bold opacity-60 ml-2">{perf.vgeType === 'FREELANCER' ? 'Est. Monthly' : 'Est. CTC'}</span>
+                </p>
+              </div>
+              <div className="w-12 h-12 bg-white/20 backdrop-blur rounded-2xl flex items-center justify-center">
+                <TrendingUp size={24} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Fixed Salary</p>
+                <p className="text-xl font-black">₹{perf.vgeType === 'FREELANCER' ? '0' : perf.baseSalary?.toLocaleString()}</p>
+                <p className="text-[10px] font-bold opacity-60 mt-1">{perf.vgeType === 'FREELANCER' ? 'Not Applicable' : 'Guaranteed Base'}</p>
+              </div>
+              <div className="bg-white/10 backdrop-blur rounded-2xl p-4 border border-white/10">
+                <p className="text-[9px] font-black uppercase tracking-widest opacity-70 mb-1">Incentives (Est.)</p>
+                <p className="text-xl font-black">₹{(perf.totalIncentive * 30).toLocaleString()}</p>
+                <p className="text-[10px] font-bold opacity-60 mt-1">App Commissions</p>
+              </div>
+            </div>
           </div>
 
           <div className="space-y-4">
             <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider px-2">Digital Awards & Badges</h3>
             {(perf.rules || []).map(rule => {
               const info = getLevelInfo(rule.name);
-              const currentIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
-              const ruleIdx = (perf.rules || []).sort((a,b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === rule.name);
+              const currentIdx = (perf.rules || []).sort((a, b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === perf.level);
+              const ruleIdx = (perf.rules || []).sort((a, b) => (a.salesFrom || 0) - (b.salesFrom || 0)).findIndex(r => r.name === rule.name);
               const isUnlocked = currentIdx >= ruleIdx && ruleIdx !== -1;
 
               return (

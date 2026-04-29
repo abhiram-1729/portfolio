@@ -20,6 +20,12 @@ import procurementRoutes from './routes/procurementRoutes.js';
 import roleRoutes from './routes/roleRoutes.js';
 import activityRoutes from './routes/activityRoutes.js';
 import damageRoutes from './routes/damageRoutes.js';
+import attendanceRoutes from './routes/attendanceRoutes.js';
+import shiftRoutes from './routes/shiftRoutes.js';
+import villageActivityRoutes from './routes/villageActivityRoutes.js';
+import locationRoutes from './routes/locationRoutes.js';
+import refillRoutes from './routes/refillRoutes.js';
+import lateEntryRoutes from './routes/lateEntryRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -67,11 +73,17 @@ apiRouter.use('/procurement', procurementRoutes);
 apiRouter.use('/admin/roles', roleRoutes);
 apiRouter.use('/activities', activityRoutes);
 apiRouter.use('/damage', damageRoutes);
+apiRouter.use('/attendance', attendanceRoutes);
+apiRouter.use('/shifts', shiftRoutes);
+apiRouter.use('/village-activities', villageActivityRoutes);
+apiRouter.use('/location', locationRoutes);
+apiRouter.use('/refills', refillRoutes);
+apiRouter.use('/late-entry', lateEntryRoutes);
 
 // Mount the apiRouter both WITH and WITHOUT /api prefix
 // This ensures compatibility with proxies that might or might not strip the prefix
 app.use('/api', apiRouter);
-app.use(apiRouter); 
+app.use(apiRouter);
 
 // Root path health check (accessible at both / and /api)
 app.get('/', (req, res) => {
@@ -83,12 +95,12 @@ app.get('/', (req, res) => {
 });
 
 apiRouter.get('/', (req, res) => {
-    res.json({
-      message: 'Vehicle Sales Tracking API is running...',
-      status: 'healthy',
-      timestamp: new Date().toISOString()
-    });
+  res.json({
+    message: 'Vehicle Sales Tracking API is running...',
+    status: 'healthy',
+    timestamp: new Date().toISOString()
   });
+});
 
 // Error Middleware
 app.use(errorHandler);

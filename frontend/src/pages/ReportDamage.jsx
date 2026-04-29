@@ -33,12 +33,12 @@ export default function ReportDamage() {
   const user = useUserStore(s => s.user);
   const fileInputRef = useRef(null);
   const dropdownRef = useRef(null);
-  
+
   const [view, setView] = useState('list'); // list | form
   const [myReports, setMyReports] = useState([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Form state
   const [products, setProducts] = useState([]);
   const [selectedProduct, setSelectedProduct] = useState('');
@@ -224,100 +224,100 @@ export default function ReportDamage() {
 
       <div className="px-4">
 
-      {/* Summary bar */}
-      {myReports.length > 0 && (
-        <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
-          {[
-            { label: 'Total', val: myReports.length, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200' },
-            { label: 'Pending', val: myReports.filter(r => r.status === 'PENDING').length, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
-            { label: 'Approved', val: myReports.filter(r => r.status === 'APPROVED').length, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
-          ].map((s, i) => (
-            <div key={i} className={`shrink-0 ${s.bg} border ${s.border} rounded-xl px-3 py-2 flex items-center gap-2`}>
-              <span className={`text-base font-black ${s.color}`}>{s.val}</span>
-              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{s.label}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {loading ? (
-        <div className="flex items-center justify-center py-20">
-          <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-500 border-t-transparent" />
-        </div>
-      ) : myReports.length === 0 ? (
-        <div className="bg-white rounded-2xl border border-slate-100 p-8 sm:p-10 text-center shadow-sm mt-4">
-          <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
-            <AlertTriangle size={28} className="text-red-300" />
-          </div>
-          <p className="text-slate-500 font-bold text-sm">No damage reports yet</p>
-          <p className="text-[11px] text-slate-300 mt-1 mb-4">Report damaged inventory to keep track</p>
-          <button
-            onClick={() => setView('form')}
-            className="px-5 py-2.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-red-200 hover:bg-red-700 active:scale-95 transition-all inline-flex items-center gap-2"
-          >
-            <Plus size={14} strokeWidth={3} />
-            Report Damage
-          </button>
-        </div>
-      ) : (
-        <div className="space-y-2.5 sm:space-y-3">
-          {myReports.map(report => {
-            const s = STATUS_STYLES[report.status] || STATUS_STYLES.PENDING;
-            const dmgType = DAMAGE_TYPES.find(d => d.value === report.damageType);
-            return (
-              <div key={report.id} className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm active:bg-slate-50 transition-colors">
-                {/* Top Row — Product + Status */}
-                <div className="flex items-start gap-2.5 sm:gap-3">
-                  {/* Product Image */}
-                  <div className="shrink-0">
-                    {report.product?.image ? (
-                      <img src={report.product.image} alt="" className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover border border-gray-100" />
-                    ) : (
-                      <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gray-100 flex items-center justify-center">
-                        <Package size={16} className="text-gray-400" />
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Product Info */}
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[13px] sm:text-sm font-bold text-slate-900 truncate leading-tight">{report.product?.name}</p>
-                    <p className="text-[10px] text-slate-400 truncate mt-0.5">
-                      {report.displayId} · {new Date(report.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
-                    </p>
-                  </div>
-
-                  {/* Status Badge */}
-                  <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${s.bg} ${s.text} border ${s.border}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
-                    {report.status?.replace('_', ' ')}
-                  </span>
-                </div>
-
-                {/* Bottom Row — Type, Qty, Loss */}
-                <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-slate-50">
-                  <span className={`shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${dmgType?.bg || 'bg-gray-100'} ${dmgType?.color || ''}`}>
-                    {dmgType && <dmgType.icon size={12} />} {report.damageType}
-                  </span>
-                  <span className="text-[11px] font-bold text-slate-600">Qty: {report.quantity}</span>
-                  <span className="ml-auto text-[12px] font-black text-red-600">₹{(report.totalLoss || 0).toFixed(0)}</span>
-                </div>
-
-                {/* Deduction row */}
-                {report.deduction && (
-                  <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
-                    <span className="text-[10px] text-orange-600 font-bold flex items-center gap-1"><Coins size={10} /> Deduction: ₹{report.deduction.deductionAmount?.toFixed(0)}</span>
-                    <span className={`text-[9px] font-black uppercase ${report.deduction.status === 'APPLIED' ? 'text-emerald-500' : 'text-amber-500'}`}>{report.deduction.status}</span>
-                  </div>
-                )}
+        {/* Summary bar */}
+        {myReports.length > 0 && (
+          <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+            {[
+              { label: 'Total', val: myReports.length, color: 'text-slate-600', bg: 'bg-slate-50', border: 'border-slate-200' },
+              { label: 'Pending', val: myReports.filter(r => r.status === 'PENDING').length, color: 'text-amber-600', bg: 'bg-amber-50', border: 'border-amber-200' },
+              { label: 'Approved', val: myReports.filter(r => r.status === 'APPROVED').length, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200' },
+            ].map((s, i) => (
+              <div key={i} className={`shrink-0 ${s.bg} border ${s.border} rounded-xl px-3 py-2 flex items-center gap-2`}>
+                <span className={`text-base font-black ${s.color}`}>{s.val}</span>
+                <span className="text-[9px] font-bold text-gray-400 uppercase tracking-wider">{s.label}</span>
               </div>
-            );
-          })}
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center py-20">
+            <div className="animate-spin rounded-full h-8 w-8 border-2 border-emerald-500 border-t-transparent" />
+          </div>
+        ) : myReports.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-slate-100 p-8 sm:p-10 text-center shadow-sm mt-4">
+            <div className="w-16 h-16 rounded-2xl bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={28} className="text-red-300" />
+            </div>
+            <p className="text-slate-500 font-bold text-sm">No damage reports yet</p>
+            <p className="text-[11px] text-slate-300 mt-1 mb-4">Report damaged inventory to keep track</p>
+            <button
+              onClick={() => setView('form')}
+              className="px-5 py-2.5 rounded-xl bg-red-600 text-white text-xs font-black uppercase tracking-wider shadow-lg shadow-red-200 hover:bg-red-700 active:scale-95 transition-all inline-flex items-center gap-2"
+            >
+              <Plus size={14} strokeWidth={3} />
+              Report Damage
+            </button>
+          </div>
+        ) : (
+          <div className="space-y-2.5 sm:space-y-3">
+            {myReports.map(report => {
+              const s = STATUS_STYLES[report.status] || STATUS_STYLES.PENDING;
+              const dmgType = DAMAGE_TYPES.find(d => d.value === report.damageType);
+              return (
+                <div key={report.id} className="bg-white rounded-2xl border border-slate-100 p-3 sm:p-4 shadow-sm active:bg-slate-50 transition-colors">
+                  {/* Top Row — Product + Status */}
+                  <div className="flex items-start gap-2.5 sm:gap-3">
+                    {/* Product Image */}
+                    <div className="shrink-0">
+                      {report.product?.image ? (
+                        <img src={report.product.image} alt="" className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl object-cover border border-gray-100" />
+                      ) : (
+                        <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-gray-100 flex items-center justify-center">
+                          <Package size={16} className="text-gray-400" />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Product Info */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] sm:text-sm font-bold text-slate-900 truncate leading-tight">{report.product?.name}</p>
+                      <p className="text-[10px] text-slate-400 truncate mt-0.5">
+                        {report.displayId} · {new Date(report.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                      </p>
+                    </div>
+
+                    {/* Status Badge */}
+                    <span className={`shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[8px] sm:text-[9px] font-black uppercase tracking-wider ${s.bg} ${s.text} border ${s.border}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
+                      {report.status?.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  {/* Bottom Row — Type, Qty, Loss */}
+                  <div className="flex items-center gap-2 mt-2.5 pt-2 border-t border-slate-50">
+                    <span className={`shrink-0 flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold ${dmgType?.bg || 'bg-gray-100'} ${dmgType?.color || ''}`}>
+                      {dmgType && <dmgType.icon size={12} />} {report.damageType}
+                    </span>
+                    <span className="text-[11px] font-bold text-slate-600">Qty: {report.quantity}</span>
+                    <span className="ml-auto text-[12px] font-black text-red-600">₹{(report.totalLoss || 0).toFixed(0)}</span>
+                  </div>
+
+                  {/* Deduction row */}
+                  {report.deduction && (
+                    <div className="mt-2 pt-2 border-t border-slate-100 flex items-center justify-between">
+                      <span className="text-[10px] text-orange-600 font-bold flex items-center gap-1"><Coins size={10} /> Deduction: ₹{report.deduction.deductionAmount?.toFixed(0)}</span>
+                      <span className={`text-[9px] font-black uppercase ${report.deduction.status === 'APPLIED' ? 'text-emerald-500' : 'text-amber-500'}`}>{report.deduction.status}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
-  </div>
-);
+  );
 
   // ───────── FORM VIEW ─────────
   const renderForm = () => (

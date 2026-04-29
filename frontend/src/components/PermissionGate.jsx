@@ -16,8 +16,10 @@ export default function PermissionGate({ module, action, disabled = false, child
   const user = useUserStore((s) => s.user);
 
   // Bypass roles always have full access
-  const bypassRoles = ['SUPER_ADMIN', 'TENANT_OWNER', 'ADMIN'];
-  if (user && bypassRoles.includes(user.role)) {
+  if (user && ['SUPER_ADMIN', 'TENANT_OWNER'].includes(user.role)) {
+    return children;
+  }
+  if (user && user.role === 'ADMIN' && !user.customRoleId) {
     return children;
   }
 
@@ -50,8 +52,8 @@ export default function PermissionGate({ module, action, disabled = false, child
 export function useHasPermission(module, action) {
   const user = useUserStore((s) => s.user);
   
-  const bypassRoles = ['SUPER_ADMIN', 'TENANT_OWNER', 'ADMIN'];
-  if (user && bypassRoles.includes(user.role)) return true;
+  if (user && ['SUPER_ADMIN', 'TENANT_OWNER'].includes(user.role)) return true;
+  if (user && user.role === 'ADMIN' && !user.customRoleId) return true;
   
   const permissions = user?.permissions;
   if (!permissions) return false;

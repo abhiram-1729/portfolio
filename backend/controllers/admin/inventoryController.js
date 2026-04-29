@@ -32,9 +32,22 @@ export const getItems = async (req, res) => {
         category: { select: { name: true } },
         subCategory: { select: { name: true } },
         unit: { select: { name: true, type: true } },
+        WarehouseInventory: {
+          select: { quantity: true }
+        }
       }
     });
-    res.json(items);
+
+    // Map each item and ensure the 'stock' field reflects the SUM of WarehouseInventory
+    const processedItems = items.map(item => {
+      const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+      return {
+        ...item,
+        stock: warehouseQty > 0 ? warehouseQty : (item.stock || 0)
+      };
+    });
+
+    res.json(processedItems);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching items', error: error.message });
   }
@@ -165,6 +178,32 @@ export const createItem = async (req, res) => {
       data: itemData
     });
 
+    // Handle initial stock if provided (using raw SQL to bypass stale client validation)
+    const initialStock = parseInt(req.body.stock) || 0;
+    if (initialStock > 0) {
+      await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${initialStock} WHERE "id" = '${item.id}'`);
+      
+      // Also ensure at least one WarehouseInventory record exists if we have a warehouse
+      const warehouse = await prisma.warehouse.findFirst({
+        where: { tenantId: finalTenantId }
+      });
+
+      if (warehouse) {
+        await prisma.warehouseInventory.upsert({
+          where: { warehouseId_productId: { warehouseId: warehouse.id, productId: item.id } },
+          update: { quantity: initialStock },
+          create: {
+            tenantId: finalTenantId,
+            warehouseId: warehouse.id,
+            productId: item.id,
+            quantity: initialStock
+          }
+        });
+      }
+      
+      console.log(`[Inventory] Initial stock set for ${item.name}: ${initialStock}`);
+    }
+
     res.status(201).json({ message: 'Item created successfully', item });
   } catch (error) {
     console.error('❌ Create Item Error:', error);
@@ -286,6 +325,36 @@ export const updateItem = async (req, res) => {
       data: updateData
     });
 
+    // Handle manual stock override if provided
+    if (req.body.stock !== undefined) {
+      const newStock = parseInt(req.body.stock) || 0;
+      await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${newStock} WHERE "id" = '${id}'`);
+      
+      // Also update WarehouseInventory to ensure the 'getItems' mapping reflects the override
+      const warehouseInventories = await prisma.warehouseInventory.findMany({
+        where: { productId: id, tenantId: finalTenantId }
+      });
+
+      if (warehouseInventories.length > 0) {
+        // Update the first one to the new stock level
+        await prisma.warehouseInventory.update({
+          where: { id: warehouseInventories[0].id },
+          data: { quantity: newStock }
+        });
+
+        // Set others to 0 to ensure the sum equals the newStock
+        if (warehouseInventories.length > 1) {
+          const otherIds = warehouseInventories.slice(1).map(wi => wi.id);
+          await prisma.warehouseInventory.updateMany({
+            where: { id: { in: otherIds } },
+            data: { quantity: 0 }
+          });
+        }
+      }
+
+      console.log(`[Inventory] Manual stock override for ${item.name}: ${newStock}`);
+    }
+
     res.json({ message: 'Item updated successfully', item });
   } catch (error) {
     console.error('❌ Update Item Error:', error);
@@ -329,40 +398,69 @@ export const loadStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
-    for (const item of items) {
-      const q = parseFloat(item.quantity);
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const q = parseFloat(item.quantity);
+        if (isNaN(q) || q <= 0) continue;
 
-      // Create transaction
-      await prisma.stockTransaction.create({
-        data: {
-          tenantId: req.user.tenantId,
-          storeId,
-          type: 'LOAD',
-          vehicleId,
-          productId: item.productId,
-          quantity: q
+        // 🆕 VALIDATION: Ensure requested quantity doesn't exceed Store Stock
+        const prod = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!prod) {
+          throw new Error(`Product ${item.productId} not found`);
         }
-      });
+        if (Math.floor(q) > (prod.stock || 0)) {
+          throw new Error(`Insufficient stock for ${prod.name}. Available in store: ${prod.stock}`);
+        }
 
-      // Update vehicle stock
-      await prisma.vehicleStock.upsert({
-        where: {
-          vehicleId_productId: { vehicleId, productId: item.productId }
-        },
-        update: {
-          quantity: { increment: q },
-          openingQuantity: { increment: q }
-        },
-        create: {
-          tenantId: req.user.tenantId,
-          storeId,
-          vehicleId,
-          productId: item.productId,
-          quantity: q,
-          openingQuantity: q
+        // Create transaction record
+        await tx.stockTransaction.create({
+          data: {
+            tenantId: req.user.tenantId,
+            storeId,
+            userId: req.user.id,
+            type: 'LOAD',
+            vehicleId,
+            productId: item.productId,
+            quantity: q
+          }
+        });
+
+        // Update vehicle stock
+        await tx.vehicleStock.upsert({
+          where: {
+            vehicleId_productId: { vehicleId, productId: item.productId }
+          },
+          update: {
+            quantity: { increment: Math.floor(q) },
+            openingQuantity: { increment: Math.floor(q) }
+          },
+          create: {
+            tenantId: req.user.tenantId,
+            storeId,
+            vehicleId,
+            productId: item.productId,
+            quantity: Math.floor(q),
+            openingQuantity: Math.floor(q)
+          }
+        });
+
+        // 🆕 DECREMENT main product stock AND WarehouseInventory
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: Math.floor(q) } }
+        });
+
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId: req.user.tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { decrement: Math.floor(q) } }
+          });
         }
-      });
-    }
+      }
+    });
 
     res.json({ message: 'Stock loaded successfully' });
 
@@ -397,6 +495,48 @@ export const loadStock = async (req, res) => {
   }
 };
 
+export const getLoadHistory = async (req, res) => {
+  try {
+    const { storeFilterId, startDate, endDate } = req.query;
+
+    const whereClause = {
+      tenantId: req.user.tenantId,
+      type: 'LOAD'
+    };
+
+    if (storeFilterId) whereClause.storeId = storeFilterId;
+    else if (req.user.storeId) whereClause.storeId = req.user.storeId;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      whereClause.date = { gte: start, lte: end };
+    } else {
+      // Default to last 7 days if not provided
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      whereClause.date = { gte: start };
+    }
+
+    const history = await prisma.stockTransaction.findMany({
+      where: whereClause,
+      include: {
+        vehicle: { select: { vehicleNumber: true, displayId: true } },
+        product: { select: { name: true, skuCode: true, unit: { select: { name: true } } } },
+        user: { select: { name: true, role: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching load history', error: error.message });
+  }
+};
+
 // Stock Return (Evening)
 export const returnStock = async (req, res) => {
   try {
@@ -411,32 +551,52 @@ export const returnStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
-    for (const item of items) {
-      const q = parseFloat(item.quantity);
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const q = parseFloat(item.quantity);
 
-      // Create transaction
-      await prisma.stockTransaction.create({
-        data: {
-          tenantId: req.user.tenantId,
-          storeId,
-          type: 'RETURN',
-          vehicleId,
-          productId: item.productId,
-          quantity: q
-        }
-      });
+        // Create transaction record
+        await tx.stockTransaction.create({
+          data: {
+            tenantId: req.user.tenantId,
+            storeId,
+            userId: req.user.id,
+            type: 'RETURN',
+            vehicleId,
+            productId: item.productId,
+            quantity: q
+          }
+        });
 
-      // Update vehicle stock
-      await prisma.vehicleStock.update({
-        where: {
-          vehicleId_productId: { vehicleId, productId: item.productId }
-        },
-        data: {
-          quantity: { decrement: q },
-          openingQuantity: { decrement: q }
+        // Update vehicle stock
+        await tx.vehicleStock.updateMany({
+          where: {
+            vehicleId,
+            productId: item.productId
+          },
+          data: {
+            quantity: { decrement: Math.floor(q) },
+            openingQuantity: { decrement: Math.floor(q) }
+          }
+        });
+
+        // 🆕 INCREMENT main product stock back AND WarehouseInventory
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: Math.floor(q) } }
+        });
+
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId: req.user.tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { increment: Math.floor(q) } }
+          });
         }
-      });
-    }
+      }
+    });
 
     res.json({ message: 'Stock returned successfully' });
 
@@ -450,8 +610,8 @@ export const returnStock = async (req, res) => {
       userId: req.user.id,
       tenantId: req.user.tenantId,
       storeId,
-      action: 'STOCK_RETURNED',
-      details: `Processed evening stock return for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || vehicleId}. Total items: ${items.length}`,
+      action: 'STOCK_RETURNING',
+      details: `Returned evening stock for vehicle ${vehicle?.vehicleNumber || vehicle?.displayId || vehicleId}. Total items: ${items.length}`,
       targetUserId: assignedUser?.id,
       metadata: { vehicleId, itemCount: items.length }
     });
@@ -460,13 +620,55 @@ export const returnStock = async (req, res) => {
       vehicleIds: [vehicleId],
       roles: ['ADMIN'],
       title: 'Stock Returned',
-      message: `Evening stock return processed for vehicle.`,
+      message: `Stock has been returned from vehicle.`,
       type: 'inventory',
       priority: 'low',
       metadata: { vehicleId }
     });
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: 'Error returning stock', error: error.message });
+  }
+};
+
+export const getReturnHistory = async (req, res) => {
+  try {
+    const { storeFilterId, startDate, endDate } = req.query;
+
+    const whereClause = {
+      tenantId: req.user.tenantId,
+      type: 'RETURN'
+    };
+
+    if (storeFilterId) whereClause.storeId = storeFilterId;
+    else if (req.user.storeId) whereClause.storeId = req.user.storeId;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      whereClause.date = { gte: start, lte: end };
+    } else {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      whereClause.date = { gte: start };
+    }
+
+    const history = await prisma.stockTransaction.findMany({
+      where: whereClause,
+      include: {
+        vehicle: { select: { vehicleNumber: true, displayId: true } },
+        product: { select: { name: true, skuCode: true, unit: { select: { name: true } } } },
+        user: { select: { name: true, role: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching return history', error: error.message });
   }
 };
 
@@ -937,56 +1139,65 @@ export const auditVehicleStock = async (req, res) => {
         }
       });
 
+      // 2. Prepare data for batch operations
+      const auditItemsData = [];
+      const transactionsData = [];
+      
       for (const item of items) {
-        const q = Math.floor(parseFloat(item.quantity) || 0);
-        const oldQty = stockMap.get(item.productId) || 0;
+        const q = parseFloat(item.quantity);
+        if (isNaN(q)) continue;
 
-        // 2. Create Audit Item
-        await tx.stockAuditItem.create({
-          data: {
-            tenantId: req.user.tenantId,
-            auditId: audit.id,
-            productId: item.productId,
-            oldQuantity: oldQty,
-            newQuantity: q
-          }
+        // Get current stock for historical record (still need this per item unfortunately)
+        const currentStock = await tx.vehicleStock.findUnique({
+          where: { vehicleId_productId: { vehicleId: id, productId: item.productId } }
         });
 
-        // 3. Log the audit as a special transaction
-        await tx.stockTransaction.create({
-          data: {
-            tenantId: req.user.tenantId,
-            storeId,
-            type: 'AUDIT',
-            vehicleId: id,
-            productId: item.productId,
-            quantity: q,
-            date: new Date()
-          }
+        auditItemsData.push({
+          tenantId: req.user.tenantId,
+          auditId: audit.id,
+          productId: item.productId,
+          oldQuantity: Math.floor(currentStock?.quantity || 0),
+          newQuantity: Math.floor(q)
         });
 
-        // 4. Hard update the stock to the new audited value
+        transactionsData.push({
+          tenantId: req.user.tenantId,
+          storeId,
+          type: 'AUDIT',
+          vehicleId: id,
+          productId: item.productId,
+          quantity: Math.floor(q),
+          date: new Date()
+        });
+
+        // 3. Hard update the stock to the new audited value
         await tx.vehicleStock.upsert({
           where: {
             vehicleId_productId: { vehicleId: id, productId: item.productId }
           },
           update: { 
-            quantity: q,
-            openingQuantity: q 
+            quantity: Math.floor(q),
+            openingQuantity: Math.floor(q) 
           },
           create: { 
             tenantId: req.user.tenantId,
             storeId,
             vehicleId: id, 
             productId: item.productId, 
-            quantity: q,
-            openingQuantity: q
+            quantity: Math.floor(q),
+            openingQuantity: Math.floor(q)
           }
         });
       }
+
+      // 4. Batch create Audit Items and Transactions
+      if (auditItemsData.length > 0) {
+        await tx.stockAuditItem.createMany({ data: auditItemsData });
+        await tx.stockTransaction.createMany({ data: transactionsData });
+      }
     }, {
-      maxWait: 30000, 
-      timeout: 120000 // 2 minutes for large audits
+      maxWait: 20000,
+      timeout: 60000
     });
     console.log('Prisma Transaction committed successfully.');
 
@@ -1118,8 +1329,9 @@ export const approveRefillRequest = async (req, res) => {
           data: {
             tenantId: request.tenantId,
             storeId: request.storeId,
+            userId: req.user.id,
             date: new Date(),
-            type: 'LOAD',
+            type: 'REFILL',
             vehicleId: request.vehicleId,
             productId: item.productId,
             quantity: item.quantity
@@ -1141,7 +1353,14 @@ export const approveRefillRequest = async (req, res) => {
             openingQuantity: item.quantity
           }
         });
+ 
+        // 🆕 DECREMENT main product stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: Math.floor(item.quantity) } }
+        });
       }
+
 
       const processedItemIds = itemsToProcess.map(i => i.id);
       
@@ -1158,6 +1377,7 @@ export const approveRefillRequest = async (req, res) => {
             tenantId: request.tenantId,
             vehicleId: request.vehicleId,
             userId: request.userId,
+            approvedById: req.user.id,
             status: 'APPROVED',
             parentId: request.parentId || request.id,
             items: {
@@ -1175,7 +1395,10 @@ export const approveRefillRequest = async (req, res) => {
         // Full Approval
         await tx.refillRequest.update({
           where: { id },
-          data: { status: 'APPROVED' }
+          data: { 
+            status: 'APPROVED',
+            approvedById: req.user.id
+          }
         });
 
         // Update items to store the requested quantity if not already set
@@ -1311,8 +1534,14 @@ export const rejectRefillRequest = async (req, res) => {
       include: { items: true }
     });
 
-    if (!request) return res.status(404).json({ message: 'Refill request not found' });
-    if (request.status !== 'PENDING') return res.status(400).json({ message: 'Request is already processed' });
+    if (!request) {
+      console.log('Reject Refill Failed: Not found', id);
+      return res.status(404).json({ message: 'Refill request not found' });
+    }
+    if (request.status !== 'PENDING') {
+      console.log('Reject Refill Failed: Already processed', id, 'Status:', request.status);
+      return res.status(400).json({ message: `Request is already ${request.status}` });
+    }
 
     let itemsToProcess = request.items;
     if (rejectedItemIds && Array.isArray(rejectedItemIds)) {
@@ -1470,5 +1699,157 @@ export const getAuditHistory = async (req, res) => {
   } catch (error) {
     console.error('getAuditHistory error:', error);
     res.status(500).json({ message: 'Error fetching audit history', error: error.message });
+  }
+};
+
+// Update Product Stock Count
+export const updateProductStock = async (req, res) => {
+  try {
+    const { productId, quantity, mode } = req.body;
+    const finalTenantId = req.user?.tenantId || getTenantId();
+
+    console.log(`[Inventory] Stock Update Request: Product=${productId}, Qty=${quantity}, Mode=${mode}, Tenant=${finalTenantId}`);
+
+    if (!productId || quantity === undefined) {
+      return res.status(400).json({ message: 'productId and quantity are required' });
+    }
+
+    const qty = parseInt(quantity);
+    if (isNaN(qty)) {
+      return res.status(400).json({ message: 'Invalid quantity' });
+    }
+
+    const updatedProduct = await prisma.$transaction(async (tx) => {
+      // 1. Find Product
+      const product = await tx.product.findUnique({ where: { id: productId } });
+      if (!product) throw new Error('Product not found in database');
+
+      // 2. Update Product main stock using raw SQL to bypass stale Prisma client validation
+      if (mode === 'add') {
+        await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = "stock" + ${qty} WHERE "id" = '${productId}'`);
+      } else {
+        await tx.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${qty} WHERE "id" = '${productId}'`);
+      }
+      
+      const prod = await tx.product.findUnique({ where: { id: productId } });
+      if (!prod) throw new Error('Product not found after update');
+
+      console.log(`[Inventory] Primary stock updated for ${prod.name}. New total: ${prod.stock}`);
+
+      // 3. Find/Create Warehouse
+      let warehouse = await tx.warehouse.findFirst({
+        where: { tenantId: finalTenantId }
+      });
+
+      if (!warehouse) {
+        console.log(`[Inventory] No warehouse found for tenant ${finalTenantId}, creating default.`);
+        warehouse = await tx.warehouse.create({
+          data: {
+            tenantId: finalTenantId,
+            name: 'Main Warehouse',
+            location: 'System Generated'
+          }
+        });
+      }
+
+      // 4. Update Warehouse Inventory
+      const existingWI = await tx.warehouseInventory.findFirst({
+        where: { 
+          warehouseId: warehouse.id,
+          productId: productId 
+        }
+      });
+
+      if (existingWI) {
+        await tx.warehouseInventory.update({
+          where: { id: existingWI.id },
+          data: {
+            quantity: mode === 'add' ? { increment: qty } : qty
+          }
+        });
+      } else {
+        await tx.warehouseInventory.create({
+          data: {
+            tenantId: finalTenantId,
+            warehouseId: warehouse.id,
+            productId: productId,
+            quantity: qty
+          }
+        });
+      }
+
+      console.log(`[Inventory] Warehouse Inventory synced for warehouse ${warehouse.id}`);
+
+      // 5. Return updated product with relations for UI
+      return tx.product.findUnique({
+        where: { id: productId },
+        include: {
+          category: true,
+          subCategory: true,
+          unit: true,
+          brand: true,
+        }
+      });
+    });
+
+    // Log Activity (Non-blocking or outside transaction is fine)
+    await logActivity({
+      tenantId: finalTenantId,
+      userId: req.user.id,
+      storeId: req.user.storeId || null,
+      action: 'STOCK_UPDATE',
+      entity: 'PRODUCT',
+      entityId: productId,
+      description: `Stock ${mode === 'add' ? 'added' : 'set'}: ${qty} units for ${updatedProduct.name}. New total: ${updatedProduct.stock}`,
+    }).catch(err => console.warn('[Inventory] Log activity failed:', err.message));
+
+    res.json({ success: true, data: updatedProduct });
+  } catch (error) {
+    console.error('❌ updateProductStock Error Details:', {
+      message: error.message,
+      stack: error.stack,
+      body: req.body
+    });
+    res.status(500).json({ message: 'Error updating stock', error: error.message });
+  }
+};
+export const getRefillHistory = async (req, res) => {
+  try {
+    const { storeFilterId, startDate, endDate } = req.query;
+
+    const whereClause = {
+      tenantId: req.user.tenantId,
+      type: 'REFILL'
+    };
+
+    if (storeFilterId) whereClause.storeId = storeFilterId;
+    else if (req.user.storeId) whereClause.storeId = req.user.storeId;
+
+    if (startDate && endDate) {
+      const start = new Date(startDate);
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      whereClause.date = { gte: start, lte: end };
+    } else {
+      const start = new Date();
+      start.setDate(start.getDate() - 7);
+      whereClause.date = { gte: start };
+    }
+
+    const history = await prisma.stockTransaction.findMany({
+      where: whereClause,
+      include: {
+        vehicle: { select: { vehicleNumber: true, displayId: true } },
+        product: { select: { name: true, skuCode: true, unit: { select: { name: true } } } },
+        user: { select: { name: true, role: true } }
+      },
+      orderBy: { date: 'desc' },
+      take: 500
+    });
+
+    res.json(history);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Error fetching refill history', error: error.message });
   }
 };

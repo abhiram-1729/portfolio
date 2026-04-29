@@ -18,7 +18,8 @@ router.route('/vendors')
   .get(vendorCtr.getVendors)
   .post(vendorCtr.createVendor);
 router.route('/vendors/:id')
-  .put(vendorCtr.updateVendor);
+  .put(vendorCtr.updateVendor)
+  .delete(vendorCtr.deleteVendor);
 router.put('/vendors/:id/toggle-status', vendorCtr.toggleVendorStatus);
 router.get('/vendors/:id/ledger', vendorCtr.getVendorLedger);
 

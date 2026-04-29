@@ -5,7 +5,7 @@ import {
   Filter, ChevronDown, ChevronRight, Search, TrendingDown, Users, Truck,
   Image as ImageIcon, Shield, Ban, FileText, BarChart3, X, AlertCircle,
   Percent, CreditCard, RefreshCcw, Download, Info, Hammer, Droplets,
-  HelpCircle, Coins, ArrowLeft
+  HelpCircle, Coins, ArrowLeft, Plus, Send, Camera, Trash2 as Trash
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { damageAPI } from '../../services/damageService';
@@ -43,7 +43,23 @@ const RESPONSIBILITY_LABELS = {
 export default function AdminDamage() {
   const [searchParams] = useSearchParams();
   const storeId = searchParams.get('storeId');
-  const user = useUserStore(s => s.user);
+  const { user, can } = useUserStore();
+
+  if (!can('INVENTORY', 'READ', 'DAMAGE')) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 bg-white rounded-[2rem] border border-gray-100 shadow-sm mt-8">
+        <Ban size={48} className="text-gray-300 mb-4" />
+        <h2 className="text-xl font-black text-gray-900 uppercase tracking-tight">Access Denied</h2>
+        <p className="text-gray-500 mt-1 font-bold text-sm">You do not have permission to view Damage management.</p>
+        <button 
+          onClick={() => window.history.back()}
+          className="mt-6 px-6 py-2.5 bg-gray-900 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-800 transition-all"
+        >
+          Go Back
+        </button>
+      </div>
+    );
+  }
 
   const [activeTab, setActiveTab] = useState('entries');
   const [entries, setEntries] = useState([]);
@@ -70,6 +86,23 @@ export default function AdminDamage() {
   const [deductionMode, setDeductionMode] = useState('FULL');
   const [deductionPercentage, setDeductionPercentage] = useState(100);
   const [deductionRemarks, setDeductionRemarks] = useState('');
+
+  // Creation State
+  const [showCreatePage, setShowCreatePage] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [allProducts, setAllProducts] = useState([]);
+  const [vehicles, setVehicles] = useState([]);
+  const [createData, setCreateData] = useState({
+    productId: '',
+    vehicleId: '',
+    quantity: '',
+    damageType: 'DAMAGED',
+    reason: '',
+    responsibility: 'UNKNOWN',
+    images: []
+  });
+  const [createPreviews, setCreatePreviews] = useState([]);
+  const [productSearch, setProductSearch] = useState('');
 
   const fetchEntries = useCallback(async () => {
     try {
@@ -114,6 +147,23 @@ export default function AdminDamage() {
     else if (activeTab === 'deductions') fetchDeductions();
     else if (activeTab === 'reports') fetchReports();
   }, [activeTab, fetchEntries, fetchDeductions, fetchReports]);
+
+  const fetchCreateData = useCallback(async () => {
+    try {
+      const [prodsRes, vehiclesRes] = await Promise.all([
+        adminAPI.getItems({ showAll: true }),
+        adminAPI.getVehicles()
+      ]);
+      setAllProducts(prodsRes.data || []);
+      setVehicles(vehiclesRes.data || []);
+    } catch (err) {
+      console.error('Failed to fetch data for damage creation');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showCreatePage) fetchCreateData();
+  }, [showCreatePage, fetchCreateData]);
 
   // Filtered entries
   const filteredEntries = useMemo(() => {
@@ -195,6 +245,55 @@ export default function AdminDamage() {
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to apply deduction');
     }
+  };
+
+  const handleCreateSubmit = async (e) => {
+    e.preventDefault();
+    if (!createData.productId || !createData.quantity || !createData.damageType) {
+      return toast.error('Fill required fields');
+    }
+
+    setSubmitting(true);
+    try {
+      const formData = new FormData();
+      formData.append('productId', createData.productId);
+      formData.append('quantity', createData.quantity);
+      formData.append('damageType', createData.damageType);
+      formData.append('reason', createData.reason || 'Reported by Admin');
+      formData.append('responsibility', createData.responsibility);
+      if (createData.vehicleId) formData.append('vehicleId', createData.vehicleId);
+
+      createData.images.forEach(img => formData.append('images', img));
+
+      await damageAPI.reportDamage(formData);
+      toast.success('Damage reported successfully');
+      setShowCreatePage(false);
+      setCreateData({ productId: '', vehicleId: '', quantity: '', damageType: 'DAMAGED', reason: '', responsibility: 'UNKNOWN', images: [] });
+      setCreatePreviews([]);
+      fetchEntries();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create report');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleImageChange = (e) => {
+    const files = Array.from(e.target.files);
+    if (!files.length) return;
+    const newImages = [...createData.images, ...files].slice(0, 4);
+    setCreateData({ ...createData, images: newImages });
+    const newPreviews = files.map(f => URL.createObjectURL(f));
+    setCreatePreviews([...createPreviews, ...newPreviews].slice(0, 4));
+  };
+
+  const removeImage = (index) => {
+    const newImgs = [...createData.images];
+    newImgs.splice(index, 1);
+    const newPrevs = [...createPreviews];
+    newPrevs.splice(index, 1);
+    setCreateData({ ...createData, images: newImgs });
+    setCreatePreviews(newPrevs);
   };
 
   const handleDeductionStatusChange = async (id, status) => {
@@ -376,7 +475,7 @@ export default function AdminDamage() {
                         >
                           <Eye size={16} />
                         </button>
-                        {(entry.status === 'PENDING' || entry.status === 'UNDER_REVIEW') && (
+                        {can('INVENTORY', 'UPDATE', 'DAMAGE') && (entry.status === 'PENDING' || entry.status === 'UNDER_REVIEW') && (
                           <button 
                             onClick={() => openReview(entry)} 
                             className="p-2 rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-500 hover:text-emerald-700 hover:bg-white hover:shadow-md transition-all" 
@@ -385,7 +484,7 @@ export default function AdminDamage() {
                             <Shield size={16} />
                           </button>
                         )}
-                        {entry.status === 'APPROVED' && !entry.deduction && entry.adminResponsibility && entry.adminResponsibility !== 'NOT_RESPONSIBLE' && (
+                        {can('INVENTORY', 'UPDATE', 'DAMAGE') && entry.status === 'APPROVED' && !entry.deduction && entry.adminResponsibility && entry.adminResponsibility !== 'NOT_RESPONSIBLE' && (
                           <button 
                             onClick={() => openDeduction(entry)} 
                             className="p-2 rounded-xl bg-amber-50 border border-amber-100 text-amber-500 hover:text-amber-700 hover:bg-white hover:shadow-md transition-all" 
@@ -487,7 +586,7 @@ export default function AdminDamage() {
                   <p className="text-sm font-bold text-red-600">₹{(d.deductionAmount || 0).toFixed(0)}</p>
                 </div>
               </div>
-              {d.status === 'PENDING' && (
+              {can('INVENTORY', 'UPDATE', 'DAMAGE') && d.status === 'PENDING' && (
                 <div className="flex gap-2 mt-2 pt-2 border-t border-gray-100">
                   <button onClick={() => handleDeductionStatusChange(d.id, 'APPLIED')} className="flex-1 py-2 rounded-xl bg-emerald-50 text-emerald-600 text-xs font-bold hover:bg-emerald-100 flex items-center justify-center gap-2">
                     <CheckCircle size={14} /> Apply to Payroll
@@ -651,6 +750,206 @@ export default function AdminDamage() {
   };
 
   // ───────── MODALS ─────────
+  
+  // Create Page
+  const renderCreatePage = () => {
+    return (
+      <div className="w-full space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-300 pb-12">
+        <div className="flex items-center justify-between mb-4">
+          <button 
+            onClick={() => setShowCreatePage(false)} 
+            className="flex items-center gap-2 text-gray-500 hover:text-gray-900 border border-gray-200 bg-white px-5 py-2.5 rounded-xl text-xs font-black uppercase shadow-sm transition-all hover:bg-gray-50"
+          >
+            <ArrowLeft size={16} /> Cancel & Back
+          </button>
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-red-100 rounded-lg flex items-center justify-center text-red-600">
+              <AlertTriangle size={16} />
+            </div>
+            <h2 className="text-sm font-black text-gray-900 uppercase tracking-wider">Report New Damage</h2>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 mx-auto max-w-2xl overflow-hidden">
+          <div className="p-8 md:p-10 space-y-8">
+            <form onSubmit={handleCreateSubmit} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Select Product *</label>
+                <div className="relative">
+                  <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                  <input
+                    type="text"
+                    placeholder="Search product by name or barcode..."
+                    value={productSearch}
+                    onChange={(e) => {
+                      setProductSearch(e.target.value);
+                      // Clear selection if they start typing again
+                      if (createData.productId) setCreateData({ ...createData, productId: '' });
+                    }}
+                    className="w-full pl-12 pr-12 py-4 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 outline-none transition-all"
+                  />
+                  {(productSearch || createData.productId) && (
+                    <button
+                      type="button"
+                      onClick={() => { setProductSearch(''); setCreateData({ ...createData, productId: '' }); }}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 rounded-xl bg-gray-100 flex items-center justify-center text-gray-400 hover:text-red-500 transition-all"
+                    >
+                      <X size={16} />
+                    </button>
+                  )}
+                  {productSearch && !createData.productId && (
+                    <div className="absolute z-20 left-0 right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-2xl max-h-64 overflow-y-auto scrollbar-thin">
+                      {allProducts
+                        .filter(p => 
+                          p.name.toLowerCase().includes(productSearch.toLowerCase()) || 
+                          (p.barcode && p.barcode.toLowerCase().includes(productSearch.toLowerCase()))
+                        )
+                        .slice(0, 15)
+                        .map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => { setCreateData({ ...createData, productId: p.id }); setProductSearch(p.name); }}
+                            className="w-full px-5 py-4 text-left hover:bg-red-50 flex items-center justify-between border-b last:border-0 transition-colors"
+                          >
+                            <div className="flex items-center gap-3">
+                               <div className="w-10 h-10 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-100">
+                                 {p.image ? <img src={p.image} className="w-full h-full object-cover" alt="" /> : <Package size={16} className="text-gray-400" />}
+                               </div>
+                               <div className="flex flex-col">
+                                 <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{p.name}</span>
+                                 <span className="text-[10px] font-bold text-gray-400">{p.barcode || 'NO BARCODE'}</span>
+                               </div>
+                            </div>
+                            <div className="text-right">
+                              <span className="text-[10px] font-black text-emerald-600 block">₹{p.price}</span>
+                              <span className="text-[9px] font-bold text-gray-400 uppercase">STOCK: {p.stock}</span>
+                            </div>
+                          </button>
+                        ))
+                      }
+                      {allProducts.filter(p => p.name.toLowerCase().includes(productSearch.toLowerCase())).length === 0 && (
+                        <div className="p-8 text-center text-gray-400">
+                          <Package size={24} className="mx-auto mb-2 opacity-20" />
+                          <p className="text-xs font-bold">No products found</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {createData.productId && (
+                <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 flex items-center gap-4 animate-in slide-in-from-top-2">
+                  <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center border border-emerald-100 shadow-sm overflow-hidden">
+                    {allProducts.find(p => p.id === createData.productId)?.image ? (
+                      <img src={allProducts.find(p => p.id === createData.productId).image} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      <Package size={20} className="text-emerald-300" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Selected Item</p>
+                    <p className="text-sm font-black text-emerald-950 uppercase">{allProducts.find(p => p.id === createData.productId)?.name}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[10px] font-black text-emerald-600 uppercase">Availability</p>
+                    <p className="text-sm font-black text-emerald-950">{allProducts.find(p => p.id === createData.productId)?.stock} Units</p>
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Quantity *</label>
+                  <input
+                    type="number"
+                    required
+                    value={createData.quantity}
+                    onChange={(e) => setCreateData({ ...createData, quantity: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white outline-none"
+                    placeholder="0"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Damage Type *</label>
+                  <select
+                    value={createData.damageType}
+                    onChange={(e) => setCreateData({ ...createData, damageType: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white outline-none appearance-none cursor-pointer"
+                  >
+                    <option value="DAMAGED">Damaged</option>
+                    <option value="EXPIRED">Expired</option>
+                    <option value="LEAKAGE">Leakage</option>
+                    <option value="LOST">Lost</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Target Location (Optional)</label>
+                <select
+                  value={createData.vehicleId}
+                  onChange={(e) => setCreateData({ ...createData, vehicleId: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white outline-none appearance-none cursor-pointer"
+                >
+                  <option value="">Store Level (Warehouse)</option>
+                  {vehicles.map(v => (
+                    <option key={v.id} value={v.id}>{v.vehicleNumber} ({v.driver?.name || 'No Driver'})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Reason / Notes</label>
+                <textarea
+                  value={createData.reason}
+                  onChange={(e) => setCreateData({ ...createData, reason: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-5 py-4 text-sm font-bold focus:bg-white outline-none h-24 resize-none"
+                  placeholder="Provide detailed information about the loss..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Evidence Photos (Max 4)</label>
+                <div className="flex flex-wrap gap-3">
+                  {createPreviews.map((p, i) => (
+                    <div key={i} className="relative w-20 h-20 rounded-2xl overflow-hidden border border-gray-200 group shadow-sm">
+                      <img src={p} alt="" className="w-full h-full object-cover" />
+                      <button 
+                        type="button" 
+                        onClick={() => removeImage(i)} 
+                        className="absolute top-1 right-1 bg-white/90 backdrop-blur p-1 rounded-lg text-red-500 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                      >
+                        <Trash size={12} />
+                      </button>
+                    </div>
+                  ))}
+                  {createData.images.length < 4 && (
+                    <label className="w-20 h-20 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-300 hover:border-red-400 hover:text-red-500 cursor-pointer transition-all hover:bg-red-50/50">
+                      <Camera size={20} />
+                      <span className="text-[8px] font-black uppercase mt-1">Upload</span>
+                      <input type="file" multiple accept="image/*" onChange={handleImageChange} className="hidden" />
+                    </label>
+                  )}
+                </div>
+              </div>
+
+              <div className="pt-4">
+                <button
+                  type="submit"
+                  disabled={submitting || !createData.productId}
+                  className="w-full bg-red-600 text-white font-black py-5 rounded-[2rem] shadow-2xl shadow-red-600/20 hover:bg-red-700 active:scale-95 transition-all flex items-center justify-center gap-3 disabled:opacity-50 text-xs uppercase tracking-[0.2em]"
+                >
+                  {submitting ? <RefreshCcw className="animate-spin" size={18} /> : <><Send size={18} /> Submit Damage Report</>}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   // Detail Modal
   const renderDetailModal = () => {
@@ -1019,6 +1318,15 @@ export default function AdminDamage() {
     );
   }
 
+  if (showCreatePage) {
+    return (
+      <div className="w-full space-y-6 animate-in slide-in-from-bottom-4 duration-500 pb-12">
+        {renderCreatePage()}
+        {renderImageModal()}
+      </div>
+    );
+  }
+
   return (
     <div className="w-full">
       {/* Page Header - Non sticky for better vertical space */}
@@ -1031,6 +1339,14 @@ export default function AdminDamage() {
             <h1 className="text-xl font-black text-gray-900 tracking-tight">Damage & Deductions</h1>
             <p className="text-xs text-gray-400 font-medium tracking-tight">Inventory damage tracking, accountability & financial recovery</p>
           </div>
+          {can('INVENTORY', 'CREATE', 'DAMAGE') && (
+            <button 
+              onClick={() => setShowCreatePage(true)}
+              className="ml-auto flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/10 hover:bg-red-700 active:scale-95 transition-all"
+            >
+              <Plus size={14} strokeWidth={3} /> Report Damage
+            </button>
+          )}
         </div>
       </div>
 
@@ -1050,12 +1366,10 @@ export default function AdminDamage() {
         </div>
       </div>
 
-      {/* Tab Content */}
       {activeTab === 'entries' && renderEntries()}
       {activeTab === 'deductions' && renderDeductions()}
       {activeTab === 'reports' && renderReportsTab()}
 
-      {/* Modals */}
       {/* Modals */}
       {renderImageModal()}
     </div>

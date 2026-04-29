@@ -3,6 +3,9 @@ import { useCartStore } from '../store/cartStore';
 import { useUserStore } from '../store/userStore';
 import { useNotificationStore } from '../store/notificationStore';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { attendanceAPI } from '../services/api';
+import PunchOutModal from './PunchOutModal';
 
 import logo from '../assets/VillagKart_Logo.png';
 
@@ -12,6 +15,44 @@ export default function Header({ onMenuClick }) {
   const navigate = useNavigate();
   const location = useLocation();
   const isRoot = location.pathname === '/';
+
+  const [attendance, setAttendance] = useState(null);
+  const [durationHours, setDurationHours] = useState(0);
+  const [showPunchOut, setShowPunchOut] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === 'SALES_AGENT') {
+      attendanceAPI.getToday().then(({ data }) => {
+        if (data.punchedIn && data.attendance?.status === 'ACTIVE') {
+          setAttendance(data.attendance);
+        }
+      }).catch(console.error);
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!attendance?.punchInTime) return;
+    
+    const updateTime = () => {
+      const now = new Date();
+      const punchInTime = new Date(attendance.punchInTime);
+      const diffMs = now - punchInTime;
+      const hours = diffMs / (1000 * 60 * 60);
+      setDurationHours(hours);
+    };
+    
+    updateTime();
+    const timer = setInterval(updateTime, 60000); // update every minute
+    return () => clearInterval(timer);
+  }, [attendance]);
+
+  const handlePunchOutSuccess = (completedAttendance) => {
+    setAttendance(null); // Hide button
+    setShowPunchOut(false);
+  };
+
+  const isEarly = durationHours < 9;
+  const hoursText = durationHours > 0 ? durationHours.toFixed(1) + 'h' : '0.0h';
 
   return (
     <header className="sticky top-0 z-40 bg-white border-b border-gray-100 pt-[calc(var(--safe-top)+0.5rem)] pb-2 transition-all duration-300 shadow-sm">
@@ -59,6 +100,24 @@ export default function Header({ onMenuClick }) {
               <PackageSearch size={20} strokeWidth={2.5} />
             </Link>
 
+            {/* Punch Out Button */}
+            {attendance && (
+              <button 
+                onClick={() => setShowPunchOut(true)}
+                className={`px-3 py-1.5 rounded-xl flex items-center gap-2 border font-bold text-xs transition-all hover:shadow-md active:scale-95 ${
+                  isEarly 
+                    ? 'bg-orange-50 text-orange-700 border-orange-200 shadow-orange-500/10' 
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-emerald-500/10'
+                }`}
+              >
+                 <LogOut size={16} strokeWidth={2.5} className={isEarly ? 'text-orange-500' : 'text-emerald-500'} />
+                 <div className="hidden xs:flex flex-col items-start leading-none">
+                   <span className="text-[10px] uppercase tracking-wider font-black">Punch Out</span>
+                   <span className="text-[8px] opacity-80 font-bold">{hoursText} ({isEarly ? 'Early' : 'On-Time'})</span>
+                 </div>
+              </button>
+            )}
+
             <Link to="/notifications" className="relative p-2 rounded-xl hover:bg-white active:scale-90 transition-all text-slate-500 flex items-center justify-center">
               <Bell size={20} strokeWidth={2.5} />
               {unreadCount > 0 && (
@@ -71,6 +130,13 @@ export default function Header({ onMenuClick }) {
         </div>
 
       </div>
+
+      {showPunchOut && (
+        <PunchOutModal 
+          onClose={() => setShowPunchOut(false)} 
+          onPunchOut={handlePunchOutSuccess} 
+        />
+      )}
     </header>
   );
 }

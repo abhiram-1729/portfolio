@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Package, Loader2, Search, Plus, Minus, X, Gift } from 'lucide-react';
+import { ArrowLeft, Package, Loader2, Search, Plus, Minus, X, Gift, History, Calendar, User, Info, ChevronDown, ChevronUp } from 'lucide-react';
 import { productsAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import { format } from 'date-fns';
 
 export default function AgentInventory() {
+  const [activeTab, setActiveTab] = useState('stock'); // 'stock' or 'history'
   const [inventory, setInventory] = useState([]);
+  const [auditHistory, setAuditHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterFreeOnly, setFilterFreeOnly] = useState(false);
@@ -14,17 +17,22 @@ export default function AgentInventory() {
   const [refillItems, setRefillItems] = useState({}); // { [productId]: quantity }
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [refillSearchQuery, setRefillSearchQuery] = useState('');
+  const [expandedAuditId, setExpandedAuditId] = useState(null);
 
   const navigate = useNavigate();
   const { vehicleId } = useParams();
 
   useEffect(() => {
     if (vehicleId && vehicleId !== 'undefined' && vehicleId !== 'null') {
-      fetchInventory();
+      if (activeTab === 'stock') {
+        fetchInventory();
+      } else {
+        fetchAuditHistory();
+      }
     } else {
       setLoading(false);
     }
-  }, [vehicleId]);
+  }, [vehicleId, activeTab]);
 
   const fetchInventory = async () => {
     try {
@@ -34,6 +42,19 @@ export default function AgentInventory() {
     } catch (error) {
       console.error(error);
       toast.error('Failed to load vehicle inventory');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchAuditHistory = async () => {
+    try {
+      setLoading(true);
+      const { data } = await productsAPI.getAuditHistory(vehicleId);
+      setAuditHistory(data);
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to load audit history');
     } finally {
       setLoading(false);
     }
@@ -82,10 +103,10 @@ export default function AgentInventory() {
         const { data } = await productsAPI.getAll({ showAll: true });
         setAllProducts(data);
       }
-      
+
       const newRefillItems = {};
       let hasItemsToRefill = false;
-      
+
       inventory.forEach(item => {
         const targetCapacity = Math.max(item.openingQuantity || 0, item.quantity);
         const diff = targetCapacity - item.quantity;
@@ -94,12 +115,12 @@ export default function AgentInventory() {
           hasItemsToRefill = true;
         }
       });
-      
+
       if (!hasItemsToRefill) {
         toast.error('Inventory is already at full capacity');
         return;
       }
-      
+
       setRefillItems(newRefillItems);
       setShowRefillModal(true);
     } catch (error) {
@@ -124,44 +145,63 @@ export default function AgentInventory() {
             <button onClick={() => navigate(-1)} className="p-2.5 rounded-2xl hover:bg-emerald-50 active:scale-90 transition-all bg-white shadow-sm border border-emerald-100 text-emerald-700">
               <ArrowLeft size={22} strokeWidth={2.5} />
             </button>
-            <h1 className="text-xl font-black text-emerald-950 tracking-tight">Vehicle Inventory</h1>
+            <h1 className="text-xl font-black text-emerald-950 tracking-tight">Inventory</h1>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={refillToInitial}
-              className="px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
-            >
-              <Package size={16} /> Refill Original
-            </button>
-            <button
-              onClick={fetchAllProductsForRefill}
-              className="px-3 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
-            >
-              <Plus size={16} /> Custom Refill
-            </button>
-          </div>
+          {activeTab === 'stock' && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={refillToInitial}
+                className="px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+              >
+                <Package size={16} /> Original
+              </button>
+              <button
+                onClick={fetchAllProductsForRefill}
+                className="px-3 py-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+              >
+                <Plus size={16} /> Custom
+              </button>
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center gap-3 bg-white border border-emerald-100 p-2 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
-          <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500">
-            <Search size={18} strokeWidth={2.5} />
-          </div>
-          <input
-            type="text"
-            placeholder="Search items..."
-            className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold text-emerald-950 placeholder-emerald-950/30"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-          />
-
+        {/* Tab Switcher */}
+        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200 shadow-inner">
+          <button
+            onClick={() => setActiveTab('stock')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'stock' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            <Package size={14} /> Current Stock
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`flex-1 flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+          >
+            <History size={14} /> Tracking History
+          </button>
         </div>
+
+        {activeTab === 'stock' && (
+          <div className="flex items-center gap-3 bg-white border border-emerald-100 p-2 rounded-2xl shadow-sm focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+            <div className="bg-emerald-50 p-1.5 rounded-xl text-emerald-500">
+              <Search size={18} strokeWidth={2.5} />
+            </div>
+            <input
+              type="text"
+              placeholder="Search items..."
+              className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold text-emerald-950 placeholder-emerald-950/30"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </div>
+        )}
       </div>
 
       <div className="max-w-lg mx-auto px-5 pt-6 space-y-4">
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-4">
             <Loader2 className="animate-spin text-emerald-600" size={40} />
-            <p className="text-sm font-black text-emerald-900/40 uppercase tracking-widest">Loading Stock...</p>
+            <p className="text-sm font-black text-emerald-900/40 uppercase tracking-widest">Loading...</p>
           </div>
         ) : (!vehicleId || vehicleId === 'undefined' || vehicleId === 'null' || vehicleId === 'none') ? (
           <div className="glass rounded-[2rem] p-10 flex flex-col items-center text-center border border-rose-50 bg-white/70 shadow-sm">
@@ -169,74 +209,163 @@ export default function AgentInventory() {
             <p className="text-sm font-black text-rose-900 uppercase tracking-widest">No Vehicle Assigned</p>
             <p className="text-[10px] font-bold text-rose-600 mt-2 uppercase tracking-tighter">Please contact your administrator to assign a vehicle to your profile.</p>
           </div>
-        ) : filteredInventory.length === 0 ? (
-          <div className="glass rounded-[2rem] p-10 flex flex-col items-center text-center border border-emerald-50 bg-white/70 shadow-sm opacity-60">
-            <Package size={48} className="text-emerald-300 mb-4" />
-            <p className="text-sm font-black text-emerald-900 uppercase tracking-widest">No Items Found</p>
-            <p className="text-[10px] font-bold text-emerald-600 mt-2 uppercase tracking-tighter">Stock may not be assigned yet.</p>
-          </div>
-        ) : (
+        ) : activeTab === 'stock' ? (
           <>
-            {/* Total Value Card */}
-            <div className="bg-blue-600 rounded-[2rem] p-6 shadow-xl shadow-blue-600/20 relative overflow-hidden group">
-              <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-white/20 to-transparent blur-[40px] pointer-events-none group-hover:scale-110 transition-transform duration-700" />
-              <div className="relative flex justify-between items-center text-white">
-                <div>
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Remaining Inventory Value</p>
-                  <p className="text-3xl font-black tracking-tighter">₹{
-                    filteredInventory.reduce((acc, item) => acc + (item.quantity * (item.product?.price || 0)), 0)
-                      .toLocaleString('en-IN', { minimumFractionDigits: 2 })
-                  }</p>
-                </div>
-                <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
-                  <Package size={28} strokeWidth={2.5} />
-                </div>
+            {filteredInventory.length === 0 ? (
+              <div className="glass rounded-[2rem] p-10 flex flex-col items-center text-center border border-emerald-50 bg-white/70 shadow-sm opacity-60">
+                <Package size={48} className="text-emerald-300 mb-4" />
+                <p className="text-sm font-black text-emerald-900 uppercase tracking-widest">No Items Found</p>
+                <p className="text-[10px] font-bold text-emerald-600 mt-2 uppercase tracking-tighter">Stock may not be assigned yet.</p>
               </div>
-            </div>
-
-            {/* Inventory List */}
-            <div className="space-y-3">
-              {filteredInventory.map((item) => {
-                const itemAmount = item.quantity * (item.product?.price || 0);
-                return (
-                  <div key={item.id} className="glass rounded-xl p-3 bg-white shadow-sm flex items-center gap-3 border border-gray-100/50 hover:border-emerald-200 transition-all active:scale-[0.99]">
-                    <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 overflow-hidden border border-emerald-100/50 shadow-inner shrink-0 leading-none">
-                      {item.product?.image ? (
-                        <img src={item.product?.image} alt={item.product?.name} className="w-full h-full object-cover" />
-                      ) : (
-                        <Package size={20} strokeWidth={2} />
-                      )}
+            ) : (
+              <>
+                {/* Total Value Card */}
+                <div className="bg-blue-600 rounded-[2rem] p-6 shadow-xl shadow-blue-600/20 relative overflow-hidden group">
+                  <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-white/20 to-transparent blur-[40px] pointer-events-none group-hover:scale-110 transition-transform duration-700" />
+                  <div className="relative flex justify-between items-center text-white">
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.2em] opacity-60 mb-1">Inventory Value</p>
+                      <p className="text-3xl font-black tracking-tighter">₹{
+                        filteredInventory.reduce((acc, item) => acc + (item.quantity * (item.product?.price || 0)), 0)
+                          .toLocaleString('en-IN', { minimumFractionDigits: 2 })
+                      }</p>
                     </div>
-                    <div className="flex-1 flex flex-col justify-center min-w-0">
-                      <h3 className="text-sm font-black text-emerald-950 tracking-tight leading-tight mb-1">{item.product?.name}</h3>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100/30">
-                          {item.product?.category?.name || 'Item'}
-                        </span>
-                        {item.product?.unit && (
-                          <span className="text-[10px] font-black text-emerald-600 bg-white px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-50">
-                            {item.product.unitValue || ''} {item.product.unit.type}
-                          </span>
-                        )}
-                        <span className="text-[9px] font-black text-blue-500/60 uppercase tracking-tighter">₹{item.product?.price} / Unit</span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-4 pl-4 border-l border-gray-100/50">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Total</span>
-                        <span className="text-xs font-black text-emerald-900/60">{Math.max(item.openingQuantity || 0, item.quantity)}</span>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Rem</span>
-                        <span className="text-lg font-black text-emerald-950 tracking-tighter leading-none">{item.quantity}</span>
-                      </div>
+                    <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md">
+                      <Package size={28} strokeWidth={2.5} />
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                </div>
+
+                {/* Inventory List */}
+                <div className="space-y-3">
+                  {filteredInventory.map((item) => (
+                    <div key={item.id} className="glass rounded-xl p-3 bg-white shadow-sm flex items-center gap-3 border border-gray-100/50 hover:border-emerald-200 transition-all active:scale-[0.99]">
+                      <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 overflow-hidden border border-emerald-100/50 shadow-inner shrink-0 leading-none">
+                        {item.product?.image ? (
+                          <img src={item.product?.image} alt={item.product?.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={20} strokeWidth={2} />
+                        )}
+                      </div>
+                      <div className="flex-1 flex flex-col justify-center min-w-0">
+                        <h3 className="text-sm font-black text-emerald-950 tracking-tight leading-tight mb-1 truncate">{item.product?.name}</h3>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-100/30">
+                            {item.product?.category?.name || 'Item'}
+                          </span>
+                          {item.product?.unit && (
+                            <span className="text-[10px] font-black text-emerald-600 bg-white px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-50">
+                              {item.product.unitValue || ''} {item.product.unit.type}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4 pl-4 border-l border-gray-100/50">
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Total</span>
+                          <span className="text-xs font-black text-emerald-900/60">{Math.max(item.openingQuantity || 0, item.quantity)}</span>
+                        </div>
+                        <div className="flex flex-col items-end">
+                          <span className="text-[9px] font-black text-emerald-800/40 uppercase tracking-widest mb-0.5">Rem</span>
+                          <span className="text-lg font-black text-emerald-950 tracking-tighter leading-none">{item.quantity}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
           </>
+        ) : (
+          /* History View */
+          <div className="space-y-4">
+            {auditHistory.length === 0 ? (
+              <div className="glass rounded-[2rem] p-10 flex flex-col items-center text-center border border-slate-100 bg-white/70 shadow-sm opacity-60">
+                <History size={48} className="text-slate-300 mb-4" />
+                <p className="text-sm font-black text-slate-900 uppercase tracking-widest">No Audit History</p>
+                <p className="text-[10px] font-bold text-slate-500 mt-2 uppercase tracking-tighter">Inventory tracking records will appear here after audits.</p>
+              </div>
+            ) : (
+              auditHistory.map((audit) => (
+                <div key={audit.id} className="bg-white rounded-[1.5rem] border border-slate-100 shadow-sm overflow-hidden transition-all">
+                  <div 
+                    onClick={() => setExpandedAuditId(expandedAuditId === audit.id ? null : audit.id)}
+                    className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-fuchsia-50 flex items-center justify-center text-fuchsia-600 border border-fuchsia-100">
+                        <History size={24} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-[10px] font-black text-fuchsia-600 uppercase tracking-widest bg-fuchsia-50 px-2 py-0.5 rounded border border-fuchsia-100 shadow-sm">Stock Audit</span>
+                          <span className="text-[9px] font-bold text-slate-400">{format(new Date(audit.createdAt), 'hh:mm a')}</span>
+                        </div>
+                        <p className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1">
+                          {format(new Date(audit.createdAt), 'do MMMM yyyy')}
+                        </p>
+                        <div className="flex items-center gap-2 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
+                          <User size={10} className="text-slate-300" /> {audit.user?.name || 'Admin'}
+                        </div>
+                      </div>
+                    </div>
+                    {expandedAuditId === audit.id ? <ChevronUp size={20} className="text-slate-400" /> : <ChevronDown size={20} className="text-slate-400" />}
+                  </div>
+
+                  {expandedAuditId === audit.id && (
+                    <div className="px-4 pb-4 animate-in slide-in-from-top-2 duration-300">
+                      {audit.remark && (
+                        <div className="mb-4 p-3 bg-slate-50 rounded-xl border border-slate-100 flex items-start gap-3">
+                          <Info size={14} className="text-slate-400 mt-0.5" />
+                          <p className="text-xs font-bold text-slate-600 italic">"{audit.remark}"</p>
+                        </div>
+                      )}
+                      
+                      <div className="space-y-1 border-t border-slate-100 pt-3">
+                        <div className="grid grid-cols-12 gap-2 px-2 mb-1">
+                          <span className="col-span-6 text-[8px] font-black text-slate-400 uppercase tracking-widest">Adjusted Product</span>
+                          <span className="col-span-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">System</span>
+                          <span className="col-span-2 text-[8px] font-black text-emerald-600 uppercase tracking-widest text-center">Audited</span>
+                          <span className="col-span-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Var</span>
+                        </div>
+                        {audit.items?.map((item) => {
+                          const diff = (item.newQuantity || 0) - (item.oldQuantity || 0);
+                          return (
+                            <div key={item.id} className="grid grid-cols-12 gap-2 items-center p-2 rounded-xl bg-slate-50/50 border border-slate-100/30">
+                              <div className="col-span-6 flex flex-col min-w-0">
+                                <span className="text-[11px] font-black text-slate-800 truncate leading-tight uppercase">{item.product?.name}</span>
+                                <span className="text-[8px] font-bold text-slate-400 uppercase tracking-tighter truncate">
+                                  {item.product?.category?.name || 'General'}
+                                </span>
+                              </div>
+                              <div className="col-span-2 text-center">
+                                <span className="text-[10px] font-bold text-slate-400">{item.oldQuantity}</span>
+                              </div>
+                              <div className="col-span-2 text-center">
+                                <span className="text-[10px] font-black text-emerald-600">{item.newQuantity}</span>
+                              </div>
+                              <div className="col-span-2 flex justify-end">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-[8px] font-black border-2 shadow-sm shrink-0 ${
+                                  diff === 0 
+                                    ? 'bg-emerald-50 text-emerald-600 border-emerald-500' 
+                                    : diff > 0 
+                                      ? 'bg-emerald-50 text-emerald-600 border-emerald-500 animate-pulse'
+                                      : 'bg-rose-50 text-rose-600 border-rose-500 animate-pulse'
+                                }`}>
+                                  {diff === 0 ? 'FIXED' : diff > 0 ? `+${diff}` : diff}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))
+            )}
+          </div>
         )}
       </div>
 
@@ -267,7 +396,6 @@ export default function AgentInventory() {
                   value={refillSearchQuery}
                   onChange={(e) => setRefillSearchQuery(e.target.value)}
                 />
-
               </div>
             </div>
 
@@ -281,29 +409,24 @@ export default function AgentInventory() {
                 const reqQty = refillItems[p.id] || 0;
                 return (
                   <div key={`refill-${p.id}`} className="p-3 bg-gray-50 rounded-2xl flex items-center justify-between border border-gray-100">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
                       <div className="w-12 h-12 bg-white border border-gray-100 rounded-xl shadow-sm flex items-center justify-center overflow-hidden shrink-0">
                         {p.image ? <img src={p.image} alt={p.name} className="w-full h-full object-cover" /> : <Package size={20} className="text-gray-300" />}
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-bold text-gray-800">{p.name}</span>
+                      <div className="flex flex-col min-w-0">
+                        <span className="text-sm font-bold text-gray-800 truncate">{p.name}</span>
                         <div className="flex items-center gap-2 mt-1">
-                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100">
+                          <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100 shrink-0">
                             Current: {currentStock}
                           </span>
-                          <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded cursor-default border border-orange-100">
-                            ₹{p.price} / Unit
+                          <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded cursor-default border border-orange-100 shrink-0">
+                            ₹{p.price}
                           </span>
-                          {p.unit && (
-                            <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-1.5 py-0.5 rounded cursor-default border border-blue-100">
-                              {p.unitValue || ''} {p.unit.type}
-                            </span>
-                          )}
                         </div>
                       </div>
                     </div>
                     {/* Add/remove controls */}
-                    <div className="flex items-center gap-3 shrink-0">
+                    <div className="flex items-center gap-3 shrink-0 ml-4">
                       <button
                         onClick={() => setRefillItems(prev => ({ ...prev, [p.id]: Math.max(0, reqQty - 1) }))}
                         className="w-8 h-8 rounded-lg bg-white border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50 active:scale-95 shadow-sm"

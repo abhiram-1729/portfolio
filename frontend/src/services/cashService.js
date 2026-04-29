@@ -49,6 +49,16 @@ export const getStoreCashRegister = async (date) => {
   return response.data;
 };
 
+export const getStoreCashLedger = async (date) => {
+  const response = await api.get(`/cash/store-register/${date}/ledger`);
+  return response.data;
+};
+
+export const createSafeMovement = async (data) => {
+  const response = await api.post('/cash/safe-movement', data);
+  return response.data;
+};
+
 export const openStoreCashRegister = async (data) => {
   const response = await api.post('/cash/store-register/open', data);
   return response.data;
@@ -86,5 +96,10 @@ export const addBankDeposit = async (data) => {
 
 export const deleteBankDeposit = async (id) => {
   const response = await api.delete(`/cash/store-register/bank-deposit/${id}`);
+  return response.data;
+};
+
+export const resetStoreCashRegister = async (date) => {
+  const response = await api.delete(`/cash/store-register/${date}/reset`);
   return response.data;
 };

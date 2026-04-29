@@ -20,7 +20,7 @@ export default function Profile() {
     if (passwords.newPassword.length < 6) {
       return toast.error("New password must be at least 6 characters");
     }
-    
+
     setIsUpdating(true);
     try {
       await authAPI.updatePassword({
@@ -165,7 +165,7 @@ export default function Profile() {
                 </div>
 
                 <div className="pt-2">
-                  <button 
+                  <button
                     onClick={() => navigate(`/agent-inventory/${user.assignedVehicle.id}`)}
                     className="w-full bg-emerald-600 text-white p-3.5 rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest"
                   >
@@ -205,42 +205,42 @@ export default function Profile() {
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div className="space-y-1.5">
                 <label className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">Current Password</label>
-                <input 
+                <input
                   type="password"
                   required
                   placeholder="Enter old password"
                   className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
                   value={passwords.oldPassword}
-                  onChange={(e) => setPasswords({...passwords, oldPassword: e.target.value})}
+                  onChange={(e) => setPasswords({ ...passwords, oldPassword: e.target.value })}
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">New Password</label>
-                  <input 
+                  <input
                     type="password"
                     required
                     placeholder="New password"
                     className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
                     value={passwords.newPassword}
-                    onChange={(e) => setPasswords({...passwords, newPassword: e.target.value})}
+                    onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-emerald-800/50 uppercase tracking-widest ml-1">Confirm</label>
-                  <input 
+                  <input
                     type="password"
                     required
                     placeholder="Confirm password"
                     className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
                     value={passwords.confirmPassword}
-                    onChange={(e) => setPasswords({...passwords, confirmPassword: e.target.value})}
+                    onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
                   />
                 </div>
               </div>
 
-              <button 
+              <button
                 type="submit"
                 disabled={isUpdating}
                 className="w-full bg-orange-500 text-white p-3.5 rounded-2xl shadow-lg shadow-orange-500/20 hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest disabled:opacity-70 mt-2"

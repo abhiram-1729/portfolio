@@ -412,7 +412,7 @@ export default function AdminAssets() {
             </select>
           </div>
 
-          {can('ASSETS', 'UPDATE') ? (
+          {(can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) ? (
             <button type="submit" disabled={isSubmitting}
               className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
               {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Assigning...</> : '✅ Assign Asset'}
@@ -428,7 +428,7 @@ export default function AdminAssets() {
       {/* Return Asset */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
         <h3 className="text-lg font-black text-gray-900 flex items-center gap-2"><ArrowDownCircle size={20} className="text-orange-500" /> Return Asset</h3>
-        {can('ASSETS', 'UPDATE') && (
+        {(can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
           <button onClick={() => { loadTracking(); setShowReturnModal(true); }}
             className="w-full bg-orange-50 text-orange-600 font-bold py-3 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors">
             Process Return
@@ -550,7 +550,7 @@ export default function AdminAssets() {
 
               <div className="flex items-center justify-between pt-1">
                 <span className="text-[10px] text-gray-400">{new Date(issue.createdAt).toLocaleDateString('en-IN')}</span>
-                {issue.status === 'OPEN' && can('ASSETS', 'UPDATE') && (
+                {issue.status === 'OPEN' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
                   <div className="flex gap-2">
                     <button onClick={() => handleIssueStatus(issue.id, 'RESOLVED')}
                       className="text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl hover:bg-emerald-100 border border-emerald-100">
@@ -694,7 +694,7 @@ export default function AdminAssets() {
                 }`}>Priority: {req.priority}</span>
               </div>
 
-              {req.status === 'PENDING' && can('ASSETS', 'UPDATE') && (
+              {req.status === 'PENDING' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
                 <div className="grid grid-cols-2 gap-2 pt-1 mt-auto">
                    <button 
                      onClick={() => handleRequestUpdate(req.id, 'APPROVED')}
@@ -714,7 +714,7 @@ export default function AdminAssets() {
                 </div>
               )}
               
-              {req.status === 'APPROVED' && can('ASSETS', 'UPDATE') && (
+              {req.status === 'APPROVED' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
                  <button 
                     onClick={() => handleRequestUpdate(req.id, 'COMPLETED')}
                     className="w-full py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all"

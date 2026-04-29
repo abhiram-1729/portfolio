@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { Lock, Phone } from 'lucide-react';
+import { Lock, Phone, Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import logo from '../assets/VillagKart_Logo.png';
 
@@ -11,6 +11,7 @@ export default function Login() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [loginError, setLoginError] = useState(null);
+  const [showPassword, setShowPassword] = useState(false);
   const { setUser } = useUserStore();
   const navigate = useNavigate();
 
@@ -26,7 +27,7 @@ export default function Login() {
       const { data } = await authAPI.login({ mobile, password });
       setUser(data, data.token);
       toast.success(`Welcome back, ${data.name || 'Agent'}!`);
-      
+
       if (data.role === 'TENANT_OWNER') {
         navigate('/tenant');
       } else if (data.role === 'ADMIN') {
@@ -85,7 +86,7 @@ export default function Login() {
             {loginError && (
               <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-start gap-3 animate-in fade-in zoom-in duration-200 shadow-sm">
                 <div className="mt-0.5 bg-red-100 p-1 rounded-full text-red-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
                 </div>
                 <div className="flex-1">
                   <p className="text-[13px] font-black tracking-tight leading-tight mb-0.5">Access Denied</p>
@@ -117,15 +118,22 @@ export default function Login() {
               </div>
               <input
                 id="password-input"
-                type="password"
+                type={showPassword ? 'text' : 'password'}
                 placeholder="Password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
                   setLoginError(null);
                 }}
-                className={`w-full pl-16 pr-4 py-4 rounded-[1.25rem] border ${loginError ? 'border-red-300 bg-red-50/30' : 'border-emerald-100 bg-white/50'} hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium`}
+                className={`w-full pl-16 pr-12 py-4 rounded-[1.25rem] border ${loginError ? 'border-red-300 bg-red-50/30' : 'border-emerald-100 bg-white/50'} hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium`}
               />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-all duration-300"
+              >
+                {showPassword ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
+              </button>
             </div>
 
             <button

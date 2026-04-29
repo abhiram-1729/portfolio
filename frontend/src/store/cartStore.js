@@ -51,8 +51,19 @@ export const useCartStore = create(
         const items = get().items;
         const existing = items.find((i) => i.productId === product.id);
         const isFree = checkIsFree(product.isFree);
-        let newItems;
+        
+        const availableStock = product.stock || 0;
+        const currentQty = existing ? existing.quantity : 0;
+        const newQtyRequested = currentQty + quantity;
 
+        if (newQtyRequested > availableStock) {
+          // If already at max, do nothing or we could throw/return false
+          if (currentQty >= availableStock) return;
+          // Otherwise cap it at available stock
+          quantity = availableStock - currentQty;
+        }
+
+        let newItems;
         if (existing) {
           newItems = items.map((i) =>
             i.productId === product.id
@@ -60,7 +71,7 @@ export const useCartStore = create(
                   ...i, 
                   quantity: i.quantity + quantity, 
                   isFree: isFree,
-                  stock: product.stock, // Sync current stock
+                  stock: availableStock,
                   minShopAmount: Number(product.minShopAmount || 0)
                 }
               : i
@@ -77,7 +88,7 @@ export const useCartStore = create(
               landingPrice: Number(product.landingPrice || 0),
               image: product.image,
               isFree: isFree,
-              stock: product.stock, // Persist stock limit
+              stock: availableStock,
               minShopAmount: Number(product.minShopAmount || 0),
               quantity,
             },
@@ -96,7 +107,14 @@ export const useCartStore = create(
           get().removeItem(productId);
           return;
         }
-        const newItems = get().items.map((i) =>
+
+        const items = get().items;
+        const item = items.find(i => i.productId === productId);
+        if (item && quantity > (item.stock || 0)) {
+          quantity = item.stock;
+        }
+
+        const newItems = items.map((i) =>
           i.productId === productId ? { ...i, quantity } : i
         );
         set({ items: newItems, ...calculateTotals(newItems) });

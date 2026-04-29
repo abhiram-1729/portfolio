@@ -8,17 +8,47 @@ export const getStockReport = async (req, res) => {
 
     if (storeId && storeId !== 'undefined') where.storeId = storeId;
 
-    const inventory = await prisma.warehouseInventory.findMany({
-      where,
+    // 1. Get all products for the tenant/store
+    const products = await prisma.product.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        ...(storeId && storeId !== 'undefined' ? { storeId } : {}),
+        status: 'ACTIVE'
+      },
       include: {
-        product: {
-          select: { name: true, price: true, purchasePrice: true, minStockAlert: true, status: true }
-        },
-        warehouse: { select: { name: true } }
+        category: { select: { name: true } },
+        unit: { select: { name: true, type: true } },
+        WarehouseInventory: {
+          where: {
+            ...(storeId && storeId !== 'undefined' ? { storeId } : {})
+          },
+          select: { quantity: true, warehouse: { select: { name: true } } }
+        }
       }
     });
 
-    res.json(inventory);
+    // 2. Map products to a WarehouseInventory-like structure for frontend compatibility
+    // but ensure products with NO warehouse records yet (but have main stock) still show up.
+    const report = products
+      .map(p => {
+        const warehouseQty = p.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+        // If it has warehouse records, use that quantity. 
+        // If not, but it has main product stock, show that as being in the system.
+        const finalQty = warehouseQty > 0 ? warehouseQty : (p.stock || 0);
+
+        return {
+          id: p.WarehouseInventory[0]?.id || `virtual-${p.id}`,
+          productId: p.id,
+          quantity: finalQty,
+          storeId: p.storeId,
+          tenantId: p.tenantId,
+          product: p, // Keep full product object for frontend
+          warehouse: p.WarehouseInventory[0]?.warehouse || { name: 'Main Store' }
+        };
+      })
+      .filter(item => item.quantity > 0); // Only show items that actually have stock
+
+    res.json(report);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching stock report', error: error.message });
   }

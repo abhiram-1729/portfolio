@@ -76,6 +76,7 @@ export const productsAPI = {
   getAll: (params) => api.get('/products', { params }),
   getById: (id) => api.get(`/products/${id}`),
   getVehicleInventory: (id) => api.get(`/products/vehicle-inventory/${id}`),
+  getAuditHistory: (vehicleId) => api.get(`/products/audit-history/${vehicleId}`),
   requestRefill: (data) => api.post('/products/refill', data),
 };
 
@@ -91,6 +92,17 @@ export const ordersAPI = {
   createFromCart: (data) => api.post('/orders/create-from-cart', data),
   completePayment: (data) => api.post('/orders/complete-payment', data),
   getById: (id) => api.get(`/orders/${id}`),
+  getMyHistory: (params) => api.get('/orders/my-history', { params }),
+  // V2.0 — Order Mutations
+  editItem: (orderId, itemId, data) => api.put(`/orders/${orderId}/items/${itemId}`, data),
+  removeItem: (orderId, itemId) => api.delete(`/orders/${orderId}/items/${itemId}`),
+  returnItems: (orderId, data) => api.post(`/orders/${orderId}/return`, data),
+  cancelOrder: (orderId, data) => api.post(`/orders/${orderId}/cancel`, data),
+  // V2.0 — Reports & Session
+  getSessionSales: (params) => api.get('/orders/session-sales', { params }),
+  getReturnReport: (params) => api.get('/orders/return-report', { params }),
+  getItemWiseReport: (params) => api.get('/orders/item-wise-report', { params }),
+  freezeSession: (data) => api.post('/orders/freeze-session', data),
 };
 
 export const reportsAPI = {
@@ -113,6 +125,18 @@ export const assetAPI = {
   createRequest: (data) => api.post('/assets/requests', data),
   getMyRequests: () => api.get('/assets/requests'),
   getCatalog: () => api.get('/assets/catalog'),
+};
+
+export const attendanceAPI = {
+  punchIn: (data) => api.post('/attendance/punch-in', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  punchOut: (data) => api.post('/attendance/punch-out', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getToday: () => api.get('/attendance/today'),
+  getMyHistory: (params) => api.get('/attendance/my-history', { params }),
+  getAll: (params) => api.get('/attendance/all', { params }),
 };
 
 export default api;

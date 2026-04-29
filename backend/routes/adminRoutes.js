@@ -15,6 +15,7 @@ import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
+import * as mediaCtr from '../controllers/admin/mediaController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
@@ -31,6 +32,9 @@ router.use(admin);
 
 // Dashboard
 router.get('/dashboard', dashboardCtr.getDashboardStats);
+
+// Generic Upload Helper
+router.post('/upload-image', uploadMiddleware.single('image'), mediaCtr.uploadImage);
 
 // Users
 router.route('/users')
@@ -80,7 +84,11 @@ router.route('/inventory/items/:id')
   .delete(inventoryCtr.deleteItem);
 
 router.post('/inventory/load', inventoryCtr.loadStock);
+router.get('/inventory/load-history', inventoryCtr.getLoadHistory);
+router.post('/inventory/stock', inventoryCtr.updateProductStock);
 router.post('/inventory/return', inventoryCtr.returnStock);
+router.get('/inventory/return-history', inventoryCtr.getReturnHistory);
+router.get('/inventory/refill-history', inventoryCtr.getRefillHistory);
 router.get('/inventory/vehicle/:id', inventoryCtr.getVehicleInventory);
 router.put('/inventory/vehicle/:id/audit', inventoryCtr.auditVehicleStock);
 router.get('/inventory/audit-history', inventoryCtr.getAuditHistory);
@@ -102,6 +110,10 @@ router.get('/reports/reconciliation', reportCtr.getReconciliationReport);
 router.get('/reports/route-wise', reportCtr.getRouteWiseReport);
 router.get('/reports/village-wise', reportCtr.getVillageWiseReport);
 router.get('/reports/agent-performance', reportCtr.getAgentPerformance);
+router.get('/reports/category-wise', reportCtr.getCategoryWiseReport);
+router.get('/reports/returns', reportCtr.getReturnReport);
+router.get('/reports/sessions', reportCtr.getSessionReport);
+router.get('/reports/vehicle-all', reportCtr.getAllVehiclePerformance);
 
 // Activity Logs
 router.get('/activities', activityCtr.getActivityLogs);

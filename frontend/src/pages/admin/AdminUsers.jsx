@@ -155,20 +155,26 @@ export default function AdminUsers({ type }) {
       SUPERVISOR: { label: 'Sup', color: 'bg-amber-50 text-amber-700 border-amber-100', icon: UserCog },
       HELPER: { label: 'Helper', color: 'bg-slate-50 text-slate-700 border-slate-100', icon: Users },
     };
+
+    // If there's a custom role, we use its name as the primary label
+    if (customRole?.name) {
+      const isSystemAdmin = customRole.portalType === 'ADMIN' || customRole.portalType === 'SUPERVISOR';
+      return (
+        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${isSystemAdmin ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-emerald-50 text-emerald-700 border-emerald-100'}`}>
+          {isSystemAdmin ? <ShieldCheck size={8} /> : <Truck size={8} />}
+          {customRole.name}
+        </span>
+      );
+    }
+
     const r = roles[roleName] || { label: roleName, color: 'bg-gray-50 text-gray-700 border-gray-100', icon: User };
     const Icon = r.icon;
+    
     return (
-      <div className="flex flex-col gap-1 items-center">
-        <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${r.color}`}>
-          <Icon size={8} />
-          {r.label}
-        </span>
-        {customRole?.name && (
-          <span className="inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[8px] font-black border border-emerald-100 bg-emerald-50 text-emerald-600 uppercase tracking-tighter">
-            <ShieldCheck size={7} /> {customRole.name}
-          </span>
-        )}
-      </div>
+      <span className={`inline-flex items-center gap-1 px-1.5 py-0 rounded-md text-[9px] font-black border uppercase tracking-tighter ${r.color}`}>
+        <Icon size={8} />
+        {r.label}
+      </span>
     );
   };
 
@@ -205,7 +211,9 @@ export default function AdminUsers({ type }) {
 
   const filteredUsers = React.useMemo(() => {
     return users.filter(u => {
-      // Role Filter based on tab
+
+
+      // 1. Role Filter based on tab
       const userIsAdmin = u.role === 'ADMIN' || u.customRole?.portalType === 'ADMIN' || u.customRole?.portalType === 'SUPERVISOR';
 
       const roleMatches = activeTab === 'all'
@@ -226,7 +234,8 @@ export default function AdminUsers({ type }) {
       if (
         !u.name?.toLowerCase().includes(searchLower) &&
         !u.mobile?.includes(searchTerm) &&
-        !u.role?.toLowerCase().includes(searchLower)
+        !u.role?.toLowerCase().includes(searchLower) &&
+        !u.customRole?.name?.toLowerCase().includes(searchLower)
       ) {
         return false;
       }
@@ -327,7 +336,7 @@ export default function AdminUsers({ type }) {
                     <Pencil size={15} />
                   </button>
                 )}
-                {can('STAFF', 'UPDATE') && (
+                {can('STAFF', 'TOGGLE_STATUS') && (
                   <button onClick={() => handleToggleStatus(user)}
                     className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
                     {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
@@ -473,7 +482,7 @@ export default function AdminUsers({ type }) {
                         <Pencil size={15} />
                       </button>
                     )}
-                    {can('STAFF', 'UPDATE') && (
+                    {can('STAFF', 'TOGGLE_STATUS') && (
                       <button
                         onClick={() => handleToggleStatus(user)}
                         title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
@@ -798,10 +807,20 @@ export default function AdminUsers({ type }) {
 
               <button
                 onClick={() => setActiveTab('agent')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-blue-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
               >
                 Agents
               </button>
+
+              {relevantCustomRoles.map(role => (
+                <button
+                  key={role.id}
+                  onClick={() => setActiveTab(role.id)}
+                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === role.id ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+                >
+                  {role.name}
+                </button>
+              ))}
             </div>
           </div>
           <div className="flex items-center gap-2 mt-2">
@@ -846,7 +865,7 @@ export default function AdminUsers({ type }) {
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
           </div>
-          {can('STAFF', 'CREATE') && (
+          {can('STAFF', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
             <button
               onClick={() => {
                 setNewUser({
@@ -1015,6 +1034,24 @@ export default function AdminUsers({ type }) {
                     value={editingUser.baseSalary || ''}
                     onChange={(e) => setEditingUser({ ...editingUser, baseSalary: e.target.value })}
                   />
+                </div>
+              )}
+
+              {can('STAFF', 'TOGGLE_STATUS') && (
+                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                  <div className="flex flex-col">
+                    <span className="text-sm font-bold text-gray-700">Account Access</span>
+                    <span className={`text-[10px] font-black uppercase ${editingUser.status === 'ACTIVE' ? 'text-emerald-600' : 'text-rose-500'}`}>
+                      {editingUser.status === 'ACTIVE' ? 'ACTIVE / AUTHORIZED' : 'SUSPENDED / BLOCKED'}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setEditingUser({ ...editingUser, status: editingUser.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                    className={cn('w-12 h-6 rounded-full relative transition-colors shadow-inner', editingUser.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-rose-400')}
+                  >
+                    <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300', editingUser.status === 'ACTIVE' ? 'right-1' : 'left-1')} />
+                  </button>
                 </div>
               )}
 

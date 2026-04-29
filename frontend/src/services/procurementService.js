@@ -5,6 +5,7 @@ export const procurementAPI = {
   getVendors: (params) => api.get('/procurement/vendors', { params }),
   createVendor: (data) => api.post('/procurement/vendors', data),
   updateVendor: (id, data) => api.put(`/procurement/vendors/${id}`, data),
+  deleteVendor: (id) => api.delete(`/procurement/vendors/${id}`),
   toggleVendorStatus: (id) => api.put(`/procurement/vendors/${id}/toggle-status`),
   getVendorLedger: (id) => api.get(`/procurement/vendors/${id}/ledger`),
 

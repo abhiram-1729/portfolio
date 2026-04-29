@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle } from 'lucide-react';
+import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
+import AdminLateEntryConfig from './AdminLateEntryConfig';
 
 export default function AdminSettings() {
   const [settings, setSettings] = useState({
@@ -11,11 +12,21 @@ export default function AdminSettings() {
     contactNo: '',
     email: '',
     address: '',
-    taxRates: '0,5,12,18'
+    taxRates: '0,5,12,18',
+    shiftMode: 'STANDARD', // 'STANDARD' | 'MULTI'
+    shifts: []
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeModal, setActiveModal] = useState(null); // 'TAX' | 'BUSINESS' | 'UNITS' | 'CATEGORIES'
+  const [activeModal, setActiveModal] = useState(null); // 'TAX' | 'BUSINESS' | 'UNITS' | 'CATEGORIES' | 'SHIFTS'
+  const [isCreatingShift, setIsCreatingShift] = useState(false);
+  const [editingShiftId, setEditingShiftId] = useState(null);
+  const [shiftForm, setShiftForm] = useState({
+    type: 'STANDARD',
+    name: '',
+    isActive: true,
+    sessions: [{ startTime: '09:00', endTime: '18:00' }]
+  });
 
   // Units State
   const [units, setUnits] = useState([]);
@@ -39,6 +50,12 @@ export default function AdminSettings() {
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState({ name: '', categoryId: '' });
   const [editingSubCategoryId, setEditingSubCategoryId] = useState(null);
+  
+  // Search States
+  const [unitSearch, setUnitSearch] = useState('');
+  const [categorySearch, setCategorySearch] = useState('');
+  const [subCategorySearch, setSubCategorySearch] = useState('');
+  const [assetCategorySearch, setAssetCategorySearch] = useState('');
 
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -111,6 +128,23 @@ export default function AdminSettings() {
       setLoading(false);
     }
   };
+
+  // Initialize shifts if empty when entering SHIFTS modal
+  useEffect(() => {
+    if (activeModal === 'SHIFTS' && (settings.shifts || []).length === 0) {
+      const isMulti = settings.shiftMode === 'MULTI';
+      setSettings(prev => ({
+        ...prev,
+        shifts: [{
+          id: `shift_${Date.now()}`,
+          name: isMulti ? 'Morning Shift' : 'General Shift',
+          startTime: '09:00',
+          endTime: '18:00',
+          isActive: true
+        }]
+      }));
+    }
+  }, [activeModal, settings.shiftMode]);
 
   const handleUpdateSettings = async (e) => {
     e.preventDefault();
@@ -264,43 +298,56 @@ export default function AdminSettings() {
     }
   };
 
+  const hasPermission = (sectionKey) => {
+    if (!currentUser?.customRoleId) return true;
+    const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS || [];
+    return targetSections.includes(sectionKey);
+  };
+
   const sections = [
     { 
-      title: 'Inventory Settings', 
+      title: 'Inventory Management', 
       icon: Package, 
       items: [
-        { label: 'Unit Management', action: () => setActiveModal('UNITS') },
-        { label: 'Category Management', action: () => setActiveModal('CATEGORIES') },
+        { label: 'Measurement Units', action: () => setActiveModal('UNITS') },
+        { label: 'Product Categories', action: () => setActiveModal('CATEGORIES') },
         { label: 'Sub-Category Management', action: () => setActiveModal('SUB_CATEGORIES') },
         { label: 'Asset Type Management', action: () => setActiveModal('ASSET_CATEGORIES') }
-      ] 
+      ]
     },
     { 
       title: 'Payment Settings', 
       icon: CreditCard, 
       items: [
-        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon') },
-        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon') },
-        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon') }
-      ] 
+        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
+        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
+        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' }
+      ].filter(item => hasPermission(item.key))
     },
     { 
-      title: 'Business Details', 
+      title: 'Business Profile', 
       icon: Store, 
       items: [
-        { label: 'Tax Settings (GST)', action: () => setActiveModal('TAX') },
-        { label: 'Business Profile Details', action: () => setActiveModal('BUSINESS') },
-        { label: 'Currency Options', action: () => toast.error('This feature is coming soon') }
-      ] 
+        { label: 'Basic Information', action: () => setActiveModal('BUSINESS_PROFILE') },
+        { label: 'Contact Details', action: () => setActiveModal('BUSINESS_PROFILE') }
+      ]
+    },
+    { 
+      title: 'Tax Settings', 
+      icon: Receipt, 
+      items: [
+        { label: 'GST Configuration', action: () => setActiveModal('TAX_SETTINGS') },
+        { label: 'Tax Slabs & Rules', action: () => setActiveModal('TAX_SETTINGS') }
+      ]
     },
     { 
       title: 'Invoice Format', 
       icon: FileText, 
       items: [
-        { label: 'Header/Footer Text', action: () => toast.error('Coming soon') },
-        { label: 'Upload Logo', action: () => toast.error('Coming soon') },
-        { label: 'Sequential Numbering', action: () => toast.error('Coming soon') }
-      ] 
+        { label: 'Header/Footer Text', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
+        { label: 'Upload Logo', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
+        { label: 'Sequential Numbering', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' }
+      ].filter(item => hasPermission(item.key))
     },
     { 
       title: 'Notifications', 
@@ -308,7 +355,15 @@ export default function AdminSettings() {
       items: [
         { label: 'Low Stock Alerts', action: () => {} },
         { label: 'Daily Sales Report Email', action: () => {} }
-      ] 
+      ]
+    },
+    {
+      title: 'Shift Management',
+      icon: Clock,
+      items: [
+        { label: 'Configure Timing & Shifts', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } },
+        { label: 'Late Entry Rules', action: () => setActiveModal('LATE_RULES') }
+      ]
     }
   ];
 
@@ -386,12 +441,24 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 bg-emerald-900 text-emerald-100 flex items-center justify-between">
+            <div className="px-8 py-6 bg-emerald-900 text-emerald-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <FileText size={18} className="text-emerald-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Authorized Units Registry</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-emerald-800/50 rounded-full border border-emerald-700/50">{units.length} ACTIVE</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Units..." 
+                    value={unitSearch}
+                    onChange={(e) => setUnitSearch(e.target.value)}
+                    className="bg-emerald-800/50 border border-emerald-700/50 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-emerald-400 focus:bg-emerald-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-emerald-800/50 rounded-full border border-emerald-700/50 min-w-fit">{units.length} ACTIVE</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -403,7 +470,7 @@ export default function AdminSettings() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {units.map(unit => (
+                  {units.filter(u => u.name.toLowerCase().includes(unitSearch.toLowerCase()) || u.type.toLowerCase().includes(unitSearch.toLowerCase())).map(unit => (
                     <tr key={unit.id} className="hover:bg-emerald-50/30 transition-all group">
                       <td className="py-5 px-8">
                         <span className="text-sm font-black text-slate-700">{unit.name}</span>
@@ -463,18 +530,30 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between">
+             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Hash size={18} className="text-amber-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Master Classification Indexed</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700">{categories.length} SEGMENTS</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Categories..." 
+                    value={categorySearch}
+                    onChange={(e) => setCategorySearch(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-slate-500 focus:bg-slate-850 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700 min-w-fit">{categories.length} SEGMENTS</span>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left font-bold">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Operational Category</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Contextual Actions</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {categories.map(category => (
+                  {categories.filter(c => c.name.toLowerCase().includes(categorySearch.toLowerCase())).map(category => (
                     <tr key={category.id} className="hover:bg-amber-50/20 group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{category.name}</td>
                       <td className="py-5 px-8 text-right"><div className="flex items-center justify-end gap-2 pr-2">
@@ -533,18 +612,30 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 bg-orange-950 text-white flex items-center justify-between">
+            <div className="px-8 py-6 bg-orange-950 text-white flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Package size={18} className="text-orange-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Granular Catalog Index</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-orange-900 rounded-full border border-orange-800">{subCategories.length} RECORDS</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-orange-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Sub-Cats..." 
+                    value={subCategorySearch}
+                    onChange={(e) => setSubCategorySearch(e.target.value)}
+                    className="bg-orange-900 border border-orange-800 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-orange-600 focus:bg-orange-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-orange-900 rounded-full border border-orange-800 min-w-fit">{subCategories.length} RECORDS</span>
+              </div>
             </div>
             <div className="overflow-x-auto font-bold">
               <table className="w-full text-left">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sub-segment</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Parent Segment</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Operations</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {subCategories.map(sub => (
+                  {subCategories.filter(s => s.name.toLowerCase().includes(subCategorySearch.toLowerCase()) || s.category?.name.toLowerCase().includes(subCategorySearch.toLowerCase())).map(sub => (
                     <tr key={sub.id} className="hover:bg-orange-50 transition-all group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{sub.name}</td>
                       <td className="py-5 px-8"><span className="text-[10px] px-2.5 py-1 bg-gray-100 text-gray-500 rounded-lg uppercase font-black">{sub.category?.name}</span></td>
@@ -596,18 +687,30 @@ export default function AdminSettings() {
           </div>
 
           <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
-            <div className="px-8 py-6 bg-indigo-950 text-indigo-50 flex items-center justify-between">
+            <div className="px-8 py-6 bg-indigo-950 text-indigo-50 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Store size={18} className="text-indigo-400 opacity-60" />
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Institutional Asset Registry</h4>
               </div>
-              <span className="text-[10px] font-black px-4 py-1.5 bg-indigo-900 rounded-full border border-indigo-800">{assetCategories.length} GROUPS</span>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Asset Types..." 
+                    value={assetCategorySearch}
+                    onChange={(e) => setAssetCategorySearch(e.target.value)}
+                    className="bg-indigo-900 border border-indigo-800 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-indigo-600 focus:bg-indigo-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-indigo-900 rounded-full border border-indigo-800 min-w-fit">{assetCategories.length} GROUPS</span>
+              </div>
             </div>
             <div className="overflow-x-auto font-bold">
               <table className="w-full text-left">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset Grouping</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Override Options</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {assetCategories.map(category => (
+                  {assetCategories.filter(c => c.name.toLowerCase().includes(assetCategorySearch.toLowerCase())).map(category => (
                     <tr key={category.id} className="hover:bg-indigo-50 group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{category.name}</td>
                       <td className="py-5 px-8 text-right"><div className="flex items-center justify-end gap-2 pr-2">
@@ -743,6 +846,354 @@ export default function AdminSettings() {
             </form>
           </div>
         </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'SHIFTS') {
+    const formatTime12h = (time24) => {
+      if (!time24) return 'N/A';
+      const [hours, minutes] = time24.split(':');
+      const h = parseInt(hours);
+      const ampm = h >= 12 ? 'PM' : 'AM';
+      const h12 = h % 12 || 12;
+      return `${h12}:${minutes} ${ampm}`;
+    };
+
+    const handleAddSession = () => {
+      if (shiftForm.sessions.length >= 5) return toast.error('Maximum 5 sessions allowed');
+      setShiftForm({
+        ...shiftForm,
+        sessions: [...shiftForm.sessions, { startTime: '14:00', endTime: '18:00' }]
+      });
+    };
+
+    const handleRemoveSession = (index) => {
+      if (shiftForm.sessions.length <= 1) return;
+      setShiftForm({
+        ...shiftForm,
+        sessions: shiftForm.sessions.filter((_, i) => i !== index)
+      });
+    };
+
+    const handleSessionChange = (index, field, value) => {
+      const newSessions = [...shiftForm.sessions];
+      newSessions[index][field] = value;
+      setShiftForm({ ...shiftForm, sessions: newSessions });
+    };
+
+    const validateShiftForm = () => {
+      if (!shiftForm.name) return 'Shift name is required';
+      if (!shiftForm.type) return 'Shift type is required';
+      
+      for (let i = 0; i < shiftForm.sessions.length; i++) {
+        const s = shiftForm.sessions[i];
+        if (s.startTime >= s.endTime) return `Session ${i + 1}: End time must be after start time`;
+        
+        // Overlap check
+        for (let j = i + 1; j < shiftForm.sessions.length; j++) {
+          const s2 = shiftForm.sessions[j];
+          if (s.startTime < s2.endTime && s.endTime > s2.startTime) {
+            return `Overlap detected between Session ${i + 1} and Session ${j + 1}`;
+          }
+        }
+      }
+      return null;
+    };
+
+    const handleSaveShift = async (e) => {
+      e.preventDefault();
+      const error = validateShiftForm();
+      if (error) return toast.error(error);
+
+      setSaving(true);
+      try {
+        // Calculate overall start/end for backward compatibility
+        const allStarts = shiftForm.sessions.map(s => s.startTime).sort();
+        const allEnds = shiftForm.sessions.map(s => s.endTime).sort();
+        
+        const newShift = {
+          id: editingShiftId || `shift_${Date.now()}`,
+          name: shiftForm.name,
+          type: shiftForm.type,
+          startTime: allStarts[0],
+          endTime: allEnds[allEnds.length - 1],
+          sessions: shiftForm.sessions,
+          isActive: shiftForm.isActive
+        };
+
+        const updatedShifts = editingShiftId 
+          ? settings.shifts.map(s => s.id === editingShiftId ? newShift : s)
+          : [...(settings.shifts || []), newShift];
+        const { data } = await adminAPI.updateSettings({ 
+          ...settings, 
+          shifts: updatedShifts, 
+          storeId: currentUser?.storeId 
+        });
+
+        if (data.success) {
+          setSettings({ ...settings, shifts: updatedShifts });
+          toast.success(editingShiftId ? 'Shift Updated ✅' : 'Shift Configuration Saved ✅');
+          setIsCreatingShift(false);
+          setEditingShiftId(null);
+          setShiftForm({ type: 'STANDARD', name: '', isActive: true, sessions: [{ startTime: '09:00', endTime: '18:00' }] });
+        }
+      } catch (err) {
+        toast.error('Failed to save shift');
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    const handleDeleteShift = async (id) => {
+      if (!confirm('Are you sure you want to delete this shift?')) return;
+      const updatedShifts = settings.shifts.filter(s => s.id !== id);
+      try {
+        await adminAPI.updateSettings({ ...settings, shifts: updatedShifts, storeId: currentUser?.storeId });
+        setSettings({ ...settings, shifts: updatedShifts });
+        toast.success('Shift deleted');
+      } catch (err) {
+        toast.error('Failed to delete shift');
+      }
+    };
+
+    const handleToggleShiftStatus = async (id) => {
+      const updatedShifts = settings.shifts.map(s => 
+        s.id === id ? { ...s, isActive: s.isActive === false } : s
+      );
+      try {
+        await adminAPI.updateSettings({ ...settings, shifts: updatedShifts, storeId: currentUser?.storeId });
+        setSettings({ ...settings, shifts: updatedShifts });
+        toast.success('Shift status updated');
+      } catch (err) {
+        toast.error('Failed to update status');
+      }
+    };
+
+    const handleEditShift = (shift) => {
+      setShiftForm({
+        type: shift.type || (shift.sessions?.length > 1 ? 'MULTI_SESSION' : 'STANDARD'),
+        name: shift.name,
+        isActive: shift.isActive !== undefined ? shift.isActive : true,
+        sessions: shift.sessions || [{ startTime: shift.startTime, endTime: shift.endTime }]
+      });
+      setEditingShiftId(shift.id);
+      setIsCreatingShift(true);
+    };
+
+    if (isCreatingShift) {
+      return (
+        <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-20">
+          <div className="flex items-center justify-between">
+             <div className="flex items-center gap-4">
+                <button onClick={() => { setIsCreatingShift(false); setEditingShiftId(null); }} className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-rose-600 transition-all shadow-sm">
+                  <ArrowLeft size={20} />
+                </button>
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">{editingShiftId ? 'Edit Shift Configuration' : 'Create Shift Configuration'}</h2>
+                  <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">{editingShiftId ? 'Update Operational Parameters' : 'Define Operational Parameters'}</p>
+                </div>
+             </div>
+          </div>
+
+          <div className="bg-white rounded-[3rem] border border-gray-100 shadow-2xl overflow-hidden p-8 md:p-12 space-y-10">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Shift Type</label>
+                  <select 
+                    value={shiftForm.type} 
+                    onChange={e => {
+                      const type = e.target.value;
+                      setShiftForm({ 
+                        ...shiftForm, 
+                        type, 
+                        sessions: type === 'STANDARD' ? [{ startTime: '09:00', endTime: '18:00' }] : [{ startTime: '09:00', endTime: '13:00' }, { startTime: '15:00', endTime: '19:00' }]
+                      });
+                    }}
+                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-black text-slate-900 appearance-none outline-none focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 transition-all cursor-pointer"
+                  >
+                    <option value="STANDARD">Standard Shift (Full Day)</option>
+                    <option value="MULTI_SESSION">Multi-Session Shift (Split)</option>
+                  </select>
+               </div>
+
+               <div className="space-y-3">
+                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Shift Name</label>
+                  <div className="flex gap-4">
+                    <input 
+                      type="text" 
+                      placeholder="e.g., General Operations Shift" 
+                      value={shiftForm.name} 
+                      onChange={e => setShiftForm({ ...shiftForm, name: e.target.value })}
+                      className="flex-1 bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all" 
+                    />
+                    <button 
+                      type="button"
+                      onClick={() => setShiftForm({...shiftForm, isActive: !shiftForm.isActive})}
+                      className={`px-6 rounded-2xl border flex items-center gap-2 transition-all ${shiftForm.isActive ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-rose-50 border-rose-100 text-rose-500'}`}
+                    >
+                      <div className={`w-2 h-2 rounded-full ${shiftForm.isActive ? 'bg-emerald-500' : 'bg-rose-500'} animate-pulse`}></div>
+                      <span className="text-[10px] font-black uppercase tracking-widest">{shiftForm.isActive ? 'Active' : 'Inactive'}</span>
+                    </button>
+                  </div>
+               </div>
+            </div>
+
+            <div className="pt-6 border-t border-gray-50">
+              <div className="flex items-center justify-between mb-6">
+                <h4 className="text-[11px] font-black text-slate-900 uppercase tracking-[0.2em] flex items-center gap-2">
+                  <Clock size={16} className="text-violet-600" /> Time Configuration
+                </h4>
+                {shiftForm.type === 'MULTI_SESSION' && (
+                  <button onClick={handleAddSession} className="text-[10px] font-black text-violet-600 uppercase tracking-widest hover:underline flex items-center gap-1">
+                    <Plus size={14} /> Add Session
+                  </button>
+                )}
+              </div>
+
+              <div className="space-y-6">
+                {shiftForm.sessions.map((session, idx) => (
+                  <div key={idx} className="bg-slate-50/50 rounded-3xl p-6 border border-slate-100 relative group animate-in zoom-in-95 duration-300">
+                    <div className="flex items-center justify-between mb-4">
+                      <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        {shiftForm.type === 'STANDARD' ? 'Operational Hours' : `Session ${idx + 1}`}
+                      </span>
+                      {shiftForm.type === 'MULTI_SESSION' && shiftForm.sessions.length > 1 && (
+                        <button onClick={() => handleRemoveSession(idx)} className="text-rose-400 hover:text-rose-600 transition-colors opacity-0 group-hover:opacity-100">
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                    <div className="grid grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Start Time</label>
+                        <input type="time" value={session.startTime} onChange={e => handleSessionChange(idx, 'startTime', e.target.value)}
+                          className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-black focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all" />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">End Time</label>
+                        <input type="time" value={session.endTime} onChange={e => handleSessionChange(idx, 'endTime', e.target.value)}
+                          className="w-full bg-white border border-slate-100 rounded-2xl px-5 py-3.5 text-sm font-black focus:ring-4 focus:ring-violet-500/10 focus:border-violet-500 outline-none transition-all" />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6 bg-violet-50 rounded-3xl border border-violet-100 flex items-center justify-between gap-4">
+               <div className="flex items-center gap-3">
+                 <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center text-violet-600 shadow-sm">
+                   <FileText size={18} />
+                 </div>
+                 <div>
+                   <p className="text-[10px] font-black text-violet-900 uppercase tracking-widest mb-0.5">Configuration Summary</p>
+                   <p className="text-xs font-bold text-violet-600 italic">
+                     {shiftForm.sessions.length > 1 
+                       ? `Split shift with ${shiftForm.sessions.length} active sessions` 
+                       : `Standard continuous shift: ${formatTime12h(shiftForm.sessions[0].startTime)} to ${formatTime12h(shiftForm.sessions[0].endTime)}`}
+                   </p>
+                 </div>
+               </div>
+               <div className="flex gap-3">
+                 <button onClick={() => { setIsCreatingShift(false); setEditingShiftId(null); }} className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-all">Cancel</button>
+                 <button onClick={handleSaveShift} disabled={saving} className="bg-slate-900 text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-slate-900/20 hover:bg-violet-600 transition-all active:scale-95 disabled:opacity-50 flex items-center gap-2">
+                    {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                    {editingShiftId ? 'Update Shift' : 'Save Shift'}
+                 </button>
+               </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Shift Configuration</h2>
+            <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">Manage Operational Sessions</p>
+          </div>
+          <button 
+            onClick={() => setIsCreatingShift(true)}
+            className="bg-emerald-600 text-white px-6 py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 flex items-center gap-2"
+          >
+            <Plus size={18} strokeWidth={3} /> Create Shift
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {(settings.shifts || []).map((shift) => (
+            <div key={shift.id} className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl p-6 relative group overflow-hidden hover:border-emerald-200 transition-all">
+              <div className="absolute top-0 right-0 p-4 flex gap-2">
+                <button onClick={() => handleEditShift(shift)} className="p-2 text-emerald-300 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                  <Edit size={18} />
+                </button>
+                <button onClick={() => handleDeleteShift(shift.id)} className="p-2 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all opacity-0 group-hover:opacity-100">
+                  <Trash2 size={18} />
+                </button>
+              </div>
+              
+              <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 mb-6 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
+                <Clock size={24} />
+              </div>
+
+              <div className="flex items-center justify-between mb-1">
+                <h4 className="text-sm font-black text-gray-900">{shift.name}</h4>
+                <button 
+                  onClick={() => handleToggleShiftStatus(shift.id)}
+                  className={`px-3 py-1 rounded-full border text-[8px] font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-1.5 ${
+                    shift.isActive !== false 
+                      ? 'bg-emerald-50 border-emerald-100 text-emerald-600 hover:bg-emerald-100' 
+                      : 'bg-rose-50 border-rose-100 text-rose-500 hover:bg-rose-100'
+                  }`}
+                >
+                  <div className={`w-1.5 h-1.5 rounded-full ${shift.isActive !== false ? 'bg-emerald-500' : 'bg-rose-500'} ${shift.isActive !== false ? 'animate-pulse' : ''}`}></div>
+                  {shift.isActive !== false ? 'Active' : 'Inactive'}
+                </button>
+              </div>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-4">
+                {shift.type === 'MULTI_SESSION' ? 'Multi-Session Shift' : 'Standard Shift'}
+              </p>
+
+              <div className="space-y-2 border-t border-gray-50 pt-4">
+                 {(shift.sessions || [{startTime: shift.startTime, endTime: shift.endTime}]).map((s, i) => (
+                   <div key={i} className="flex items-center justify-between text-[11px] font-bold text-gray-500">
+                      <span>{shift.type === 'MULTI_SESSION' ? `Session ${i+1}` : 'Timing'}</span>
+                      <span className="text-gray-900 font-black">{formatTime12h(s.startTime)} - {formatTime12h(s.endTime)}</span>
+                   </div>
+                 ))}
+              </div>
+            </div>
+          ))}
+          {(!settings.shifts || settings.shifts.length === 0) && (
+            <div className="col-span-full py-20 text-center bg-gray-50 rounded-[3rem] border-2 border-dashed border-gray-200">
+               <Clock size={48} className="mx-auto text-gray-200 mb-4" />
+               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No shifts configured yet</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'LATE_RULES') {
+    return (
+      <div className="space-y-6 pb-20">
+        <div className="flex items-center gap-4 mb-8">
+          <button 
+            onClick={() => setActiveModal(null)}
+            className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 transition-all shadow-sm group"
+          >
+            <ArrowLeft size={20} className="group-hover:-translate-x-0.5 transition-transform" />
+          </button>
+          <div>
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Late Entry Rules</h2>
+            <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1 italic">Attendance Policy Configuration</p>
+          </div>
+        </div>
+        <AdminLateEntryConfig />
       </div>
     );
   }

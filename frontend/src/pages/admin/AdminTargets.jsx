@@ -757,42 +757,51 @@ export default function AdminTargets() {
                         <tr key={rule.id} className="hover:bg-gray-50/50">
                           <td className="p-2">
                             <input type="text" placeholder="Level Name" value={rule.name} onChange={e => updateRule(rule.id, 'name', e.target.value)}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.salesFrom} onChange={e => updateRule(rule.id, 'salesFrom', parseFloat(e.target.value)||0)}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.salesTo} onChange={e => updateRule(rule.id, 'salesTo', parseFloat(e.target.value)||0)}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.appsTarget} onChange={e => updateRule(rule.id, 'appsTarget', parseFloat(e.target.value)||0)}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.salesSlab} onChange={e => updateRule(rule.id, 'salesSlab', parseFloat(e.target.value)||0)}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.appsSlab} onChange={e => updateRule(rule.id, 'appsSlab', parseFloat(e.target.value)||0)}
-                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-white border border-gray-200 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <select value={rule.salesType || 'PERCENTAGE'} onChange={e => updateRule(rule.id, 'salesType', e.target.value)}
-                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none">
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400">
                               <option value="PERCENTAGE">%</option>
                               <option value="FIXED">Flat ₹</option>
                             </select>
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.salesValue} onChange={e => updateRule(rule.id, 'salesValue', parseFloat(e.target.value)||0)}
-                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2">
                             <input type="number" value={rule.appsRate} onChange={e => updateRule(rule.id, 'appsRate', parseFloat(e.target.value)||0)}
-                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none" />
+                              disabled={!can('TARGETS', 'UPDATE') && !can('TARGETS', 'CREATE')}
+                              className="w-full bg-blue-50 text-blue-700 border border-blue-100 rounded-lg px-2 py-1.5 text-xs font-bold outline-none disabled:bg-gray-50 disabled:text-gray-400" />
                           </td>
                           <td className="p-2 text-center">
                             {(() => {
@@ -845,7 +854,7 @@ export default function AdminTargets() {
               </button>
             )}
 
-            {can('TARGETS', 'UPDATE') && (
+            {(can('TARGETS', 'UPDATE') || can('TARGETS', 'CREATE')) && (
               <button
                 onClick={handleSaveConfig}
                 disabled={isSubmitting}
