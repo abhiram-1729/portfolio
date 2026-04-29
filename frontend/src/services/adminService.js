@@ -73,7 +73,9 @@ export const adminAPI = {
   getReturnReport: (params) => api.get('/admin/reports/returns', { params }),
   getSessionReport: (params) => api.get('/admin/reports/sessions', { params }),
   getVehicleAllPerformance: (params) => api.get('/admin/reports/vehicle-all', { params }),
+  getPaymentReport: (params) => api.get('/admin/reports/daily', { params }),
   getDamageReports: (params) => api.get('/damage/reports', { params }),
+  getInvoiceReport: (params) => api.get('/admin/sales', { params }),
   getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
   getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),
 

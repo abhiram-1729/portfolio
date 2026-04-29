@@ -14,7 +14,7 @@ export default function DamageReport() {
   const fetchData = async () => {
     setIsLoading(true);
     try {
-      const res = await adminAPI.getDamageReport({ storeId });
+      const res = await adminAPI.getDamageReports({ storeId });
       setReportData(res.data);
     } catch (error) {
       toast.error('Failed to load damage data');
