@@ -82,10 +82,10 @@ export default function AdminAttendance() {
   });
 
   const openPhoto = (record, type) => {
-    const url = type === 'in' ? record.punchInPhoto : record.punchOutPhoto;
-    if (!url) return;
+    const rawUrl = type === 'in' ? record.punchInPhoto : record.punchOutPhoto;
+    if (!rawUrl) return;
     setPhotoModal({
-      url,
+      url: getPhotoUrl(rawUrl),
       agentName: record.user?.name || 'Agent',
       type: type === 'in' ? 'Punch-In' : 'Punch-Out',
       time: type === 'in' ? formatTime(record.punchInTime) : formatTime(record.punchOutTime),
@@ -104,6 +104,14 @@ export default function AdminAttendance() {
     { label: 'Completed', value: summary?.completedToday || 0, icon: Timer, bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-100', iconBg: 'bg-purple-100' },
     { label: 'Avg Hours', value: summary?.avgHours?.toFixed(1) || '0', icon: TrendingUp, bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-100', iconBg: 'bg-amber-100' }
   ];
+
+  const getPhotoUrl = (url) => {
+    if (!url) return null;
+    if (url.startsWith('http')) return url;
+    // Prepend API URL if it's a relative path
+    const apiBase = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001';
+    return `${apiBase}${url.startsWith('/') ? '' : '/'}${url}`;
+  };
 
   return (
     <div className="space-y-6">
@@ -340,32 +348,39 @@ export default function AdminAttendance() {
                             ) : null}
                           </td>
                           <td className="px-4 py-4 text-center">
-                            <div className="flex items-center justify-center gap-1">
-                              {record.punchInPhoto ? (
-                                <button
-                                  onClick={() => openPhoto(record, 'in')}
-                                  className="group relative w-10 h-10 rounded-xl overflow-hidden border-2 border-emerald-200 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md"
-                                >
-                                  <img src={record.punchInPhoto} alt="In" className="w-full h-full object-cover" />
-                                  <div className="absolute inset-0 bg-emerald-600/0 group-hover:bg-emerald-600/20 transition-all flex items-center justify-center">
-                                    <Camera size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                            <div className="flex items-center justify-center gap-2">
+                              <div className="flex flex-col items-center gap-1">
+                                {record.punchInPhoto ? (
+                                  <button
+                                    onClick={() => openPhoto(record, 'in')}
+                                    className="group relative w-12 h-12 rounded-xl overflow-hidden border-2 border-emerald-200 hover:border-emerald-500 transition-all shadow-sm hover:shadow-md"
+                                  >
+                                    <img src={getPhotoUrl(record.punchInPhoto)} alt="In" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-emerald-600/0 group-hover:bg-emerald-600/20 transition-all flex items-center justify-center">
+                                      <Camera size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </button>
+                                ) : (
+                                  <div className="w-12 h-12 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
+                                    <Camera size={14} className="text-gray-300" />
                                   </div>
-                                </button>
-                              ) : (
-                                <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center">
-                                  <Camera size={12} className="text-gray-300" />
-                                </div>
-                              )}
+                                )}
+                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Punch-In</span>
+                              </div>
+
                               {record.punchOutPhoto ? (
-                                <button
-                                  onClick={() => openPhoto(record, 'out')}
-                                  className="group relative w-10 h-10 rounded-xl overflow-hidden border-2 border-orange-200 hover:border-orange-500 transition-all shadow-sm hover:shadow-md"
-                                >
-                                  <img src={record.punchOutPhoto} alt="Out" className="w-full h-full object-cover" />
-                                  <div className="absolute inset-0 bg-orange-600/0 group-hover:bg-orange-600/20 transition-all flex items-center justify-center">
-                                    <Camera size={12} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
-                                  </div>
-                                </button>
+                                <div className="flex flex-col items-center gap-1">
+                                  <button
+                                    onClick={() => openPhoto(record, 'out')}
+                                    className="group relative w-12 h-12 rounded-xl overflow-hidden border-2 border-orange-200 hover:border-orange-500 transition-all shadow-sm hover:shadow-md"
+                                  >
+                                    <img src={getPhotoUrl(record.punchOutPhoto)} alt="Out" className="w-full h-full object-cover" />
+                                    <div className="absolute inset-0 bg-orange-600/0 group-hover:bg-orange-600/20 transition-all flex items-center justify-center">
+                                      <Camera size={14} className="text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+                                    </div>
+                                  </button>
+                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Punch-Out</span>
+                                </div>
                               ) : null}
                             </div>
                           </td>
@@ -407,15 +422,23 @@ export default function AdminAttendance() {
                     <div key={record.id} className="p-4">
                       <div className="flex items-center justify-between mb-3">
                         <div className="flex items-center gap-3">
-                          {record.punchInPhoto ? (
-                            <button onClick={() => openPhoto(record, 'in')} className="w-10 h-10 rounded-xl overflow-hidden border-2 border-emerald-200 shadow-sm">
-                              <img src={record.punchInPhoto} alt="In" className="w-full h-full object-cover" />
-                            </button>
-                          ) : (
-                            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
-                              {record.user?.name?.charAt(0) || '?'}
-                            </div>
-                          )}
+                          <div className="flex items-center gap-1">
+                            {record.punchInPhoto ? (
+                              <button onClick={() => openPhoto(record, 'in')} className="w-11 h-11 rounded-xl overflow-hidden border-2 border-emerald-200 shadow-sm flex-shrink-0">
+                                <img src={getPhotoUrl(record.punchInPhoto)} alt="In" className="w-full h-full object-cover" />
+                              </button>
+                            ) : null}
+                            {record.punchOutPhoto ? (
+                              <button onClick={() => openPhoto(record, 'out')} className="w-11 h-11 rounded-xl overflow-hidden border-2 border-orange-200 shadow-sm flex-shrink-0">
+                                <img src={getPhotoUrl(record.punchOutPhoto)} alt="Out" className="w-full h-full object-cover" />
+                              </button>
+                            ) : null}
+                            {(!record.punchInPhoto && !record.punchOutPhoto) && (
+                              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
+                                {record.user?.name?.charAt(0) || '?'}
+                              </div>
+                            )}
+                          </div>
                           <div>
                             <p className="text-sm font-black text-gray-900 tracking-tight">{record.user?.name}</p>
                             <p className="text-[10px] font-bold text-gray-400">{record.user?.assignedVehicle?.vehicleNumber || 'No Vehicle'}</p>

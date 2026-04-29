@@ -825,7 +825,8 @@ export default function AdminInventory() {
       setStockQuantities({});
       setShowLoadConfirmModal(false);
     } catch (error) {
-      toast.error('Failed to load stock');
+      const msg = error.response?.data?.message || 'Failed to load stock';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

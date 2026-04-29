@@ -387,7 +387,12 @@ export const deleteItem = async (req, res) => {
 // Stock Loading (Morning)
 export const loadStock = async (req, res) => {
   try {
-    const { vehicleId, items } = req.body; // items = [{ productId, quantity }]
+    const { vehicleId, items } = req.body;
+
+    if (!vehicleId) {
+      return res.status(400).json({ message: 'Vehicle ID is required' });
+    }
+
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: vehicleId },
       select: { id: true, storeId: true, vehicleNumber: true, displayId: true }
@@ -409,7 +414,7 @@ export const loadStock = async (req, res) => {
           throw new Error(`Product ${item.productId} not found`);
         }
         if (Math.floor(q) > (prod.stock || 0)) {
-          throw new Error(`Insufficient stock for ${prod.name}. Available in store: ${prod.stock}`);
+          throw new Error(`VALIDATION:Insufficient stock for ${prod.name}. Available: ${prod.stock}`);
         }
 
         // Create transaction record
@@ -489,8 +494,14 @@ export const loadStock = async (req, res) => {
       priority: 'low',
       metadata: { vehicleId }
     });
-  } catch (error) {
-    console.error(error);
+    } catch (error) {
+    console.error('❌ loadStock Crash:', error);
+    
+    // Handle validation errors with 400
+    if (error.message.startsWith('VALIDATION:')) {
+      return res.status(400).json({ message: error.message.replace('VALIDATION:', '') });
+    }
+
     res.status(500).json({ message: 'Error loading stock', error: error.message });
   }
 };
