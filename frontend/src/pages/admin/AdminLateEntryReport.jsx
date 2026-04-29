@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import lateEntryService from '../../services/lateEntryService';
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import { toast } from 'react-hot-toast';
-import { 
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, 
-  BarChart, Bar, Cell, PieChart, Pie, Legend 
+import {
+  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
+  BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
-import { Edit, X, Save, User, Clock, Calendar, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Edit, X, Check, Save, User, Clock, Calendar, AlertTriangle, ShieldCheck } from 'lucide-react';
 
 const AdminLateEntryReport = () => {
   const [records, setRecords] = useState([]);
@@ -117,15 +117,15 @@ const AdminLateEntryReport = () => {
         </div>
 
         <div className="flex items-center gap-3">
-          <input 
-            type="date" 
+          <input
+            type="date"
             className="px-3 py-2 rounded-lg border text-sm"
             value={filters.startDate}
             onChange={(e) => setFilters({ ...filters, startDate: e.target.value })}
           />
           <span className="text-gray-400">to</span>
-          <input 
-            type="date" 
+          <input
+            type="date"
             className="px-3 py-2 rounded-lg border text-sm"
             value={filters.endDate}
             onChange={(e) => setFilters({ ...filters, endDate: e.target.value })}
@@ -140,8 +140,8 @@ const AdminLateEntryReport = () => {
           <p className="text-3xl font-bold text-gray-800 mt-1">{summaryStats.totalLates}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
-          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Penalties Applied</p>
-          <p className="text-3xl font-bold text-amber-600 mt-1">{summaryStats.totalPenalties} <span className="text-sm font-normal text-gray-400">Days</span></p>
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Total Penalties Amount</p>
+          <p className="text-3xl font-bold text-amber-600 mt-1">₹{summaryStats.totalPenalties.toLocaleString()}</p>
         </div>
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100">
           <p className="text-sm font-medium text-gray-500 uppercase tracking-wider">Pending Exceptions</p>
@@ -182,7 +182,7 @@ const AdminLateEntryReport = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-sm font-black text-rose-600">{user.lateCount} Lates</p>
-                  <p className="text-[10px] text-gray-400">-{user.totalPenalties} Days</p>
+                  <p className="text-[10px] text-gray-400">-₹{user.totalPenalties?.toLocaleString()}</p>
                 </div>
               </div>
             ))}
@@ -226,7 +226,7 @@ const AdminLateEntryReport = () => {
                   </td>
                   <td className="px-6 py-4">
                     <span className={`text-sm font-medium ${record.isWaived ? 'line-through text-gray-400' : 'text-amber-700'}`}>
-                      {record.penaltyApplied} ({record.penaltyValue})
+                      {record.penaltyApplied} (₹{record.penaltyValue.toLocaleString()})
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -256,7 +256,7 @@ const AdminLateEntryReport = () => {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2">
-                      <button 
+                      <button
                         onClick={() => handleEdit(record)}
                         className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                         title="Edit Record"
@@ -265,19 +265,19 @@ const AdminLateEntryReport = () => {
                       </button>
                       {record.exception?.status === 'PENDING' && (
                         <>
-                          <button 
+                          <button
                             onClick={() => handleReview(record.exception.id, 'APPROVED')}
-                            className="p-1.5 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                            className="p-1.5 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all hover:scale-110 active:scale-95 border border-emerald-100"
                             title="Approve Exception"
                           >
-                            ✅
+                            <Check size={14} />
                           </button>
-                          <button 
+                          <button
                             onClick={() => handleReview(record.exception.id, 'REJECTED')}
-                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            className="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition-all hover:scale-110 active:scale-95 border border-rose-100"
                             title="Reject Exception"
                           >
-                            ❌
+                            <X size={14} />
                           </button>
                         </>
                       )}
@@ -319,10 +319,10 @@ const AdminLateEntryReport = () => {
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Date</label>
-                  <input 
+                  <input
                     type="date"
                     value={editForm.date}
-                    onChange={e => setEditForm({...editForm, date: e.target.value})}
+                    onChange={e => setEditForm({ ...editForm, date: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
@@ -331,20 +331,20 @@ const AdminLateEntryReport = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Shift Start</label>
-                  <input 
+                  <input
                     type="text"
                     value={editForm.shiftStart}
-                    onChange={e => setEditForm({...editForm, shiftStart: e.target.value})}
+                    onChange={e => setEditForm({ ...editForm, shiftStart: e.target.value })}
                     placeholder="e.g. 09:00 AM"
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Check-In Time</label>
-                  <input 
+                  <input
                     type="datetime-local"
                     value={editForm.checkinTime}
-                    onChange={e => setEditForm({...editForm, checkinTime: e.target.value})}
+                    onChange={e => setEditForm({ ...editForm, checkinTime: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
@@ -353,17 +353,17 @@ const AdminLateEntryReport = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Late Minutes</label>
-                  <input 
+                  <input
                     type="number"
                     value={editForm.lateMinutes}
-                    onChange={e => setEditForm({...editForm, lateMinutes: e.target.value})}
+                    onChange={e => setEditForm({ ...editForm, lateMinutes: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Waive Status</label>
-                  <button 
-                    onClick={() => setEditForm({...editForm, isWaived: !editForm.isWaived})}
+                  <button
+                    onClick={() => setEditForm({ ...editForm, isWaived: !editForm.isWaived })}
                     className={`w-full px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${editForm.isWaived ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-slate-100 text-slate-400 border border-slate-200'}`}
                   >
                     {editForm.isWaived ? <ShieldCheck size={14} /> : <AlertTriangle size={14} />}
@@ -375,11 +375,12 @@ const AdminLateEntryReport = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penalty Type</label>
-                  <select 
+                  <select
                     value={editForm.penaltyApplied}
-                    onChange={e => setEditForm({...editForm, penaltyApplied: e.target.value})}
+                    onChange={e => setEditForm({ ...editForm, penaltyApplied: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all appearance-none"
                   >
+                    <option value="NONE">None</option>
                     <option value="WARNING">Warning</option>
                     <option value="HALF_DAY">Half Day</option>
                     <option value="FULL_DAY">Full Day</option>
@@ -387,12 +388,11 @@ const AdminLateEntryReport = () => {
                   </select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penalty Value (Days)</label>
-                  <input 
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Penalty Amount (₹)</label>
+                  <input
                     type="number"
-                    step="0.5"
                     value={editForm.penaltyValue}
-                    onChange={e => setEditForm({...editForm, penaltyValue: e.target.value})}
+                    onChange={e => setEditForm({ ...editForm, penaltyValue: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-blue-500/10 focus:border-blue-500 outline-none transition-all"
                   />
                 </div>
@@ -400,13 +400,13 @@ const AdminLateEntryReport = () => {
             </div>
 
             <div className="p-6 bg-slate-50 border-t border-gray-100 flex gap-3">
-              <button 
+              <button
                 onClick={() => setShowEditModal(false)}
                 className="flex-1 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-500 hover:bg-slate-200 transition-all"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleUpdate}
                 className="flex-1 py-4 bg-blue-600 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest shadow-xl shadow-blue-600/20 hover:bg-blue-700 transition-all active:scale-95 flex items-center justify-center gap-2"
               >

@@ -193,7 +193,9 @@ export const getMyHistory = async (req, res, next) => {
         date: { gte: startDate, lte: endDate }
       },
       include: {
-        lateEntry: true
+        lateEntry: {
+          include: { exception: true }
+        }
       },
       orderBy: { date: 'desc' }
     });

@@ -62,9 +62,9 @@ export default function AgentAttendance() {
   const handleWaiverRequest = async () => {
     if (!waiverReason) return toast.error('Please provide a reason');
     try {
-      await lateEntryService.requestException({ 
-        lateEntryId: selectedLateId, 
-        reason: waiverReason 
+      await lateEntryService.requestException({
+        lateEntryId: selectedLateId,
+        reason: waiverReason
       });
       toast.success('Waiver requested successfully');
       setShowWaiverModal(false);
@@ -179,14 +179,14 @@ export default function AgentAttendance() {
         </div>
 
         <div className="flex bg-slate-100 p-1 rounded-xl">
-           <button 
-             onClick={() => setActiveTab('logs')}
-             className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'logs' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
-           >Logs</button>
-           <button 
-             onClick={() => setActiveTab('late-report')}
-             className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'late-report' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
-           >Late Report</button>
+          <button
+            onClick={() => setActiveTab('logs')}
+            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'logs' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+          >Logs</button>
+          <button
+            onClick={() => setActiveTab('late-report')}
+            className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'late-report' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+          >Late Report</button>
         </div>
       </div>
 
@@ -269,19 +269,25 @@ export default function AgentAttendance() {
                       )}
                     </div>
                     <div className="flex items-center gap-2">
-                      {record.isLate && !record.exceptionId && (
-                        <button 
-                          onClick={() => { setSelectedLateId(record.lateEntry?.id); setShowWaiverModal(true); }}
+                      {record.isLate && !record.lateEntry?.exception && (
+                        <button
+                          onClick={() => { 
+                            if(record.lateEntry?.id) {
+                              setSelectedLateId(record.lateEntry.id); 
+                              setShowWaiverModal(true); 
+                            } else {
+                              toast.error("Late entry record not found. Please refresh.");
+                            }
+                          }}
                           className="text-[9px] font-bold text-blue-600 underline"
                         >
                           Request Waiver
                         </button>
                       )}
-                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                        record.status === 'COMPLETED' 
-                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${record.status === 'COMPLETED'
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                           : 'bg-amber-50 text-amber-600 border border-amber-100'
-                      }`}>
+                        }`}>
                         {record.status === 'COMPLETED' ? 'Completed' : 'Active'}
                       </span>
                     </div>
@@ -322,75 +328,75 @@ export default function AgentAttendance() {
         </>
       ) : (
         <div className="space-y-4">
-           {/* Late Report View */}
-           <div className="grid grid-cols-2 gap-4">
-              <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
-                 <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Total Late Entries</p>
-                 <p className="text-2xl font-black text-slate-900">{lateHistory.length}</p>
-              </div>
-              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
-                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Active Penalties</p>
-                 <p className="text-2xl font-black text-slate-900">
-                    {lateHistory.reduce((sum, h) => sum + (h.isWaived ? 0 : (h.penaltyValue > 0 ? 1 : 0)), 0)}
-                 </p>
-              </div>
-           </div>
+          {/* Late Report View */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
+              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Total Late Entries</p>
+              <p className="text-2xl font-black text-slate-900">{lateHistory.length}</p>
+            </div>
+            <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+              <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Active Penalties</p>
+              <p className="text-2xl font-black text-slate-900">
+                {lateHistory.reduce((sum, h) => sum + (h.isWaived ? 0 : (h.penaltyValue > 0 ? 1 : 0)), 0)}
+              </p>
+            </div>
+          </div>
 
-           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
-              <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Penalty History</h3>
-                 <span className="text-[10px] font-bold text-slate-400">{monthNames[month-1]}</span>
-              </div>
-              <div className="divide-y divide-slate-50">
-                 {lateHistory.length === 0 ? (
-                   <div className="p-10 text-center">
-                      <CheckCircle2 size={32} className="text-emerald-200 mx-auto mb-2" />
-                      <p className="text-xs font-bold text-slate-400">Great! No late entries this month.</p>
-                   </div>
-                 ) : (
-                   lateHistory.map(late => (
-                     <div 
-                        key={late.id} 
-                        className={`p-4 flex items-center justify-between transition-colors ${!late.isWaived && !late.exception ? 'cursor-pointer hover:bg-slate-100' : ''}`}
-                        onClick={() => {
-                          if (!late.isWaived && !late.exception) {
-                            setSelectedLateId(late.id);
-                            setShowWaiverModal(true);
-                          }
-                        }}
-                     >
-                        <div>
-                           <p className="text-xs font-black text-slate-900">{formatDate(late.date)}</p>
-                           <p className="text-[10px] font-bold text-slate-400 mt-0.5">
-                              {late.lateMinutes < 60 ? `${late.lateMinutes} mins` : `${Math.floor(late.lateMinutes / 60)} hr ${late.lateMinutes % 60} mins`} late • Shift: {late.shiftStart}
-                           </p>
-                           {late.exception && (
-                             <div className={`mt-2 flex items-center gap-1.5`}>
-                                <div className={`w-1.5 h-1.5 rounded-full ${late.exception.status === 'APPROVED' ? 'bg-emerald-500' : late.exception.status === 'REJECTED' ? 'bg-rose-500' : 'bg-amber-500'}`} />
-                                <span className="text-[9px] font-black uppercase tracking-tight text-slate-500">
-                                   Waiver: {late.exception.status}
-                                </span>
-                             </div>
-                           )}
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Penalty History</h3>
+              <span className="text-[10px] font-bold text-slate-400">{monthNames[month - 1]}</span>
+            </div>
+            <div className="divide-y divide-slate-50">
+              {lateHistory.length === 0 ? (
+                <div className="p-10 text-center">
+                  <CheckCircle2 size={32} className="text-emerald-200 mx-auto mb-2" />
+                  <p className="text-xs font-bold text-slate-400">Great! No late entries this month.</p>
+                </div>
+              ) : (
+                lateHistory.map(late => (
+                  <div
+                    key={late.id}
+                    className={`p-4 flex items-center justify-between transition-colors ${!late.isWaived && !late.exception ? 'cursor-pointer hover:bg-slate-100' : ''}`}
+                    onClick={() => {
+                      if (!late.isWaived && !late.exception) {
+                        setSelectedLateId(late.id);
+                        setShowWaiverModal(true);
+                      }
+                    }}
+                  >
+                    <div>
+                      <p className="text-xs font-black text-slate-900">{formatDate(late.date)}</p>
+                      <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                        {late.lateMinutes < 60 ? `${late.lateMinutes} mins` : `${Math.floor(late.lateMinutes / 60)} hr ${late.lateMinutes % 60} mins`} late • Shift: {late.shiftStart}
+                      </p>
+                      {late.exception && (
+                        <div className={`mt-2 flex items-center gap-1.5`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${late.exception.status === 'APPROVED' ? 'bg-emerald-500' : late.exception.status === 'REJECTED' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                          <span className="text-[9px] font-black uppercase tracking-tight text-slate-500">
+                            Waiver: {late.exception.status}
+                          </span>
                         </div>
-                        <div className="text-right flex flex-col items-end gap-1">
-                           <div className={`px-2 py-1 rounded text-[10px] font-black uppercase ${late.isWaived ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
-                              {late.isWaived ? 'Waived' : late.penaltyApplied}
-                           </div>
-                           {!late.isWaived && !late.exception && (
-                             <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded">
-                               Request Waiver
-                             </span>
-                           )}
-                           {!late.isWaived && late.penaltyValue > 0 && (
-                             <p className="text-[10px] font-bold text-rose-500">-{late.penaltyValue} Day</p>
-                           )}
-                        </div>
-                     </div>
-                   ))
-                 )}
-              </div>
-           </div>
+                      )}
+                    </div>
+                    <div className="text-right flex flex-col items-end gap-1">
+                      <div className={`px-2 py-1 rounded text-[10px] font-black uppercase ${late.isWaived ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                        {late.isWaived ? 'Waived' : late.penaltyApplied}
+                      </div>
+                      {!late.isWaived && !late.exception && (
+                        <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded">
+                          Request Waiver
+                        </span>
+                      )}
+                      {!late.isWaived && late.penaltyValue > 0 && (
+                        <p className="text-[10px] font-bold text-rose-500">-{late.penaltyValue} Day</p>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
         </div>
       )}
 
@@ -400,8 +406,8 @@ export default function AgentAttendance() {
           <div className="bg-white rounded-3xl p-6 w-full max-w-sm animate-in zoom-in-95 duration-200">
             <h3 className="text-lg font-black text-slate-900 mb-2">Request Waiver</h3>
             <p className="text-sm text-slate-500 mb-4">Please provide a reason why this late mark should be ignored.</p>
-            
-            <select 
+
+            <select
               className="w-full p-3 rounded-xl bg-slate-50 border border-slate-100 mb-3 text-sm font-bold text-slate-900 outline-none focus:ring-2 focus:ring-emerald-500"
               value={waiverReason}
               onChange={(e) => setWaiverReason(e.target.value)}
@@ -415,13 +421,13 @@ export default function AgentAttendance() {
             </select>
 
             <div className="flex gap-2">
-              <button 
+              <button
                 onClick={() => setShowWaiverModal(false)}
                 className="flex-1 py-3 rounded-xl font-bold text-slate-400 hover:bg-slate-50 transition-colors"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleWaiverRequest}
                 className="flex-1 py-3 rounded-xl font-bold bg-emerald-600 text-white shadow-lg shadow-emerald-200 hover:bg-emerald-700 transition-all"
               >

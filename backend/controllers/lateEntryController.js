@@ -144,7 +144,11 @@ export const requestException = async (req, res, next) => {
     });
 
     if (existing) {
-      return res.status(400).json({ success: false, message: 'Waiver request already exists for this entry' });
+      return res.status(400).json({ 
+        success: false, 
+        message: 'Waiver request already exists for this entry',
+        data: existing 
+      });
     }
 
     const exception = await prisma.lateEntryException.create({
