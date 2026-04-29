@@ -63,7 +63,7 @@ export const syncPendingLogs = async () => {
  * Start periodic location tracking
  */
 let trackingInterval = null;
-export const startLiveTracking = (intervalMs = 30000) => {
+export const startLiveTracking = (intervalMs = 15000) => {
   if (trackingInterval) return;
 
   const captureLocation = () => {
@@ -92,4 +92,8 @@ export const stopLiveTracking = () => {
     clearInterval(trackingInterval);
     trackingInterval = null;
   }
+};
+
+export const isTrackingActive = () => {
+  return trackingInterval !== null;
 };

@@ -335,60 +335,62 @@ export default function AdminLayout() {
     )}>
       {/* Header */}
       {!isPOS && (
-      <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="VillagKart" className="h-10 w-auto" />
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
-            <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
+      <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 px-4 py-3">
+        <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src={logo} alt="VillagKart" className="h-10 w-auto" />
+            <div className="flex flex-col">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
+              <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center gap-4 relative">
-          {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
-            <Link
-              to={appendParams('/admin/pos')}
-              className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
-              title="Point of Sale"
-            >
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-                <PlusCircle size={18} strokeWidth={3} />
-              </div>
-              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
-            </Link>
-          )}
-
-          <NotificationPopover
-            isOpen={isNotifOpen}
-            onClose={() => setIsNotifOpen(false)}
-          />
-          <button
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
-            className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
-          >
-            <Bell size={22} strokeWidth={2.5} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-red-500/10 z-10 transition-all">
-                {unreadCount}
-              </span>
+          <div className="flex items-center gap-4 relative">
+            {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
+              <Link
+                to={appendParams('/admin/pos')}
+                className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
+                title="Point of Sale"
+              >
+                <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+                  <PlusCircle size={18} strokeWidth={3} />
+                </div>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
+              </Link>
             )}
-          </button>
 
-          {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
+            <NotificationPopover
+              isOpen={isNotifOpen}
+              onClose={() => setIsNotifOpen(false)}
+            />
             <button
-              onClick={() => navigate('/admin/settings')}
-              className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50"
-              title="Admin Settings"
+              onClick={() => setIsNotifOpen(!isNotifOpen)}
+              className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
             >
-              <Settings size={22} strokeWidth={2.5} />
+              <Bell size={22} strokeWidth={2.5} />
+              {unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-red-500/10 z-10 transition-all">
+                  {unreadCount}
+                </span>
+              )}
             </button>
-          )}
 
-          <button
-            onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
-          >
-            <LogOut size={20} />
-          </button>
+            {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
+              <button
+                onClick={() => navigate('/admin/settings')}
+                className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50"
+                title="Admin Settings"
+              >
+                <Settings size={22} strokeWidth={2.5} />
+              </button>
+            )}
+
+            <button
+              onClick={handleLogout}
+              className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
         </div>
       </header>
       )}
