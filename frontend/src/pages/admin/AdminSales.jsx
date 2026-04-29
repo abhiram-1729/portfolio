@@ -566,9 +566,9 @@ export default function AdminSales() {
                       Invoice <span className="text-emerald-600">#{detailOrder.displayId || detailOrder.orderNumber || viewingOrder.displayId || viewingOrder.orderNumber}</span>
                     </h2>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${(detailOrder.status || viewingOrder.status) === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                        (detailOrder.status || viewingOrder.status) === 'RETURNED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                          (detailOrder.status || viewingOrder.status) === 'CANCELLED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                            'bg-emerald-50 text-emerald-600 border-emerald-100'
+                      (detailOrder.status || viewingOrder.status) === 'RETURNED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        (detailOrder.status || viewingOrder.status) === 'CANCELLED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                          'bg-emerald-50 text-emerald-600 border-emerald-100'
                       }`}>
                       {detailOrder.status || viewingOrder.status || 'PENDING'}
                     </span>
@@ -865,13 +865,13 @@ export default function AdminSales() {
                             {canEditOrder && (
                               <td className="px-6 py-5">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button
+                                  {/* <button
                                     title="Edit Quantity"
                                     onClick={() => { setEditingItem(item); setEditQty(item.quantity); }}
                                     className="w-8 h-8 flex items-center justify-center bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-500 hover:text-white transition-all border border-sky-100 shadow-sm"
                                   >
                                     <Edit3 size={14} />
-                                  </button>
+                                  </button> */}
                                   {(item.returnableQty > 0 || (!fullOrder && item.quantity > 0)) && (
                                     <button
                                       title="Return Item"
@@ -881,7 +881,7 @@ export default function AdminSales() {
                                       <RotateCcw size={14} />
                                     </button>
                                   )}
-                                  {(detailOrder.items || viewingOrder.items)?.length > 1 && (
+                                  {/* {(detailOrder.items || viewingOrder.items)?.length > 1 && (
                                     <button
                                       title="Remove Item"
                                       onClick={() => { if (confirm('Remove this item from the order?')) handleRemoveItem(item.id); }}
@@ -889,7 +889,7 @@ export default function AdminSales() {
                                     >
                                       <Trash2 size={14} />
                                     </button>
-                                  )}
+                                  )} */}
                                 </div>
                               </td>
                             )}
