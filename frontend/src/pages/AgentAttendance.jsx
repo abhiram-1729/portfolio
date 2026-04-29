@@ -17,6 +17,8 @@ export default function AgentAttendance() {
   const [showWaiverModal, setShowWaiverModal] = useState(false);
   const [selectedLateId, setSelectedLateId] = useState(null);
   const [waiverReason, setWaiverReason] = useState('');
+  const [activeTab, setActiveTab] = useState('logs'); // 'logs' | 'late-report'
+  const [lateHistory, setLateHistory] = useState([]);
 
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
@@ -29,6 +31,12 @@ export default function AgentAttendance() {
         ...data.summary,
         totalLates: (data.records || []).filter(r => r.isLate && !r.isWaived).length
       });
+
+      // Also fetch detailed late history
+      const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+      const lateRes = await lateEntryService.getMyHistory(monthStr);
+      setLateHistory(lateRes.data || []);
+
     } catch (err) {
       console.error('Failed to fetch attendance history:', err);
     } finally {
@@ -43,7 +51,8 @@ export default function AgentAttendance() {
 
   const fetchLeaveBalance = async () => {
     try {
-      const { data } = await lateEntryService.getLeaveBalance(null, `${year}-${String(month).padStart(2, '0')}`);
+      const monthStr = `${year}-${String(month).padStart(2, '0')}`;
+      const { data } = await lateEntryService.getLeaveBalance(null, monthStr);
       setLeaveBalance(data);
     } catch (err) {
       console.error('Failed to fetch leave balance:', err);
@@ -156,17 +165,28 @@ export default function AgentAttendance() {
   ];
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl mx-auto">
+    <div className="p-4 md:p-6 max-w-2xl mx-auto pb-24">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3 mb-1">
+      <div className="mb-6 flex items-center justify-between">
+        <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
             <Clock size={20} strokeWidth={2.5} />
           </div>
           <div>
-            <h1 className="text-xl font-black text-slate-900 tracking-tight">My Attendance</h1>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Punch-In History</p>
+            <h1 className="text-xl font-black text-slate-900 tracking-tight">Attendance</h1>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Punch-In & Late Reports</p>
           </div>
+        </div>
+
+        <div className="flex bg-slate-100 p-1 rounded-xl">
+           <button 
+             onClick={() => setActiveTab('logs')}
+             className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'logs' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+           >Logs</button>
+           <button 
+             onClick={() => setActiveTab('late-report')}
+             className={`px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'late-report' ? 'bg-white text-emerald-600 shadow-sm' : 'text-slate-400'}`}
+           >Late Report</button>
         </div>
       </div>
 
@@ -185,118 +205,180 @@ export default function AgentAttendance() {
         </button>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-3 gap-2 mb-5">
-        {statCards.map((card) => (
-          <div key={card.label} className={`${card.bg} rounded-2xl p-3 border ${card.border} flex flex-col justify-between`}>
-            <div className="flex items-center gap-1.5 mb-1.5">
-              <card.icon size={12} className={card.text} strokeWidth={2.5} />
-              <span className={`text-[8px] font-black uppercase tracking-widest ${card.text}`}>{card.label}</span>
-            </div>
-            <p className="text-lg font-black text-slate-900">{card.value}</p>
+      {activeTab === 'logs' ? (
+        <>
+          {/* Summary Cards */}
+          <div className="grid grid-cols-3 gap-2 mb-5">
+            {statCards.map((card) => (
+              <div key={card.label} className={`${card.bg} rounded-2xl p-3 border ${card.border} flex flex-col justify-between`}>
+                <div className="flex items-center gap-1.5 mb-1.5">
+                  <card.icon size={12} className={card.text} strokeWidth={2.5} />
+                  <span className={`text-[8px] font-black uppercase tracking-widest ${card.text}`}>{card.label}</span>
+                </div>
+                <p className="text-lg font-black text-slate-900">{card.value}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      {/* Leave Balance Section */}
-      {leaveBalance && (
-        <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 mb-5 text-white shadow-lg">
-          <div className="flex items-center gap-2 mb-3">
-            <Info size={14} className="text-blue-400" />
-            <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Monthly Leave Balance</h3>
+          {/* Leave Balance Section */}
+          {leaveBalance && (
+            <div className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-2xl p-4 mb-5 text-white shadow-lg">
+              <div className="flex items-center gap-2 mb-3">
+                <Info size={14} className="text-blue-400" />
+                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Monthly Leave Balance</h3>
+              </div>
+              <div className="grid grid-cols-3 gap-4">
+                <div>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Half Days</p>
+                  <p className="text-xl font-black">{leaveBalance.halfDays || 0}</p>
+                </div>
+                <div>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">LOP Days</p>
+                  <p className="text-xl font-black text-red-400">{leaveBalance.lopDays || 0}</p>
+                </div>
+                <div>
+                  <p className="text-[8px] font-bold text-slate-400 uppercase">Remaining</p>
+                  <p className="text-xl font-black text-emerald-400">{(leaveBalance.annualLeave || 0) + (leaveBalance.casualLeave || 0) + (leaveBalance.sickLeave || 0)}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Records List */}
+          <div className="space-y-2">
+            {loading ? (
+              <div className="flex items-center justify-center py-20">
+                <div className="w-8 h-8 border-3 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+              </div>
+            ) : records.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center">
+                <AlertCircle size={40} className="text-slate-200 mx-auto mb-3" />
+                <p className="text-sm font-bold text-slate-400">No attendance records for this month</p>
+              </div>
+            ) : (
+              records.map((record) => (
+                <div key={record.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-shadow">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-2">
+                      <CalendarDays size={14} className="text-slate-400" />
+                      <span className="text-sm font-black text-slate-900 tracking-tight">{formatDate(record.date)}</span>
+                      {record.isLate && (
+                        <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold">
+                          LATE ({record.lateMinutes < 60 ? `${record.lateMinutes}m` : `${Math.floor(record.lateMinutes / 60)}h ${record.lateMinutes % 60}m`})
+                        </span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {record.isLate && !record.exceptionId && (
+                        <button 
+                          onClick={() => { setSelectedLateId(record.id); setShowWaiverModal(true); }}
+                          className="text-[9px] font-bold text-blue-600 underline"
+                        >
+                          Request Waiver
+                        </button>
+                      )}
+                      <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
+                        record.status === 'COMPLETED' 
+                          ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
+                          : 'bg-amber-50 text-amber-600 border border-amber-100'
+                      }`}>
+                        {record.status === 'COMPLETED' ? 'Completed' : 'Active'}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
+                        <LogIn size={13} className="text-emerald-600" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">In</p>
+                        <p className="text-sm font-black text-slate-900">{formatTime(record.punchInTime)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 flex-1">
+                      <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
+                        <LogOut size={13} className="text-orange-600" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Out</p>
+                        <p className="text-sm font-black text-slate-900">{formatTime(record.punchOutTime)}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
+                        <Timer size={13} className="text-purple-600" />
+                      </div>
+                      <div>
+                        <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Hrs</p>
+                        <p className="text-sm font-black text-slate-900">{record.totalHours ? `${record.totalHours}h` : '—'}</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-[8px] font-bold text-slate-400 uppercase">Half Days</p>
-              <p className="text-xl font-black">{leaveBalance.halfDays || 0}</p>
-            </div>
-            <div>
-              <p className="text-[8px] font-bold text-slate-400 uppercase">LOP Days</p>
-              <p className="text-xl font-black text-red-400">{leaveBalance.lopDays || 0}</p>
-            </div>
-            <div>
-              <p className="text-[8px] font-bold text-slate-400 uppercase">Remaining</p>
-              <p className="text-xl font-black text-emerald-400">{leaveBalance.annualLeave + leaveBalance.casualLeave + leaveBalance.sickLeave}</p>
-            </div>
-          </div>
+        </>
+      ) : (
+        <div className="space-y-4">
+           {/* Late Report View */}
+           <div className="grid grid-cols-2 gap-4">
+              <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
+                 <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Total Late Entries</p>
+                 <p className="text-2xl font-black text-slate-900">{lateHistory.length}</p>
+              </div>
+              <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
+                 <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Active Penalties</p>
+                 <p className="text-2xl font-black text-slate-900">
+                    {lateHistory.reduce((sum, h) => sum + (h.isWaived ? 0 : (h.penaltyValue > 0 ? 1 : 0)), 0)}
+                 </p>
+              </div>
+           </div>
+
+           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+              <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
+                 <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Penalty History</h3>
+                 <span className="text-[10px] font-bold text-slate-400">{monthNames[month-1]}</span>
+              </div>
+              <div className="divide-y divide-slate-50">
+                 {lateHistory.length === 0 ? (
+                   <div className="p-10 text-center">
+                      <CheckCircle2 size={32} className="text-emerald-200 mx-auto mb-2" />
+                      <p className="text-xs font-bold text-slate-400">Great! No late entries this month.</p>
+                   </div>
+                 ) : (
+                   lateHistory.map(late => (
+                     <div key={late.id} className="p-4 flex items-center justify-between">
+                        <div>
+                           <p className="text-xs font-black text-slate-900">{formatDate(late.date)}</p>
+                           <p className="text-[10px] font-bold text-slate-400 mt-0.5">
+                              {late.lateMinutes < 60 ? `${late.lateMinutes} mins` : `${Math.floor(late.lateMinutes / 60)} hr ${late.lateMinutes % 60} mins`} late • Shift: {late.shiftStart}
+                           </p>
+                           {late.exception && (
+                             <div className={`mt-2 flex items-center gap-1.5`}>
+                                <div className={`w-1.5 h-1.5 rounded-full ${late.exception.status === 'APPROVED' ? 'bg-emerald-500' : late.exception.status === 'REJECTED' ? 'bg-rose-500' : 'bg-amber-500'}`} />
+                                <span className="text-[9px] font-black uppercase tracking-tight text-slate-500">
+                                   Waiver: {late.exception.status}
+                                </span>
+                             </div>
+                           )}
+                        </div>
+                        <div className="text-right">
+                           <div className={`px-2 py-1 rounded text-[10px] font-black uppercase ${late.isWaived ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-100 text-rose-700'}`}>
+                              {late.isWaived ? 'Waived' : late.penaltyApplied}
+                           </div>
+                           {!late.isWaived && late.penaltyValue > 0 && (
+                             <p className="text-[10px] font-bold text-rose-500 mt-1">-{late.penaltyValue} Day</p>
+                           )}
+                        </div>
+                     </div>
+                   ))
+                 )}
+              </div>
+           </div>
         </div>
       )}
-
-      {/* Records List */}
-      <div className="space-y-2">
-        {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <div className="w-8 h-8 border-3 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
-          </div>
-        ) : records.length === 0 ? (
-          <div className="bg-white rounded-2xl border border-slate-100 p-10 text-center">
-            <AlertCircle size={40} className="text-slate-200 mx-auto mb-3" />
-            <p className="text-sm font-bold text-slate-400">No attendance records for this month</p>
-          </div>
-        ) : (
-          records.map((record) => (
-            <div key={record.id} className="bg-white rounded-2xl border border-slate-100 p-4 shadow-sm hover:shadow-md transition-shadow">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <CalendarDays size={14} className="text-slate-400" />
-                  <span className="text-sm font-black text-slate-900 tracking-tight">{formatDate(record.date)}</span>
-                  {record.isLate && (
-                    <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded text-[9px] font-bold">
-                      LATE ({record.lateMinutes}m)
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-2">
-                  {record.isLate && !record.exceptionId && (
-                    <button 
-                      onClick={() => { setSelectedLateId(record.id); setShowWaiverModal(true); }}
-                      className="text-[9px] font-bold text-blue-600 underline"
-                    >
-                      Request Waiver
-                    </button>
-                  )}
-                  <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                    record.status === 'COMPLETED' 
-                      ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' 
-                      : 'bg-amber-50 text-amber-600 border border-amber-100'
-                  }`}>
-                    {record.status === 'COMPLETED' ? 'Completed' : 'Active'}
-                  </span>
-                </div>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2 flex-1">
-                  <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center">
-                    <LogIn size={13} className="text-emerald-600" />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">In</p>
-                    <p className="text-sm font-black text-slate-900">{formatTime(record.punchInTime)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2 flex-1">
-                  <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
-                    <LogOut size={13} className="text-orange-600" />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Out</p>
-                    <p className="text-sm font-black text-slate-900">{formatTime(record.punchOutTime)}</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-                    <Timer size={13} className="text-purple-600" />
-                  </div>
-                  <div>
-                    <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Hrs</p>
-                    <p className="text-sm font-black text-slate-900">{record.totalHours ? `${record.totalHours}h` : '—'}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))
-        )}
-      </div>
 
       {/* Waiver Modal */}
       {showWaiverModal && (

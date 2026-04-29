@@ -329,7 +329,7 @@ export default function AdminAttendance() {
                               <span className="text-sm font-black text-gray-900">{formatTime(record.punchInTime)}</span>
                               {record.isLate && (
                                 <span className="ml-2 px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[8px] font-black uppercase tracking-tighter">
-                                  Late {record.lateMinutes}m
+                                  Late {record.lateMinutes < 60 ? `${record.lateMinutes}m` : `${Math.floor(record.lateMinutes / 60)}h ${record.lateMinutes % 60}m`}
                                 </span>
                               )}
                             </div>

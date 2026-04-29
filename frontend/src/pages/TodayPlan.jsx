@@ -371,7 +371,7 @@ export default function TodayPlan() {
                   </p>
                   {attendance?.isLate && (
                     <span className="px-1.5 py-0.5 bg-red-100 text-red-600 rounded text-[8px] font-black uppercase">
-                      Late {attendance.lateMinutes}m
+                      Late {attendance.lateMinutes < 60 ? `${attendance.lateMinutes}m` : `${Math.floor(attendance.lateMinutes / 60)}h ${attendance.lateMinutes % 60}m`}
                     </span>
                   )}
                   {!attendance?.isLate && attendance?.punchInTime && (

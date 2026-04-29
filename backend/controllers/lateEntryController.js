@@ -138,6 +138,54 @@ export const requestException = async (req, res, next) => {
   }
 };
 
+// @desc    Update late entry record manually (Admin)
+// @route   PATCH /api/late-entry/:id
+// @access  Private (Admin)
+export const updateLateEntry = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { 
+      userId, 
+      date, 
+      shiftStart, 
+      checkinTime, 
+      lateMinutes, 
+      penaltyApplied, 
+      penaltyValue, 
+      isWaived 
+    } = req.body;
+    const adminId = req.user.id;
+
+    // Get old record to see if we need to sync leave balance
+    const oldRecord = await prisma.lateEntry.findUnique({ where: { id } });
+    if (!oldRecord) return res.status(404).json({ success: false, message: 'Record not found' });
+
+    // Update the record
+    const updatedRecord = await prisma.lateEntry.update({
+      where: { id },
+      data: {
+        userId,
+        date,
+        shiftStart,
+        checkinTime: checkinTime ? new Date(checkinTime) : undefined,
+        lateMinutes: parseInt(lateMinutes),
+        penaltyApplied,
+        penaltyValue: parseFloat(penaltyValue),
+        isWaived: isWaived !== undefined ? isWaived : oldRecord.isWaived,
+        waivedById: isWaived ? adminId : (isWaived === false ? null : oldRecord.waivedById),
+        waivedReason: isWaived ? 'Manual adjustment by Admin' : (isWaived === false ? null : oldRecord.waivedReason)
+      }
+    });
+
+    // TODO: Ideally sync LeaveBalance if penaltyValue or isWaived changed.
+    // For now, let's keep it simple as requested.
+
+    res.json({ success: true, data: updatedRecord, message: 'Late entry updated successfully' });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Approve/Reject exception (Manager/Admin)
 // @route   PATCH /api/late-entry/exception/:id
 // @access  Private (Manager/Admin)
@@ -159,7 +207,7 @@ export const reviewException = async (req, res, next) => {
 
     if (status === 'APPROVED') {
       // Waive the penalty
-      await prisma.lateEntry.update({
+      const lateEntry = await prisma.lateEntry.update({
         where: { id: exception.lateEntryId },
         data: {
           isWaived: true,
@@ -168,7 +216,29 @@ export const reviewException = async (req, res, next) => {
         }
       });
 
-      // TODO: Revert LeaveBalance deduction if needed (complex logic)
+      // Revert LeaveBalance deduction if needed
+      if (lateEntry.penaltyValue > 0) {
+        const month = lateEntry.date.substring(0, 7);
+        const balance = await prisma.leaveBalance.findUnique({
+          where: { userId_month: { userId: lateEntry.userId, month } }
+        });
+
+        if (balance) {
+          const updateData = {};
+          if (lateEntry.penaltyApplied === 'HALF_DAY') {
+            updateData.halfDays = { decrement: lateEntry.penaltyValue };
+          } else if (lateEntry.penaltyApplied === 'FULL_DAY' || lateEntry.penaltyApplied === 'LOP') {
+            updateData.lopDays = { decrement: lateEntry.penaltyValue };
+          }
+
+          if (Object.keys(updateData).length > 0) {
+            await prisma.leaveBalance.update({
+              where: { id: balance.id },
+              data: updateData
+            });
+          }
+        }
+      }
     }
 
     res.json({ success: true, data: exception, message: `Exception ${status}` });
