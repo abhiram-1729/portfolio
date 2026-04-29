@@ -17,9 +17,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const menuItems = [
     { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'SALES' },
     { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'ROUTES' },
-    { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
+    // { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
     // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
+    // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'INVENTORY' },
     {
       name: 'Inventory',
@@ -129,13 +129,13 @@ export default function Sidebar({ isOpen, onClose }) {
   ].filter(item => {
     // Hide administrative modules for non-admins (Agents, Drivers, Helpers)
     if ((user?.role === 'SALES_AGENT' || user?.role === 'DRIVER' || user?.role === 'HELPER') && item.isAdmin) return false;
-    
+
     if (item.shouldShow && !item.shouldShow()) return false;
 
     // Bypass granular checks for basic roles without custom roles, or for core agent roles
     const isBasicAgentRole = ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role);
     if (!item.module || user?.role === 'TENANT_OWNER' || (isBasicAgentRole && !user?.customRoleId) || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
-    
+
     // If it's a basic agent role WITH a custom role, still allow core modules unless explicitly handled above
     if (isBasicAgentRole && !item.isAdmin) return true;
 
