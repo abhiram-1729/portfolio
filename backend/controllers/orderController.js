@@ -40,6 +40,7 @@ export const createOrderFromCart = async (req, res, next) => {
         const productIds = cartItems.map((i) => i.productId);
         const products = await prisma.product.findMany({
             where: { id: { in: productIds }, tenantId: req.user.tenantId },
+            include: { WarehouseInventory: true }
         });
 
         const productMap = products.reduce((acc, p) => {
@@ -118,7 +119,7 @@ export const createOrderFromCart = async (req, res, next) => {
             coverageType: coverage
         };
 
-        // 2.7 Verify Vehicle Stock Availability (Prevent + Notify on shortage)
+        // 2.7 Verify Stock Availability (Vehicle Stock OR Store Stock)
         if (vehicleId) {
             for (const item of orderItemsData) {
                 const stock = await prisma.vehicleStock.findUnique({
@@ -141,6 +142,20 @@ export const createOrderFromCart = async (req, res, next) => {
                     
                     res.status(400);
                     throw new Error(`Insufficient stock for ${product.name} (Available: ${stock?.quantity || 0})`);
+                }
+            }
+        } else {
+            // POS / Store-level sale — validate against Product.stock AND Warehouse Sum
+            for (const item of orderItemsData) {
+                const product = productMap[item.productId];
+                if (product) {
+                    const warehouseSum = product.WarehouseInventory?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+                    const availableStock = warehouseSum > 0 ? warehouseSum : (product.stock || 0);
+
+                    if (availableStock < item.quantity) {
+                        res.status(400);
+                        throw new Error(`Insufficient store stock for ${product.name} (Available: ${availableStock})`);
+                    }
                 }
             }
         }
@@ -252,8 +267,9 @@ export const completePayment = async (req, res, next) => {
                 },
             });
 
-            // Reduce vehicle inventory for all items in parallel
+            // Reduce inventory for all items in parallel
             if (order.vehicleId) {
+                // Vehicle-level sale — decrement VehicleStock
                 await Promise.all(order.items.map(async (item) => {
                     const updatedStock = await tx.vehicleStock.update({
                         where: {
@@ -274,6 +290,40 @@ export const completePayment = async (req, res, next) => {
                             name: updatedStock.product.name,
                             productId: item.productId,
                             quantity: updatedStock.quantity
+                        });
+                    }
+                }));
+            } else {
+                // POS / Store-level sale — decrement Product.stock AND WarehouseInventory
+                await Promise.all(order.items.map(async (item) => {
+                    // 1. Decrement main Product.stock
+                    const updatedProduct = await tx.product.update({
+                        where: { id: item.productId },
+                        data: { stock: { decrement: item.quantity } }
+                    });
+
+                    // 2. Sync with WarehouseInventory if it exists
+                    // We target the same tenant and optionally storeId if available
+                    const wi = await tx.warehouseInventory.findFirst({
+                        where: { 
+                            productId: item.productId, 
+                            tenantId: order.tenantId
+                        }
+                    });
+
+                    if (wi) {
+                        await tx.warehouseInventory.update({
+                            where: { id: wi.id },
+                            data: { quantity: { decrement: item.quantity } }
+                        });
+                    }
+
+                    // Low stock alert for store products
+                    if (updatedProduct.stock < (updatedProduct.minStockAlert || 5)) {
+                        lowStockItems.push({
+                            name: updatedProduct.name,
+                            productId: item.productId,
+                            quantity: updatedProduct.stock
                         });
                     }
                 }));

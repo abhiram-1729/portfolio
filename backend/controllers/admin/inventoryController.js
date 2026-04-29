@@ -356,57 +356,69 @@ export const loadStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
-    for (const item of items) {
-      const q = parseFloat(item.quantity);
-      if (isNaN(q) || q <= 0) continue;
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const q = parseFloat(item.quantity);
+        if (isNaN(q) || q <= 0) continue;
 
-      // 🆕 VALIDATION: Ensure requested quantity doesn't exceed Store Stock
-      const prod = await prisma.product.findUnique({ where: { id: item.productId } });
-      if (!prod) {
-        return res.status(404).json({ message: `Product ${item.productId} not found` });
-      }
-      if (Math.floor(q) > (prod.stock || 0)) {
-        return res.status(400).json({ message: `Insufficient stock for ${prod.name}. Available in store: ${prod.stock}` });
-      }
-
-      // Create transaction
-      await prisma.stockTransaction.create({
-        data: {
-          tenantId: req.user.tenantId,
-          storeId,
-          userId: req.user.id,
-          type: 'LOAD',
-          vehicleId,
-          productId: item.productId,
-          quantity: q
+        // 🆕 VALIDATION: Ensure requested quantity doesn't exceed Store Stock
+        const prod = await tx.product.findUnique({ where: { id: item.productId } });
+        if (!prod) {
+          throw new Error(`Product ${item.productId} not found`);
         }
-      });
-
-      // Update vehicle stock
-      await prisma.vehicleStock.upsert({
-        where: {
-          vehicleId_productId: { vehicleId, productId: item.productId }
-        },
-        update: {
-          quantity: { increment: Math.floor(q) },
-          openingQuantity: { increment: Math.floor(q) }
-        },
-        create: {
-          tenantId: req.user.tenantId,
-          storeId,
-          vehicleId,
-          productId: item.productId,
-          quantity: Math.floor(q),
-          openingQuantity: Math.floor(q)
+        if (Math.floor(q) > (prod.stock || 0)) {
+          throw new Error(`Insufficient stock for ${prod.name}. Available in store: ${prod.stock}`);
         }
-      });
- 
-      // 🆕 DECREMENT main product stock
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: Math.floor(q) } }
-      });
-    }
+
+        // Create transaction record
+        await tx.stockTransaction.create({
+          data: {
+            tenantId: req.user.tenantId,
+            storeId,
+            userId: req.user.id,
+            type: 'LOAD',
+            vehicleId,
+            productId: item.productId,
+            quantity: q
+          }
+        });
+
+        // Update vehicle stock
+        await tx.vehicleStock.upsert({
+          where: {
+            vehicleId_productId: { vehicleId, productId: item.productId }
+          },
+          update: {
+            quantity: { increment: Math.floor(q) },
+            openingQuantity: { increment: Math.floor(q) }
+          },
+          create: {
+            tenantId: req.user.tenantId,
+            storeId,
+            vehicleId,
+            productId: item.productId,
+            quantity: Math.floor(q),
+            openingQuantity: Math.floor(q)
+          }
+        });
+
+        // 🆕 DECREMENT main product stock AND WarehouseInventory
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: Math.floor(q) } }
+        });
+
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId: req.user.tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { decrement: Math.floor(q) } }
+          });
+        }
+      }
+    });
 
     res.json({ message: 'Stock loaded successfully' });
 
@@ -497,41 +509,52 @@ export const returnStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
-    for (const item of items) {
-      const q = parseFloat(item.quantity);
+    await prisma.$transaction(async (tx) => {
+      for (const item of items) {
+        const q = parseFloat(item.quantity);
 
-      // Create transaction
-      await prisma.stockTransaction.create({
-        data: {
-          tenantId: req.user.tenantId,
-          storeId,
-          userId: req.user.id,
-          type: 'RETURN',
-          vehicleId,
-          productId: item.productId,
-          quantity: q
-        }
-      });
+        // Create transaction record
+        await tx.stockTransaction.create({
+          data: {
+            tenantId: req.user.tenantId,
+            storeId,
+            userId: req.user.id,
+            type: 'RETURN',
+            vehicleId,
+            productId: item.productId,
+            quantity: q
+          }
+        });
 
-      // Update vehicle stock
-      // Update vehicle stock
-      await prisma.vehicleStock.updateMany({
-        where: {
-          vehicleId,
-          productId: item.productId
-        },
-        data: {
-          quantity: { decrement: Math.floor(q) },
-          openingQuantity: { decrement: Math.floor(q) }
+        // Update vehicle stock
+        await tx.vehicleStock.updateMany({
+          where: {
+            vehicleId,
+            productId: item.productId
+          },
+          data: {
+            quantity: { decrement: Math.floor(q) },
+            openingQuantity: { decrement: Math.floor(q) }
+          }
+        });
+
+        // 🆕 INCREMENT main product stock back AND WarehouseInventory
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: Math.floor(q) } }
+        });
+
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId: req.user.tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { increment: Math.floor(q) } }
+          });
         }
-      });
- 
-      // 🆕 INCREMENT main product stock back
-      await prisma.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: Math.floor(q) } }
-      });
-    }
+      }
+    });
 
     res.json({ message: 'Stock returned successfully' });
 

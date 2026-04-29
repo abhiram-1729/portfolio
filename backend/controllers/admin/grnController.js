@@ -87,6 +87,12 @@ export const createGRN = async (req, res) => {
               }
             });
           }
+
+          // ALSO update Product.stock for POS sync
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: receivedQty } }
+          });
         }
       }
 

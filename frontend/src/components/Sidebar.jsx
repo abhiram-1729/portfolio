@@ -17,9 +17,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const menuItems = [
     { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'SALES' },
     { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'ROUTES' },
-    // { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
+    { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
     // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
-    // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
+    { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'INVENTORY' },
     {
       name: 'Inventory',
@@ -54,7 +54,7 @@ export default function Sidebar({ isOpen, onClose }) {
       bg: 'bg-orange-50',
       module: 'CASH',
       shouldShow: () => {
-        if (!user?.customRoleId) return true;
+        if (!user?.customRoleId || ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role)) return true;
         const sections = user?.permissions?.CASH_SECTIONS;
         if (sections) return (sections['RECONCILIATION'] || []).includes('READ');
         return user?.permissions?.CASH_TARGET_SECTIONS?.includes('RECONCILIATION');
@@ -68,7 +68,7 @@ export default function Sidebar({ isOpen, onClose }) {
       bg: 'bg-emerald-50',
       module: 'CASH',
       shouldShow: () => {
-        if (!user?.customRoleId) return true;
+        if (!user?.customRoleId || ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role)) return true;
         const sections = user?.permissions?.CASH_SECTIONS;
         if (sections) return (sections['LIVE_CASH'] || []).includes('READ');
         return user?.permissions?.CASH_TARGET_SECTIONS?.includes('LIVE_CASH');
@@ -84,13 +84,6 @@ export default function Sidebar({ isOpen, onClose }) {
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      module: 'INVENTORY',
-      shouldShow: () => {
-        if (!user?.customRoleId) return true;
-        const sections = user?.permissions?.INVENTORY_SECTIONS;
-        if (sections) return (sections['DAMAGE'] || []).includes('READ');
-        return user?.permissions?.INVENTORY_TARGET_SECTIONS?.includes('DAMAGE');
-      }
     },
     { name: 'My Attendance', path: '/attendance', icon: Clock, color: 'text-teal-600', bg: 'bg-teal-50' },
     { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
@@ -134,10 +127,17 @@ export default function Sidebar({ isOpen, onClose }) {
       }
     },
   ].filter(item => {
-    // Hide administrative modules for Agents
-    if (user?.role === 'SALES_AGENT' && item.isAdmin) return false;
+    // Hide administrative modules for non-admins (Agents, Drivers, Helpers)
+    if ((user?.role === 'SALES_AGENT' || user?.role === 'DRIVER' || user?.role === 'HELPER') && item.isAdmin) return false;
+    
     if (item.shouldShow && !item.shouldShow()) return false;
-    if (!item.module || user?.role === 'TENANT_OWNER' || user?.role === 'SALES_AGENT' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+
+    // Bypass granular checks for basic roles without custom roles, or for core agent roles
+    const isBasicAgentRole = ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role);
+    if (!item.module || user?.role === 'TENANT_OWNER' || (isBasicAgentRole && !user?.customRoleId) || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    
+    // If it's a basic agent role WITH a custom role, still allow core modules unless explicitly handled above
+    if (isBasicAgentRole && !item.isAdmin) return true;
 
     // Granular checks for top-level modules - PRIORITIZE SECTION VISIBILITY OVER MODULE READ
     if (item.module === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {

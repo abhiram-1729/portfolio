@@ -35,6 +35,7 @@ export const getProducts = async (req, res, next) => {
                 brand: true,
                 variants: true,
                 unit: true,
+                WarehouseInventory: true, // Always include for stock sync
             },
         };
 
@@ -55,6 +56,7 @@ export const getProducts = async (req, res, next) => {
                 { WarehouseInventory: { some: { warehouseId, quantity: { gt: 0 } } } },
                 { isFree: true }
             ];
+            // Override the include to only show this specific warehouse if requested
             query.include.WarehouseInventory = {
                 where: { warehouseId }
             };
@@ -77,15 +79,18 @@ export const getProducts = async (req, res, next) => {
         }
 
         const products = await prisma.product.findMany(query);
-        console.log(`[getProducts] Found ${products.length} products for vehicle ${vehicleId || 'NONE'}`);
+        console.log(`[getProducts] Found ${products.length} products. Source: ${vehicleId ? 'Vehicle' : (warehouseId ? 'Warehouse' : 'General')}`);
         
         // Flatten stock info for easier frontend consumption
-        const result = products.map(p => ({
-            ...p,
-            stock: vehicleId 
-                ? (p.vehicleStocks?.[0]?.quantity || 0) 
-                : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : null)
-        }));
+        const result = products.map(p => {
+            const warehouseSum = p.WarehouseInventory?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            return {
+                ...p,
+                stock: vehicleId 
+                    ? (p.vehicleStocks?.[0]?.quantity || 0) 
+                    : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : (warehouseSum > 0 ? warehouseSum : (p.stock ?? 0)))
+            };
+        });
 
         res.json(result);
     } catch (error) {
