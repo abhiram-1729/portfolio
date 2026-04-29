@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Plus, Search, Loader2, ClipboardList, X, ArrowLeft
+  Plus, Search, Loader2, ClipboardList, X, ArrowLeft, Edit3, Trash2
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
 import toast from 'react-hot-toast';
@@ -69,25 +69,66 @@ const PurchaseOrdersSection = ({ can }) => {
     }));
   };
 
+  const handleEdit = async (po) => {
+    try {
+      const { data: v } = await procurementAPI.getVendors({ status: 'ACTIVE' });
+      setVendors(v);
+      const { data: m } = await procurementAPI.getVendorMappings(po.vendorId);
+      setMappedItems(m.map(item => ({
+        productId: item.product.id,
+        name: item.product.name,
+        purchasePrice: item.product.purchasePrice || item.product.price || 0
+      })));
+      setForm({
+        id: po.id,
+        vendorId: po.vendorId,
+        poDate: format(new Date(po.poDate), 'yyyy-MM-dd'),
+        expectedDelivery: po.expectedDelivery ? format(new Date(po.expectedDelivery), 'yyyy-MM-dd') : '',
+        remarks: po.remarks || '',
+        items: po.items.map(i => ({ productId: i.productId, quantity: i.quantity, rate: i.rate }))
+      });
+      setShowForm(true);
+    } catch { toast.error('Failed to load data for editing'); }
+  };
+
+  const handleDeletePO = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this Purchase Order?')) return;
+    try {
+      await procurementAPI.deletePurchaseOrder(id);
+      toast.success('Purchase Order deleted');
+      loadPOs();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error deleting PO');
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!form.vendorId || form.items.length === 0) {
       return toast.error('Select a vendor and at least one item');
     }
     try {
-      await procurementAPI.createPurchaseOrder({
+      const payload = {
         vendorId: form.vendorId,
         poDate: form.poDate,
         expectedDelivery: form.expectedDelivery || null,
         remarks: form.remarks,
         items: form.items.map(i => ({ productId: i.productId, quantity: parseInt(i.quantity), rate: parseFloat(i.rate) }))
-      });
-      toast.success('Purchase Order created');
+      };
+      
+      if (form.id) {
+        await procurementAPI.updatePurchaseOrder(form.id, payload);
+        toast.success('Purchase Order updated');
+      } else {
+        await procurementAPI.createPurchaseOrder(payload);
+        toast.success('Purchase Order created');
+      }
+      
       setShowForm(false);
       setForm({ vendorId: '', poDate: format(new Date(), 'yyyy-MM-dd'), expectedDelivery: '', remarks: '', items: [] });
       loadPOs();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Error creating PO');
+      toast.error(err.response?.data?.message || 'Error saving PO');
     }
   };
 
@@ -132,7 +173,7 @@ const PurchaseOrdersSection = ({ can }) => {
           </div>
         </div>
         {can('PROCUREMENT', 'CREATE', 'PO') && (
-          <button onClick={openForm}
+          <button onClick={() => { setForm({ vendorId: '', poDate: format(new Date(), 'yyyy-MM-dd'), expectedDelivery: '', remarks: '', items: [] }); openForm(); }}
             className="flex items-center gap-1.5 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 hover:-translate-y-0.5 transition-all shadow-xl shadow-emerald-600/20 active:translate-y-0">
             <Plus size={14} strokeWidth={3} /> Create Purchase Order
           </button>
@@ -164,7 +205,17 @@ const PurchaseOrdersSection = ({ can }) => {
                   </div>
                   <p className="text-[10px] text-gray-400 font-bold mt-0.5">{po.vendor?.vendorName} • {format(new Date(po.poDate), 'dd MMM yyyy')}</p>
                 </div>
-                <span className="text-base font-black text-gray-900">₹{po.totalAmount.toLocaleString()}</span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="text-base font-black text-gray-900">₹{po.totalAmount.toLocaleString()}</span>
+                  <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                    {po.status === 'CREATED' && can('PROCUREMENT', 'UPDATE', 'PO') && (
+                      <button onClick={() => handleEdit(po)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100" title="Edit"><Edit3 size={12} /></button>
+                    )}
+                    {can('PROCUREMENT', 'DELETE', 'PO') && po.status !== 'CLOSED' && (
+                      <button onClick={() => handleDeletePO(po.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Delete"><Trash2 size={12} /></button>
+                    )}
+                  </div>
+                </div>
               </div>
               <div className="flex flex-wrap gap-1.5">
                 {po.items?.slice(0, 3).map(item => (
@@ -269,7 +320,7 @@ const PurchaseOrdersSection = ({ can }) => {
                   className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
               </div>
               <button className="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
-                Create Purchase Order
+                {form.id ? 'Update Purchase Order' : 'Create Purchase Order'}
               </button>
             </form>
           </div>

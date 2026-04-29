@@ -1,6 +1,7 @@
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // ─── CREATE PAYMENT ─────────────────────────────────────
 export const createPayment = async (req, res) => {
@@ -183,5 +184,65 @@ export const getOutstandingInvoices = async (req, res) => {
     res.json(result);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching outstanding invoices', error: error.message });
+  }
+};
+
+// ─── DELETE PAYMENT ─────────────────────────────────────
+export const deletePayment = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const payment = await prisma.vendorPayment.findUnique({
+      where: { id },
+      include: { allocations: { include: { invoice: true } } }
+    });
+
+    if (!payment) return res.status(404).json({ message: 'Payment not found' });
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Rollback allocations
+      for (const allocation of payment.allocations) {
+        const inv = allocation.invoice;
+        const newPaidAmount = Math.max(0, inv.paidAmount - allocation.amount);
+        const newStatus = newPaidAmount === 0 ? 'CONFIRMED' : 'PARTIAL_PAID';
+
+        await tx.purchaseInvoice.update({
+          where: { id: inv.id },
+          data: { paidAmount: newPaidAmount, status: newStatus }
+        });
+      }
+
+      // 2. Revert Vendor Balance
+      const currentVendor = await tx.vendor.findUnique({ where: { id: payment.vendorId } });
+      const newBalance = (currentVendor?.currentBalance || 0) + payment.amount;
+
+      await tx.vendor.update({
+        where: { id: payment.vendorId },
+        data: { currentBalance: newBalance }
+      });
+
+      // 3. Delete Ledger Entry
+      await tx.vendorLedger.deleteMany({
+        where: { reference: payment.id, type: 'PAYMENT' }
+      });
+
+      // 4. Delete allocations & payment
+      await tx.vendorPaymentAllocation.deleteMany({ where: { paymentId: id } });
+      await tx.vendorPayment.delete({ where: { id } });
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      action: 'VENDOR_PAYMENT_DELETED',
+      details: `Deleted Payment of ₹${payment.amount} for Vendor ${payment.vendorId}`,
+      metadata: { paymentId: id }
+    });
+
+    res.json({ message: 'Payment deleted successfully' });
+  } catch (error) {
+    console.error('❌ Delete Payment Error:', error);
+    res.status(500).json({ message: 'Error deleting payment', error: error.message });
   }
 };

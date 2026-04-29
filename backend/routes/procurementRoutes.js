@@ -31,24 +31,35 @@ router.put('/vendors/:vendorId/mappings', vendorCtr.updateVendorMappings);
 router.route('/purchase-orders')
   .get(poCtr.getPOs)
   .post(poCtr.createPO);
-router.get('/purchase-orders/:id', poCtr.getPOById);
+router.route('/purchase-orders/:id')
+  .get(poCtr.getPOById)
+  .put(poCtr.updatePO)
+  .delete(poCtr.deletePO);
 router.put('/purchase-orders/:id/status', poCtr.updatePOStatus);
 
 // ─── GOODS RECEIPT NOTES ─────────────────────────────────────
 router.route('/grn')
   .get(grnCtr.getGRNs)
   .post(grnCtr.createGRN);
+router.route('/grn/:id')
+  .put(grnCtr.updateGRN)
+  .delete(grnCtr.deleteGRN);
 
 // ─── PURCHASE INVOICES ─────────────────────────────────────
 router.route('/purchases')
   .get(purchaseCtr.getPurchases)
   .post(purchaseCtr.createPurchase);
-router.get('/purchases/:id', purchaseCtr.getPurchaseById);
+router.route('/purchases/:id')
+  .get(purchaseCtr.getPurchaseById)
+  .put(purchaseCtr.updatePurchase)
+  .delete(purchaseCtr.deletePurchase);
 
 // ─── VENDOR PAYMENTS ─────────────────────────────────────
 router.route('/payments')
   .get(paymentCtr.getPayments)
   .post(paymentCtr.createPayment);
+router.route('/payments/:id')
+  .delete(paymentCtr.deletePayment);
 router.get('/payments/outstanding/:vendorId', paymentCtr.getOutstandingInvoices);
 
 // ─── REPORTS ─────────────────────────────────────
