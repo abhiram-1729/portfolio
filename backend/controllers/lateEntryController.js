@@ -121,20 +121,47 @@ export const requestException = async (req, res, next) => {
     const userId = req.user.id;
     const tenantId = req.user.tenantId;
 
+    if (!lateEntryId || !reason) {
+      return res.status(400).json({ success: false, message: 'Late entry ID and reason are required' });
+    }
+
+    // Verify late entry exists and belongs to user
+    const lateEntry = await prisma.lateEntry.findUnique({
+      where: { id: lateEntryId }
+    });
+
+    if (!lateEntry) {
+      return res.status(404).json({ success: false, message: 'Late entry record not found' });
+    }
+
+    if (lateEntry.userId !== userId) {
+      return res.status(403).json({ success: false, message: 'Unauthorized to request waiver for this record' });
+    }
+
+    // Check if exception already exists
+    const existing = await prisma.lateEntryException.findUnique({
+      where: { lateEntryId }
+    });
+
+    if (existing) {
+      return res.status(400).json({ success: false, message: 'Waiver request already exists for this entry' });
+    }
+
     const exception = await prisma.lateEntryException.create({
       data: {
-        tenantId,
+        tenantId: tenantId || 'VK001',
         userId,
         lateEntryId,
         reason,
-        description,
+        description: description || '',
         status: 'PENDING'
       }
     });
 
-    res.status(201).json({ success: true, data: exception, message: 'Exception request submitted' });
+    res.status(201).json({ success: true, data: exception, message: 'Waiver request submitted' });
   } catch (error) {
-    next(error);
+    console.error('[requestException Error]:', error);
+    res.status(500).json({ success: false, message: error.message || 'Internal server error' });
   }
 };
 

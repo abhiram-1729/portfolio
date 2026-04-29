@@ -203,6 +203,7 @@ const AdminLateEntryReport = () => {
                 <th className="px-6 py-4">Check-In</th>
                 <th className="px-6 py-4">Late Mins</th>
                 <th className="px-6 py-4">Penalty</th>
+                <th className="px-6 py-4">Waiver Reason</th>
                 <th className="px-6 py-4">Status</th>
                 <th className="px-6 py-4">Actions</th>
               </tr>
@@ -229,12 +230,28 @@ const AdminLateEntryReport = () => {
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    {record.isWaived ? (
-                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase">Waived</span>
-                    ) : record.exception?.status === 'PENDING' ? (
-                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase">Pending Appr.</span>
+                    {record.exception ? (
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-slate-700 uppercase tracking-tight">{record.exception.reason?.replace('_', ' ')}</span>
+                        {record.exception.description && (
+                          <span className="text-[9px] text-slate-400 italic truncate max-w-[150px]" title={record.exception.description}>
+                            "{record.exception.description}"
+                          </span>
+                        )}
+                      </div>
+                    ) : record.isWaived && record.waivedReason ? (
+                      <span className="text-[10px] text-slate-400 italic">"{record.waivedReason}"</span>
                     ) : (
-                      <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-[10px] font-bold uppercase">Applied</span>
+                      <span className="text-[10px] text-slate-300">---</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4">
+                    {record.isWaived ? (
+                      <span className="px-2 py-1 bg-green-100 text-green-700 rounded-full text-[10px] font-bold uppercase w-fit">Waived</span>
+                    ) : record.exception?.status === 'PENDING' ? (
+                      <span className="px-2 py-1 bg-blue-100 text-blue-700 rounded-full text-[10px] font-bold uppercase w-fit">Pending Appr.</span>
+                    ) : (
+                      <span className="px-2 py-1 bg-gray-100 text-gray-500 rounded-full text-[10px] font-bold uppercase w-fit">Applied</span>
                     )}
                   </td>
                   <td className="px-6 py-4">
