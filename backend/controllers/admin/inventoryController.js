@@ -497,12 +497,25 @@ export const loadStock = async (req, res) => {
     } catch (error) {
     console.error('❌ loadStock Crash:', error);
     
-    // Handle validation errors with 400
-    if (error.message.startsWith('VALIDATION:')) {
-      return res.status(400).json({ message: error.message.replace('VALIDATION:', '') });
+    const errorMessage = error.message || '';
+    
+    // 1. Handle our custom business logic validation errors
+    if (errorMessage.match(/VALIDATION:/i)) {
+      const parts = errorMessage.split(/VALIDATION:/i);
+      const cleanMessage = parts[parts.length - 1].trim();
+      return res.status(400).json({ message: cleanMessage });
     }
 
-    res.status(500).json({ message: 'Error loading stock', error: error.message });
+    // 2. Handle Prisma specific validation/constraint errors
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'A record with this information already exists.' });
+    }
+
+    res.status(500).json({ 
+      message: 'Error loading stock', 
+      error: errorMessage,
+      code: error.code
+    });
   }
 };
 
