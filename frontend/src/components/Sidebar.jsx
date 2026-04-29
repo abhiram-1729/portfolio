@@ -84,13 +84,6 @@ export default function Sidebar({ isOpen, onClose }) {
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
-      module: 'INVENTORY',
-      shouldShow: () => {
-        if (!user?.customRoleId) return true;
-        const sections = user?.permissions?.INVENTORY_SECTIONS;
-        if (sections) return (sections['DAMAGE'] || []).includes('READ');
-        return user?.permissions?.INVENTORY_TARGET_SECTIONS?.includes('DAMAGE');
-      }
     },
     { name: 'My Attendance', path: '/attendance', icon: Clock, color: 'text-teal-600', bg: 'bg-teal-50' },
     { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
