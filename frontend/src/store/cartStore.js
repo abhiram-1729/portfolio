@@ -30,7 +30,7 @@ const calculateTotals = (items) => {
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return { 
-    totalAmount: Math.round(totalAmount * 100) / 100, 
+    totalAmount: Math.round(totalAmount), 
     totalItems 
   };
 };

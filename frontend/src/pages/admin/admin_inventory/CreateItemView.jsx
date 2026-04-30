@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, PlusCircle, Package, Camera, Info, Barcode, Grid, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Package, Camera, Info, Barcode, Grid, Plus, Trash2, ScanBarcode } from 'lucide-react';
 
 const CreateItemView = ({
   setIsCreateView,
@@ -14,7 +14,9 @@ const CreateItemView = ({
   units,
   taxRates,
   handleCreateItem,
-  isUploading
+  isUploading,
+  setScannerTarget,
+  setShowScanner
 }) => {
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
@@ -98,6 +100,17 @@ const CreateItemView = ({
                         value={newItem.barcode}
                         onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScannerTarget('create');
+                          setShowScanner(true);
+                        }}
+                        className="p-2 m-1 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                        title="Scan Barcode with Camera"
+                      >
+                        <ScanBarcode size={18} />
+                      </button>
                     </div>
                   </div>
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2
+  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
@@ -29,6 +29,7 @@ const PurchasesSection = ({ can }) => {
   const [categories, setCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [search, setSearch] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -131,6 +132,7 @@ const PurchasesSection = ({ can }) => {
       return toast.error('Please select a product and valid quantity for all items');
     }
     try {
+      setIsSubmitting(true);
       const payload = {
         ...form,
         items: form.items.map(i => ({ productId: i.productId, quantity: parseInt(i.quantity), price: parseFloat(i.price) }))
@@ -151,6 +153,8 @@ const PurchasesSection = ({ can }) => {
       setPurchases(data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error saving purchase');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -163,7 +167,9 @@ const PurchasesSection = ({ can }) => {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/50 p-3 rounded-[2rem] border border-gray-100">
+      {!showForm ? (
+        <>
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/50 p-3 rounded-[2rem] border border-gray-100">
         <div className="relative group flex-1 max-w-md w-full">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
           <input 
@@ -226,15 +232,15 @@ const PurchasesSection = ({ can }) => {
           ))}
         </div>
       )}
-
-      {/* Purchase Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-white w-full max-w-2xl rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between">
-              <h3 className="text-lg font-black text-gray-900">New Purchase Invoice</h3>
-              <button onClick={() => setShowForm(false)} className="text-gray-400"><X size={20} /></button>
-            </div>
+      </>
+      ) : (
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
+            <button type="button" onClick={() => setShowForm(false)} className="p-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 hover:text-emerald-600 transition-all">
+              <ArrowLeft size={18} />
+            </button>
+            <h3 className="text-xl font-black text-gray-900">{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'}</h3>
+          </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
@@ -323,9 +329,6 @@ const PurchasesSection = ({ can }) => {
                     <button type="button" onClick={() => setShowQuickProduct(true)} className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 bg-blue-50/50 px-3 py-2 rounded-xl hover:bg-blue-100 transition-all active:scale-95">
                       <Plus size={12} strokeWidth={3} /> New Product
                     </button>
-                    <button type="button" onClick={addItem} className="text-[10px] font-black text-emerald-600 flex items-center gap-1.5 bg-emerald-50/50 px-3 py-2 rounded-xl hover:bg-emerald-100 transition-all active:scale-95">
-                      <Plus size={12} strokeWidth={3} /> Add Blank Row
-                    </button>
                   </div>
                 </div>
               <div className="space-y-3" onClick={() => setShowItemResults(false)}>
@@ -337,15 +340,10 @@ const PurchasesSection = ({ can }) => {
                 ) : (
                   form.items.map((item, idx) => (
                     <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-gray-50/30 p-3 rounded-2xl border border-gray-100 group relative hover:border-emerald-200 transition-all animate-in slide-in-from-left-2 duration-300">
-                    <div className="flex-1 min-w-0">
-                      <select value={item.productId} onChange={e => {
-                        const prod = products.find(p => p.id === e.target.value);
-                        updateItem(idx, 'productId', e.target.value);
-                        if (prod) updateItem(idx, 'price', String(prod.purchasePrice || prod.price || 0));
-                      }} className="w-full bg-white rounded-xl px-3 py-2 text-xs font-bold border border-gray-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all appearance-none">
-                        <option value="">Select Item</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                      </select>
+                    <div className="flex-1 min-w-0 bg-white border border-gray-100 rounded-xl px-4 py-2 flex items-center shadow-inner">
+                      <span className="text-xs font-bold text-gray-900 truncate">
+                        {products.find(p => p.id === item.productId)?.name || 'Unknown Product'}
+                      </span>
                     </div>
                     <div className="flex items-center gap-2">
                       <div className="relative">
@@ -367,11 +365,18 @@ const PurchasesSection = ({ can }) => {
               )))}
             </div>
               </div>
-              <button className="w-full bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all">
-                {form.id ? 'Update Purchase Invoice' : 'Create Purchase Invoice'}
+              <button 
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSubmitting ? (
+                  <><Loader2 className="animate-spin" size={16} /> Saving...</>
+                ) : (
+                  form.id ? 'Update Purchase Invoice' : 'Create Purchase Invoice'
+                )}
               </button>
             </form>
-          </div>
         </div>
       )}
 

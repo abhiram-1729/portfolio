@@ -40,12 +40,14 @@ import {
   Send,
   Image as ImageIcon,
   Camera,
-  Trash2 as Trash
+  Trash2 as Trash,
+  NotebookText
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import villagKartLogo from '../../assets/vk.png';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
+import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
 
 export default function AdminPOS() {
   const navigate = useNavigate();
@@ -56,17 +58,37 @@ export default function AdminPOS() {
   const [products, setProducts] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+  const [unavailableCode, setUnavailableCode] = useState(null);
+  const [scannedProduct, setScannedProduct] = useState(null);
+  const [scannedQuantity, setScannedQuantity] = useState(1);
   const [selectedCategory, setSelectedCategory] = useState('ALL');
 
   // Checkout States
   const [checkoutStep, setCheckoutStep] = useState('CART'); // 'CART', 'PAYMENT', 'SUCCESS'
   const [selectedPaymentMode, setSelectedPaymentMode] = useState(null);
+  const [orderType, setOrderType] = useState('COUNTER');
   const [cashReceived, setCashReceived] = useState('');
   const [splitAmounts, setSplitAmounts] = useState({ cash: '', upi: '' });
   const [actionLoading, setActionLoading] = useState(false);
   const [lastOrder, setLastOrder] = useState(null);
   const [settings, setSettings] = useState(null);
   const [isDownloading, setIsDownloading] = useState(false);
+
+  const handleBarcodeScan = (code) => {
+    const product = products.find(p => p.skuCode === code || p.barcode === code);
+    if (product) {
+      if (product.stock <= 0) {
+        toast.error(`${product.name} is out of stock`);
+      } else {
+        setScannedProduct(product);
+        setScannedQuantity(1);
+      }
+    } else {
+      setUnavailableCode(code);
+    }
+  };
+
+  useBarcodeScanner(handleBarcodeScan);
 
   // Damage Reporting State
   const [isDamageModalOpen, setIsDamageModalOpen] = useState(false);
@@ -138,8 +160,12 @@ export default function AdminPOS() {
       const cash = parseFloat(splitAmounts.cash) || 0;
       const upi = parseFloat(splitAmounts.upi) || 0;
       if (Math.abs((cash + upi) - totalAmount) > 0.01) {
-        return toast.error(`Total must equal ₹${totalAmount.toFixed(2)}`);
+        return toast.error(`Total must equal ₹${Math.round(totalAmount)}`);
       }
+    }
+
+    if (selectedPaymentMode === 'CREDIT' && !customerMobile && !customerName) {
+      return toast.error('Customer name or mobile required for Credit sales');
     }
 
     setActionLoading(true);
@@ -372,7 +398,7 @@ export default function AdminPOS() {
     const leftColBottom = sellerDetailsY + 2;
 
     // Right column
-    const paymentLabel = order.paymentMode === 'CASH' ? 'Cash' : order.paymentMode === 'UPI' ? 'UPI' : order.paymentMode === 'CASH_UPI' ? 'Split (Cash+UPI)' : 'Card';
+    const paymentLabel = order.paymentMode === 'CASH' ? 'Cash' : order.paymentMode === 'UPI' ? 'UPI' : order.paymentMode === 'CASH_UPI' ? 'Split (Cash+UPI)' : order.paymentMode === 'CREDIT' ? 'Credit (Udhar)' : 'Card';
     pdf.setTextColor(...grayText);
     pdf.setFontSize(8);
     pdf.setFont('helvetica', 'bold');
@@ -489,21 +515,21 @@ export default function AdminPOS() {
       }
       pdf.text(displayName, colX.item, y + 1);
       pdf.text(`${qty}`, colX.qty, y + 1);
-      pdf.text(`${itemGstAmt.toFixed(2)}`, colX.gst, y + 1);
+      pdf.text(`${itemGstAmt.toFixed(0)}`, colX.gst, y + 1);
 
       pdf.setTextColor(...grayText);
       pdf.setFontSize(7);
-      pdf.text(`Rs.${mrpValue.toFixed(2)}`, colX.mrp, y + 1, { align: 'left' });
+      pdf.text(`Rs.${mrpValue.toFixed(0)}`, colX.mrp, y + 1, { align: 'left' });
 
       const isItemFree = price === 0;
       pdf.setTextColor(...(isItemFree ? orangeAccent : emerald));
       pdf.setFontSize(isItemFree ? 7 : 8);
       pdf.setFont('helvetica', 'bold');
-      pdf.text(isItemFree ? 'GIFT/FREE' : `Rs.${price.toFixed(2)}`, colX.price, y + 1);
+      pdf.text(isItemFree ? 'GIFT/FREE' : `Rs.${price.toFixed(0)}`, colX.price, y + 1);
 
       pdf.setTextColor(...darkText);
       pdf.setFontSize(9);
-      pdf.text(isItemFree ? 'Rs.0.00' : `Rs.${amount.toFixed(2)}`, colX.amount, y + 1, { align: 'right' });
+      pdf.text(isItemFree ? 'Rs.0.00' : `Rs.${amount.toFixed(0)}`, colX.amount, y + 1, { align: 'right' });
 
       y += 9;
     });
@@ -532,7 +558,7 @@ export default function AdminPOS() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('Subtotal (MRP)', totalsX, rightY);
     pdf.setTextColor(...darkText);
-    pdf.text(`Rs.${subTotalMRP.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    pdf.text(`Rs.${subTotalMRP.toFixed(0)}`, colX.amount, rightY, { align: 'right' });
     rightY += 7;
 
     if (savings > 0) {
@@ -543,7 +569,7 @@ export default function AdminPOS() {
       pdf.setFont('helvetica', 'bold');
       pdf.text('TOTAL SAVINGS', totalsX, rightY + 1.5);
       pdf.setFontSize(11);
-      pdf.text(`- Rs.${savings.toFixed(2)}`, colX.amount, rightY + 1.5, { align: 'right' });
+      pdf.text(`- Rs.${savings.toFixed(0)}`, colX.amount, rightY + 1.5, { align: 'right' });
       rightY += 9;
     }
 
@@ -558,14 +584,14 @@ export default function AdminPOS() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('Taxable Value', totalsX, rightY);
     pdf.setTextColor(...darkText);
-    pdf.text(`Rs.${(order.totalAmount - totalTax).toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    pdf.text(`Rs.${(order.totalAmount - totalTax).toFixed(0)}`, colX.amount, rightY, { align: 'right' });
     rightY += 7;
 
     pdf.setTextColor(...grayText);
     pdf.setFont('helvetica', 'bold');
     pdf.text(`Total GST (Incl.)`, totalsX, rightY);
     pdf.setTextColor(...darkText);
-    pdf.text(`Rs.${totalTax.toFixed(2)}`, colX.amount, rightY, { align: 'right' });
+    pdf.text(`Rs.${totalTax.toFixed(0)}`, colX.amount, rightY, { align: 'right' });
     rightY += 4;
 
     pdf.setDrawColor(...lightLine);
@@ -579,21 +605,22 @@ export default function AdminPOS() {
     pdf.setFont('helvetica', 'bold');
     pdf.text('TOTAL', totalsX, rightY + 3);
     pdf.setFontSize(14);
-    pdf.text(`Rs.${order.totalAmount?.toFixed(2)}`, colX.amount, rightY + 4, { align: 'right' });
+    pdf.text(`Rs.${order.totalAmount?.toFixed(0)}`, colX.amount, rightY + 4, { align: 'right' });
     rightY += 15;
 
     // Payment Status Badge
     const badgeWidth = (totalsX - margin) - 15;
-    pdf.setFillColor(236, 253, 245);
+    const isCredit = order.paymentMode === 'CREDIT';
+    pdf.setFillColor(isCredit ? 254 : 236, isCredit ? 242 : 253, isCredit ? 242 : 245);
     pdf.roundedRect(margin, startY, badgeWidth, 18, 3, 3, 'F');
-    pdf.setDrawColor(167, 243, 208);
+    pdf.setDrawColor(isCredit ? 252 : 167, isCredit ? 165 : 243, isCredit ? 165 : 208);
     pdf.roundedRect(margin, startY, badgeWidth, 18, 3, 3, 'S');
-    pdf.setTextColor(...emerald);
+    pdf.setTextColor(...(isCredit ? [220, 38, 38] : emerald));
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
     pdf.text('PAYMENT STATUS', margin + badgeWidth / 2, startY + 7, { align: 'center' });
     pdf.setFontSize(11);
-    pdf.text('PAID', margin + badgeWidth / 2, startY + 13, { align: 'center' });
+    pdf.text(isCredit ? 'CREDIT / UNPAID' : 'PAID', margin + badgeWidth / 2, startY + 13, { align: 'center' });
 
     y = Math.max(startY + 25, rightY + 5);
 
@@ -707,7 +734,7 @@ export default function AdminPOS() {
             <div class="item-row">
               <span class="item-name">${(item.product?.name || 'Product').slice(0, 18)}</span>
               <span class="item-qty">${item.quantity}</span>
-              <span class="item-amt">${(item.price * item.quantity).toFixed(2)}</span>
+              <span class="item-amt">${(item.price * item.quantity).toFixed(0)}</span>
             </div>
           `).join('')}
           
@@ -715,16 +742,16 @@ export default function AdminPOS() {
           
           <div class="total-row">
             <span>TOTAL AMOUNT</span>
-            <span>Rs.${lastOrder.totalAmount.toFixed(2)}</span>
+            <span>Rs.${Math.round(lastOrder.totalAmount)}</span>
           </div>
           <div class="item-row" style="font-size: 9px; margin-top: 4px;">
-            <span>Payment: ${lastOrder.paymentMode}</span>
-            <span>Status: PAID</span>
+            <span>Payment: ${lastOrder.paymentMode === 'CREDIT' ? 'Credit (Udhar)' : lastOrder.paymentMode}</span>
+            <span>Status: ${lastOrder.paymentMode === 'CREDIT' ? 'CREDIT' : 'PAID'}</span>
           </div>
 
           ${savings > 0 ? `
             <div class="savings-box">
-              YOU SAVED: Rs.${savings.toFixed(2)}
+              YOU SAVED: Rs.${savings.toFixed(0)}
             </div>
           ` : ''}
           
@@ -785,7 +812,7 @@ export default function AdminPOS() {
             </div>
             <div className="text-right">
               <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest leading-none">Cart</p>
-              <p className="text-lg font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</p>
+              <p className="text-lg font-black text-emerald-950 tracking-tighter">₹{Math.round(totalAmount)}</p>
             </div>
           </div>
         </div>
@@ -999,7 +1026,7 @@ export default function AdminPOS() {
                 <div className="space-y-2">
                   <div className="flex justify-between items-center px-1">
                     <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
-                    <span className="text-xs font-black text-gray-700">₹{totalAmount.toFixed(2)}</span>
+                    <span className="text-xs font-black text-gray-700">₹{Math.round(totalAmount)}</span>
                   </div>
 
                   {items.some(i => i.mrp > i.price) && (
@@ -1010,7 +1037,7 @@ export default function AdminPOS() {
                           <h3 className="font-black text-[10px] uppercase">Direct Discount</h3>
                         </div>
                         <span className="text-xl font-black tracking-tighter">
-                          -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(2)}
+                          -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(0)}
                         </span>
                       </div>
                     </div>
@@ -1018,7 +1045,7 @@ export default function AdminPOS() {
 
                   <div className="flex justify-between items-center px-1 pt-2">
                     <span className="text-sm font-black text-emerald-950 uppercase tracking-wider">Total Amount</span>
-                    <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
+                    <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{Math.round(totalAmount)}</span>
                   </div>
                 </div>
 
@@ -1056,7 +1083,7 @@ export default function AdminPOS() {
                         </div>
                         <div>
                           <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-tight leading-tight max-w-[120px] truncate">{item.name}</h4>
-                          <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(2)}</span>
+                          <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(0)}</span>
                         </div>
                       </div>
                       <div className="flex items-center gap-3">
@@ -1076,7 +1103,7 @@ export default function AdminPOS() {
                           </button>
                         </div>
                         <div className="text-right min-w-[50px]">
-                          <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(2)}</p>
+                          <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(0)}</p>
                         </div>
                       </div>
                     </div>
@@ -1109,7 +1136,7 @@ export default function AdminPOS() {
               <div className="flex-1 overflow-y-auto p-6 space-y-6">
                 <div className="bg-emerald-50 rounded-3xl p-6 text-center border border-emerald-100">
                   <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Payable Amount</p>
-                  <p className="text-4xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</p>
+                  <p className="text-4xl font-black text-emerald-950 tracking-tighter">₹{Math.round(totalAmount)}</p>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
@@ -1117,7 +1144,8 @@ export default function AdminPOS() {
                     { id: 'CASH', label: 'Cash', icon: Banknote, color: 'bg-emerald-600' },
                     { id: 'UPI', label: 'UPI', icon: Smartphone, color: 'bg-orange-600' },
                     { id: 'CARD', label: 'Card', icon: CreditCard, color: 'bg-sky-600' },
-                    { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'bg-indigo-600' }
+                    { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'bg-indigo-600' },
+                    { id: 'CREDIT', label: 'Credit (Udhar)', icon: NotebookText, color: 'bg-purple-600' }
                   ].map(mode => (
                     <button
                       key={mode.id}
@@ -1149,7 +1177,7 @@ export default function AdminPOS() {
                       <div className="flex justify-between items-center pt-2 border-t border-gray-50">
                         <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Change Due</span>
                         <span className="text-lg font-black text-orange-600">
-                          ₹{Math.max(0, (parseFloat(cashReceived) || 0) - totalAmount).toFixed(2)}
+                          ₹{Math.max(0, (parseFloat(cashReceived) || 0) - totalAmount).toFixed(0)}
                         </span>
                       </div>
                     </div>
@@ -1167,7 +1195,7 @@ export default function AdminPOS() {
                           onChange={(e) => {
                             const val = e.target.value;
                             const rem = Math.max(0, totalAmount - (parseFloat(val) || 0));
-                            setSplitAmounts({ cash: val, upi: rem.toFixed(2) });
+                            setSplitAmounts({ cash: val, upi: rem.toFixed(0) });
                           }}
                           className="w-full text-lg font-black text-emerald-950 outline-none"
                           placeholder="0.00"
@@ -1181,7 +1209,7 @@ export default function AdminPOS() {
                           onChange={(e) => {
                             const val = e.target.value;
                             const rem = Math.max(0, totalAmount - (parseFloat(val) || 0));
-                            setSplitAmounts({ upi: val, cash: rem.toFixed(2) });
+                            setSplitAmounts({ upi: val, cash: rem.toFixed(0) });
                           }}
                           className="w-full text-lg font-black text-orange-600 outline-none"
                           placeholder="0.00"
@@ -1209,7 +1237,7 @@ export default function AdminPOS() {
                   <div className="bg-white rounded-3xl p-6 border border-emerald-100 shadow-sm space-y-4">
                     <div className="flex justify-between items-center">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Amount</span>
-                      <span className="text-2xl font-black text-emerald-950">₹{lastOrder.totalAmount?.toFixed(2)}</span>
+                      <span className="text-2xl font-black text-emerald-950">₹{Math.round(lastOrder.totalAmount || 0)}</span>
                     </div>
                     <div className="flex justify-between items-center pt-4 border-t border-gray-50">
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Paid Via</span>
@@ -1340,7 +1368,7 @@ export default function AdminPOS() {
                       <div className="space-y-2">
                         <div className="flex justify-between items-center px-1">
                           <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Subtotal</span>
-                          <span className="text-xs font-black text-gray-700">₹{totalAmount.toFixed(2)}</span>
+                          <span className="text-xs font-black text-gray-700">₹{Math.round(totalAmount)}</span>
                         </div>
 
                         {items.some(i => i.mrp > i.price) && (
@@ -1351,7 +1379,7 @@ export default function AdminPOS() {
                                 <h3 className="font-black text-[10px] uppercase">Direct Discount</h3>
                               </div>
                               <span className="text-xl font-black tracking-tighter">
-                                -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(2)}
+                                -₹{(items.reduce((sum, i) => sum + (i.mrp || i.price) * i.quantity, 0) - totalAmount).toFixed(0)}
                               </span>
                             </div>
                           </div>
@@ -1359,7 +1387,7 @@ export default function AdminPOS() {
 
                         <div className="flex justify-between items-center px-1 pt-2">
                           <span className="text-sm font-black text-emerald-950 uppercase tracking-wider">Total Amount</span>
-                          <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</span>
+                          <span className="text-3xl font-black text-emerald-950 tracking-tighter">₹{Math.round(totalAmount)}</span>
                         </div>
                       </div>
 
@@ -1386,7 +1414,7 @@ export default function AdminPOS() {
                             </div>
                             <div>
                               <h4 className="text-[10px] font-black text-gray-900 uppercase tracking-tight leading-tight max-w-[120px] truncate">{item.name}</h4>
-                              <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(2)}</span>
+                              <span className="text-[9px] font-bold text-emerald-600">₹{item.price.toFixed(0)}</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-3">
@@ -1406,7 +1434,7 @@ export default function AdminPOS() {
                               </button>
                             </div>
                             <div className="text-right min-w-[50px]">
-                              <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(2)}</p>
+                              <p className="text-[10px] font-black text-gray-950 tracking-tighter">₹{(item.price * item.quantity).toFixed(0)}</p>
                             </div>
                           </div>
                         </div>
@@ -1433,7 +1461,7 @@ export default function AdminPOS() {
                     <div className="flex-1 overflow-y-auto p-6 space-y-6">
                       <div className="bg-emerald-50 rounded-3xl p-6 text-center border border-emerald-100">
                         <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Payable Amount</p>
-                        <p className="text-3xl font-black text-emerald-950 tracking-tighter">₹{totalAmount.toFixed(2)}</p>
+                        <p className="text-3xl font-black text-emerald-950 tracking-tighter">₹{Math.round(totalAmount)}</p>
                       </div>
 
                       <div className="grid grid-cols-2 gap-3">
@@ -1441,7 +1469,8 @@ export default function AdminPOS() {
                           { id: 'CASH', label: 'Cash', icon: Banknote, color: 'bg-emerald-600' },
                           { id: 'UPI', label: 'UPI', icon: Smartphone, color: 'bg-orange-600' },
                           { id: 'CARD', label: 'Card', icon: CreditCard, color: 'bg-sky-600' },
-                          { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'bg-indigo-600' }
+                          { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'bg-indigo-600' },
+                          { id: 'CREDIT', label: 'Credit (Udhar)', icon: NotebookText, color: 'bg-purple-600' }
                         ].map(mode => (
                           <button
                             key={mode.id}
@@ -1533,8 +1562,7 @@ export default function AdminPOS() {
         <BarcodeScannerOverlay
           onClose={() => setIsScanning(false)}
           onScan={(code) => {
-            setSearchTerm(code);
-            toast.success("Barcode Scanned!");
+            handleBarcodeScan(code);
           }}
         />
       )}
@@ -1663,6 +1691,72 @@ export default function AdminPOS() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Unavailable Product Modal */}
+      {unavailableCode && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-2">Product Not Found</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              The scanned barcode <span className="font-bold text-gray-900">"{unavailableCode}"</span> does not match any product in your inventory.
+            </p>
+            <button
+              onClick={() => setUnavailableCode(null)}
+              className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-colors"
+            >
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scanned Product Quantity Modal */}
+      {scannedProduct && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-gray-900 mb-1">{scannedProduct.name}</h3>
+            <p className="text-xs text-emerald-600 font-bold mb-6">Price: ₹{scannedProduct.price} • Stock: {scannedProduct.stock}</p>
+            
+            <div className="flex items-center justify-center gap-6 mb-8">
+              <button
+                onClick={() => setScannedQuantity(Math.max(1, scannedQuantity - 1))}
+                className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+              >
+                <Minus size={24} strokeWidth={3} />
+              </button>
+              <span className="text-4xl font-black text-gray-900 w-16">{scannedQuantity}</span>
+              <button
+                onClick={() => setScannedQuantity(Math.min(scannedProduct.stock, scannedQuantity + 1))}
+                className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              >
+                <Plus size={24} strokeWidth={3} />
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setScannedProduct(null)}
+                className="flex-1 bg-gray-100 text-gray-600 font-bold py-3.5 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  addItem(scannedProduct, scannedQuantity);
+                  toast.success(`Added ${scannedQuantity}x ${scannedProduct.name}`);
+                  setScannedProduct(null);
+                }}
+                className="flex-[2] bg-emerald-600 text-white font-black py-3.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                Add to Cart
+              </button>
+            </div>
           </div>
         </div>
       )}

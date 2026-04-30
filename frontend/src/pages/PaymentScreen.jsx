@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { useUserStore } from '../store/userStore';
 import { ordersAPI } from '../services/api';
-import { ArrowLeft, Banknote, Smartphone, CreditCard } from 'lucide-react';
+import { ArrowLeft, Banknote, Smartphone, CreditCard, NotebookText } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const PAYMENT_MODES = [
@@ -11,6 +11,7 @@ const PAYMENT_MODES = [
   { id: 'UPI', label: 'UPI', icon: Smartphone, color: 'from-orange-500 to-orange-600', shadow: 'shadow-orange-600/30' },
   { id: 'CARD', label: 'Card', icon: CreditCard, color: 'from-emerald-700 to-emerald-800', shadow: 'shadow-emerald-800/30' },
   { id: 'CASH_UPI', label: 'Cash + UPI', icon: Banknote, color: 'from-blue-500 to-blue-600', shadow: 'shadow-blue-600/30', isSplit: true },
+  { id: 'CREDIT', label: 'Credit (Udhar)', icon: NotebookText, color: 'from-purple-500 to-purple-600', shadow: 'shadow-purple-600/30' },
 ];
 
 export default function PaymentScreen() {
@@ -59,6 +60,10 @@ export default function PaymentScreen() {
       if (Math.abs((cash + upi) - totalAmount) > 0.01) {
         return toast.error(`Total must equal ₹${totalAmount.toFixed(2)}`);
       }
+    }
+
+    if (selected === 'CREDIT' && !customerMobile && !customerName) {
+      return toast.error('Customer name or mobile required for Credit sales');
     }
 
     setLoading(true);

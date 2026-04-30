@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, Pencil, Package, Camera, Info, Barcode, Grid, Check, Loader2 } from 'lucide-react';
+import { ArrowLeft, Pencil, Package, Camera, Info, Barcode, Grid, Check, Loader2, ScanBarcode } from 'lucide-react';
 
 const EditItemView = ({
   setIsEditView,
@@ -14,7 +14,9 @@ const EditItemView = ({
   units,
   taxRates,
   handleUpdateItem,
-  isUploading
+  isUploading,
+  setScannerTarget,
+  setShowScanner
 }) => {
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
@@ -98,6 +100,17 @@ const EditItemView = ({
                         value={editItem.barcode || ''}
                         onChange={(e) => setEditItem({ ...editItem, barcode: e.target.value })}
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScannerTarget('edit');
+                          setShowScanner(true);
+                        }}
+                        className="p-2 m-1 bg-indigo-50 text-indigo-600 rounded-xl hover:bg-indigo-100 transition-colors"
+                        title="Scan Barcode with Camera"
+                      >
+                        <ScanBarcode size={18} />
+                      </button>
                     </div>
                   </div>
 
