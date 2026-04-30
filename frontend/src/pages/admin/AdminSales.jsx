@@ -66,6 +66,7 @@ export default function AdminSales() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDate, setFilterDate] = useState('Today');
+  const [saleType, setSaleType] = useState('ALL'); // ALL, POS, AGENT
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingOrder, setViewingOrder] = useState(null);
   const ITEMS_PER_PAGE = 10;
@@ -580,6 +581,11 @@ export default function AdminSales() {
   // Apply Store filter mathematically to sales
   const listToRender = sales.filter(s => {
     if (storeFilterId && s.storeId !== storeFilterId) return false;
+    
+    // Segmented Control Filter
+    if (saleType === 'POS' && s.orderType !== 'POS' && s.vehicleId) return false;
+    if (saleType === 'AGENT' && (s.orderType === 'POS' || !s.vehicleId)) return false;
+
     const query = searchQuery.toLowerCase();
     const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
     const customerName = s.customerName ? s.customerName.toLowerCase() : '';
@@ -627,8 +633,29 @@ export default function AdminSales() {
             )}
           </div>
         </div>
-        {can('SALES', 'CREATE') && !viewingOrder && activeTab === 'sales' && (
-          <div className="flex items-center gap-3 no-print">
+
+        {/* Segmented Control */}
+        <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-80 shadow-inner">
+          {['ALL', 'POS', 'AGENT'].map((type) => (
+            <button
+              key={type}
+              onClick={() => {
+                setSaleType(type);
+                setCurrentPage(1);
+              }}
+              className={`flex-1 py-2 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all ${
+                saleType === type 
+                  ? 'bg-white text-emerald-600 shadow-sm' 
+                  : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              {type === 'ALL' ? 'All Sales' : type === 'POS' ? 'POS Sales' : 'Agent Sales'}
+            </button>
+          ))}
+        </div>
+
+        {can('SALES', 'CREATE') && !viewingOrder && (
+          <div className="flex items-center gap-2 no-print">
             <button
               onClick={exportHistoryToExcel}
               className="bg-emerald-50 text-emerald-600 border border-emerald-100 p-3 rounded-xl hover:bg-emerald-100 transition-all shadow-sm group"
