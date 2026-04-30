@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft
+  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft, Check, FileUp
 } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
 import toast from 'react-hot-toast';
@@ -21,6 +22,9 @@ const PurchasesSection = ({ can }) => {
   const [showQuickProduct, setShowQuickProduct] = useState(false);
   const [itemSearch, setItemSearch] = useState('');
   const [showItemResults, setShowItemResults] = useState(false);
+  const [searchQty, setSearchQty] = useState('1');
+  const [searchPrice, setSearchPrice] = useState('0');
+  const [selectedProduct, setSelectedProduct] = useState(null);
   const [quickVendorForm, setQuickVendorForm] = useState({
     vendorName: '', mobile: '', email: '', address: '',
     gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0'
@@ -115,12 +119,116 @@ const PurchasesSection = ({ can }) => {
     if (!window.confirm('Are you sure you want to delete this purchase invoice? This will revert stock and vendor balance.')) return;
     try {
       await procurementAPI.deletePurchase(id);
-      toast.success('Purchase invoice deleted');
+      toast.success('Purchase deleted');
       const { data } = await procurementAPI.getPurchases();
       setPurchases(data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error deleting purchase');
     }
+  };
+
+  const handleExcelUpload = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          toast.error('Excel sheet is empty');
+          return;
+        }
+
+        const itemsToAdd = [];
+        const missingProductsToCreate = [];
+        const rowData = []; // Store original row data for items to create
+
+        data.forEach(row => {
+          const normalizedRow = {};
+          Object.keys(row).forEach(key => {
+            normalizedRow[key.toLowerCase().trim().replace(/\s+/g, '')] = row[key];
+          });
+
+          const identifier = String(normalizedRow.barcode || normalizedRow.sku || normalizedRow.skucode || normalizedRow.itemcode || '').trim();
+          const nameMatch = String(normalizedRow.name || normalizedRow.productname || normalizedRow.itemname || normalizedRow.product || '').trim();
+          
+          const qty = Math.round(parseFloat(normalizedRow.quantity || normalizedRow.qty || normalizedRow.totalquantity || normalizedRow.total || 1));
+          const price = parseFloat(normalizedRow.price || normalizedRow.purchaseprice || normalizedRow.cost || normalizedRow.rate || 0);
+
+          if (identifier || nameMatch) {
+            const product = products.find(p => 
+              (identifier && (String(p.barcode).trim() === identifier || String(p.skuCode).trim() === identifier)) ||
+              (nameMatch && p.name.toLowerCase().trim() === nameMatch.toLowerCase())
+            );
+
+            if (product) {
+              itemsToAdd.push({
+                productId: product.id,
+                quantity: String(qty),
+                price: String(price || product.purchasePrice || product.price || 0)
+              });
+            } else if (nameMatch || identifier) {
+              // Prepare for bulk creation
+              missingProductsToCreate.push({
+                name: nameMatch || `New Product ${identifier}`,
+                barcode: identifier || undefined,
+                skuCode: identifier || undefined,
+                purchasePrice: price,
+                price: price * 1.2, // Default markup
+                categoryName: 'Uncategorized',
+                unitType: normalizedRow.unit || 'pcs'
+              });
+              rowData.push({ qty: String(qty), price: String(price) });
+            }
+          }
+        });
+
+        let finalItemsToAdd = [...itemsToAdd];
+
+        if (missingProductsToCreate.length > 0) {
+          toast.loading(`Creating ${missingProductsToCreate.length} new products...`, { id: 'bulk-create' });
+          try {
+            const { data: createdItems } = await adminAPI.bulkCreateItems(missingProductsToCreate);
+            
+            createdItems.forEach((p, idx) => {
+              finalItemsToAdd.push({
+                productId: p.id,
+                quantity: rowData[idx].qty,
+                price: rowData[idx].price || String(p.purchasePrice || p.price || 0)
+              });
+            });
+
+            // Refresh local products list
+            const { data: updatedProducts } = await adminAPI.getItems();
+            setProducts(updatedProducts);
+            
+            toast.success(`Created ${createdItems.length} new products and added to invoice`, { id: 'bulk-create' });
+          } catch (err) {
+            toast.error('Failed to create new products', { id: 'bulk-create' });
+          }
+        }
+
+        if (finalItemsToAdd.length > 0) {
+          setForm(prev => ({
+            ...prev,
+            items: [...prev.items, ...finalItemsToAdd]
+          }));
+          toast.success(`Total ${finalItemsToAdd.length} items added to invoice`);
+        } else {
+          toast.error('No valid products found in Excel');
+        }
+      } catch (err) {
+        toast.error('Failed to parse Excel file');
+      }
+    };
+    reader.readAsBinaryString(file);
+    e.target.value = null;
   };
 
   const handleSubmit = async (e) => {
@@ -289,7 +397,14 @@ const PurchasesSection = ({ can }) => {
                         placeholder="Search & add product..."
                         className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-inner"
                         value={itemSearch}
-                        onChange={e => { setItemSearch(e.target.value); setShowItemResults(true); }}
+                        onChange={e => { 
+                          setItemSearch(e.target.value); 
+                          setShowItemResults(true); 
+                          if (!e.target.value) {
+                            setSelectedProduct(null);
+                            setSearchPrice('0');
+                          }
+                        }}
                         onFocus={() => setShowItemResults(true)}
                       />
                       {showItemResults && itemSearch && (
@@ -299,12 +414,11 @@ const PurchasesSection = ({ can }) => {
                               key={p.id}
                               type="button"
                               onClick={() => {
-                                setForm(prev => ({
-                                  ...prev,
-                                  items: [...prev.items, { productId: p.id, quantity: 1, price: String(p.purchasePrice || p.price || 0) }]
-                                }));
-                                setItemSearch('');
+                                setSelectedProduct(p);
+                                setSearchPrice(String(p.purchasePrice || p.price || 0));
+                                setItemSearch(p.name);
                                 setShowItemResults(false);
+                                setSearchQty('1');
                               }}
                               className="w-full text-left px-4 py-3 hover:bg-emerald-50 border-b border-gray-50 last:border-0 flex items-center justify-between group transition-colors"
                             >
@@ -325,7 +439,61 @@ const PurchasesSection = ({ can }) => {
                       )}
                     </div>
                   </div>
+
+                  <div className="flex items-end gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[8px] font-bold uppercase text-gray-400 pl-1">Qty</label>
+                      <input 
+                        type="number"
+                        placeholder="Qty"
+                        className="w-16 bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-inner"
+                        value={searchQty}
+                        onChange={e => setSearchQty(e.target.value)}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[8px] font-bold uppercase text-gray-400 pl-1">Price</label>
+                      <input 
+                        type="number"
+                        placeholder="Price"
+                        className="w-24 bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-inner"
+                        value={searchPrice}
+                        onChange={e => setSearchPrice(e.target.value)}
+                      />
+                    </div>
+                    <button 
+                      type="button" 
+                      onClick={() => {
+                        if (!selectedProduct) return toast.error('Please select a product first');
+                        setForm(prev => ({
+                          ...prev,
+                          items: [...prev.items, { productId: selectedProduct.id, quantity: searchQty, price: searchPrice }]
+                        }));
+                        setSelectedProduct(null);
+                        setItemSearch('');
+                        setSearchQty('1');
+                        setSearchPrice('0');
+                      }}
+                      className="bg-emerald-600 text-white p-2.5 rounded-xl hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
+                      title="Add to List"
+                    >
+                      <Check size={16} strokeWidth={3} />
+                    </button>
+                  </div>
                   <div className="flex gap-2 self-end">
+                    <input
+                      type="file"
+                      accept=".xlsx, .xls, .csv"
+                      id="excel-upload"
+                      className="hidden"
+                      onChange={handleExcelUpload}
+                    />
+                    <label
+                      htmlFor="excel-upload"
+                      className="text-[10px] font-black text-amber-600 flex items-center gap-1.5 bg-amber-50/50 px-3 py-2 rounded-xl hover:bg-amber-100 transition-all cursor-pointer active:scale-95 border border-amber-100"
+                    >
+                      <FileUp size={12} strokeWidth={3} /> Bulk Upload
+                    </label>
                     <button type="button" onClick={() => setShowQuickProduct(true)} className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 bg-blue-50/50 px-3 py-2 rounded-xl hover:bg-blue-100 transition-all active:scale-95">
                       <Plus size={12} strokeWidth={3} /> New Product
                     </button>

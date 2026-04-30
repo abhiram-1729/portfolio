@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client';
 import prisma from '../../utils/prisma.js';
 import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
@@ -256,31 +257,44 @@ export const updatePurchase = async (req, res) => {
     const updated = await prisma.$transaction(async (tx) => {
       // 1. Handle Item Updates & Stock Adjustments
       if (items) {
-        // Revert old items' stock
-        const oldItems = await tx.purchaseInvoiceItem.findMany({ 
-          where: { invoiceId: id } 
+        const oldItems = await tx.purchaseInvoiceItem.findMany({ where: { invoiceId: id } });
+        const warehouse = await tx.warehouse.findFirst({ where: { tenantId: existing.tenantId } });
+
+        // Calculate Net Stock Changes
+        const netChanges = {};
+        oldItems.forEach(i => { netChanges[i.productId] = (netChanges[i.productId] || 0) - i.quantity; });
+        items.forEach(i => {
+          const qty = parseInt(i.quantity) || 0;
+          netChanges[i.productId] = (netChanges[i.productId] || 0) + qty;
         });
-        
-        for (const item of oldItems) {
-          // Update Warehouse Inventory if it exists
-          const existingWI = await tx.warehouseInventory.findFirst({
-            where: { productId: item.productId, tenantId: existing.tenantId }
+
+        // ─── ULTRA-FAST BULK STOCK UPDATES ────────────────────────────────
+        const entries = Object.entries(netChanges).filter(([_, qty]) => qty !== 0);
+        if (entries.length > 0 && warehouse) {
+          // 1. Bulk Update Products Stock
+          const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
+          await tx.$executeRaw`
+            UPDATE "Product" AS p
+            SET stock = p.stock + v.change
+            FROM (VALUES ${Prisma.join(productValues)}) AS v(id, change)
+            WHERE p.id = v.id
+          `;
+
+          // 2. Bulk Upsert Warehouse Inventory
+          const invValues = entries.map(([pId, qty]) => {
+            const tempId = 'cl' + Math.random().toString(36).substring(2, 11); 
+            return Prisma.sql`(${tempId}, ${existing.tenantId}, ${warehouse.id}, ${pId}, ${qty}::int)`;
           });
-          if (existingWI) {
-            await tx.warehouseInventory.update({
-              where: { id: existingWI.id },
-              data: { quantity: { decrement: item.quantity } }
-            });
-          }
-          
-          // Update Product total stock
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { decrement: item.quantity } }
-          });
+
+          await tx.$executeRaw`
+            INSERT INTO "WarehouseInventory" (id, "tenantId", "warehouseId", "productId", quantity)
+            VALUES ${Prisma.join(invValues)}
+            ON CONFLICT ("warehouseId", "productId")
+            DO UPDATE SET quantity = "WarehouseInventory".quantity + EXCLUDED.quantity
+          `;
         }
 
-        // Replace old items with new ones using the nested relation for safety
+        // Replace old items with new ones
         await tx.purchaseInvoice.update({
           where: { id },
           data: {
@@ -296,41 +310,6 @@ export const updatePurchase = async (req, res) => {
             }
           }
         });
-
-        // Apply new stock levels
-        for (const item of items) {
-          const qty = parseInt(item.quantity) || 0;
-          if (qty <= 0) continue;
-
-          const existingWI = await tx.warehouseInventory.findFirst({
-            where: { productId: item.productId, tenantId: existing.tenantId }
-          });
-          
-          if (existingWI) {
-            await tx.warehouseInventory.update({
-              where: { id: existingWI.id },
-              data: { quantity: { increment: qty } }
-            });
-          } else {
-            // If somehow missing, find main warehouse and create
-            const warehouse = await tx.warehouse.findFirst({ where: { tenantId: existing.tenantId } });
-            if (warehouse) {
-              await tx.warehouseInventory.create({
-                data: {
-                  tenantId: existing.tenantId,
-                  warehouseId: warehouse.id,
-                  productId: item.productId,
-                  quantity: qty
-                }
-              });
-            }
-          }
-
-          await tx.product.update({
-            where: { id: item.productId },
-            data: { stock: { increment: qty } }
-          });
-        }
       }
 
       // 2. Update Invoice Metadata
@@ -369,8 +348,8 @@ export const updatePurchase = async (req, res) => {
 
       return inv;
     }, {
-      maxWait: 20000,
-      timeout: 60000
+      maxWait: 60000,
+      timeout: 300000
     });
 
     logActivity({
