@@ -12,16 +12,18 @@ export const getStockReport = async (req, res) => {
     const products = await prisma.product.findMany({
       where: {
         tenantId: req.user.tenantId,
-        ...(storeId && storeId !== 'undefined' ? { storeId } : {}),
-        status: 'ACTIVE'
+        status: 'ACTIVE',
+        ...(storeId && storeId !== 'undefined' ? {
+          OR: [
+            { storeId: storeId },
+            { storeId: null }
+          ]
+        } : {})
       },
       include: {
         category: { select: { name: true } },
         unit: { select: { name: true, type: true } },
         WarehouseInventory: {
-          where: {
-            ...(storeId && storeId !== 'undefined' ? { storeId } : {})
-          },
           select: { quantity: true, warehouse: { select: { name: true } } }
         }
       }

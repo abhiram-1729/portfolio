@@ -96,6 +96,12 @@ export const createPurchase = async (req, res) => {
           });
         }
 
+        // Update Product Master Stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: qty } }
+        });
+
         // Procurement stock ledger entry
         const currentWI = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId }
@@ -222,5 +228,254 @@ export const getPurchaseById = async (req, res) => {
     res.json(purchase);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching purchase', error: error.message });
+  }
+};
+
+// ─── UPDATE PURCHASE INVOICE ─────────────────────────────────────
+export const updatePurchase = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { invoiceNumber, invoiceDate, transportCharges, otherCharges, remarks, items } = req.body;
+
+    const existing = await prisma.purchaseInvoice.findUnique({ where: { id } });
+    if (!existing) return res.status(404).json({ message: 'Purchase invoice not found' });
+
+    // Financial fields update
+    const parsedDate = invoiceDate ? new Date(invoiceDate) : null;
+    const isValidDate = parsedDate && !isNaN(parsedDate.getTime());
+
+    const newTransport = transportCharges !== undefined ? (parseFloat(transportCharges) || 0) : existing.transportCharges;
+    const newOther = otherCharges !== undefined ? (parseFloat(otherCharges) || 0) : existing.otherCharges;
+    
+    // Recalculate totalAmount from items
+    const itemsTotal = items ? items.reduce((sum, item) => sum + ((parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0)), 0) : 
+                       (existing.totalAmount - existing.transportCharges - existing.otherCharges);
+    const newTotal = itemsTotal + newTransport + newOther;
+    const diff = newTotal - existing.totalAmount;
+
+    const updated = await prisma.$transaction(async (tx) => {
+      // 1. Handle Item Updates & Stock Adjustments
+      if (items) {
+        // Revert old items' stock
+        const oldItems = await tx.purchaseInvoiceItem.findMany({ 
+          where: { invoiceId: id } 
+        });
+        
+        for (const item of oldItems) {
+          // Update Warehouse Inventory if it exists
+          const existingWI = await tx.warehouseInventory.findFirst({
+            where: { productId: item.productId, tenantId: existing.tenantId }
+          });
+          if (existingWI) {
+            await tx.warehouseInventory.update({
+              where: { id: existingWI.id },
+              data: { quantity: { decrement: item.quantity } }
+            });
+          }
+          
+          // Update Product total stock
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: item.quantity } }
+          });
+        }
+
+        // Replace old items with new ones using the nested relation for safety
+        await tx.purchaseInvoice.update({
+          where: { id },
+          data: {
+            items: {
+              deleteMany: {},
+              create: items.map(item => ({
+                tenantId: existing.tenantId,
+                productId: item.productId,
+                quantity: parseInt(item.quantity) || 0,
+                price: parseFloat(item.price) || 0,
+                total: (parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0)
+              }))
+            }
+          }
+        });
+
+        // Apply new stock levels
+        for (const item of items) {
+          const qty = parseInt(item.quantity) || 0;
+          if (qty <= 0) continue;
+
+          const existingWI = await tx.warehouseInventory.findFirst({
+            where: { productId: item.productId, tenantId: existing.tenantId }
+          });
+          
+          if (existingWI) {
+            await tx.warehouseInventory.update({
+              where: { id: existingWI.id },
+              data: { quantity: { increment: qty } }
+            });
+          } else {
+            // If somehow missing, find main warehouse and create
+            const warehouse = await tx.warehouse.findFirst({ where: { tenantId: existing.tenantId } });
+            if (warehouse) {
+              await tx.warehouseInventory.create({
+                data: {
+                  tenantId: existing.tenantId,
+                  warehouseId: warehouse.id,
+                  productId: item.productId,
+                  quantity: qty
+                }
+              });
+            }
+          }
+
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { increment: qty } }
+          });
+        }
+      }
+
+      // 2. Update Invoice Metadata
+      const inv = await tx.purchaseInvoice.update({
+        where: { id },
+        data: {
+          invoiceNumber: invoiceNumber || existing.invoiceNumber,
+          invoiceDate: isValidDate ? parsedDate : existing.invoiceDate,
+          transportCharges: newTransport,
+          otherCharges: newOther,
+          totalAmount: newTotal
+        }
+      });
+
+      // 3. Update Vendor Balance & Ledger if total changed
+      if (diff !== 0) {
+        await tx.vendor.update({
+          where: { id: existing.vendorId },
+          data: { currentBalance: { increment: diff } }
+        });
+
+        const ledgerEntries = await tx.vendorLedger.findMany({
+          where: { reference: id, type: 'PURCHASE' }
+        });
+        
+        for (const entry of ledgerEntries) {
+          await tx.vendorLedger.update({
+            where: { id: entry.id },
+            data: { 
+              debit: newTotal,
+              balance: { increment: diff }
+            }
+          });
+        }
+      }
+
+      return inv;
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      action: 'PURCHASE_UPDATED',
+      details: `Updated Purchase Invoice #${updated.invoiceNumber}. New Total: ₹${updated.totalAmount}`,
+      metadata: { invoiceId: id, diff }
+    });
+
+    res.json({ message: 'Purchase invoice updated', invoice: updated });
+  } catch (error) {
+    console.error('❌ Update Purchase Critical Error:', error);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'Invoice number already exists for this tenant' });
+    }
+    res.status(500).json({ message: 'Error updating purchase', error: error.message });
+  }
+};
+
+// ─── DELETE PURCHASE INVOICE ─────────────────────────────────────
+export const deletePurchase = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const invoice = await prisma.purchaseInvoice.findUnique({
+      where: { id },
+      include: { 
+        items: true,
+        _count: { select: { paymentAllocations: true } }
+      }
+    });
+
+    if (!invoice) return res.status(404).json({ message: 'Invoice not found' });
+    if (invoice._count.paymentAllocations > 0) {
+      return res.status(400).json({ message: 'Cannot delete invoice with associated payments. Remove payments first.' });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Revert Stock
+      for (const item of invoice.items) {
+        const existingWI = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        if (existingWI) {
+          await tx.warehouseInventory.update({
+            where: { id: existingWI.id },
+            data: { quantity: { decrement: item.quantity } }
+          });
+        }
+
+        // Revert Product Master Stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } }
+        });
+        
+        // Add a reversal entry in ledger
+        const currentWI = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        await tx.procurementStockLedger.create({
+          data: {
+            tenantId,
+            storeId: invoice.storeId,
+            productId: item.productId,
+            type: 'ADJUSTMENT',
+            quantity: -item.quantity,
+            reference: invoice.id,
+            refType: 'INVOICE_DELETE',
+            balanceAfter: currentWI?.quantity || 0
+          }
+        });
+      }
+
+      // 2. Revert Vendor Balance
+      const currentVendor = await tx.vendor.findUnique({ where: { id: invoice.vendorId } });
+      const newBalance = (currentVendor?.currentBalance || 0) - invoice.totalAmount;
+
+      await tx.vendor.update({
+        where: { id: invoice.vendorId },
+        data: { currentBalance: newBalance }
+      });
+
+      // 3. Delete Ledger Entry
+      await tx.vendorLedger.deleteMany({
+        where: { reference: invoice.id, type: 'PURCHASE' }
+      });
+
+      // 4. Delete Invoice Items
+      await tx.purchaseInvoiceItem.deleteMany({ where: { invoiceId: id } });
+
+      // 5. Delete Invoice
+      await tx.purchaseInvoice.delete({ where: { id } });
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      action: 'PURCHASE_INVOICE_DELETED',
+      details: `Deleted Purchase Invoice #${invoice.invoiceNumber}. Total: ₹${invoice.totalAmount}`,
+      metadata: { invoiceId: id }
+    });
+
+    res.json({ message: 'Purchase invoice deleted successfully' });
+  } catch (error) {
+    console.error('❌ Delete Purchase Error:', error);
+    res.status(500).json({ message: 'Error deleting purchase invoice', error: error.message });
   }
 };
