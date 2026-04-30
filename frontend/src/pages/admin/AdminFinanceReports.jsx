@@ -10,8 +10,11 @@ import {
     Receipt, 
     Coins,
     Loader2,
-    Download
+    Download,
+    Printer,
+    FileText
 } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -44,6 +47,21 @@ export default function AdminFinanceReports() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleExportExcel = () => {
+        if (!data?.dailySheet) return;
+        exportReportToExcel('finance-daily-sheet', data.dailySheet);
+    };
+
+    const handleExportPDF = () => {
+        if (!data?.dailySheet) return;
+        generateReportPDF('finance-daily-sheet', data.dailySheet);
+    };
+
+    const handlePrint = () => {
+        if (!data?.dailySheet) return;
+        generateReportPDF('finance-daily-sheet', data.dailySheet, true);
     };
 
     if (loading && !data) {
@@ -105,6 +123,29 @@ export default function AdminFinanceReports() {
                             onChange={(e) => setDate(e.target.value)}
                             className="bg-transparent border-none focus:outline-none text-sm font-bold text-gray-700 pr-2"
                         />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleExportPDF}
+                            className="p-3 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all shadow-sm"
+                            title="Export PDF"
+                        >
+                            <FileText size={18} />
+                        </button>
+                        <button
+                            onClick={handlePrint}
+                            className="p-3 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all shadow-sm"
+                            title="Print Report"
+                        >
+                            <Printer size={18} />
+                        </button>
+                        <button
+                            onClick={handleExportExcel}
+                            className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
+                            title="Export Excel"
+                        >
+                            <Download size={18} />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -219,9 +260,20 @@ export default function AdminFinanceReports() {
                         <h3 className="font-black text-gray-900 uppercase tracking-tight">Daily Cash Sheet</h3>
                     </div>
                     {can('REPORTS', 'CREATE') && (
-                      <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">
-                          <Download size={14} /> Export PDF
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button 
+                            onClick={handleExportPDF}
+                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600"
+                        >
+                            <FileText size={14} /> PDF
+                        </button>
+                        <button 
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700"
+                        >
+                            <Download size={14} /> Excel
+                        </button>
+                      </div>
                     )}
                 </div>
                 <div className="overflow-x-auto">

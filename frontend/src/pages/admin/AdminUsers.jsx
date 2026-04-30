@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2 } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, FileText, Download, Printer } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
+import { generateReportPDF } from './adminreports/ReportUtils';
 export default function AdminUsers({ type }) {
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
@@ -289,6 +291,38 @@ export default function AdminUsers({ type }) {
   const totalPages = React.useMemo(() => Math.ceil(filteredUsers.length / ITEMS_PER_PAGE), [filteredUsers.length]);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedUsers = React.useMemo(() => filteredUsers.slice(startIndex, startIndex + ITEMS_PER_PAGE), [filteredUsers, startIndex]);
+
+  const handleExportPDF = () => {
+    generateReportPDF('users', filteredUsers);
+  };
+
+  const handleExportExcel = () => {
+    try {
+      const exportData = filteredUsers.map(u => ({
+        'Name': u.name,
+        'Email': u.email,
+        'Mobile': u.mobile || 'N/A',
+        'Role': u.role,
+        'Custom Role': u.customRole?.name || 'Standard',
+        'Store': u.store?.name || 'Unassigned',
+        'VGE Type': u.vgeType,
+        'Status': u.status,
+        'Base Salary': u.baseSalary || 0
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Users");
+      XLSX.writeFile(wb, `Users_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Excel exported successfully');
+    } catch (error) {
+      toast.error('Failed to export Excel');
+    }
+  };
+
+  const handlePrint = () => {
+    generateReportPDF('users', filteredUsers, true);
+  };
 
   if (loading) {
     return (
@@ -864,6 +898,29 @@ export default function AdminUsers({ type }) {
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
             />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportPDF}
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
+              title="Export PDF"
+            >
+              <FileText size={18} />
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm"
+              title="Export Excel"
+            >
+              <Download size={18} />
+            </button>
+            <button
+              onClick={handlePrint}
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+              title="Print List"
+            >
+              <Printer size={18} />
+            </button>
           </div>
           {can('STAFF', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
             <button

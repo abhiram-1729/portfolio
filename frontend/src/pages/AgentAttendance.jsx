@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { attendanceAPI } from '../services/api';
-import { Clock, CalendarDays, ChevronLeft, ChevronRight, Timer, CheckCircle2, AlertCircle, TrendingUp, LogIn, LogOut, Info, FileText } from 'lucide-react';
+import { Clock, CalendarDays, ChevronLeft, ChevronRight, Timer, CheckCircle2, AlertCircle, TrendingUp, LogIn, LogOut, Info, FileText, Download, Printer } from 'lucide-react';
 import lateEntryService from '../services/lateEntryService';
 import { toast } from 'react-hot-toast';
+import { exportReportToExcel, generateReportPDF } from './admin/adminreports/ReportUtils';
 
 export default function AgentAttendance() {
   const [records, setRecords] = useState([]);
@@ -114,6 +115,30 @@ export default function AgentAttendance() {
       day: 'numeric',
       month: 'short'
     });
+  };
+
+  const handleExportExcel = () => {
+    if (activeTab === 'late-report') {
+      exportReportToExcel('late-entries', lateHistory);
+    } else {
+      exportReportToExcel('attendance-logs', records);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (activeTab === 'late-report') {
+      generateReportPDF('late-entries', lateHistory);
+    } else {
+      generateReportPDF('attendance-logs', records);
+    }
+  };
+
+  const handlePrint = () => {
+    if (activeTab === 'late-report') {
+      generateReportPDF('late-entries', lateHistory, true);
+    } else {
+      generateReportPDF('attendance-logs', records, true);
+    }
   };
 
   const statCards = [
@@ -246,6 +271,32 @@ export default function AgentAttendance() {
 
           {/* Records List */}
           <div className="space-y-2">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Punch Logs</h3>
+              <div className="flex items-center gap-2 no-print">
+                <button
+                  onClick={handleExportPDF}
+                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
+                  title="Export PDF"
+                >
+                  <FileText size={14} />
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-blue-500 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+                  title="Print Report"
+                >
+                  <Printer size={14} />
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="p-1.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
+                  title="Export Excel"
+                >
+                  <Download size={14} />
+                </button>
+              </div>
+            </div>
             {loading ? (
               <div className="flex items-center justify-center py-20">
                 <div className="w-8 h-8 border-3 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
@@ -344,8 +395,33 @@ export default function AgentAttendance() {
 
           <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
             <div className="bg-slate-50 px-4 py-3 border-b border-slate-100 flex justify-between items-center">
-              <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Penalty History</h3>
-              <span className="text-[10px] font-bold text-slate-400">{monthNames[month - 1]}</span>
+              <div className="flex items-center gap-2">
+                <h3 className="text-xs font-black text-slate-900 uppercase tracking-widest">Penalty History</h3>
+                <span className="text-[10px] font-bold text-slate-400">{monthNames[month - 1]}</span>
+              </div>
+              <div className="flex items-center gap-2 no-print">
+                <button
+                  onClick={handleExportPDF}
+                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
+                  title="Export PDF"
+                >
+                  <FileText size={14} />
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-blue-500 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+                  title="Print Report"
+                >
+                  <Printer size={14} />
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="p-1.5 bg-emerald-50 border border-emerald-100 rounded-lg text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
+                  title="Export Excel"
+                >
+                  <Download size={14} />
+                </button>
+              </div>
             </div>
             <div className="divide-y divide-slate-50">
               {lateHistory.length === 0 ? (

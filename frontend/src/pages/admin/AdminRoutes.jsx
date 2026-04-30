@@ -21,7 +21,9 @@ import {
   Target,
   Hexagon,
   Circle as CircleIcon,
-  RotateCcw
+  RotateCcw,
+  FileText,
+  Download
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, CircleF, InfoWindow } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
@@ -31,6 +33,8 @@ import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useUserStore } from '../../store/userStore';
 import StoreSelector from './StoreSelector';
+import * as XLSX from 'xlsx';
+import { generateReportPDF } from './adminreports/ReportUtils';
 
 export default function AdminRoutes() {
   const [villages, setVillages] = useState([]);
@@ -148,6 +152,57 @@ export default function AdminRoutes() {
   );
   const totalAssignmentPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
   const paginatedAssignments = filteredAssignments.slice((assignmentPage - 1) * ITEMS_PER_PAGE, assignmentPage * ITEMS_PER_PAGE);
+
+  const handleExportPDF = () => {
+    const dataMap = {
+      'villages': filteredVillages,
+      'routes': filteredRoutes,
+      'assignments': filteredAssignments
+    };
+    const reportType = activeTab === 'routes' ? 'routes-list' : activeTab;
+    generateReportPDF(reportType, dataMap[activeTab]);
+  };
+
+  const handleExportExcel = () => {
+    try {
+      let exportData = [];
+      let filename = 'Export';
+      
+      if (activeTab === 'villages') {
+        exportData = filteredVillages.map(v => ({
+          'Village Name': v.name,
+          'Latitude': v.latitude || 'N/A',
+          'Longitude': v.longitude || 'N/A',
+          'Radius': `${v.radius || 500}m`,
+          'Type': v.isPolygon ? 'Polygon' : 'Circle'
+        }));
+        filename = 'Villages';
+      } else if (activeTab === 'routes') {
+        exportData = filteredRoutes.map(r => ({
+          'Route Name': r.routeName,
+          'Villages': r.villages?.join(', '),
+          'Store': r.store?.name || 'All'
+        }));
+        filename = 'Routes';
+      } else if (activeTab === 'assignments') {
+        exportData = filteredAssignments.map(a => ({
+          'Agent': a.user?.name,
+          'Vehicle': a.vehicle?.vehicleNumber,
+          'Route': a.route?.routeName,
+          'Schedule': Object.entries(a.schedule || {}).filter(([_, s]) => s.morning || s.evening).map(([d]) => d).join(', ')
+        }));
+        filename = 'Assignments';
+      }
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, filename);
+      XLSX.writeFile(wb, `${filename}_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Excel exported successfully');
+    } catch (error) {
+      toast.error('Failed to export Excel');
+    }
+  };
 
   // Helper for map interaction - now handled via GoogleMap props
 
@@ -370,6 +425,23 @@ export default function AdminRoutes() {
               Assignments
             </button>
           )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportPDF}
+            className="p-2.5 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
+            title="Export PDF"
+          >
+            <FileText size={18} />
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="p-2.5 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm"
+            title="Export Excel"
+          >
+            <Download size={18} />
+          </button>
         </div>
       </div>
 

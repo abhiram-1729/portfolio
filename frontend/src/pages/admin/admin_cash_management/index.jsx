@@ -5,8 +5,9 @@ import toast from 'react-hot-toast';
 import { 
   Search, Calendar, Eye, Plus, Loader2, X, Sun, Moon, ArrowLeft, 
   Smartphone, BookOpen, User, Coins, Package, Printer, Shield, 
-  CheckCircle2, Info, AlertTriangle, Clock, ArrowRight, Vault, Building2, Zap, ShoppingCart, Pencil, AlertCircle
+  CheckCircle2, Info, AlertTriangle, Clock, ArrowRight, Vault, Building2, Zap, ShoppingCart, Pencil, AlertCircle, Download, FileText
 } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from '../adminreports/ReportUtils';
 
 // Shared Components
 const style = document.createElement('style');
@@ -437,6 +438,18 @@ export default function AdminCashManagementContent() {
     } catch (error) { toast.error('Failed'); } finally { setIsDeleting(false); }
   };
 
+  const handleExportExcel = () => {
+    exportReportToExcel('cash-reconciliation', filteredSummaries);
+  };
+
+  const handleExportPDF = () => {
+    generateReportPDF('cash-reconciliation', filteredSummaries);
+  };
+
+  const handlePrint = () => {
+    generateReportPDF('cash-reconciliation', filteredSummaries, true);
+  };
+
   const filteredSummaries = summaries.filter(s => {
     if (storeFilterId && s.vehicle?.storeId !== storeFilterId) return false;
     const searchLower = searchTerm.toLowerCase();
@@ -744,15 +757,38 @@ export default function AdminCashManagementContent() {
                 />
               </div>
               {can('CASH', 'CREATE', 'RECONCILIATION') && (
-                <button 
-                  onClick={() => {
-                    if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') return toast.error('Initialize Safe first');
-                    setShowAssignModal(true);
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
-                >
-                  <Plus size={18} strokeWidth={3} /> Assign Float
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportPDF}
+                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+                    title="Export PDF"
+                  >
+                    <FileText size={18} />
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+                    title="Print Report"
+                  >
+                    <Printer size={18} />
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+                    title="Export Excel"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') return toast.error('Initialize Safe first');
+                      setShowAssignModal(true);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                  >
+                    <Plus size={18} strokeWidth={3} /> Assign Float
+                  </button>
+                </div>
               )}
             </div>
           </div>

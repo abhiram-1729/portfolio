@@ -14,6 +14,7 @@ import { ordersAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
+import { generateReportPDF } from './adminreports/ReportUtils';
 
 export default function AdminSales() {
   // Add Print Styles
@@ -344,9 +345,17 @@ export default function AdminSales() {
     toast.success('Detailed order exported');
   };
 
+  const handleExportPDF = () => {
+    generateReportPDF('invoices', listToRender);
+  };
+
+  const handlePrintList = () => {
+    generateReportPDF('invoices', listToRender, true);
+  };
+
   const handleDownloadReport = (shouldPrint = false) => {
     if (shouldPrint) {
-      window.print();
+      handlePrintList();
       return;
     }
     exportHistoryToExcel();
@@ -541,12 +550,27 @@ export default function AdminSales() {
           </div>
         </div>
         {can('SALES', 'CREATE') && !viewingOrder && (
-          <div className="flex items-center gap-3 no-print">
+          <div className="flex items-center gap-2 no-print">
             <button
               onClick={exportHistoryToExcel}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm"
+              className="bg-emerald-50 text-emerald-600 border border-emerald-100 p-3 rounded-xl hover:bg-emerald-100 transition-all shadow-sm group"
+              title="Export Excel"
             >
-              <FileDown size={18} /> EXPORT
+              <Download size={20} />
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="bg-rose-50 text-rose-600 border border-rose-100 p-3 rounded-xl hover:bg-rose-100 transition-all shadow-sm group"
+              title="Export PDF"
+            >
+              <FileText size={20} />
+            </button>
+            <button
+              onClick={handlePrintList}
+              className="bg-blue-50 text-blue-600 border border-blue-100 p-3 rounded-xl hover:bg-blue-100 transition-all shadow-sm group"
+              title="Print History"
+            >
+              <Printer size={20} />
             </button>
           </div>
         )}
