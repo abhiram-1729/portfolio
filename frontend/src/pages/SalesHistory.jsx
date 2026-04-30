@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { ordersAPI } from '../services/api';
-import { ArrowLeft, Search, ShoppingBag, Calendar, User, IndianRupee, Clock, ChevronRight, PackageOpen, LayoutGrid, ListFilter, ShieldCheck } from 'lucide-react';
+import { ArrowLeft, Search, ShoppingBag, Calendar, User, IndianRupee, Clock, ChevronRight, PackageOpen, LayoutGrid, ListFilter, ShieldCheck, Download, Printer, FileText } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from './admin/adminreports/ReportUtils';
 import { useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -26,6 +27,18 @@ export default function SalesHistory() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportExcel = () => {
+    exportReportToExcel('invoices', filteredOrders);
+  };
+
+  const handleExportPDF = () => {
+    generateReportPDF('invoices', filteredOrders);
+  };
+
+  const handlePrint = () => {
+    generateReportPDF('invoices', filteredOrders, true);
   };
 
   const filteredOrders = orders.filter(o => {
@@ -69,9 +82,34 @@ export default function SalesHistory() {
               </button>
               <h1 className="text-lg font-black text-emerald-950 tracking-tight">Sales History</h1>
             </div>
-            <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5 shadow-sm">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{filteredOrders.length} records</span>
+            <div className="flex items-center gap-2">
+              <div className="bg-emerald-50 px-3 py-1 rounded-full border border-emerald-100 flex items-center gap-1.5 shadow-sm">
+                <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+                <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">{filteredOrders.length} records</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={handleExportPDF}
+                  className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+                  title="PDF"
+                >
+                  <FileText size={16} />
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="p-1.5 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+                  title="Print"
+                >
+                  <Printer size={16} />
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="p-1.5 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+                  title="Excel"
+                >
+                  <Download size={16} />
+                </button>
+              </div>
             </div>
           </div>
 

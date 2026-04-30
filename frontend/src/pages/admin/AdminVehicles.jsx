@@ -4,6 +4,9 @@ import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useUserStore } from '../../store/userStore';
+import * as XLSX from 'xlsx';
+import { generateReportPDF } from './adminreports/ReportUtils';
+import { Download } from 'lucide-react';
 
 export default function AdminVehicles() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -173,6 +176,33 @@ export default function AdminVehicles() {
   const totalPages = Math.ceil(filteredVehicles.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const paginatedVehicles = filteredVehicles.slice(startIndex, startIndex + ITEMS_PER_PAGE);
+
+  const handleExportPDF = () => {
+    generateReportPDF('vehicles', filteredVehicles);
+  };
+
+  const handleExportExcel = () => {
+    try {
+      const exportData = filteredVehicles.map(v => ({
+        'Vehicle Number': v.vehicleNumber,
+        'Model Name': v.vehicleName || 'N/A',
+        'Store': v.store?.name || 'Unassigned',
+        'Assigned Driver': v.assignedUsers?.[0]?.name || 'Not Assigned',
+        'Status': v.status ? 'ACTIVE' : 'INACTIVE',
+        'RC Document': v.rcDocument || 'N/A',
+        'Insurance': v.insuranceDocument || 'N/A',
+        'Permit': v.permitDocument || 'N/A'
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Vehicles");
+      XLSX.writeFile(wb, `Vehicles_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Excel exported successfully');
+    } catch (error) {
+      toast.error('Failed to export Excel');
+    }
+  };
 
   // ── Assign driver & Audit ─────────────────────────────────────────
   const initiateAssignDriver = async (user) => {
@@ -763,19 +793,19 @@ export default function AdminVehicles() {
       ) : (
         <>
           {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-            <div className="flex flex-col gap-1">
-              <div className="flex items-center gap-3">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+            <div className="flex flex-col gap-2">
+              <div className="flex items-center gap-4">
                 {isTenantRoute && storeFilterId && (
                   <button
                     onClick={() => setSearchParams({})}
-                    className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                    className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
                     title="Back to All Branches"
                   >
                     <ArrowLeft size={18} />
                   </button>
                 )}
-                <h2 className="text-2xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
+                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
               </div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
@@ -816,8 +846,24 @@ export default function AdminVehicles() {
                   placeholder="Search by number or driver..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
+                  className="pl-10 pr-4 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
                 />
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportPDF}
+                  className="p-3 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm active:scale-95"
+                  title="Export PDF"
+                >
+                  <FileText size={20} />
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="p-3 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm active:scale-95"
+                  title="Export Excel"
+                >
+                  <Download size={20} />
+                </button>
               </div>
               {can('VEHICLES', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
                 <button onClick={() => {
@@ -831,8 +877,11 @@ export default function AdminVehicles() {
                   setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
                   setShowAddModal(true);
                 }}
-                  className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-all active:scale-95">
-                  <Plus size={24} />
+                  className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3.5 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
+                >
+                  <Plus size={20} />
+                  <span className="hidden md:inline">Register Vehicle</span>
+                  <span className="md:hidden">Add</span>
                 </button>
               )}
             </div>

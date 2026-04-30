@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Search, X, Loader2, Pencil, Trash2, Truck, Users, ArrowLeft, AlertTriangle,
-  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw } from 'lucide-react';
+  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw, Download, Printer, FileText } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
@@ -221,6 +222,24 @@ export default function AdminAssets() {
       toast.success('Issue updated');
       loadIssues();
     } catch { toast.error('Failed to update issue'); }
+  };
+
+  const handleExportExcel = (type) => {
+    if (!reports) return;
+    const data = type === 'asset-utilization' ? reports.utilization : reports.executiveReport;
+    exportReportToExcel(type, data);
+  };
+
+  const handleExportPDF = (type) => {
+    if (!reports) return;
+    const data = type === 'asset-utilization' ? reports.utilization : reports.executiveReport;
+    generateReportPDF(type, data);
+  };
+
+  const handlePrint = (type) => {
+    if (!reports) return;
+    const data = type === 'asset-utilization' ? reports.utilization : reports.executiveReport;
+    generateReportPDF(type, data, true);
   };
 
   const filteredAssets = useMemo(() => {
@@ -576,6 +595,40 @@ export default function AdminAssets() {
 
     return (
       <div className="space-y-8">
+        <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
+              <BarChart3 size={20} />
+            </div>
+            <div>
+              <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Asset Analytics</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Inventory Health & Distribution Reports</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleExportPDF('asset-utilization')}
+              className="p-2.5 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm"
+              title="Export PDF"
+            >
+              <FileText size={16} />
+            </button>
+            <button
+              onClick={() => handlePrint('asset-utilization')}
+              className="p-2.5 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm"
+              title="Print Report"
+            >
+              <Printer size={16} />
+            </button>
+            <button
+              onClick={() => handleExportExcel('asset-utilization')}
+              className="flex items-center gap-2 px-4 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all font-black text-[10px] uppercase tracking-widest shadow-sm"
+            >
+              <Download size={14} /> Export Excel
+            </button>
+          </div>
+        </div>
+
         {/* Utilization */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
           <h3 className="text-sm font-black text-gray-900 uppercase mb-4 flex items-center gap-2"><BarChart3 size={16} className="text-emerald-500" /> Asset Utilization</h3>
@@ -609,7 +662,31 @@ export default function AdminAssets() {
 
         {/* Executive Report */}
         <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <h3 className="text-sm font-black text-gray-900 uppercase mb-4 flex items-center gap-2"><Users size={16} className="text-blue-500" /> Executive Asset Report</h3>
+          <div className="flex items-center justify-between mb-4 border-b border-gray-50 pb-4">
+            <h3 className="text-sm font-black text-gray-900 uppercase flex items-center gap-2"><Users size={16} className="text-blue-500" /> Executive Asset Report</h3>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => handleExportPDF('asset-executive-report')}
+                className="p-2 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                title="Export PDF"
+              >
+                <FileText size={14} />
+              </button>
+              <button
+                onClick={() => handlePrint('asset-executive-report')}
+                className="p-2 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                title="Print Report"
+              >
+                <Printer size={14} />
+              </button>
+              <button
+                onClick={() => handleExportExcel('asset-executive-report')}
+                className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all font-black text-[9px] uppercase tracking-widest"
+              >
+                <Download size={12} /> Export Excel
+              </button>
+            </div>
+          </div>
           {reports.executiveReport.length === 0 ? (
             <p className="text-sm text-gray-400 text-center py-4">No active assignments</p>
           ) : (

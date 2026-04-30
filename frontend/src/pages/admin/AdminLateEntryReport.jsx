@@ -6,7 +6,8 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, PieChart, Pie, Legend
 } from 'recharts';
-import { Edit, X, Check, Save, User, Clock, Calendar, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Edit, X, Check, Save, User, Clock, Calendar, AlertTriangle, ShieldCheck, Download, Printer, FileText } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 
 const AdminLateEntryReport = () => {
   const [records, setRecords] = useState([]);
@@ -102,6 +103,18 @@ const AdminLateEntryReport = () => {
     }
   };
 
+  const handleExportExcel = () => {
+    exportReportToExcel('late-entries', records);
+  };
+
+  const handlePrint = () => {
+    generateReportPDF('late-entries', records, true);
+  };
+
+  const handleExportPDF = () => {
+    generateReportPDF('late-entries', records);
+  };
+
   const summaryStats = {
     totalLates: records.length,
     totalPenalties: records.reduce((sum, r) => sum + (r.isWaived ? 0 : r.penaltyValue), 0),
@@ -117,6 +130,26 @@ const AdminLateEntryReport = () => {
         </div>
 
         <div className="flex items-center gap-3">
+          <button
+            onClick={handleExportPDF}
+            className="flex items-center gap-2 px-3 py-2 bg-white text-gray-500 hover:text-rose-600 rounded-lg border border-gray-100 hover:bg-rose-50 transition-all font-bold text-[10px] uppercase tracking-widest shadow-sm"
+            title="Export PDF"
+          >
+            <FileText size={14} />
+          </button>
+          <button
+            onClick={handlePrint}
+            className="flex items-center gap-2 px-3 py-2 bg-white text-gray-500 hover:text-blue-600 rounded-lg border border-gray-100 hover:bg-blue-50 transition-all font-bold text-[10px] uppercase tracking-widest shadow-sm"
+            title="Print Report"
+          >
+            <Printer size={14} />
+          </button>
+          <button
+            onClick={handleExportExcel}
+            className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all font-bold text-xs uppercase tracking-widest shadow-sm mr-2"
+          >
+            <Download size={14} /> Excel
+          </button>
           <input
             type="date"
             className="px-3 py-2 rounded-lg border text-sm"

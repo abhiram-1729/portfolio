@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   FileDown, Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, ChevronLeft, 
   Loader2, ArrowLeft, User, Smartphone, Shield, Coins, Package, Info, MapPin, Printer, Clock, 
@@ -14,6 +14,7 @@ import { ordersAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
+import { generateReportPDF } from './adminreports/ReportUtils';
 
 export default function AdminSales() {
   // Add Print Styles
@@ -83,6 +84,82 @@ export default function AdminSales() {
   // ── Session States ──
   const [sessionData, setSessionData] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
+
+  // ── Tab State ──
+  const [activeTab, setActiveTab] = useState('sales'); // 'sales', 'customers', 'analytics'
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
+
+  // ── Customer Data Extraction ──
+  const customerData = useMemo(() => {
+    const customersMap = new globalThis.Map();
+
+    sales.forEach(sale => {
+      const mobile = sale.mobile || 'Walk-in';
+      const name = sale.customerName || 'Walk-in Customer';
+      const identifier = mobile === 'Walk-in' && name !== 'Walk-in Customer' ? name : mobile;
+
+      if (!customersMap.has(identifier)) {
+        customersMap.set(identifier, {
+          id: identifier,
+          mobile: sale.mobile || 'N/A',
+          name: name,
+          totalSpent: 0,
+          totalOrders: 0,
+          lastOrderDate: sale.createdAt,
+          itemsBought: {}
+        });
+      }
+
+      const cust = customersMap.get(identifier);
+      cust.totalSpent += sale.totalAmount || 0;
+      cust.totalOrders += 1;
+      
+      // Update last order date if this sale is more recent
+      if (new Date(sale.createdAt) > new Date(cust.lastOrderDate)) {
+        cust.lastOrderDate = sale.createdAt;
+      }
+
+      // Track items bought to find favorite product
+      sale.items?.forEach(item => {
+        const productName = item.product?.name || item.productName || 'Unknown Product';
+        if (!cust.itemsBought[productName]) {
+          cust.itemsBought[productName] = 0;
+        }
+        cust.itemsBought[productName] += item.quantity || 1;
+      });
+    });
+
+    return Array.from(customersMap.values()).map(cust => {
+      // Find favorite product
+      let favoriteProduct = 'N/A';
+      let maxQty = 0;
+      for (const [prod, qty] of Object.entries(cust.itemsBought)) {
+        if (qty > maxQty) {
+          maxQty = qty;
+          favoriteProduct = prod;
+        }
+      }
+      return { ...cust, favoriteProduct };
+    }).sort((a, b) => b.totalSpent - a.totalSpent); // Sort by highest spend by default
+  }, [sales]);
+
+  // Analytics Metrics
+  const analyticsData = useMemo(() => {
+    if (customerData.length === 0) return null;
+    
+    // Top 5 spenders
+    const topSpenders = [...customerData].sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
+    
+    // Most frequent buyers
+    const frequentBuyers = [...customerData].sort((a, b) => b.totalOrders - a.totalOrders).slice(0, 5);
+
+    return { topSpenders, frequentBuyers };
+  }, [customerData]);
+
+  const filteredCustomers = customerData.filter(c => 
+    c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) || 
+    c.mobile.includes(customerSearchQuery)
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
@@ -271,16 +348,16 @@ export default function AdminSales() {
         'Total items': s.items?.length || 0,
         'Total Quantity': totalQty,
         'Sum of qty': totalQty,
-        'Invoice Amount': s.totalAmount.toFixed(2),
-        'Discount': totalDiscount.toFixed(2),
-        'Total bill': s.totalAmount.toFixed(2),
+        'Invoice Amount': s.totalAmount.toFixed(0),
+        'Discount': totalDiscount.toFixed(0),
+        'Total bill': s.totalAmount.toFixed(0),
         'Payment Mode': s.paymentMode || 'Cash',
         'Cash / UPI / Credit': s.paymentMode || 'Cash',
-        'Cash Amount': (s.cashAmount || 0).toFixed(2),
-        'UPI Amount': (s.upiAmount || 0).toFixed(2),
-        'Return Amount': returnAmt.toFixed(2),
-        'Net Amount': (s.totalAmount - returnAmt).toFixed(2),
-        'After return': (s.totalAmount - returnAmt).toFixed(2),
+        'Cash Amount': (s.cashAmount || 0).toFixed(0),
+        'UPI Amount': (s.upiAmount || 0).toFixed(0),
+        'Return Amount': returnAmt.toFixed(0),
+        'Net Amount': (s.totalAmount - returnAmt).toFixed(0),
+        'After return': (s.totalAmount - returnAmt).toFixed(0),
         'Sold By (Agent)': s.user?.name || s.userName,
         'VGE Name': s.user?.name || s.userName,
         'Order Status': s.status,
@@ -311,8 +388,8 @@ export default function AdminSales() {
       'Product': item.product?.name || item.productName,
       'Price': item.price,
       'Quantity': item.quantity,
-      'Item Discount': (item.discount || 0).toFixed(2),
-      'Item Total': (item.price * item.quantity).toFixed(2),
+      'Item Discount': (item.discount || 0).toFixed(0),
+      'Item Total': (item.price * item.quantity).toFixed(0),
       'Customer Mobile': viewingOrder.mobile || 'N/A',
       'Agent': viewingOrder.user?.name || viewingOrder.userName,
       'Payment Mode': viewingOrder.paymentMode,
@@ -328,9 +405,9 @@ export default function AdminSales() {
       'Product': 'TOTALS',
       'Price': '',
       'Quantity': totalQty,
-      'Item Discount': totalDiscount.toFixed(2),
-      'Item Total': viewingOrder.totalAmount.toFixed(2),
-      'Customer Mobile': `Net: ${(viewingOrder.totalAmount - returnAmt).toFixed(2)}`,
+      'Item Discount': totalDiscount.toFixed(0),
+      'Item Total': viewingOrder.totalAmount.toFixed(0),
+      'Customer Mobile': `Net: ${(viewingOrder.totalAmount - returnAmt).toFixed(0)}`,
       'Agent': '',
       'Payment Mode': '',
       'Status': '',
@@ -344,9 +421,17 @@ export default function AdminSales() {
     toast.success('Detailed order exported');
   };
 
+  const handleExportPDF = () => {
+    generateReportPDF('invoices', listToRender);
+  };
+
+  const handlePrintList = () => {
+    generateReportPDF('invoices', listToRender, true);
+  };
+
   const handleDownloadReport = (shouldPrint = false) => {
     if (shouldPrint) {
-      window.print();
+      handlePrintList();
       return;
     }
     exportHistoryToExcel();
@@ -430,10 +515,10 @@ export default function AdminSales() {
       doc.text("FINANCIAL SUMMARY", 25, y + 2);
 
       doc.setFontSize(9);
-      doc.text(`Total Bill: Rs. ${order.totalAmount.toFixed(2)}`, 110, y + 2);
+      doc.text(`Total Bill: Rs. ${order.totalAmount.toFixed(0)}`, 110, y + 2);
       doc.text(`Paid via: ${order.paymentMode}`, 110, y + 9);
       doc.setFont("helvetica", "normal");
-      doc.text(`Net After Returns: Rs. ${(order.totalAmount - returnAmt).toFixed(2)}`, 25, y + 9);
+      doc.text(`Net After Returns: Rs. ${(order.totalAmount - returnAmt).toFixed(0)}`, 25, y + 9);
 
       // Items Table
       y = 150;
@@ -462,8 +547,8 @@ export default function AdminSales() {
         doc.rect(20, y - 5, 170, 7, 'F');
         doc.text(item.product?.name || item.productName || 'Unknown', 25, y);
         doc.text(String(item.quantity), 120, y);
-        doc.text(item.price.toFixed(2), 145, y);
-        doc.text((item.price * item.quantity).toFixed(2), 185, y, { align: "right" });
+        doc.text(item.price.toFixed(0), 145, y);
+        doc.text((item.price * item.quantity).toFixed(0), 185, y, { align: "right" });
         y += 7;
       });
 
@@ -504,6 +589,8 @@ export default function AdminSales() {
   const totalPages = Math.ceil(listToRender.length / ITEMS_PER_PAGE);
   const paginatedSales = listToRender.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
 
+
+
   return (
     <div className="main-content-to-print space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
@@ -540,17 +627,71 @@ export default function AdminSales() {
             )}
           </div>
         </div>
-        {can('SALES', 'CREATE') && !viewingOrder && (
+        {can('SALES', 'CREATE') && !viewingOrder && activeTab === 'sales' && (
           <div className="flex items-center gap-3 no-print">
             <button
               onClick={exportHistoryToExcel}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm"
+              className="bg-emerald-50 text-emerald-600 border border-emerald-100 p-3 rounded-xl hover:bg-emerald-100 transition-all shadow-sm group"
+              title="Export Excel"
             >
-              <FileDown size={18} /> EXPORT
+              <Download size={20} />
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="bg-rose-50 text-rose-600 border border-rose-100 p-3 rounded-xl hover:bg-rose-100 transition-all shadow-sm group"
+              title="Export PDF"
+            >
+              <FileText size={20} />
+            </button>
+            <button
+              onClick={handlePrintList}
+              className="bg-blue-50 text-blue-600 border border-blue-100 p-3 rounded-xl hover:bg-blue-100 transition-all shadow-sm group"
+              title="Print History"
+            >
+              <Printer size={20} />
             </button>
           </div>
         )}
       </div>
+
+      {/* Tab Navigation */}
+      {!viewingOrder && (
+        <div className="flex items-center gap-2 bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 w-fit no-print">
+          <button
+            onClick={() => setActiveTab('sales')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+              activeTab === 'sales' 
+                ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+            }`}
+          >
+            <ShoppingCart size={16} />
+            Sales List
+          </button>
+          <button
+            onClick={() => setActiveTab('customers')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+              activeTab === 'customers' 
+                ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+            }`}
+          >
+            <User size={16} />
+            Customer Data
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+              activeTab === 'analytics' 
+                ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+            }`}
+          >
+            <BarChart3 size={16} />
+            Analytics
+          </button>
+        </div>
+      )}
 
       {viewingOrder ? (
         /* ========== SALES DETAIL FULL PAGE VIEW ========== */
@@ -606,7 +747,7 @@ export default function AdminSales() {
                 <div className="h-12 w-[1px] bg-gray-100 mx-1 hidden md:block"></div>
                 <div className="flex flex-col items-end">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Bill Amount</p>
-                  <p className="text-2xl font-black text-gray-900 tabular-nums tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                  <p className="text-2xl font-black text-gray-900 tabular-nums tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</p>
                 </div>
               </div>
             </div>
@@ -750,7 +891,7 @@ export default function AdminSales() {
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-emerald-600 group-hover:text-emerald-100 uppercase tracking-widest mb-1">Invoice Amount</p>
-                      <p className="text-xl font-black text-emerald-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                      <p className="text-xl font-black text-emerald-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</p>
                     </div>
                   </div>
 
@@ -764,7 +905,7 @@ export default function AdminSales() {
                     <div>
                       <p className="text-[9px] font-black text-indigo-600 group-hover:text-indigo-100 uppercase tracking-widest mb-1">Net Paid (Mode)</p>
                       <div className="flex items-baseline gap-2">
-                        <p className="text-xl font-black text-indigo-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                        <p className="text-xl font-black text-indigo-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</p>
                         <p className="text-[8px] font-black text-indigo-400 group-hover:text-indigo-200 uppercase tracking-widest">{viewingOrder.paymentMode}</p>
                       </div>
                     </div>
@@ -781,11 +922,11 @@ export default function AdminSales() {
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] font-black">
                           <span className="text-amber-500 group-hover:text-amber-200">CASH:</span>
-                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.cashAmount || 0).toFixed(2)}</span>
+                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.cashAmount || 0).toFixed(0)}</span>
                         </div>
                         <div className="flex justify-between text-[10px] font-black">
                           <span className="text-amber-500 group-hover:text-amber-200">UPI:</span>
-                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.upiAmount || 0).toFixed(2)}</span>
+                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.upiAmount || 0).toFixed(0)}</span>
                         </div>
                       </div>
                     </div>
@@ -799,7 +940,7 @@ export default function AdminSales() {
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-rose-600 group-hover:text-rose-100 uppercase tracking-widest mb-1">Returns & Adjust</p>
-                      <p className="text-xl font-black text-rose-900 group-hover:text-white tabular-nums">₹{(viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0).toFixed(2)}</p>
+                      <p className="text-xl font-black text-rose-900 group-hover:text-white tabular-nums">₹{(viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0).toFixed(0)}</p>
                     </div>
                   </div>
                 </div>
@@ -820,7 +961,7 @@ export default function AdminSales() {
                     </div>
                     <div className="flex flex-col items-end">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Discount</p>
-                      <p className="text-sm font-black text-rose-600">-₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(2)}</p>
+                      <p className="text-sm font-black text-rose-600">-₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(0)}</p>
                     </div>
                   </div>
 
@@ -859,13 +1000,13 @@ export default function AdminSales() {
                               </span>
                             </td>
                             <td className="px-6 py-5 text-right font-black text-gray-600 text-xs tabular-nums">
-                              ₹{(item.price || 0).toFixed(2)}
+                              ₹{(item.price || 0).toFixed(0)}
                             </td>
                             <td className="px-6 py-5 text-right font-black text-gray-400 text-[10px] tabular-nums">
                               {item.product?.gst || 0}%
                             </td>
                             <td className="px-6 py-5 text-right font-black text-gray-900 text-xs tabular-nums">
-                              ₹{(item.price * item.quantity).toFixed(2)}
+                              ₹{(item.price * item.quantity).toFixed(0)}
                             </td>
                             {canEditOrder && (
                               <td className="px-6 py-5">
@@ -908,7 +1049,7 @@ export default function AdminSales() {
                     <div className="flex items-center gap-6">
                       <div>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Bill (Gross)</p>
-                        <p className="text-2xl font-black tracking-tighter">₹{(detailOrder.totalAmount || viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                        <p className="text-2xl font-black tracking-tighter">₹{(detailOrder.totalAmount || viewingOrder.totalAmount || 0).toFixed(0)}</p>
                       </div>
                       <div className="w-[1px] h-10 bg-gray-800"></div>
                       <div>
@@ -944,7 +1085,7 @@ export default function AdminSales() {
                       {detailOrder.returns.map((r, i) => (
                         <div key={i} className="flex justify-between items-center py-3 px-4 bg-white rounded-2xl border border-rose-100/50">
                           <div>
-                            <p className="text-xs font-black text-rose-800">Qty: {r.returnQty} • ₹{(r.returnAmount || r.refundAmount || 0).toFixed(2)}</p>
+                            <p className="text-xs font-black text-rose-800">Qty: {r.returnQty} • ₹{(r.returnAmount || r.refundAmount || 0).toFixed(0)}</p>
                             {r.reason && <p className="text-[9px] font-bold text-rose-500/70 mt-0.5">{r.reason}</p>}
                           </div>
                           <span className="text-[9px] font-bold text-rose-400">{format(new Date(r.createdAt), 'dd MMM, hh:mm a')}</span>
@@ -980,7 +1121,7 @@ export default function AdminSales() {
                   <input type="number" value={editQty} onChange={e => setEditQty(Math.max(1, parseInt(e.target.value) || 1))} className="w-24 text-center text-3xl font-black text-gray-900 bg-gray-50 rounded-2xl py-3 border border-gray-100 outline-none focus:ring-2 focus:ring-emerald-500/20" />
                   <button onClick={() => setEditQty(editQty + 1)} className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all border border-emerald-100"><Plus size={22} /></button>
                 </div>
-                <p className="text-center text-xs font-black text-gray-400">New Total: <span className="text-emerald-600">₹{(editQty * (editingItem.price || 0)).toFixed(2)}</span></p>
+                <p className="text-center text-xs font-black text-gray-400">New Total: <span className="text-emerald-600">₹{(editQty * (editingItem.price || 0)).toFixed(0)}</span></p>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setEditingItem(null)} className="py-4 bg-gray-100 text-gray-600 font-black text-xs uppercase rounded-2xl hover:bg-gray-200 transition-all">Cancel</button>
                   <button onClick={handleEditQty} disabled={actionLoading} className="py-4 bg-emerald-600 text-white font-black text-xs uppercase rounded-2xl hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
@@ -1009,7 +1150,7 @@ export default function AdminSales() {
                 </div>
                 <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100 text-center">
                   <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Refund Amount</p>
-                  <p className="text-2xl font-black text-rose-600 tracking-tighter">₹{(returnQty * (returningItem.price || 0)).toFixed(2)}</p>
+                  <p className="text-2xl font-black text-rose-600 tracking-tighter">₹{(returnQty * (returningItem.price || 0)).toFixed(0)}</p>
                 </div>
                 <input type="text" placeholder="Reason for return (optional)" value={returnReason} onChange={e => setReturnReason(e.target.value)} className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-100 text-sm font-bold text-gray-700 outline-none placeholder:text-gray-300 focus:ring-2 focus:ring-emerald-500/20" />
                 <div className="grid grid-cols-2 gap-3">
@@ -1034,7 +1175,7 @@ export default function AdminSales() {
                   </div>
                 </div>
                 <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100">
-                  <p className="text-xs font-black text-rose-700">Order #{detailOrder?.displayId || detailOrder?.orderNumber} — ₹{(detailOrder?.totalAmount || 0).toFixed(2)}</p>
+                  <p className="text-xs font-black text-rose-700">Order #{detailOrder?.displayId || detailOrder?.orderNumber} — ₹{(detailOrder?.totalAmount || 0).toFixed(0)}</p>
                 </div>
                 <input type="text" placeholder="Cancellation reason..." value={cancelReason} onChange={e => setCancelReason(e.target.value)} className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-100 text-sm font-bold text-gray-700 outline-none placeholder:text-gray-300 focus:ring-2 focus:ring-rose-500/20" />
                 <div className="grid grid-cols-2 gap-3">
@@ -1049,7 +1190,9 @@ export default function AdminSales() {
         </>
       ) : (
         <div className="space-y-6">
-          {/* Session Control Panel */}
+          {activeTab === 'sales' && (
+            <>
+              {/* Session Control Panel */}
           {sessionData && (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -1323,6 +1466,174 @@ export default function AdminSales() {
               </>
             )}
           </div>
+          </>
+          )}
+
+          {/* ── CUSTOMERS TAB ── */}
+          {activeTab === 'customers' && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
+                      <User size={20} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total Unique Customers</p>
+                    <p className="text-3xl font-black text-emerald-900 tabular-nums">{customerData.length}</p>
+                  </div>
+                </div>
+                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 flex flex-col justify-between">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
+                      <Wallet size={20} />
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Avg Spend / Customer</p>
+                    <p className="text-3xl font-black text-indigo-900 tabular-nums">
+                      ₹{customerData.length ? (customerData.reduce((sum, c) => sum + c.totalSpent, 0) / customerData.length).toFixed(0) : 0}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm max-w-md">
+                <Search size={20} className="text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search customer by name or mobile..."
+                  className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium"
+                  value={customerSearchQuery}
+                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
+                />
+              </div>
+
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50">
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer Info</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Total Orders</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Lifetime Spend</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Favorite Product</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Last Purchase</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50 text-sm">
+                      {filteredCustomers.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="text-center py-12 text-gray-400 font-medium">No customers found</td>
+                        </tr>
+                      ) : (
+                        filteredCustomers.map((cust, idx) => (
+                          <tr key={idx} className="hover:bg-gray-50/30 transition-colors">
+                            <td className="px-6 py-4">
+                              <div className="flex flex-col">
+                                <span className="font-black text-gray-900 uppercase text-xs">{cust.name}</span>
+                                <span className="text-[10px] text-gray-500 font-bold">{cust.mobile}</span>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="font-black text-gray-700 bg-gray-100 px-3 py-1 rounded-full text-[10px]">
+                                {cust.totalOrders}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="font-black text-emerald-700 tabular-nums">₹{cust.totalSpent.toFixed(0)}</span>
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="text-[10px] text-gray-600 font-bold uppercase truncate max-w-[150px] inline-block" title={cust.favoriteProduct}>
+                                {cust.favoriteProduct}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <span className="text-[10px] text-gray-500 font-bold">
+                                {format(new Date(cust.lastOrderDate), 'dd MMM yyyy')}
+                              </span>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── ANALYTICS TAB ── */}
+          {activeTab === 'analytics' && analyticsData && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Spenders */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shadow-sm border border-amber-100">
+                      <Coins size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Top Spenders</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Highest lifetime value customers</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {analyticsData.topSpenders.map((cust, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-black flex items-center justify-center text-xs border border-amber-200">
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 uppercase">{cust.name}</p>
+                            <p className="text-[10px] font-bold text-gray-500">{cust.mobile}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-emerald-700 tabular-nums">₹{cust.totalSpent.toFixed(0)}</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase">{cust.totalOrders} orders</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Most Frequent Buyers */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
+                      <RefreshCw size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Frequent Buyers</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Highest number of orders</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {analyticsData.frequentBuyers.map((cust, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-black flex items-center justify-center text-xs border border-indigo-200">
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 uppercase">{cust.name}</p>
+                            <p className="text-[10px] font-bold text-gray-500">{cust.mobile}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-indigo-700 tabular-nums">{cust.totalOrders} Orders</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase">₹{cust.totalSpent.toFixed(0)} total</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -1434,15 +1745,15 @@ export default function AdminSales() {
               </div>
               <div>
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cash Amount</p>
-                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.cashAmount || 0).toFixed(2)}</p>
+                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.cashAmount || 0).toFixed(0)}</p>
               </div>
               <div>
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">UPI Amount</p>
-                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.upiAmount || 0).toFixed(2)}</p>
+                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.upiAmount || 0).toFixed(0)}</p>
               </div>
               <div>
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Discount</p>
-                <p className="text-xs font-black text-rose-600">₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(2)}</p>
+                <p className="text-xs font-black text-rose-600">₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(0)}</p>
               </div>
             </div>
 
@@ -1462,7 +1773,7 @@ export default function AdminSales() {
               </div>
               <div>
                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Gross Amount</p>
-                <h4 className="text-xl font-black text-slate-900 tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</h4>
+                <h4 className="text-xl font-black text-slate-900 tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</h4>
               </div>
               <div className="text-center">
                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mode & Split</p>
@@ -1473,7 +1784,7 @@ export default function AdminSales() {
               </div>
               <div className="text-right">
                 <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1">Net Bill (INR)</p>
-                <h4 className="text-2xl font-black text-emerald-700 tracking-tighter">₹{(viewingOrder.totalAmount - (viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0)).toFixed(2)}</h4>
+                <h4 className="text-2xl font-black text-emerald-700 tracking-tighter">₹{(viewingOrder.totalAmount - (viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0)).toFixed(0)}</h4>
                 <p className="text-[7px] font-bold text-emerald-600/60 uppercase">After Returns</p>
               </div>
             </div>
@@ -1496,8 +1807,8 @@ export default function AdminSales() {
                         <p className="font-black uppercase text-slate-900">{item.product?.name || item.productName}</p>
                       </td>
                       <td className="p-3 border-b border-slate-50 text-center font-bold">{item.quantity}</td>
-                      <td className="p-3 border-b border-slate-50 text-right">₹{item.price.toFixed(2)}</td>
-                      <td className="p-3 border-b border-slate-50 text-right font-black">₹{(item.price * item.quantity).toFixed(2)}</td>
+                      <td className="p-3 border-b border-slate-50 text-right">₹{item.price.toFixed(0)}</td>
+                      <td className="p-3 border-b border-slate-50 text-right font-black">₹{(item.price * item.quantity).toFixed(0)}</td>
                     </tr>
                   ))}
                 </tbody>

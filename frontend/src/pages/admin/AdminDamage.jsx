@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import { damageAPI } from '../../services/damageService';
 import { adminAPI } from '../../services/adminService';
 import { useUserStore } from '../../store/userStore';
+import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 
 const TABS = [
   { id: 'entries', label: 'Damage Entries', icon: AlertTriangle },
@@ -303,6 +304,30 @@ export default function AdminDamage() {
       fetchDeductions();
     } catch (err) {
       toast.error('Failed to update deduction status');
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (activeTab === 'reports') {
+      exportReportToExcel('damages', reports);
+    } else {
+      exportReportToExcel('agent-damage-reports', entries);
+    }
+  };
+
+  const handleExportPDF = () => {
+    if (activeTab === 'reports') {
+      generateReportPDF('damages', reports);
+    } else {
+      generateReportPDF('agent-damage-reports', entries);
+    }
+  };
+
+  const handlePrint = () => {
+    if (activeTab === 'reports') {
+      generateReportPDF('damages', reports, true);
+    } else {
+      generateReportPDF('agent-damage-reports', entries, true);
     }
   };
 
@@ -1340,12 +1365,37 @@ export default function AdminDamage() {
             <p className="text-xs text-gray-400 font-medium tracking-tight">Inventory damage tracking, accountability & financial recovery</p>
           </div>
           {can('INVENTORY', 'CREATE', 'DAMAGE') && (
-            <button 
-              onClick={() => setShowCreatePage(true)}
-              className="ml-auto flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/10 hover:bg-red-700 active:scale-95 transition-all"
-            >
-              <Plus size={14} strokeWidth={3} /> Report Damage
-            </button>
+            <div className="ml-auto flex items-center gap-2 no-print">
+              <button
+                onClick={handleExportPDF}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
+                title="Export PDF"
+              >
+                <FileText size={18} />
+              </button>
+              <button
+                onClick={handlePrint}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-blue-500 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+                title="Print Report"
+              >
+                <Printer size={18} />
+              </button>
+              <button
+                onClick={handleExportExcel}
+                className="p-2.5 bg-emerald-50 border border-emerald-100 rounded-xl text-emerald-600 hover:bg-emerald-100 transition-all shadow-sm"
+                title="Export Excel"
+              >
+                <Download size={18} />
+              </button>
+              {!showCreatePage && (
+                <button 
+                  onClick={() => setShowCreatePage(true)}
+                  className="flex items-center gap-2 px-5 py-2.5 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest shadow-lg shadow-red-600/10 hover:bg-red-700 active:scale-95 transition-all ml-1"
+                >
+                  <Plus size={14} strokeWidth={3} /> Report Damage
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

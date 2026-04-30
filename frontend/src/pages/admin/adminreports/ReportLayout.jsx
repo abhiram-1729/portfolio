@@ -3,7 +3,7 @@ import { BarChart3, Download, Printer, Zap } from 'lucide-react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import adminAPI from '../../../services/adminService';
 import StoreSelector from '../StoreSelector';
-import { generateReportPDF } from './ReportUtils';
+import { generateReportPDF, exportReportToExcel } from './ReportUtils';
 
 export default function ReportLayout({ title, icon: Icon = BarChart3, children, activeTab, reportData, isLoading, onRefresh }) {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -34,9 +34,10 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-1">Enterprise Analytics & Sales Audit Suite</p>
           </div>
           <div className="flex items-center gap-3">
-             {isTenantRoute && <div className="w-64"><StoreSelector onSelect={(id) => setSearchParams({ storeId: id })} currentStoreId={storeFilterId} stores={stores} /></div>}
-             <button onClick={() => generateReportPDF(activeTab, reportData, false)} disabled={!reportData || isLoading} className="bg-gray-900 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Download size={16} /> Download</button>
-             <button onClick={() => generateReportPDF(activeTab, reportData, true)} disabled={!reportData || isLoading} className="bg-emerald-600 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Printer size={16} /> Print</button>
+              {isTenantRoute && <div className="w-64"><StoreSelector onSelect={(id) => setSearchParams({ storeId: id })} currentStoreId={storeFilterId} stores={stores} /></div>}
+              <button onClick={() => exportReportToExcel(activeTab, reportData)} disabled={!reportData || isLoading} className="bg-white text-emerald-600 border border-emerald-100 px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-50 hover:bg-emerald-50 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Download size={16} /> Excel</button>
+              <button onClick={() => generateReportPDF(activeTab, reportData, false)} disabled={!reportData || isLoading} className="bg-gray-900 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Download size={16} /> PDF</button>
+              <button onClick={() => generateReportPDF(activeTab, reportData, true)} disabled={!reportData || isLoading} className="bg-emerald-600 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Printer size={16} /> Print</button>
            </div>
         </div>
       </div>

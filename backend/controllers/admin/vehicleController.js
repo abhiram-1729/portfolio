@@ -18,10 +18,12 @@ export const getVehicles = async (req, res) => {
       where,
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
+        store: { select: { id: true, name: true } }
       }
     });
     res.json(vehicles);
   } catch (error) {
+    console.error('❌ Error fetching vehicles:', error);
     res.status(500).json({ message: 'Error fetching vehicles', error: error.message });
   }
 };
@@ -33,6 +35,7 @@ export const getVehicleById = async (req, res) => {
       where: { id, tenantId: req.user.tenantId },
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
+        store: { select: { id: true, name: true } }
       }
     });
 

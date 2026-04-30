@@ -368,6 +368,9 @@ export const updatePurchase = async (req, res) => {
       }
 
       return inv;
+    }, {
+      maxWait: 20000,
+      timeout: 60000
     });
 
     logActivity({
@@ -380,6 +383,7 @@ export const updatePurchase = async (req, res) => {
 
     res.json({ message: 'Purchase invoice updated', invoice: updated });
   } catch (error) {
+    import('fs').then(fs => fs.appendFileSync('error.log', '\nUPDATE ERROR: ' + error.stack + '\n'));
     console.error('❌ Update Purchase Critical Error:', error);
     if (error.code === 'P2002') {
       return res.status(400).json({ message: 'Invoice number already exists for this tenant' });

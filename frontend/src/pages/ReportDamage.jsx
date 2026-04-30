@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   AlertTriangle, Camera, Package, ChevronDown, Send, X, Image as ImageIcon,
   MapPin, CheckCircle, Clock, Eye, Trash2, ChevronRight, ArrowLeft, Plus,
-  Hammer, Droplets, HelpCircle, Coins
+  Hammer, Droplets, HelpCircle, Coins, Download, Printer, FileText
 } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from './admin/adminreports/ReportUtils';
 import toast from 'react-hot-toast';
 import { damageAPI } from '../services/damageService';
 import { productsAPI } from '../services/api';
@@ -197,6 +198,18 @@ export default function ReportDamage() {
     }
   };
 
+  const handleExportExcel = () => {
+    exportReportToExcel('agent-damage-reports', myReports);
+  };
+
+  const handleExportPDF = () => {
+    generateReportPDF('agent-damage-reports', myReports);
+  };
+
+  const handlePrint = () => {
+    generateReportPDF('agent-damage-reports', myReports, true);
+  };
+
   // ───────── LIST VIEW ─────────
   const renderList = () => (
     <div className="max-w-lg mx-auto pb-24">
@@ -212,13 +225,36 @@ export default function ReportDamage() {
               <p className="text-[9px] sm:text-[10px] text-slate-400 font-bold uppercase tracking-wider">Track inventory damage</p>
             </div>
           </div>
-          <button
-            onClick={() => setView('form')}
-            className="shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-red-600 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-lg shadow-red-200 hover:bg-red-700 active:scale-95 transition-all flex items-center gap-1.5"
-          >
-            <Plus size={14} strokeWidth={3} />
-            Report
-          </button>
+          <div className="flex items-center gap-1 sm:gap-2">
+            <button
+              onClick={handleExportPDF}
+              className="p-1.5 sm:p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors"
+              title="PDF"
+            >
+              <FileText size={16} />
+            </button>
+            <button
+              onClick={handlePrint}
+              className="p-1.5 sm:p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition-colors"
+              title="Print"
+            >
+              <Printer size={16} />
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="p-1.5 sm:p-2 text-emerald-500 hover:bg-emerald-50 rounded-lg transition-colors"
+              title="Excel"
+            >
+              <Download size={16} />
+            </button>
+            <button
+              onClick={() => setView('form')}
+              className="shrink-0 px-3 sm:px-4 py-2 sm:py-2.5 rounded-xl bg-red-600 text-white text-[10px] sm:text-xs font-black uppercase tracking-wider shadow-lg shadow-red-200 hover:bg-red-700 active:scale-95 transition-all flex items-center gap-1.5 ml-1 sm:ml-2"
+            >
+              <Plus size={14} strokeWidth={3} />
+              Report
+            </button>
+          </div>
         </div>
       </div>
 

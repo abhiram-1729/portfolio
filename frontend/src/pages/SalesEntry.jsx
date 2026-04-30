@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid, ScanBarcode } from 'lucide-react';
+import { Search, ShoppingCart, Smartphone, Truck, MapPin, Gift, Loader2, Grid, ScanBarcode, AlertTriangle, Plus, Minus } from 'lucide-react';
 import { useUserStore } from '../store/userStore';
 import { productsAPI } from '../services/api';
 import { useCartStore } from '../store/cartStore';
 import ProductGrid from '../components/ProductGrid';
 import CartDrawer from '../components/CartDrawer';
 import BarcodeScannerOverlay from '../components/BarcodeScannerOverlay';
+import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { getCashStatus } from '../services/cashService';
 import { getTodayPlan } from '../services/routeService';
 import toast from 'react-hot-toast';
@@ -24,9 +25,12 @@ export default function SalesEntry() {
   const [loading, setLoading] = useState(true);
   const [cartOpen, setCartOpen] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+  const [unavailableCode, setUnavailableCode] = useState(null);
+  const [scannedProduct, setScannedProduct] = useState(null);
+  const [scannedQuantity, setScannedQuantity] = useState(1);
   const [plan, setPlan] = useState(null);
   const { user } = useUserStore();
-  const { items, customerMobile, setCustomerMobile, customerName, setCustomerName, totalAmount } = useCartStore();
+  const { items, customerMobile, setCustomerMobile, customerName, setCustomerName, totalAmount, addItem } = useCartStore();
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
   const searchRef = useRef(null);
   const navigate = useNavigate();
@@ -47,6 +51,22 @@ export default function SalesEntry() {
       console.error('Failed to load plan');
     }
   };
+
+  const handleBarcodeScan = (code) => {
+    const product = products.find(p => p.skuCode === code || p.barcode === code);
+    if (product) {
+      if (product.stock <= 0) {
+        toast.error(`${product.name} is out of stock`);
+      } else {
+        setScannedProduct(product);
+        setScannedQuantity(1);
+      }
+    } else {
+      setUnavailableCode(code);
+    }
+  };
+
+  useBarcodeScanner(handleBarcodeScan);
 
   const checkCashStatus = async () => {
     if (user?.role !== 'SALES_AGENT') return;
@@ -313,11 +333,76 @@ export default function SalesEntry() {
       {showScanner && (
         <BarcodeScannerOverlay
           onScan={(code) => {
-            setSearch(code);
-            toast.success("Barcode Scanned!");
+            handleBarcodeScan(code);
           }}
           onClose={() => setShowScanner(false)}
         />
+      )}
+
+      {/* Unavailable Product Modal */}
+      {unavailableCode && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in-95">
+            <div className="w-16 h-16 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+              <AlertTriangle size={32} />
+            </div>
+            <h3 className="text-xl font-black text-gray-900 mb-2">Product Not Found</h3>
+            <p className="text-sm text-gray-500 mb-6">
+              The scanned barcode <span className="font-bold text-gray-900">"{unavailableCode}"</span> does not match any product in your inventory.
+            </p>
+            <button
+              onClick={() => setUnavailableCode(null)}
+              className="w-full bg-gray-900 text-white font-bold py-3.5 rounded-xl hover:bg-gray-800 transition-colors"
+            >
+              Okay
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Scanned Product Quantity Modal */}
+      {scannedProduct && (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in">
+          <div className="bg-white rounded-[2rem] p-6 w-full max-w-sm text-center shadow-2xl animate-in zoom-in-95">
+            <h3 className="text-xl font-black text-gray-900 mb-1">{scannedProduct.name}</h3>
+            <p className="text-xs text-emerald-600 font-bold mb-6">Price: ₹{scannedProduct.price} • Stock: {scannedProduct.stock}</p>
+            
+            <div className="flex items-center justify-center gap-6 mb-8">
+              <button
+                onClick={() => setScannedQuantity(Math.max(1, scannedQuantity - 1))}
+                className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+              >
+                <Minus size={24} strokeWidth={3} />
+              </button>
+              <span className="text-4xl font-black text-gray-900 w-16">{scannedQuantity}</span>
+              <button
+                onClick={() => setScannedQuantity(Math.min(scannedProduct.stock, scannedQuantity + 1))}
+                className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
+              >
+                <Plus size={24} strokeWidth={3} />
+              </button>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => setScannedProduct(null)}
+                className="flex-1 bg-gray-100 text-gray-600 font-bold py-3.5 rounded-xl hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  addItem(scannedProduct, scannedQuantity);
+                  toast.success(`Added ${scannedQuantity}x ${scannedProduct.name}`);
+                  setScannedProduct(null);
+                }}
+                className="flex-[2] bg-emerald-600 text-white font-black py-3.5 rounded-xl hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-600/20"
+              >
+                Add to Cart
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
