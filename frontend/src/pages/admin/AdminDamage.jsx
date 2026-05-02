@@ -5,7 +5,8 @@ import {
   Filter, ChevronDown, ChevronRight, Search, TrendingDown, Users, Truck,
   Image as ImageIcon, Shield, Ban, FileText, BarChart3, X, AlertCircle,
   Percent, CreditCard, RefreshCcw, Download, Info, Hammer, Droplets,
-  HelpCircle, Coins, ArrowLeft, Plus, Send, Camera, Trash2 as Trash
+  HelpCircle, Coins, ArrowLeft, Plus, Send, Camera, Trash2 as Trash,
+  Printer
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { damageAPI } from '../../services/damageService';
@@ -137,7 +138,13 @@ export default function AdminDamage() {
       const params = {};
       if (storeId) params.storeId = storeId;
       const { data } = await damageAPI.getDamageReports(params);
-      setReports(data);
+      setReports(data || {
+        summary: { total: 0, totalLoss: 0, totalDeductions: 0, appliedDeductions: 0 },
+        lossByType: {},
+        topProducts: [],
+        vgeReport: [],
+        payrollReport: []
+      });
     } catch (err) {
       toast.error('Failed to load reports');
     }

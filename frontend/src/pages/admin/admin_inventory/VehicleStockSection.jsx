@@ -331,20 +331,20 @@ const VehicleStockSection = ({
                     })}
                   </div>
 
-                  <div className="hidden md:block print:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-                    <table className="w-full text-left border-collapse">
+                  <div className="hidden md:block print:block bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mb-6">
+                    <table className="w-full text-left border-collapse table-fixed">
                       <thead>
-                        <tr className="bg-gray-50/50">
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">System Qty</th>
+                        <tr className="bg-gray-50/50 text-[9px] font-black uppercase tracking-widest text-gray-400">
+                          <th className="px-4 py-3 w-[35%]">Product Details</th>
+                          <th className="px-3 py-3 text-center w-[15%]">System Qty</th>
                           {isAuditMode && (
                             <>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center">Actual Qty</th>
-                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-rose-600 text-center">Difference</th>
+                              <th className="px-3 py-3 text-center text-emerald-600 w-[15%]">Actual</th>
+                              <th className="px-3 py-3 text-center text-rose-600 w-[15%]">Diff</th>
                             </>
                           )}
-                          {!isAuditMode && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Rate</th>}
-                          <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Value</th>
+                          {!isAuditMode && <th className="px-3 py-3 text-center w-[15%]">Rate</th>}
+                          <th className="pr-4 py-3 text-right w-[20%]">Net Value</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50">
@@ -369,25 +369,25 @@ const VehicleStockSection = ({
 
                           return (
                             <tr key={`track-table-pc-${item.id}`} className="hover:bg-gray-50/30 transition-colors group">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 shadow-inner flex items-center justify-center no-print">
-                                    {item.product?.isFree ? <Gift size={18} className="text-emerald-500" /> : <Package size={18} className="text-gray-400 group-hover:text-emerald-500" />}
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-8 h-8 rounded-lg bg-gray-50 border border-gray-100 shadow-inner flex items-center justify-center no-print shrink-0">
+                                    {item.product?.isFree ? <Gift size={14} className="text-emerald-500" /> : <Package size={14} className="text-gray-400 group-hover:text-emerald-500" />}
                                   </div>
-                                  <div className="flex flex-col">
-                                    <span className="text-[11px] font-black text-gray-800 line-clamp-1 uppercase tracking-tight">{item.product?.name || 'Unknown'}</span>
+                                  <div className="flex flex-col min-w-0">
+                                    <span className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{item.product?.name || 'Unknown'}</span>
                                     <span className="text-[8px] font-bold text-gray-400 uppercase">{item.product?.skuCode}</span>
                                   </div>
                                 </div>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="text-sm font-black text-gray-400">{systemQty}</span>
+                              <td className="px-3 py-2 text-center">
+                                <span className="text-[10px] font-black text-gray-400">{systemQty}</span>
                               </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="text-xs font-black text-gray-500">₹{price}</span>
+                              <td className="px-3 py-2 text-center">
+                                <span className="text-[9px] font-black text-gray-500">₹{price}</span>
                               </td>
-                              <td className="px-6 py-4 text-right">
-                                <span className="text-sm font-black text-emerald-700">
+                              <td className="pr-4 py-2 text-right">
+                                <span className="text-[10px] font-black text-emerald-700">
                                   ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                               </td>
@@ -441,8 +441,8 @@ const VehicleStockSection = ({
 
   return (
     <div className="space-y-6 animate-in fade-in duration-300">
-      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-        <table className="w-full text-left border-collapse">
+      <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-x-auto scrollbar-thin">
+        <table className="w-full text-left border-collapse min-w-[800px]">
           <thead>
             <tr className="bg-gray-50/50">
               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>

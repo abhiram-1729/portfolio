@@ -113,17 +113,16 @@ const ReturnSection = ({
   const freeItems = paginatedItemsFromAll.filter(i => i.isFree);
 
   const renderReturnTable = (itemsToRender, isFreeGroup = false) => (
-    <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-      <table className="w-full text-left border-collapse">
+    <div className="hidden md:block bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mb-6">
+      <table className="w-full text-left border-collapse table-fixed">
         <thead>
-          <tr className="bg-gray-50/50">
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">In Vehicle</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Stock</th>
+          <tr className="bg-gray-50/50 text-[9px] font-black uppercase tracking-widest text-gray-400">
+            <th className="px-4 py-3 w-[25%]">Product Details</th>
+            <th className="px-3 py-3 text-center bg-amber-50/20 text-amber-600 w-[28%]">System Availability</th>
             {can && can('INVENTORY', 'UPDATE', 'RETURN') && (
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/10">Return Qty</th>
+              <th className="px-3 py-3 text-center bg-indigo-50/20 text-indigo-600 w-[15%]">Return Qty</th>
             )}
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Return Value</th>
+            <th className="pr-4 py-3 text-right w-[20%]">Net Value</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -134,8 +133,8 @@ const ReturnSection = ({
             const displayAmount = qty * price;
             return (
               <tr key={`return-table-${item.id}`} className={`hover:bg-gray-50/30 transition-colors group ${isFreeGroup ? 'bg-emerald-50/10' : ''}`}>
-                <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                  <div className="flex items-center gap-3">
+                <td className="px-4 py-2.5">
+                  <div className="flex items-center gap-2">
                     <div className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden border shadow-inner shrink-0 ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
                       {item.image ? (
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
@@ -143,27 +142,41 @@ const ReturnSection = ({
                         item.isFree ? <Gift size={14} /> : <Package size={14} />
                       )}
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-gray-800 leading-tight">{item.name}</span>
-                      <span className="text-[10px] font-bold text-blue-500">Rate: ₹{price}</span>
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-bold text-gray-800 leading-tight truncate">{item.name}</span>
+                      <span className="text-[8px] font-black text-blue-500 uppercase tracking-tighter">Rate: ₹{price}</span>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                  <span className="text-sm font-black text-gray-700">{currentStock}</span>
-                </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                  <span className="text-[11px] font-black text-emerald-600">{item.stock || 0}</span>
+                <td className="px-3 py-2.5 bg-amber-50/5">
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] font-black text-amber-700">{currentStock}</span>
+                      <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest leading-none mt-0.5">In Vehicle</span>
+                    </div>
+                    <div className="w-px h-4 bg-amber-100" />
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] font-black text-emerald-600">{item.warehouseStock ?? item.stock ?? 0}</span>
+                      <span className="text-[7px] font-black text-emerald-500 uppercase tracking-widest leading-none mt-0.5">In Store</span>
+                    </div>
+                    <div className="w-px h-4 bg-amber-100" />
+                    <div className="flex flex-col items-center bg-white px-1.5 py-0.5 rounded-lg border border-amber-100 shadow-sm">
+                      <span className="text-[10px] font-black text-blue-600">
+                        {item.totalStock || ((item.warehouseStock || 0) + (item.vehicleStock || 0))}
+                      </span>
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">System</span>
+                    </div>
+                  </div>
                 </td>
                 {can && can('INVENTORY', 'UPDATE', 'RETURN') && (
-                  <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent bg-emerald-50/5">
+                  <td className="px-3 py-2.5 bg-indigo-50/5">
                     <div className="flex flex-col items-center justify-center gap-1">
                       <input
                         type="number"
                         placeholder="0"
                         min="0"
                         onWheel={(e) => e.target.blur()}
-                        className={`w-20 bg-white border ${qty > currentStock ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-gray-200'} rounded-xl px-2 py-2 text-sm text-center font-black focus:ring-2 focus:ring-emerald-500/20 outline-none transition-all shadow-sm`}
+                        className={`w-16 bg-white border ${qty > currentStock ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-indigo-200'} rounded-lg px-2 py-1 text-[11px] text-center font-black focus:ring-2 focus:ring-indigo-500/20 outline-none transition-all shadow-sm`}
                         value={stockQuantities[item.id] || ''}
                         onChange={(e) => {
                           const val = Math.max(0, parseInt(e.target.value) || 0);
@@ -171,13 +184,13 @@ const ReturnSection = ({
                         }}
                       />
                       {qty > currentStock && (
-                        <span className="text-[8px] font-black text-rose-600 uppercase animate-pulse">Exceeds Store Stock</span>
+                        <span className="text-[7px] font-black text-rose-600 uppercase animate-pulse">Exceeds Fleet</span>
                       )}
                     </div>
                   </td>
                 )}
-                <td className="px-6 py-4 text-right">
-                  <span className={`text-sm font-black ${qty > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
+                <td className="pr-4 py-2.5 text-right">
+                  <span className={`text-[10px] font-black ${qty > 0 ? 'text-emerald-600' : 'text-gray-300'}`}>
                     ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                   </span>
                 </td>

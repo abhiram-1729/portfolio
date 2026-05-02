@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft, Check, FileUp
+  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft, Check, FileUp,
+  Barcode, ScanBarcode
 } from 'lucide-react';
+import BarcodeScannerOverlay from '../../../components/BarcodeScannerOverlay';
 import * as XLSX from 'xlsx';
 import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
@@ -34,6 +36,7 @@ const PurchasesSection = ({ can }) => {
   const [units, setUnits] = useState([]);
   const [search, setSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -99,6 +102,19 @@ const PurchasesSection = ({ can }) => {
       ...f,
       items: f.items.map((item, i) => i === idx ? { ...item, [field]: value } : item)
     }));
+  };
+
+  const handleBarcodeScan = (code) => {
+    const product = products.find(p => p.barcode === code || p.skuCode === code);
+    if (product) {
+      setSelectedProduct(product);
+      setSearchPrice(String(product.purchasePrice || product.price || 0));
+      setItemSearch(product.name);
+      setSearchQty('1');
+      toast.success(`Found: ${product.name}`);
+    } else {
+      toast.error('Product not found for this barcode');
+    }
   };
 
   const handleEdit = (p) => {
@@ -407,9 +423,21 @@ const PurchasesSection = ({ can }) => {
                         }}
                         onFocus={() => setShowItemResults(true)}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowScanner(true)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors"
+                        title="Scan Barcode"
+                      >
+                        <ScanBarcode size={16} />
+                      </button>
                       {showItemResults && itemSearch && (
                         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
-                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()) || p.skuCode?.includes(itemSearch)).slice(0, 10).map(p => (
+                          {products.filter(p => 
+                            p.name.toLowerCase().includes(itemSearch.toLowerCase()) || 
+                            p.skuCode?.toLowerCase().includes(itemSearch.toLowerCase()) ||
+                            p.barcode?.toLowerCase().includes(itemSearch.toLowerCase())
+                          ).slice(0, 10).map(p => (
                             <button
                               key={p.id}
                               type="button"
@@ -424,7 +452,11 @@ const PurchasesSection = ({ can }) => {
                             >
                               <div className="flex flex-col">
                                 <span className="text-xs font-black text-gray-900 group-hover:text-emerald-700">{p.name}</span>
-                                <span className="text-[10px] text-gray-400">{p.skuCode || 'No SKU'}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">Store: {p.warehouseStock || 0}</span>
+                                  <span className="text-[8px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">Veh: {p.vehicleStock || 0}</span>
+                                  <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">Total: {p.totalStock || 0}</span>
+                                </div>
                               </div>
                               <div className="flex flex-col items-end">
                                 <span className="text-xs font-black text-emerald-600">₹{p.purchasePrice || p.price}</span>
@@ -508,20 +540,44 @@ const PurchasesSection = ({ can }) => {
                 ) : (
                   form.items.map((item, idx) => (
                     <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-gray-50/30 p-3 rounded-2xl border border-gray-100 group relative hover:border-emerald-200 transition-all animate-in slide-in-from-left-2 duration-300">
-                    <div className="flex-1 min-w-0 bg-white border border-gray-100 rounded-xl px-4 py-2 flex items-center shadow-inner">
-                      <span className="text-xs font-bold text-gray-900 truncate">
-                        {products.find(p => p.id === item.productId)?.name || 'Unknown Product'}
-                      </span>
-                    </div>
+                     <div className="flex-1 min-w-0 bg-white border border-gray-100 rounded-xl px-4 py-2 flex flex-col justify-center shadow-inner">
+                        <span className="text-xs font-black text-gray-900 truncate">
+                          {products.find(p => p.id === item.productId)?.name || 'Unknown Product'}
+                        </span>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          {(() => {
+                            const p = products.find(x => x.id === item.productId);
+                            if (!p) return null;
+                            return (
+                              <>
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[7px] font-black text-emerald-600 uppercase tracking-tighter">Store</span>
+                                  <span className="text-[9px] font-black text-emerald-700">{p.warehouseStock || 0}</span>
+                                </div>
+                                <div className="w-px h-2 bg-gray-200" />
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[7px] font-black text-amber-600 uppercase tracking-tighter">Vehicles</span>
+                                  <span className="text-[9px] font-black text-amber-700">{p.vehicleStock || 0}</span>
+                                </div>
+                                <div className="w-px h-2 bg-gray-200" />
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Total</span>
+                                  <span className="text-[9px] font-black text-gray-900">{p.totalStock || 0}</span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     <div className="flex items-center gap-2">
                       <div className="relative">
                         <span className="absolute -top-4 left-1 text-[8px] font-bold text-gray-400 sm:hidden">QTY</span>
-                        <input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                        <input type="number" min="1" placeholder="Qty" value={item.quantity || ''} onChange={e => updateItem(idx, 'quantity', e.target.value)}
                           className="w-16 bg-white rounded-xl px-2 py-2 text-xs font-black border border-gray-200 text-center focus:ring-2 focus:ring-emerald-500" />
                       </div>
                       <div className="relative">
                         <span className="absolute -top-4 left-1 text-[8px] font-bold text-gray-400 sm:hidden">PRICE</span>
-                        <input type="number" placeholder="Price" value={item.price} onChange={e => updateItem(idx, 'price', e.target.value)}
+                        <input type="number" placeholder="Price" value={item.price || ''} onChange={e => updateItem(idx, 'price', e.target.value)}
                           className="w-24 bg-white rounded-xl px-2 py-2 text-xs font-black border border-gray-200 text-center focus:ring-2 focus:ring-emerald-500" />
                       </div>
                     <button type="button" onClick={() => removeItem(idx)} 
@@ -621,6 +677,12 @@ const PurchasesSection = ({ can }) => {
             </form>
           </div>
         </div>
+      )}
+      {showScanner && (
+        <BarcodeScannerOverlay
+          onScan={handleBarcodeScan}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   );

@@ -44,7 +44,7 @@ export const createPurchase = async (req, res) => {
         storeId
       });
 
-      // Create purchase invoice
+      // 1. Create the Invoice and Items
       const inv = await tx.purchaseInvoice.create({
         data: {
           tenantId,
@@ -67,62 +67,71 @@ export const createPurchase = async (req, res) => {
               total: parseInt(item.quantity) * parseFloat(item.price)
             }))
           }
-        },
-        include: {
-          items: { include: { product: { select: { name: true } } } }
         }
       });
 
-      // Update warehouse inventory (Purchase → Stock Increase)
+      // 2. High-Performance Bulk Stock Updates
+      // Deduplicate items for stock processing
+      const stockMap = new Map();
       for (const item of items) {
-        const qty = parseInt(item.quantity);
-        const existingWI = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
-        });
+        const q = parseInt(item.quantity);
+        if (q <= 0) continue;
+        stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + q);
+      }
 
-        if (existingWI) {
-          await tx.warehouseInventory.update({
-            where: { id: existingWI.id },
-            data: { quantity: { increment: qty } }
-          });
-        } else {
-          let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
-          if (!warehouse) {
-            warehouse = await tx.warehouse.create({
-              data: { tenantId, name: 'Main Warehouse', location: 'Default' }
-            });
-          }
-          await tx.warehouseInventory.create({
-            data: { tenantId, warehouseId: warehouse.id, productId: item.productId, quantity: qty }
+      const entries = Array.from(stockMap.entries());
+      if (entries.length > 0) {
+        let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
+        if (!warehouse) {
+          warehouse = await tx.warehouse.create({
+            data: { tenantId, name: 'Main Warehouse', location: 'Default' }
           });
         }
 
-        // Update Product Master Stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: qty } }
+        // A. Bulk Update Product Master Stock
+        const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
+        await tx.$executeRaw`
+          UPDATE "Product"
+          SET stock = "Product".stock + v.qty
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
+          WHERE "Product".id = v.id
+        `;
+
+        // B. Bulk Upsert Warehouse Inventory
+        const wiValues = entries.map(([pId, qty]) => {
+          const tempId = `pwi_${Math.random().toString(36).substring(2, 11)}`;
+          return Prisma.sql`(${tempId}, ${tenantId}, ${warehouse.id}, ${pId}, ${qty}::int)`;
         });
 
-        // Procurement stock ledger entry
-        const currentWI = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
+        await tx.$executeRaw`
+          INSERT INTO "WarehouseInventory" (id, "tenantId", "warehouseId", "productId", quantity)
+          VALUES ${Prisma.join(wiValues)}
+          ON CONFLICT ("warehouseId", "productId")
+          DO UPDATE SET quantity = "WarehouseInventory".quantity + EXCLUDED.quantity
+        `;
+
+        // C. Bulk Create Stock Ledger Entries
+        // We fetch current balances after update for accurate ledger
+        const currentWIs = await tx.warehouseInventory.findMany({
+          where: { warehouseId: warehouse.id, productId: { in: entries.map(e => e[0]) } }
         });
-        await tx.procurementStockLedger.create({
-          data: {
+        const currentWIMap = new Map(currentWIs.map(wi => [wi.productId, wi.quantity]));
+
+        await tx.procurementStockLedger.createMany({
+          data: entries.map(([pId, qty]) => ({
             tenantId,
             storeId,
-            productId: item.productId,
+            productId: pId,
             type: 'PURCHASE',
             quantity: qty,
             reference: inv.id,
             refType: 'INVOICE',
-            balanceAfter: currentWI?.quantity || qty
-          }
+            balanceAfter: currentWIMap.get(pId) || qty
+          }))
         });
       }
 
-      // Vendor Ledger → Debit (Purchase)
-      // Get current vendor balance
+      // 3. Vendor Ledger and Balance
       const currentVendor = await tx.vendor.findUnique({ where: { id: vendorId } });
       const newBalance = (currentVendor?.currentBalance || 0) + totalAmount;
 
@@ -139,13 +148,11 @@ export const createPurchase = async (req, res) => {
         }
       });
 
-      // Update vendor current balance
       await tx.vendor.update({
         where: { id: vendorId },
         data: { currentBalance: newBalance }
       });
 
-      // If from PO, update PO status
       if (poId) {
         await tx.purchaseOrder.update({
           where: { id: poId },
@@ -155,8 +162,8 @@ export const createPurchase = async (req, res) => {
 
       return inv;
     }, {
-      maxWait: 20000,
-      timeout: 60000
+      maxWait: 40000,
+      timeout: 120000
     });
 
     logActivity({
@@ -259,56 +266,73 @@ export const updatePurchase = async (req, res) => {
       if (items) {
         const oldItems = await tx.purchaseInvoiceItem.findMany({ where: { invoiceId: id } });
         const warehouse = await tx.warehouse.findFirst({ where: { tenantId: existing.tenantId } });
+        if (!warehouse) throw new Error('Warehouse not found for this tenant');
 
-        // Calculate Net Stock Changes
-        const netChanges = {};
-        oldItems.forEach(i => { netChanges[i.productId] = (netChanges[i.productId] || 0) - i.quantity; });
+        // Calculate Net Stock Changes (Deltas)
+        const netChanges = new Map();
+        oldItems.forEach(i => {
+          netChanges.set(i.productId, (netChanges.get(i.productId) || 0) - i.quantity);
+        });
         items.forEach(i => {
           const qty = parseInt(i.quantity) || 0;
-          netChanges[i.productId] = (netChanges[i.productId] || 0) + qty;
+          netChanges.set(i.productId, (netChanges.get(i.productId) || 0) + qty);
         });
 
-        // ─── ULTRA-FAST BULK STOCK UPDATES ────────────────────────────────
-        const entries = Object.entries(netChanges).filter(([_, qty]) => qty !== 0);
-        if (entries.length > 0 && warehouse) {
-          // 1. Bulk Update Products Stock
+        const entries = Array.from(netChanges.entries()).filter(([_, qty]) => qty !== 0);
+        if (entries.length > 0) {
+          // A. Bulk Update Product Master Stock
           const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
           await tx.$executeRaw`
-            UPDATE "Product" AS p
-            SET stock = p.stock + v.change
-            FROM (VALUES ${Prisma.join(productValues)}) AS v(id, change)
-            WHERE p.id = v.id
+            UPDATE "Product"
+            SET stock = "Product".stock + v.qty
+            FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
+            WHERE "Product".id = v.id
           `;
 
-          // 2. Bulk Upsert Warehouse Inventory
-          const invValues = entries.map(([pId, qty]) => {
-            const tempId = 'cl' + Math.random().toString(36).substring(2, 11); 
+          // B. Bulk Upsert Warehouse Inventory
+          const wiValues = entries.map(([pId, qty]) => {
+            const tempId = `pwi_upd_${Math.random().toString(36).substring(2, 11)}`;
             return Prisma.sql`(${tempId}, ${existing.tenantId}, ${warehouse.id}, ${pId}, ${qty}::int)`;
           });
 
           await tx.$executeRaw`
             INSERT INTO "WarehouseInventory" (id, "tenantId", "warehouseId", "productId", quantity)
-            VALUES ${Prisma.join(invValues)}
+            VALUES ${Prisma.join(wiValues)}
             ON CONFLICT ("warehouseId", "productId")
             DO UPDATE SET quantity = "WarehouseInventory".quantity + EXCLUDED.quantity
           `;
+
+          // C. Record in Procurement Stock Ledger
+          const currentWIs = await tx.warehouseInventory.findMany({
+            where: { warehouseId: warehouse.id, productId: { in: entries.map(e => e[0]) } }
+          });
+          const currentWIMap = new Map(currentWIs.map(wi => [wi.productId, wi.quantity]));
+
+          await tx.procurementStockLedger.createMany({
+            data: entries.map(([pId, qty]) => ({
+              tenantId: existing.tenantId,
+              storeId: existing.storeId,
+              productId: pId,
+              type: 'ADJUSTMENT',
+              quantity: qty,
+              reference: id,
+              refType: 'INVOICE_UPDATE',
+              balanceAfter: currentWIMap.get(pId) || 0
+            }))
+          });
         }
 
         // Replace old items with new ones
-        await tx.purchaseInvoice.update({
-          where: { id },
-          data: {
-            items: {
-              deleteMany: {},
-              create: items.map(item => ({
-                tenantId: existing.tenantId,
-                productId: item.productId,
-                quantity: parseInt(item.quantity) || 0,
-                price: parseFloat(item.price) || 0,
-                total: (parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0)
-              }))
-            }
-          }
+        await tx.purchaseInvoiceItem.deleteMany({ where: { invoiceId: id } });
+        await tx.purchaseInvoiceItem.createMany({
+          data: items.map(item => ({
+            tenantId: existing.tenantId,
+            invoiceId: id,
+            productId: item.productId,
+            quantity: parseInt(item.quantity) || 0,
+            price: parseFloat(item.price) || 0,
+            total: (parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0)
+          }))
         });
       }
 

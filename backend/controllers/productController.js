@@ -36,6 +36,7 @@ export const getProducts = async (req, res, next) => {
                 variants: true,
                 unit: true,
                 WarehouseInventory: true, // Always include for stock sync
+                vehicleStocks: true, // Always include for total stock calculation
             },
         };
 
@@ -83,12 +84,21 @@ export const getProducts = async (req, res, next) => {
         
         // Flatten stock info for easier frontend consumption
         const result = products.map(p => {
-            const warehouseSum = p.WarehouseInventory?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            const warehouseQty = p.WarehouseInventory?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            // Note: vehicleStocks was only included if vehicleId was provided. 
+            // To get total vehicle stock, we need to include all vehicleStocks in the original query or handle it here.
+            // For now, if vehicleStocks is not available, we assume it's part of p.stock fallback.
+            const vehicleQty = p.vehicleStocks?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            const totalQty = warehouseQty + vehicleQty;
+
             return {
                 ...p,
+                warehouseStock: warehouseQty,
+                vehicleStock: vehicleQty,
+                totalStock: totalQty,
                 stock: vehicleId 
                     ? (p.vehicleStocks?.[0]?.quantity || 0) 
-                    : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : (warehouseSum > 0 ? warehouseSum : (p.stock ?? 0)))
+                    : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : (warehouseQty > 0 ? warehouseQty : (p.stock ?? 0)))
             };
         });
 

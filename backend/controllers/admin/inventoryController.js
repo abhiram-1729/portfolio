@@ -40,16 +40,25 @@ export const getItems = async (req, res) => {
         unit: { select: { name: true, type: true } },
         WarehouseInventory: {
           select: { quantity: true }
+        },
+        vehicleStocks: {
+          select: { quantity: true }
         }
       }
     });
 
-    // Map each item and ensure the 'stock' field reflects the SUM of WarehouseInventory
+    // Map each item and provide a comprehensive stock breakdown
     const processedItems = items.map(item => {
       const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+      const vehicleQty = item.vehicleStocks.reduce((acc, curr) => acc + curr.quantity, 0);
+      const totalQty = warehouseQty + vehicleQty;
+      
       return {
         ...item,
-        stock: warehouseQty > 0 ? warehouseQty : (item.stock || 0)
+        warehouseStock: warehouseQty,
+        vehicleStock: vehicleQty,
+        totalStock: totalQty,
+        stock: warehouseQty // Keep 'stock' as warehouseQty for backward compatibility where needed
       };
     });
 
@@ -399,6 +408,20 @@ export const loadStock = async (req, res) => {
       return res.status(400).json({ message: 'Vehicle ID is required' });
     }
 
+    // 0. Deduplicate items by productId and sum quantities to prevent SQL conflicts
+    const uniqueItemsMap = new Map();
+    for (const item of items) {
+      const q = parseFloat(item.quantity) || 0;
+      if (q <= 0) continue;
+      const existing = uniqueItemsMap.get(item.productId) || 0;
+      uniqueItemsMap.set(item.productId, existing + q);
+    }
+    const processedItemsList = Array.from(uniqueItemsMap.entries()).map(([productId, quantity]) => ({ productId, quantity }));
+
+    if (processedItemsList.length === 0) {
+      return res.status(400).json({ message: 'No valid items to load' });
+    }
+
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: vehicleId },
       select: { id: true, storeId: true, vehicleNumber: true, displayId: true }
@@ -409,27 +432,24 @@ export const loadStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
-    // 1. Pre-fetch products and warehouse inventories for validation and bulk updates
-    const productIds = items.map(i => i.productId);
-    const [products, warehouseInventories] = await Promise.all([
-      prisma.product.findMany({ where: { id: { in: productIds } } }),
-      prisma.warehouseInventory.findMany({ where: { productId: { in: productIds }, tenantId: req.user.tenantId } })
-    ]);
+    // 1. Pre-fetch products WITH their warehouse inventories
+    const productIds = processedItemsList.map(i => i.productId);
+    const products = await prisma.product.findMany({ 
+      where: { id: { in: productIds } },
+      include: { WarehouseInventory: true }
+    });
 
     const productMap = new Map(products.map(p => [p.id, p]));
-    const wiMap = new Map(warehouseInventories.map(wi => [wi.productId, wi]));
 
     // 2. Validate stock availability for all items before starting transaction
-    for (const item of items) {
-      const q = parseFloat(item.quantity);
-      if (isNaN(q) || q <= 0) continue;
+    for (const item of processedItemsList) {
+      const q = item.quantity;
       
       const prod = productMap.get(item.productId);
       if (!prod) throw new Error(`Product ${item.productId} not found`);
 
-      // Calculate effective stock matching the logic in getItems
-      const itemWIs = warehouseInventories.filter(wi => wi.productId === item.productId);
-      const totalWarehouseQty = itemWIs.reduce((acc, curr) => acc + curr.quantity, 0);
+      // Calculate effective stock exactly like getItems does
+      const totalWarehouseQty = (prod.WarehouseInventory || []).reduce((acc, curr) => acc + curr.quantity, 0);
       const effectiveStock = totalWarehouseQty > 0 ? totalWarehouseQty : (prod.stock || 0);
 
       if (Math.floor(q) > effectiveStock) {
@@ -443,10 +463,10 @@ export const loadStock = async (req, res) => {
       const productUpdateValues = [];
       const wiUpdateValues = [];
 
-      for (const item of items) {
-        const q = parseFloat(item.quantity);
-        if (isNaN(q) || q <= 0) continue;
+      for (const item of processedItemsList) {
+        const q = item.quantity;
         const cleanQty = Math.floor(q);
+        const prod = productMap.get(item.productId);
 
         // Transaction record
         transactionsData.push({
@@ -468,7 +488,8 @@ export const loadStock = async (req, res) => {
         productUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
 
         // Warehouse Inventory Decrement Value
-        const wi = wiMap.get(item.productId);
+        // Pick the first warehouse record to decrement from (usually there is only one per product/tenant)
+        const wi = prod.WarehouseInventory?.[0];
         if (wi) {
           wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
         }
@@ -625,10 +646,11 @@ export const returnStock = async (req, res) => {
 
     // 1. Pre-fetch warehouse inventories for bulk updates
     const productIds = items.map(i => i.productId);
-    const warehouseInventories = await prisma.warehouseInventory.findMany({
-      where: { productId: { in: productIds }, tenantId: req.user.tenantId }
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: { WarehouseInventory: true }
     });
-    const wiMap = new Map(warehouseInventories.map(wi => [wi.productId, wi]));
+    const productMap = new Map(products.map(p => [p.id, p]));
 
     await prisma.$transaction(async (tx) => {
       const transactionsData = [];
@@ -640,6 +662,8 @@ export const returnStock = async (req, res) => {
         const q = parseFloat(item.quantity);
         if (isNaN(q) || q <= 0) continue;
         const cleanQty = Math.floor(q);
+        
+        const prod = productMap.get(item.productId);
 
         // Transaction record
         transactionsData.push({
@@ -659,7 +683,7 @@ export const returnStock = async (req, res) => {
         productUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
 
         // Warehouse Inventory Increment Value
-        const wi = wiMap.get(item.productId);
+        const wi = prod?.WarehouseInventory?.[0];
         if (wi) {
           wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
         }
