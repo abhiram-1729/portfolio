@@ -1,9 +1,68 @@
-import React from 'react';
+import React, { useState, useEffect, memo } from 'react';
 import { Truck, Package, Search, Barcode, Pencil, Gift, FileText, CheckSquare, ArrowLeft, Printer, FileDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
+// Optimized Audit Row Component
+const AuditRow = memo(({ item, initialQuantity, onQuantityChange }) => {
+  const [localQty, setLocalQty] = useState(initialQuantity ?? '');
+  const price = parseFloat(item.product?.price || 0);
+  const systemQty = item.quantity;
+
+  // Sync with prop if it changes from outside
+  useEffect(() => {
+    setLocalQty(initialQuantity ?? '');
+  }, [initialQuantity]);
+
+  const actualQty = localQty === '' ? 0 : parseInt(localQty);
+  const diff = actualQty - systemQty;
+  const displayAmount = actualQty * price;
+
+  const handleBlur = () => {
+    onQuantityChange(item.productId, localQty);
+  };
+
+  return (
+    <tr className="hover:bg-gray-50/30 transition-colors group bg-emerald-50/5">
+      <td className="px-6 py-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 shadow-inner flex items-center justify-center no-print">
+            {item.product?.isFree ? <Gift size={18} className="text-emerald-500" /> : <Package size={18} className="text-gray-400 group-hover:text-emerald-500" />}
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[11px] font-black text-gray-800 line-clamp-1 uppercase tracking-tight">{item.product?.name || 'Unknown'}</span>
+            <span className="text-[8px] font-bold text-gray-400 uppercase">{item.product?.skuCode}</span>
+          </div>
+        </div>
+      </td>
+      <td className="px-6 py-4 text-center">
+        <span className="text-sm font-black text-gray-400">{systemQty}</span>
+      </td>
+      <td className="px-6 py-4 text-center">
+        <input
+          type="number"
+          className="w-20 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-center text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none shadow-sm"
+          value={localQty}
+          onChange={(e) => setLocalQty(e.target.value)}
+          onBlur={handleBlur}
+        />
+      </td>
+      <td className="px-6 py-4 text-center">
+        <span className={`text-xs font-black ${diff === 0 ? 'text-gray-400' : diff > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+          {diff > 0 ? `+${diff}` : diff}
+        </span>
+      </td>
+      <td className="px-6 py-4 text-right">
+        <span className={`text-sm font-black ${diff !== 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+          ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
+        </span>
+      </td>
+    </tr>
+  );
+});
+
 const VehicleStockSection = ({
   loadingVehicles,
+  loadingTracking,
   viewingVehicleId,
   setViewingVehicleId,
   vehicles,
@@ -61,8 +120,20 @@ const VehicleStockSection = ({
     const v = vehicles.find(vh => vh.id === viewingVehicleId);
     if (!v) return null;
 
-    const inventory = allVehiclesStock[v.id] || [];
-    const filteredActiveStock = inventory.filter(i => {
+    const inventory = allVehiclesStock[v.id];
+    if (!inventory && loadingTracking) {
+      return (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm animate-in fade-in duration-500">
+          <div className="w-12 h-12 border-4 border-emerald-50 border-t-emerald-600 rounded-full animate-spin" />
+          <div className="flex flex-col items-center gap-1">
+            <p className="text-gray-400 font-black text-[10px] uppercase tracking-[0.2em]">Synchronizing</p>
+            <p className="text-emerald-600 font-black text-sm uppercase tracking-widest animate-pulse">Vehicle Stock Data</p>
+          </div>
+        </div>
+      );
+    }
+    const safeInventory = inventory || [];
+    const filteredActiveStock = safeInventory.filter(i => {
       if (!i.quantity || i.quantity <= 0) return false;
       const q = vehicleSearch.toLowerCase();
       return !q ||
@@ -241,11 +312,11 @@ const VehicleStockSection = ({
                                 <input
                                   type="number"
                                   className="w-16 bg-white border border-emerald-300 rounded-lg px-2 py-1 text-center text-xs font-black text-emerald-700"
-                                  value={auditQuantities[item.productId] ?? ''}
-                                  onChange={(e) => setAuditQuantities({
-                                    ...auditQuantities,
+                                  defaultValue={auditQuantities[item.productId] ?? ''}
+                                  onBlur={(e) => setAuditQuantities(prev => ({
+                                    ...prev,
                                     [item.productId]: e.target.value === '' ? '' : parseInt(e.target.value)
-                                  })}
+                                  }))}
                                 />
                               </div>
                             ) : (
@@ -278,14 +349,26 @@ const VehicleStockSection = ({
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {filteredActiveStock.map((item) => {
+                          if (isAuditMode) {
+                            return (
+                              <AuditRow 
+                                key={`track-table-pc-${item.id}`}
+                                item={item}
+                                initialQuantity={auditQuantities[item.productId]}
+                                onQuantityChange={(pid, val) => setAuditQuantities(prev => ({
+                                  ...prev,
+                                  [pid]: val === '' ? '' : parseInt(val)
+                                }))}
+                              />
+                            );
+                          }
+
                           const price = parseFloat(item.product?.price || 0);
                           const systemQty = item.quantity;
-                          const actualQty = isAuditMode ? (auditQuantities[item.productId] || 0) : systemQty;
-                          const diff = actualQty - systemQty;
-                          const displayAmount = actualQty * price;
+                          const displayAmount = systemQty * price;
 
                           return (
-                            <tr key={`track-table-pc-${item.id}`} className={`hover:bg-gray-50/30 transition-colors group ${isAuditMode ? 'bg-emerald-50/5' : ''}`}>
+                            <tr key={`track-table-pc-${item.id}`} className="hover:bg-gray-50/30 transition-colors group">
                               <td className="px-6 py-4">
                                 <div className="flex items-center gap-3">
                                   <div className="w-9 h-9 rounded-xl bg-gray-50 border border-gray-100 shadow-inner flex items-center justify-center no-print">
@@ -300,32 +383,11 @@ const VehicleStockSection = ({
                               <td className="px-6 py-4 text-center">
                                 <span className="text-sm font-black text-gray-400">{systemQty}</span>
                               </td>
-                              {isAuditMode ? (
-                                <>
-                                  <td className="px-6 py-4 text-center">
-                                    <input
-                                      type="number"
-                                      className="w-20 bg-white border border-emerald-200 rounded-lg px-2 py-1.5 text-center text-sm font-black text-emerald-700 focus:ring-2 focus:ring-emerald-500/20 focus:outline-none shadow-sm"
-                                      value={auditQuantities[item.productId] ?? ''}
-                                      onChange={(e) => setAuditQuantities({
-                                        ...auditQuantities,
-                                        [item.productId]: e.target.value === '' ? '' : parseInt(e.target.value)
-                                      })}
-                                    />
-                                  </td>
-                                  <td className="px-6 py-4 text-center">
-                                    <span className={`text-xs font-black ${diff === 0 ? 'text-gray-400' : diff > 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
-                                      {diff > 0 ? `+${diff}` : diff}
-                                    </span>
-                                  </td>
-                                </>
-                              ) : (
-                                <td className="px-6 py-4 text-center">
-                                  <span className="text-xs font-black text-gray-500">₹{price}</span>
-                                </td>
-                              )}
+                              <td className="px-6 py-4 text-center">
+                                <span className="text-xs font-black text-gray-500">₹{price}</span>
+                              </td>
                               <td className="px-6 py-4 text-right">
-                                <span className={`text-sm font-black ${isAuditMode && diff !== 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                                <span className="text-sm font-black text-emerald-700">
                                   ₹{displayAmount.toLocaleString('en-IN', { minimumFractionDigits: 2 })}
                                 </span>
                               </td>
@@ -391,8 +453,10 @@ const VehicleStockSection = ({
           </thead>
           <tbody className="divide-y divide-gray-50">
             {vehicles.map(v => {
-              const inventory = allVehiclesStock[v.id] || [];
-              const activeStock = inventory.filter(i => i.quantity > 0);
+              const inventory = allVehiclesStock[v.id];
+              const isStockLoading = !inventory && loadingTracking;
+              const safeInventory = inventory || [];
+              const activeStock = safeInventory.filter(i => i.quantity > 0);
               const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
               const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
               const lastAudit = auditHistory.find(a => a.vehicleId === v.id);
@@ -415,10 +479,17 @@ const VehicleStockSection = ({
                     </div>
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex flex-col items-center">
-                      <span className="text-sm font-black text-gray-700">{activeStock.length} SKUs</span>
-                      <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">₹{totalValue.toLocaleString('en-IN')}</span>
-                    </div>
+                    {isStockLoading ? (
+                      <div className="flex flex-col items-center gap-1 animate-pulse">
+                        <div className="w-5 h-5 border-2 border-emerald-100 border-t-emerald-600 rounded-full animate-spin" />
+                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Loading...</span>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center">
+                        <span className="text-sm font-black text-gray-700">{activeStock.length} SKUs</span>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-tighter">₹{totalValue.toLocaleString('en-IN')}</span>
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {lastAudit ? (
@@ -445,8 +516,10 @@ const VehicleStockSection = ({
 
       <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
         {vehicles.map(v => {
-          const inventory = allVehiclesStock[v.id] || [];
-          const activeStock = inventory.filter(i => i.quantity > 0);
+          const inventory = allVehiclesStock[v.id];
+          const isStockLoading = !inventory && loadingTracking;
+          const safeInventory = inventory || [];
+          const activeStock = safeInventory.filter(i => i.quantity > 0);
           const totalValue = activeStock.reduce((acc, item) => acc + (item.quantity * parseFloat(item.product?.price || 0)), 0);
           const agentStr = v.assignedUsers?.[0] ? v.assignedUsers[0].name : 'Unassigned';
           const lastAudit = auditHistory.find(a => a.vehicleId === v.id);
@@ -467,16 +540,25 @@ const VehicleStockSection = ({
                 </div>
               </div>
               <div className="bg-gray-50 group-hover:bg-emerald-50/50 transition-colors p-3 rounded-2xl flex justify-between items-center border border-transparent group-hover:border-emerald-100 italic">
-                <div className="flex flex-col">
-                  <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Stock Items</span>
-                  <span className="text-sm font-black text-gray-700 leading-none mt-1">{activeStock.length} SKUs</span>
-                </div>
-                <div className="flex flex-col items-end">
-                  <span className="text-[9px] font-black uppercase text-indigo-600/70 tracking-widest">Last Audit</span>
-                  <span className="text-sm font-black text-indigo-700 leading-none mt-1">
-                    {lastAudit ? new Date(lastAudit.createdAt).toLocaleDateString() : 'Never'}
-                  </span>
-                </div>
+                {isStockLoading ? (
+                  <div className="flex items-center gap-2 w-full justify-center py-1">
+                    <div className="w-4 h-4 border-2 border-emerald-200 border-t-emerald-600 rounded-full animate-spin" />
+                    <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest animate-pulse">Loading Inventory...</span>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex flex-col">
+                      <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Stock Items</span>
+                      <span className="text-sm font-black text-gray-700 leading-none mt-1">{activeStock.length} SKUs</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                      <span className="text-[9px] font-black uppercase text-indigo-600/70 tracking-widest">Last Audit</span>
+                      <span className="text-sm font-black text-indigo-700 leading-none mt-1">
+                        {lastAudit ? new Date(lastAudit.createdAt).toLocaleDateString() : 'Never'}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
               <div className="flex items-center justify-between text-[10px] uppercase font-black tracking-widest text-gray-400 group-hover:text-emerald-600 mt-1 transition-colors">
                 <span>View Details</span>

@@ -409,68 +409,110 @@ export const loadStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
+    // 1. Pre-fetch products and warehouse inventories for validation and bulk updates
+    const productIds = items.map(i => i.productId);
+    const [products, warehouseInventories] = await Promise.all([
+      prisma.product.findMany({ where: { id: { in: productIds } } }),
+      prisma.warehouseInventory.findMany({ where: { productId: { in: productIds }, tenantId: req.user.tenantId } })
+    ]);
+
+    const productMap = new Map(products.map(p => [p.id, p]));
+    const wiMap = new Map(warehouseInventories.map(wi => [wi.productId, wi]));
+
+    // 2. Validate stock availability for all items before starting transaction
+    for (const item of items) {
+      const q = parseFloat(item.quantity);
+      if (isNaN(q) || q <= 0) continue;
+      
+      const prod = productMap.get(item.productId);
+      if (!prod) throw new Error(`Product ${item.productId} not found`);
+
+      // Calculate effective stock matching the logic in getItems
+      const itemWIs = warehouseInventories.filter(wi => wi.productId === item.productId);
+      const totalWarehouseQty = itemWIs.reduce((acc, curr) => acc + curr.quantity, 0);
+      const effectiveStock = totalWarehouseQty > 0 ? totalWarehouseQty : (prod.stock || 0);
+
+      if (Math.floor(q) > effectiveStock) {
+        throw new Error(`VALIDATION:Insufficient stock for ${prod.name}. Available: ${effectiveStock}`);
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
+      const transactionsData = [];
+      const vehicleStockValues = [];
+      const productUpdateValues = [];
+      const wiUpdateValues = [];
+
       for (const item of items) {
         const q = parseFloat(item.quantity);
         if (isNaN(q) || q <= 0) continue;
+        const cleanQty = Math.floor(q);
 
-        // 🆕 VALIDATION: Ensure requested quantity doesn't exceed Store Stock
-        const prod = await tx.product.findUnique({ where: { id: item.productId } });
-        if (!prod) {
-          throw new Error(`Product ${item.productId} not found`);
-        }
-        if (Math.floor(q) > (prod.stock || 0)) {
-          throw new Error(`VALIDATION:Insufficient stock for ${prod.name}. Available: ${prod.stock}`);
-        }
-
-        // Create transaction record
-        await tx.stockTransaction.create({
-          data: {
-            tenantId: req.user.tenantId,
-            storeId,
-            userId: req.user.id,
-            type: 'LOAD',
-            vehicleId,
-            productId: item.productId,
-            quantity: q
-          }
+        // Transaction record
+        transactionsData.push({
+          tenantId: req.user.tenantId,
+          storeId,
+          userId: req.user.id,
+          type: 'LOAD',
+          vehicleId,
+          productId: item.productId,
+          quantity: cleanQty
         });
 
-        // Update vehicle stock
-        await tx.vehicleStock.upsert({
-          where: {
-            vehicleId_productId: { vehicleId, productId: item.productId }
-          },
-          update: {
-            quantity: { increment: Math.floor(q) },
-            openingQuantity: { increment: Math.floor(q) }
-          },
-          create: {
-            tenantId: req.user.tenantId,
-            storeId,
-            vehicleId,
-            productId: item.productId,
-            quantity: Math.floor(q),
-            openingQuantity: Math.floor(q)
-          }
-        });
+        // Vehicle Stock Bulk Upsert Value
+        const randomId = `vstk_${Math.random().toString(36).substring(2, 15)}`;
+        const storeVal = storeId ? `'${storeId}'` : 'NULL';
+        vehicleStockValues.push(`('${randomId}', '${req.user.tenantId}', ${storeVal}, '${vehicleId}', '${item.productId}', ${cleanQty}, ${cleanQty})`);
 
-        // 🆕 DECREMENT main product stock AND WarehouseInventory
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: Math.floor(q) } }
-        });
+        // Product Stock Decrement Value
+        productUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
 
-        const wi = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId: req.user.tenantId }
-        });
+        // Warehouse Inventory Decrement Value
+        const wi = wiMap.get(item.productId);
         if (wi) {
-          await tx.warehouseInventory.update({
-            where: { id: wi.id },
-            data: { quantity: { decrement: Math.floor(q) } }
-          });
+          wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
         }
       }
+
+      // 3. Batch Create Transactions
+      if (transactionsData.length > 0) {
+        await tx.stockTransaction.createMany({ data: transactionsData });
+      }
+
+      // 4. Bulk Upsert Vehicle Stock
+      if (vehicleStockValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "VehicleStock" ("id", "tenantId", "storeId", "vehicleId", "productId", "quantity", "openingQuantity")
+          VALUES ${vehicleStockValues.join(',')}
+          ON CONFLICT ("vehicleId", "productId")
+          DO UPDATE SET 
+            "quantity" = "VehicleStock"."quantity" + EXCLUDED."quantity",
+            "openingQuantity" = "VehicleStock"."openingQuantity" + EXCLUDED."openingQuantity"
+        `);
+      }
+
+      // 5. Bulk Decrement Product Stock
+      if (productUpdateValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          UPDATE "Product"
+          SET "stock" = "Product"."stock" - t.qty
+          FROM (VALUES ${productUpdateValues.join(',')}) AS t(id, qty)
+          WHERE "Product"."id" = t.id
+        `);
+      }
+
+      // 6. Bulk Decrement Warehouse Inventory
+      if (wiUpdateValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          UPDATE "WarehouseInventory"
+          SET "quantity" = "WarehouseInventory"."quantity" - t.qty
+          FROM (VALUES ${wiUpdateValues.join(',')}) AS t(id, qty)
+          WHERE "WarehouseInventory"."id" = t.id
+        `);
+      }
+    }, {
+      maxWait: 60000,
+      timeout: 120000
     });
 
     res.json({ message: 'Stock loaded successfully' });
@@ -581,53 +623,86 @@ export const returnStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
+    // 1. Pre-fetch warehouse inventories for bulk updates
+    const productIds = items.map(i => i.productId);
+    const warehouseInventories = await prisma.warehouseInventory.findMany({
+      where: { productId: { in: productIds }, tenantId: req.user.tenantId }
+    });
+    const wiMap = new Map(warehouseInventories.map(wi => [wi.productId, wi]));
+
     await prisma.$transaction(async (tx) => {
+      const transactionsData = [];
+      const vehicleUpdateValues = [];
+      const productUpdateValues = [];
+      const wiUpdateValues = [];
+
       for (const item of items) {
         const q = parseFloat(item.quantity);
+        if (isNaN(q) || q <= 0) continue;
+        const cleanQty = Math.floor(q);
 
-        // Create transaction record
-        await tx.stockTransaction.create({
-          data: {
-            tenantId: req.user.tenantId,
-            storeId,
-            userId: req.user.id,
-            type: 'RETURN',
-            vehicleId,
-            productId: item.productId,
-            quantity: q
-          }
+        // Transaction record
+        transactionsData.push({
+          tenantId: req.user.tenantId,
+          storeId,
+          userId: req.user.id,
+          type: 'RETURN',
+          vehicleId,
+          productId: item.productId,
+          quantity: cleanQty
         });
 
-        // Update vehicle stock (use update with composite key)
-        await tx.vehicleStock.update({
-          where: {
-            vehicleId_productId: {
-              vehicleId,
-              productId: item.productId
-            }
-          },
-          data: {
-            quantity: { decrement: Math.floor(q) },
-            openingQuantity: { decrement: Math.floor(q) }
-          }
-        });
+        // Vehicle Stock Decrement Value
+        vehicleUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
 
-        // 🆕 INCREMENT main product stock back AND WarehouseInventory
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: Math.floor(q) } }
-        });
+        // Product Stock Increment Value
+        productUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
 
-        const wi = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId: req.user.tenantId }
-        });
+        // Warehouse Inventory Increment Value
+        const wi = wiMap.get(item.productId);
         if (wi) {
-          await tx.warehouseInventory.update({
-            where: { id: wi.id },
-            data: { quantity: { increment: Math.floor(q) } }
-          });
+          wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
         }
       }
+
+      // 2. Batch Create Transactions
+      if (transactionsData.length > 0) {
+        await tx.stockTransaction.createMany({ data: transactionsData });
+      }
+
+      // 3. Bulk Decrement Vehicle Stock
+      if (vehicleUpdateValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          UPDATE "VehicleStock"
+          SET "quantity" = "VehicleStock"."quantity" - t.qty,
+              "openingQuantity" = "VehicleStock"."openingQuantity" - t.qty
+          FROM (VALUES ${vehicleUpdateValues.join(',')}) AS t(pid, qty)
+          WHERE "VehicleStock"."vehicleId" = '${vehicleId}' AND "VehicleStock"."productId" = t.pid
+        `);
+      }
+
+      // 4. Bulk Increment Product Stock
+      if (productUpdateValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          UPDATE "Product"
+          SET "stock" = "Product"."stock" + t.qty
+          FROM (VALUES ${productUpdateValues.join(',')}) AS t(id, qty)
+          WHERE "Product"."id" = t.id
+        `);
+      }
+
+      // 5. Bulk Increment Warehouse Inventory
+      if (wiUpdateValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          UPDATE "WarehouseInventory"
+          SET "quantity" = "WarehouseInventory"."quantity" + t.qty
+          FROM (VALUES ${wiUpdateValues.join(',')}) AS t(id, qty)
+          WHERE "WarehouseInventory"."id" = t.id
+        `);
+      }
+    }, {
+      maxWait: 60000,
+      timeout: 120000
     });
 
     res.json({ message: 'Stock returned successfully' });
@@ -1157,6 +1232,7 @@ export const auditVehicleStock = async (req, res) => {
         productId: { in: items.map(i => i.productId) }
       }
     });
+    // Create a map for O(1) lookup
     const stockMap = new Map(existingStocks.map(s => [s.productId, s.quantity]));
 
     await prisma.$transaction(async (tx) => {
@@ -1174,22 +1250,21 @@ export const auditVehicleStock = async (req, res) => {
       // 2. Prepare data for batch operations
       const auditItemsData = [];
       const transactionsData = [];
+      const stockUpsertValues = [];
       
       for (const item of items) {
         const q = parseFloat(item.quantity);
         if (isNaN(q)) continue;
 
-        // Get current stock for historical record (still need this per item unfortunately)
-        const currentStock = await tx.vehicleStock.findUnique({
-          where: { vehicleId_productId: { vehicleId: id, productId: item.productId } }
-        });
+        const currentQty = stockMap.get(item.productId) || 0;
+        const cleanQty = Math.floor(q);
 
         auditItemsData.push({
           tenantId: req.user.tenantId,
           auditId: audit.id,
           productId: item.productId,
-          oldQuantity: Math.floor(currentStock?.quantity || 0),
-          newQuantity: Math.floor(q)
+          oldQuantity: Math.floor(currentQty),
+          newQuantity: cleanQty
         });
 
         transactionsData.push({
@@ -1198,38 +1273,35 @@ export const auditVehicleStock = async (req, res) => {
           type: 'AUDIT',
           vehicleId: id,
           productId: item.productId,
-          quantity: Math.floor(q),
+          quantity: cleanQty,
           date: new Date()
         });
 
-        // 3. Hard update the stock to the new audited value
-        await tx.vehicleStock.upsert({
-          where: {
-            vehicleId_productId: { vehicleId: id, productId: item.productId }
-          },
-          update: { 
-            quantity: Math.floor(q),
-            openingQuantity: Math.floor(q) 
-          },
-          create: { 
-            tenantId: req.user.tenantId,
-            storeId,
-            vehicleId: id, 
-            productId: item.productId, 
-            quantity: Math.floor(q),
-            openingQuantity: Math.floor(q)
-          }
-        });
+        // Prepare raw values for bulk upsert
+        const randomId = `vstk_${Math.random().toString(36).substring(2, 15)}`;
+        const storeVal = storeId ? `'${storeId}'` : 'NULL';
+        stockUpsertValues.push(`('${randomId}', '${req.user.tenantId}', ${storeVal}, '${id}', '${item.productId}', ${cleanQty}, ${cleanQty})`);
       }
 
-      // 4. Batch create Audit Items and Transactions
+      // 3. Ultra-Fast Bulk Upsert using Raw SQL (PostgreSQL)
+      if (stockUpsertValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "VehicleStock" ("id", "tenantId", "storeId", "vehicleId", "productId", "quantity", "openingQuantity")
+          VALUES ${stockUpsertValues.join(',')}
+          ON CONFLICT ("vehicleId", "productId")
+          DO UPDATE SET 
+            "quantity" = EXCLUDED."quantity",
+            "openingQuantity" = EXCLUDED."openingQuantity"
+        `);
+      }
+      
       if (auditItemsData.length > 0) {
         await tx.stockAuditItem.createMany({ data: auditItemsData });
         await tx.stockTransaction.createMany({ data: transactionsData });
       }
     }, {
-      maxWait: 20000,
-      timeout: 60000
+      maxWait: 30000,
+      timeout: 120000
     });
     console.log('Prisma Transaction committed successfully.');
 
