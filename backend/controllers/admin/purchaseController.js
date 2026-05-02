@@ -88,12 +88,19 @@ export const createPurchase = async (req, res) => {
           });
         }
 
-        // A. Bulk Update Product Master Stock
-        const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
+        // A. Bulk Update Product Master Stock and Latest Purchase Price
+        const productValues = entries.map(([pId, qty]) => {
+          // Find the latest price for this product in the invoice items
+          const itemPrice = items.find(i => i.productId === pId)?.price || 0;
+          return Prisma.sql`(${pId}, ${qty}::int, ${parseFloat(itemPrice)}::float)`;
+        });
+
         await tx.$executeRaw`
           UPDATE "Product"
-          SET stock = "Product".stock + v.qty
-          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
+          SET 
+            stock = "Product".stock + v.qty,
+            "landingPrice" = v.l_price
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty, l_price)
           WHERE "Product".id = v.id
         `;
 
@@ -414,31 +421,48 @@ export const deletePurchase = async (req, res) => {
       return res.status(400).json({ message: 'Cannot delete invoice with associated payments. Remove payments first.' });
     }
 
+    const totalAmount = invoice.totalAmount;
+    const vendorId = invoice.vendorId;
+
     await prisma.$transaction(async (tx) => {
-      // 1. Revert Stock
-      for (const item of invoice.items) {
-        const existingWI = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
-        });
-        if (existingWI) {
-          await tx.warehouseInventory.update({
-            where: { id: existingWI.id },
-            data: { quantity: { decrement: item.quantity } }
+      // 1. High-Performance Bulk Stock Reversal
+      const items = invoice.items;
+      if (items.length > 0) {
+        const productValues = items.map(item => Prisma.sql`(${item.productId}, ${item.quantity}::int)`);
+        
+        // A. Bulk Decrement Product Master Stock
+        await tx.$executeRaw`
+          UPDATE "Product"
+          SET stock = "Product".stock - v.qty
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
+          WHERE "Product".id = v.id
+        `;
+
+        // B. Bulk Decrement Warehouse Inventory
+        // First find the default warehouse
+        let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
+        if (!warehouse) {
+          warehouse = await tx.warehouse.create({
+            data: { tenantId, name: 'Main Warehouse', location: 'Default' }
           });
         }
 
-        // Revert Product Master Stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: item.quantity } }
+        await tx.$executeRaw`
+          UPDATE "WarehouseInventory"
+          SET quantity = "WarehouseInventory".quantity - v.qty
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
+          WHERE "WarehouseInventory"."warehouseId" = ${warehouse.id} AND "WarehouseInventory"."productId" = v.id
+        `;
+
+        // C. Bulk Create Stock Ledger Entries (Adjustment for deletion)
+        // Fetch current balances after update for accurate ledger
+        const currentWIs = await tx.warehouseInventory.findMany({
+          where: { warehouseId: warehouse.id, productId: { in: items.map(i => i.productId) } }
         });
-        
-        // Add a reversal entry in ledger
-        const currentWI = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
-        });
-        await tx.procurementStockLedger.create({
-          data: {
+        const currentWIMap = new Map(currentWIs.map(wi => [wi.productId, wi.quantity]));
+
+        await tx.procurementStockLedger.createMany({
+          data: items.map(item => ({
             tenantId,
             storeId: invoice.storeId,
             productId: item.productId,
@@ -446,23 +470,20 @@ export const deletePurchase = async (req, res) => {
             quantity: -item.quantity,
             reference: invoice.id,
             refType: 'INVOICE_DELETE',
-            balanceAfter: currentWI?.quantity || 0
-          }
+            balanceAfter: currentWIMap.get(item.productId) || 0
+          }))
         });
       }
 
       // 2. Revert Vendor Balance
-      const currentVendor = await tx.vendor.findUnique({ where: { id: invoice.vendorId } });
-      const newBalance = (currentVendor?.currentBalance || 0) - invoice.totalAmount;
-
       await tx.vendor.update({
-        where: { id: invoice.vendorId },
-        data: { currentBalance: newBalance }
+        where: { id: vendorId },
+        data: { currentBalance: { decrement: totalAmount } }
       });
 
       // 3. Delete Ledger Entry
       await tx.vendorLedger.deleteMany({
-        where: { reference: invoice.id, type: 'PURCHASE' }
+        where: { reference: id, type: 'PURCHASE' }
       });
 
       // 4. Delete Invoice Items
@@ -470,6 +491,62 @@ export const deletePurchase = async (req, res) => {
 
       // 5. Delete Invoice
       await tx.purchaseInvoice.delete({ where: { id } });
+
+      // 6. Cleanup Orphan Products (Safe Cleanup)
+      // We only delete products that have NO other links anywhere in the system
+      for (const item of items) {
+        try {
+          const productActivity = await tx.product.findUnique({
+            where: { id: item.productId },
+            include: {
+              _count: {
+                select: {
+                  purchaseItems: true,
+                  saleItems: true,
+                  loadingItems: true,
+                  returnItems: true,
+                  damageEntries: true,
+                  poItems: true,
+                  grnItems: true,
+                  auditItems: true,
+                  variants: true,
+                  refillItems: true,
+                  vendorMappings: true
+                }
+              }
+            }
+          });
+
+          if (productActivity && 
+              productActivity._count.purchaseItems === 0 && 
+              productActivity._count.saleItems === 0 &&
+              productActivity._count.loadingItems === 0 &&
+              productActivity._count.returnItems === 0 &&
+              productActivity._count.damageEntries === 0 &&
+              productActivity._count.poItems === 0 &&
+              productActivity._count.grnItems === 0 &&
+              productActivity._count.auditItems === 0 &&
+              productActivity._count.variants === 0 &&
+              productActivity._count.refillItems === 0 &&
+              productActivity._count.vendorMappings === 0) {
+            
+            // Product is truly an orphan with zero history
+            await tx.warehouseInventory.deleteMany({ where: { productId: item.productId } });
+            await tx.vehicleStock.deleteMany({ where: { productId: item.productId } });
+            await tx.procurementStockLedger.deleteMany({ where: { productId: item.productId } });
+            await tx.stockTransaction.deleteMany({ where: { productId: item.productId } });
+            await tx.cartItem.deleteMany({ where: { productId: item.productId } });
+            
+            await tx.product.delete({ where: { id: item.productId } });
+          }
+        } catch (err) {
+          console.warn(`[Cleanup] Failed to cleanup potential orphan product ${item.productId}:`, err.message);
+          // Don't throw, just skip this product cleanup to ensure invoice deletion finishes
+        }
+      }
+    }, {
+      maxWait: 30000,
+      timeout: 90000
     });
 
     logActivity({

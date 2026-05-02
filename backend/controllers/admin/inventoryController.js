@@ -89,8 +89,11 @@ export const createItem = async (req, res) => {
       isFree,
       minShopAmount,
       barcode,
-      skuCode
+      skuCode,
+      purchasePrice
     } = req.body;
+
+    const finalLandingPrice = landingPrice || purchasePrice;
 
     // Ensure we have a valid tenantId
     const finalTenantId = tenantId || req.user?.tenantId || 'VK001';
@@ -161,7 +164,7 @@ export const createItem = async (req, res) => {
       description,
       mrp: parseNumber(mrp),
       price: parseNumber(price) || 0,
-      landingPrice: parseNumber(landingPrice),
+      landingPrice: parseNumber(finalLandingPrice),
       discount: parseNumber(discount),
       status: status || 'ACTIVE',
       image: imageUrl,
@@ -199,9 +202,15 @@ export const createItem = async (req, res) => {
       await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${initialStock} WHERE "id" = '${item.id}'`);
       
       // Also ensure at least one WarehouseInventory record exists if we have a warehouse
-      const warehouse = await prisma.warehouse.findFirst({
+      let warehouse = await prisma.warehouse.findFirst({
         where: { tenantId: finalTenantId }
       });
+
+      if (!warehouse) {
+        warehouse = await prisma.warehouse.create({
+          data: { tenantId: finalTenantId, name: 'Main Warehouse', location: 'Default' }
+        });
+      }
 
       if (warehouse) {
         await prisma.warehouseInventory.upsert({
@@ -383,13 +392,26 @@ export const deleteItem = async (req, res) => {
     const item = await prisma.product.findUnique({ where: { id } });
     if (!item) return res.status(404).json({ message: 'Item not found' });
 
-    // Cascade delete all child records in dependency order
-    await prisma.orderItem.deleteMany({ where: { productId: id } });
-    await prisma.stockTransaction.deleteMany({ where: { productId: id } });
-    await prisma.vehicleStock.deleteMany({ where: { productId: id } });
-    await prisma.warehouseInventory.deleteMany({ where: { productId: id } });
-    await prisma.productVariant.deleteMany({ where: { productId: id } });
-    await prisma.refillItem.deleteMany({ where: { productId: id } });
+    // Cascade delete all child records in dependency order to avoid foreign key constraints
+    const where = { productId: id };
+    
+    await prisma.cartItem.deleteMany({ where });
+    await prisma.orderItem.deleteMany({ where });
+    await prisma.orderReturn.deleteMany({ where });
+    await prisma.stockTransaction.deleteMany({ where });
+    await prisma.vehicleStock.deleteMany({ where });
+    await prisma.warehouseInventory.deleteMany({ where });
+    await prisma.productVariant.deleteMany({ where });
+    await prisma.refillItem.deleteMany({ where });
+    await prisma.stockAuditItem.deleteMany({ where });
+    await prisma.vendorItemMapping.deleteMany({ where });
+    await prisma.purchaseOrderItem.deleteMany({ where });
+    await prisma.goodsReceiptItem.deleteMany({ where });
+    await prisma.purchaseInvoiceItem.deleteMany({ where });
+    await prisma.damageEntry.deleteMany({ where });
+    await prisma.procurementStockLedger.deleteMany({ where });
+
+    // Finally delete the product
     await prisma.product.delete({ where: { id } });
 
     res.json({ message: 'Item deleted successfully' });
