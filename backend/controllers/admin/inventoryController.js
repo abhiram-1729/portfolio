@@ -15,6 +15,107 @@ const subCache = new Map();
 const unitCache = new Map();
 
 // Item Master
+// Consolidated Init Data (Mega-Fetch)
+export const getInventoryInitData = async (req, res) => {
+  try {
+    const { storeId } = req.query;
+    const tenantId = req.user.tenantId;
+
+    // Filter logic for Products
+    const productWhere = { tenantId };
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      productWhere.OR = [{ storeId: storeId }, { storeId: null }];
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      productWhere.OR = [{ storeId: req.user.storeId }, { storeId: null }];
+    }
+
+    // Parallel fetching for performance
+    const [products, categories, subCategories, units, vehicles, settings, refillRequests] = await Promise.all([
+      prisma.product.findMany({
+        where: productWhere,
+        include: {
+          category: { select: { name: true } },
+          subCategory: { select: { name: true } },
+          unit: { select: { name: true, type: true } },
+          WarehouseInventory: { select: { quantity: true } }
+        }
+      }),
+      prisma.category.findMany({ where: { tenantId } }),
+      prisma.subCategory.findMany({ where: { tenantId } }),
+      prisma.unit.findMany({ where: { tenantId } }),
+      prisma.vehicle.findMany({ 
+        where: { tenantId, ...(storeId && storeId !== 'null' ? { storeId } : {}) },
+        include: {
+          assignedUsers: { where: { status: 'ACTIVE' }, select: { id: true, name: true } }
+        }
+      }),
+      prisma.businessSettings.findMany({ 
+        where: { 
+          tenantId,
+          ...(storeId && storeId !== 'null' ? { storeId } : { storeId: null })
+        } 
+      }),
+      prisma.refillRequest.findMany({
+        where: { tenantId, status: 'PENDING', ...(storeId && storeId !== 'null' ? { storeId } : {}) },
+        include: { items: true }
+      })
+    ]);
+
+    // 1. Process items to sum warehouse quantity
+    const processedItems = products.map(item => {
+      const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+      return {
+        ...item,
+        stock: warehouseQty > 0 ? warehouseQty : (item.stock || 0)
+      };
+    });
+
+    // 2. Fetch Vehicle Stock for all vehicles at once (The "Mega-Fix" for per-vehicle requests)
+    const vehicleIds = vehicles.map(v => v.id);
+    const allVehicleStock = await prisma.vehicleStock.findMany({
+      where: { vehicleId: { in: vehicleIds } },
+      include: {
+        product: {
+          select: {
+            name: true,
+            skuCode: true,
+            unit: { select: { name: true } }
+          }
+        }
+      }
+    });
+
+    // Group vehicle stock by vehicleId
+    const vehicleStockMap = {};
+    allVehicleStock.forEach(stock => {
+      if (!vehicleStockMap[stock.vehicleId]) {
+        vehicleStockMap[stock.vehicleId] = [];
+      }
+      vehicleStockMap[stock.vehicleId].push(stock);
+    });
+
+    res.json({
+      items: processedItems,
+      categories,
+      subCategories,
+      units,
+      vehicles,
+      vehicleStock: vehicleStockMap,
+      settings,
+      refillRequests,
+      success: true
+    });
+
+  } catch (error) {
+    console.error('❌ getInventoryInitData Error:', error.message);
+    res.status(500).json({ 
+      message: 'Error fetching inventory initialization data', 
+      error: error.message,
+      success: false 
+    });
+  }
+};
+
 export const getItems = async (req, res) => {
   try {
     const { storeId } = req.query;
@@ -455,12 +556,7 @@ export const loadStock = async (req, res) => {
           }
         });
 
-        // 🆕 DECREMENT main product stock AND WarehouseInventory
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: Math.floor(q) } }
-        });
-
+        // 🆕 DECREMENT WarehouseInventory
         const wi = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
@@ -470,6 +566,17 @@ export const loadStock = async (req, res) => {
             data: { quantity: { decrement: Math.floor(q) } }
           });
         }
+
+        // 🆕 SYNC Product.stock (Source of Truth is now the sum of all WarehouseInventory)
+        const allWi = await tx.warehouseInventory.findMany({
+          where: { productId: item.productId, tenantId: req.user.tenantId }
+        });
+        const totalQty = allWi.reduce((acc, curr) => acc + curr.quantity, 0);
+        
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: totalQty }
+        });
       }
     });
 
@@ -612,12 +719,7 @@ export const returnStock = async (req, res) => {
           }
         });
 
-        // 🆕 INCREMENT main product stock back AND WarehouseInventory
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { increment: Math.floor(q) } }
-        });
-
+        // 🆕 INCREMENT WarehouseInventory
         const wi = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
@@ -627,6 +729,17 @@ export const returnStock = async (req, res) => {
             data: { quantity: { increment: Math.floor(q) } }
           });
         }
+
+        // 🆕 SYNC Product.stock (Source of Truth is now the sum of all WarehouseInventory)
+        const allWi = await tx.warehouseInventory.findMany({
+          where: { productId: item.productId, tenantId: req.user.tenantId }
+        });
+        const totalQty = allWi.reduce((acc, curr) => acc + curr.quantity, 0);
+        
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: totalQty }
+        });
       }
     });
 

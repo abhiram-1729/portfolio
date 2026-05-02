@@ -70,6 +70,7 @@ router.put('/vehicles/:id/assign', vehicleCtr.assignDriver);
 router.get('/vehicles/:id/sales', vehicleCtr.getVehicleSales);
 
 // Inventory (Item Master & Stocking)
+router.get('/inventory/init', inventoryCtr.getInventoryInitData);
 router.route('/inventory/items')
   .get(inventoryCtr.getItems)
   .post(

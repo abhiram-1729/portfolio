@@ -183,43 +183,51 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       setLoadingMaster(true);
       setLoadingInventory(true);
       setLoadingRefills(true);
       setLoadingAudit(true);
       setLoadingVehicles(true);
 
-      const [iRes, vRes, sRes, cRes, uRes, subRes, storeRes, aRes, stockRes] = await Promise.all([
-        adminAPI.getItems({ storeId: storeFilterId }).finally(() => setLoadingMaster(false)),
-        adminAPI.getVehicles({ storeId: storeFilterId }).finally(() => setLoadingVehicles(false)),
-        adminAPI.getSettings(),
-        adminAPI.getCategories(),
-        adminAPI.getUnits(),
-        adminAPI.getSubCategories(),
-        adminAPI.getStores(),
-        adminAPI.getAuditHistory({ storeId: storeFilterId }).finally(() => setLoadingAudit(false)),
-        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }).finally(() => setLoadingInventory(false)) : Promise.resolve({ data: [] })
+      // 1. Primary Mega-Fetch (Consolidated)
+      const { data: initData } = await adminAPI.getInventoryInit({ storeId: storeFilterId });
+      
+      if (initData?.success) {
+        setItems(initData.items || []);
+        setVehicles(initData.vehicles || []);
+        setCategories(initData.categories || []);
+        setSubCategories(initData.subCategories || []);
+        setUnits(initData.units || []);
+        setRefillRequests(initData.refillRequests || []);
+        setAllVehiclesStock(initData.vehicleStock || {});
+
+        const settings = initData.settings?.find(s => s.storeId === storeFilterId) || initData.settings?.[0];
+        if (settings?.taxRates) {
+          setTaxRates(settings.taxRates.split(',').map(r => r.trim()));
+        } else {
+          setTaxRates(['0', '5', '12', '18']); // Default fallback
+        }
+      }
+
+      // 2. Secondary Fetches (Settled so one failure doesn't crash the page)
+      const results = await Promise.allSettled([
+        adminAPI.getAuditHistory({ storeId: storeFilterId }),
+        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }) : Promise.resolve({ data: [] }),
+        adminAPI.getStores()
       ]);
 
-      // Handle refills separately if it exists in another call or similar
-      // For now we assume refills come from another source or are part of these responses
-      setLoadingRefills(false);
+      // Process settled results
+      if (results[0].status === 'fulfilled') setAuditHistory(results[0].value.data || []);
+      if (results[1].status === 'fulfilled') setWarehouseStock(results[1].value.data || []);
+      if (results[2].status === 'fulfilled' && results[2].value.data?.success) {
+        setStores(results[2].value.data.data);
+      }
 
-      setItems(iRes.data);
-      setVehicles(vRes.data);
-      setAuditHistory(aRes.data || []);
-      setCategories(cRes.data || []);
-      setSubCategories(subRes.data || []);
-      setUnits(uRes.data || []);
-      setWarehouseStock(stockRes.data || []);
-      if (sRes.data?.success && sRes.data?.data?.taxRates) {
-        setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
-      }
-      if (storeRes.data?.success) {
-        setStores(storeRes.data.data);
-      }
     } catch (error) {
-      toast.error('Failed to fetch inventory data');
+      console.error('❌ fetchData Error:', error);
+      const msg = error.response?.data?.message || 'Failed to fetch inventory data';
+      toast.error(msg);
     } finally {
       setLoading(false);
       setLoadingMaster(false);
@@ -385,22 +393,26 @@ export default function AdminInventory() {
     }
   };
 
-  const loadAllVehiclesStock = async () => {
+  const loadAllVehiclesStock = async (force = false) => {
     if (vehicles.length === 0) return;
-    try {
-      // Fetch sequentially to prevent connection pool exhaustion (500 errors)
-      const stockRes = [];
-      for (const v of vehicles) {
-        const res = await adminAPI.getVehicleInventory(v.id);
-        stockRes.push({ id: v.id, data: res.data });
-      }
+    
+    // Skip if we already have data from the Mega-Fetch (unless forced)
+    if (!force && Object.keys(allVehiclesStock).length > 0) return;
 
+    try {
+      // Use Promise.allSettled for much faster parallel fetching than the previous sequential loop
+      const results = await Promise.allSettled(vehicles.map(v => adminAPI.getVehicleInventory(v.id)));
+      
       const stockMap = {};
-      stockRes.forEach(r => {
-        stockMap[r.id] = r.data;
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          stockMap[vehicles[idx].id] = res.value.data;
+        }
       });
-      setAllVehiclesStock(stockMap);
+      
+      setAllVehiclesStock(prev => ({ ...prev, ...stockMap }));
     } catch (err) {
+      console.error('❌ loadAllVehiclesStock Error:', err);
       toast.error('Failed to load tracking data for all vehicles');
     }
   };
@@ -865,7 +877,9 @@ export default function AdminInventory() {
       setStockQuantities({});
       if (type === 'RETURN') fetchVehicleInventory(selectedVehicleId);
     } catch (error) {
-      toast.error(`Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`);
+      console.error(`❌ ${type} Error:`, error);
+      const msg = error.response?.data?.message || `Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`;
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

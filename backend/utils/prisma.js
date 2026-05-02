@@ -15,8 +15,8 @@ if (!connectionString) {
 const pool = new pg.Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
-  max: 20,                 // Maximum number of clients in the pool
-  idleTimeoutMillis: 60000, // 60s
+  max: 10,                 // Match database connection limit
+  idleTimeoutMillis: 10000, // 10s - close idle connections before Supabase kills them
   connectionTimeoutMillis: 30000, // 30s
 });
 
