@@ -515,16 +515,16 @@ export const loadStock = async (req, res) => {
         const q = parseFloat(item.quantity);
         if (isNaN(q) || q <= 0) continue;
 
-        // 🆕 VALIDATION: Ensure requested quantity doesn't exceed Store Stock
+        console.log(`[LoadStock] Checking product: ${item.productId}`);
         const prod = await tx.product.findUnique({ where: { id: item.productId } });
         if (!prod) {
-          throw new Error(`Product ${item.productId} not found`);
+          throw new Error(`VALIDATION:Product ${item.productId} not found`);
         }
         if (Math.floor(q) > (prod.stock || 0)) {
           throw new Error(`VALIDATION:Insufficient stock for ${prod.name}. Available: ${prod.stock}`);
         }
 
-        // Create transaction record
+        console.log(`[LoadStock] Creating transaction record`);
         await tx.stockTransaction.create({
           data: {
             tenantId: req.user.tenantId,
@@ -537,7 +537,7 @@ export const loadStock = async (req, res) => {
           }
         });
 
-        // Update vehicle stock
+        console.log(`[LoadStock] Updating vehicle stock (upsert)`);
         await tx.vehicleStock.upsert({
           where: {
             vehicleId_productId: { vehicleId, productId: item.productId }
@@ -556,7 +556,7 @@ export const loadStock = async (req, res) => {
           }
         });
 
-        // 🆕 DECREMENT WarehouseInventory
+        console.log(`[LoadStock] Decrementing WarehouseInventory`);
         const wi = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
@@ -567,7 +567,7 @@ export const loadStock = async (req, res) => {
           });
         }
 
-        // 🆕 SYNC Product.stock (Source of Truth is now the sum of all WarehouseInventory)
+        console.log(`[LoadStock] Syncing Product.stock`);
         const allWi = await tx.warehouseInventory.findMany({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
@@ -577,7 +577,11 @@ export const loadStock = async (req, res) => {
           where: { id: item.productId },
           data: { stock: totalQty }
         });
+        console.log(`[LoadStock] Item Success`);
       }
+    }, {
+      maxWait: 10000,
+      timeout: 30000
     });
 
     res.json({ message: 'Stock loaded successfully' });
@@ -617,11 +621,6 @@ export const loadStock = async (req, res) => {
       const parts = errorMessage.split(/VALIDATION:/i);
       const cleanMessage = parts[parts.length - 1].trim();
       return res.status(400).json({ message: cleanMessage });
-    }
-
-    // 2. Handle Prisma specific validation/constraint errors
-    if (error.code === 'P2002') {
-      return res.status(400).json({ message: 'A record with this information already exists.' });
     }
 
     res.status(500).json({ 
@@ -741,6 +740,9 @@ export const returnStock = async (req, res) => {
           data: { stock: totalQty }
         });
       }
+    }, {
+      maxWait: 10000,
+      timeout: 30000
     });
 
     res.json({ message: 'Stock returned successfully' });
@@ -1935,6 +1937,9 @@ export const updateProductStock = async (req, res) => {
           brand: true,
         }
       });
+    }, {
+      maxWait: 10000,
+      timeout: 30000
     });
 
     // Log Activity (Non-blocking or outside transaction is fine)
