@@ -634,10 +634,13 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Link Purchase Order (Optional)</label>
-                <select value={form.poId} onChange={e => handlePOSelect(e.target.value)}
-                  className="w-full bg-emerald-50/50 rounded-xl px-4 py-3 text-sm font-bold border border-emerald-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-700">
-                  <option value="">No PO Linked</option>
-                  {purchaseOrders.map(po => (
+                <select 
+                  value={form.poId} 
+                  onChange={e => handlePOSelect(e.target.value)}
+                  disabled={!form.vendorId}
+                  className="w-full bg-emerald-50/50 rounded-xl px-4 py-3 text-sm font-bold border border-emerald-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <option value="">{form.vendorId ? 'No PO Linked' : 'Select Vendor First'}</option>
+                  {form.vendorId && purchaseOrders.filter(po => po.vendorId === form.vendorId).map(po => (
                     <option key={po.id} value={po.id}>PO #{po.poNumber} ({po.vendor?.vendorName})</option>
                   ))}
                 </select>
