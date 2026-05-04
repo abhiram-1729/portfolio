@@ -47,6 +47,7 @@ export default function AdminProcurement() {
   };
 
   const availableTabs = TABS.filter(tab => canViewSection(tab.section));
+  const [headerExtra, setHeaderExtra] = React.useState(null);
 
   useEffect(() => {
     if (availableTabs.length > 0 && !availableTabs.some(t => t.key === activeTab)) {
@@ -57,21 +58,26 @@ export default function AdminProcurement() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col gap-1">
-        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Procurement & Payables</h2>
-        <p className="text-sm text-gray-400 font-bold">Vendor → PO → GRN → Purchase → Stock → Payment</p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Procurement & Payables</h2>
+          <p className="text-sm text-gray-400 font-bold">Vendor → PO → GRN → Purchase → Stock → Payment</p>
+        </div>
+        <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+          {headerExtra}
+        </div>
       </div>
 
       {/* Tab Content */}
       <div className="animate-in fade-in duration-500">
-        {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} />}
-        {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} />}
-        {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} />}
-        {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} />}
-        {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} />}
-        {activeTab === 'ledger' && canViewSection('LEDGER') && <StockLedgerSection />}
-        {activeTab === 'payments' && canViewSection('PAYMENTS') && <PaymentsSection can={can} />}
-        {activeTab === 'reports' && canViewSection('REPORTS') && <ReportsSection />}
+        {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'ledger' && canViewSection('LEDGER') && <StockLedgerSection setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'payments' && canViewSection('PAYMENTS') && <PaymentsSection can={can} setHeaderExtra={setHeaderExtra} />}
+        {activeTab === 'reports' && canViewSection('REPORTS') && <ReportsSection setHeaderExtra={setHeaderExtra} />}
       </div>
     </div>
   );

@@ -288,12 +288,13 @@ export const getProfitabilityReport = async (req, res) => {
       if (endDate) purchaseWhere.invoiceDate.lte = new Date(endDate + 'T23:59:59.999Z');
     }
 
+    // Get total purchases for summary
     const purchases = await prisma.purchaseInvoice.aggregate({
       where: purchaseWhere,
       _sum: { totalAmount: true }
     });
 
-    // Get sales revenue
+    // Get sales and calculate COGS (Cost of Goods Sold)
     const salesWhere = { tenantId, status: { in: ['PAID', 'COMPLETED'] } };
     if (storeId && storeId !== 'undefined') salesWhere.storeId = storeId;
     if (startDate || endDate) {
@@ -302,14 +303,30 @@ export const getProfitabilityReport = async (req, res) => {
       if (endDate) salesWhere.createdAt.lte = new Date(endDate + 'T23:59:59.999Z');
     }
 
-    const sales = await prisma.order.aggregate({
+    const orders = await prisma.order.findMany({
       where: salesWhere,
-      _sum: { totalAmount: true }
+      include: {
+        items: {
+          include: {
+            product: { select: { landingPrice: true, purchasePrice: true } }
+          }
+        }
+      }
+    });
+
+    let totalSales = 0;
+    let totalCOGS = 0;
+
+    orders.forEach(order => {
+      totalSales += order.totalAmount || 0;
+      order.items.forEach(item => {
+        const cost = item.landingPrice || item.product?.landingPrice || item.product?.purchasePrice || 0;
+        totalCOGS += (item.quantity * cost);
+      });
     });
 
     const totalPurchases = purchases._sum.totalAmount || 0;
-    const totalSales = sales._sum.totalAmount || 0;
-    const grossProfit = totalSales - totalPurchases;
+    const grossProfit = totalSales - totalCOGS;
     const marginPercent = totalSales > 0 ? ((grossProfit / totalSales) * 100).toFixed(2) : 0;
 
     res.json({
