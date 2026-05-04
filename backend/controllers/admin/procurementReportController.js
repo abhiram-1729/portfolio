@@ -25,15 +25,19 @@ export const getStockReport = async (req, res) => {
         unit: { select: { name: true, type: true } },
         WarehouseInventory: {
           select: { quantity: true, warehouse: { select: { name: true } } }
+        },
+        vehicleStocks: {
+          select: { quantity: true }
         }
       }
     });
 
     // 2. Map products to a WarehouseInventory-like structure for frontend compatibility
-    // but ensure products with NO warehouse records yet (but have main stock) still show up.
     const report = products
       .map(p => {
         const warehouseQty = p.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+        const vehicleQty = p.vehicleStocks.reduce((acc, curr) => acc + curr.quantity, 0);
+        
         // If it has warehouse records, use that quantity. 
         // If not, but it has main product stock, show that as being in the system.
         const finalQty = warehouseQty > 0 ? warehouseQty : (p.stock || 0);
@@ -41,14 +45,22 @@ export const getStockReport = async (req, res) => {
         return {
           id: p.WarehouseInventory[0]?.id || `virtual-${p.id}`,
           productId: p.id,
-          quantity: finalQty,
+          quantity: finalQty, // This is Store Stock
+          warehouseStock: finalQty,
+          vehicleStock: vehicleQty,
+          totalStock: finalQty + vehicleQty,
           storeId: p.storeId,
           tenantId: p.tenantId,
-          product: p, // Keep full product object for frontend
+          product: {
+            ...p,
+            warehouseStock: finalQty,
+            vehicleStock: vehicleQty,
+            totalStock: finalQty + vehicleQty
+          },
           warehouse: p.WarehouseInventory[0]?.warehouse || { name: 'Main Store' }
         };
       })
-      .filter(item => item.quantity > 0); // Only show items that actually have stock
+      .filter(item => item.quantity > 0 || item.vehicleStock > 0); // Show items if they exist anywhere
 
     res.json(report);
   } catch (error) {

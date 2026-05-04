@@ -141,16 +141,25 @@ export const getItems = async (req, res) => {
         unit: { select: { name: true, type: true } },
         WarehouseInventory: {
           select: { quantity: true }
+        },
+        vehicleStocks: {
+          select: { quantity: true }
         }
       }
     });
 
-    // Map each item and ensure the 'stock' field reflects the SUM of WarehouseInventory
+    // Map each item and provide a comprehensive stock breakdown
     const processedItems = items.map(item => {
       const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+      const vehicleQty = item.vehicleStocks.reduce((acc, curr) => acc + curr.quantity, 0);
+      const totalQty = warehouseQty + vehicleQty;
+      
       return {
         ...item,
-        stock: warehouseQty > 0 ? warehouseQty : (item.stock || 0)
+        warehouseStock: warehouseQty,
+        vehicleStock: vehicleQty,
+        totalStock: totalQty,
+        stock: warehouseQty // Keep 'stock' as warehouseQty for backward compatibility where needed
       };
     });
 
@@ -181,8 +190,11 @@ export const createItem = async (req, res) => {
       isFree,
       minShopAmount,
       barcode,
-      skuCode
+      skuCode,
+      purchasePrice
     } = req.body;
+
+    const finalLandingPrice = landingPrice || purchasePrice;
 
     // Ensure we have a valid tenantId
     const finalTenantId = tenantId || req.user?.tenantId || 'VK001';
@@ -253,7 +265,7 @@ export const createItem = async (req, res) => {
       description,
       mrp: parseNumber(mrp),
       price: parseNumber(price) || 0,
-      landingPrice: parseNumber(landingPrice),
+      landingPrice: parseNumber(finalLandingPrice),
       discount: parseNumber(discount),
       status: status || 'ACTIVE',
       image: imageUrl,
@@ -291,9 +303,15 @@ export const createItem = async (req, res) => {
       await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${initialStock} WHERE "id" = '${item.id}'`);
       
       // Also ensure at least one WarehouseInventory record exists if we have a warehouse
-      const warehouse = await prisma.warehouse.findFirst({
+      let warehouse = await prisma.warehouse.findFirst({
         where: { tenantId: finalTenantId }
       });
+
+      if (!warehouse) {
+        warehouse = await prisma.warehouse.create({
+          data: { tenantId: finalTenantId, name: 'Main Warehouse', location: 'Default' }
+        });
+      }
 
       if (warehouse) {
         await prisma.warehouseInventory.upsert({
@@ -475,13 +493,26 @@ export const deleteItem = async (req, res) => {
     const item = await prisma.product.findUnique({ where: { id } });
     if (!item) return res.status(404).json({ message: 'Item not found' });
 
-    // Cascade delete all child records in dependency order
-    await prisma.orderItem.deleteMany({ where: { productId: id } });
-    await prisma.stockTransaction.deleteMany({ where: { productId: id } });
-    await prisma.vehicleStock.deleteMany({ where: { productId: id } });
-    await prisma.warehouseInventory.deleteMany({ where: { productId: id } });
-    await prisma.productVariant.deleteMany({ where: { productId: id } });
-    await prisma.refillItem.deleteMany({ where: { productId: id } });
+    // Cascade delete all child records in dependency order to avoid foreign key constraints
+    const where = { productId: id };
+    
+    await prisma.cartItem.deleteMany({ where });
+    await prisma.orderItem.deleteMany({ where });
+    await prisma.orderReturn.deleteMany({ where });
+    await prisma.stockTransaction.deleteMany({ where });
+    await prisma.vehicleStock.deleteMany({ where });
+    await prisma.warehouseInventory.deleteMany({ where });
+    await prisma.productVariant.deleteMany({ where });
+    await prisma.refillItem.deleteMany({ where });
+    await prisma.stockAuditItem.deleteMany({ where });
+    await prisma.vendorItemMapping.deleteMany({ where });
+    await prisma.purchaseOrderItem.deleteMany({ where });
+    await prisma.goodsReceiptItem.deleteMany({ where });
+    await prisma.purchaseInvoiceItem.deleteMany({ where });
+    await prisma.damageEntry.deleteMany({ where });
+    await prisma.procurementStockLedger.deleteMany({ where });
+
+    // Finally delete the product
     await prisma.product.delete({ where: { id } });
 
     res.json({ message: 'Item deleted successfully' });
@@ -500,6 +531,20 @@ export const loadStock = async (req, res) => {
       return res.status(400).json({ message: 'Vehicle ID is required' });
     }
 
+    // 0. Deduplicate items by productId and sum quantities to prevent SQL conflicts
+    const uniqueItemsMap = new Map();
+    for (const item of items) {
+      const q = parseFloat(item.quantity) || 0;
+      if (q <= 0) continue;
+      const existing = uniqueItemsMap.get(item.productId) || 0;
+      uniqueItemsMap.set(item.productId, existing + q);
+    }
+    const processedItemsList = Array.from(uniqueItemsMap.entries()).map(([productId, quantity]) => ({ productId, quantity }));
+
+    if (processedItemsList.length === 0) {
+      return res.status(400).json({ message: 'No valid items to load' });
+    }
+
     const vehicle = await prisma.vehicle.findUnique({
       where: { id: vehicleId },
       select: { id: true, storeId: true, vehicleNumber: true, displayId: true }
@@ -510,10 +555,39 @@ export const loadStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
+    // 1. Pre-fetch products WITH their warehouse inventories
+    const productIds = processedItemsList.map(i => i.productId);
+    const products = await prisma.product.findMany({ 
+      where: { id: { in: productIds } },
+      include: { WarehouseInventory: true }
+    });
+
+    const productMap = new Map(products.map(p => [p.id, p]));
+
+    // 2. Validate stock availability for all items before starting transaction
+    for (const item of processedItemsList) {
+      const q = item.quantity;
+      
+      const prod = productMap.get(item.productId);
+      if (!prod) throw new Error(`Product ${item.productId} not found`);
+
+      // Calculate effective stock exactly like getItems does
+      const totalWarehouseQty = (prod.WarehouseInventory || []).reduce((acc, curr) => acc + curr.quantity, 0);
+      const effectiveStock = totalWarehouseQty > 0 ? totalWarehouseQty : (prod.stock || 0);
+
+      if (Math.floor(q) > effectiveStock) {
+        throw new Error(`VALIDATION:Insufficient stock for ${prod.name}. Available: ${effectiveStock}`);
+      }
+    }
+
     await prisma.$transaction(async (tx) => {
-      for (const item of items) {
-        const q = parseFloat(item.quantity);
-        if (isNaN(q) || q <= 0) continue;
+      const transactionsData = [];
+      const vehicleStockValues = [];
+      const productUpdateValues = [];
+      const wiUpdateValues = [];
+      for (const item of processedItemsList) {
+        const q = item.quantity;
+        const cleanQty = Math.floor(q);
 
         console.log(`[LoadStock] Checking product: ${item.productId}`);
         const prod = await tx.product.findUnique({ where: { id: item.productId } });
@@ -561,10 +635,7 @@ export const loadStock = async (req, res) => {
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
         if (wi) {
-          await tx.warehouseInventory.update({
-            where: { id: wi.id },
-            data: { quantity: { decrement: Math.floor(q) } }
-          });
+          wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
         }
 
         console.log(`[LoadStock] Syncing Product.stock`);
@@ -687,46 +758,47 @@ export const returnStock = async (req, res) => {
     }
     const storeId = vehicle.storeId;
 
+    // 1. Pre-fetch warehouse inventories for bulk updates
+    const productIds = items.map(i => i.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      include: { WarehouseInventory: true }
+    });
+    const productMap = new Map(products.map(p => [p.id, p]));
+
     await prisma.$transaction(async (tx) => {
+      const transactionsData = [];
+      const vehicleUpdateValues = [];
+      const productUpdateValues = [];
+      const wiUpdateValues = [];
+
       for (const item of items) {
         const q = parseFloat(item.quantity);
+        if (isNaN(q) || q <= 0) continue;
+        const cleanQty = Math.floor(q);
+        
+        const prod = productMap.get(item.productId);
 
-        // Create transaction record
-        await tx.stockTransaction.create({
-          data: {
-            tenantId: req.user.tenantId,
-            storeId,
-            userId: req.user.id,
-            type: 'RETURN',
-            vehicleId,
-            productId: item.productId,
-            quantity: q
-          }
+        // Transaction record
+        transactionsData.push({
+          tenantId: req.user.tenantId,
+          storeId,
+          userId: req.user.id,
+          type: 'RETURN',
+          vehicleId,
+          productId: item.productId,
+          quantity: cleanQty
         });
 
-        // Update vehicle stock (use update with composite key)
-        await tx.vehicleStock.update({
-          where: {
-            vehicleId_productId: {
-              vehicleId,
-              productId: item.productId
-            }
-          },
-          data: {
-            quantity: { decrement: Math.floor(q) },
-            openingQuantity: { decrement: Math.floor(q) }
-          }
-        });
+        // Vehicle Stock Decrement Value
+        vehicleUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
 
         // 🆕 INCREMENT WarehouseInventory
         const wi = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
         if (wi) {
-          await tx.warehouseInventory.update({
-            where: { id: wi.id },
-            data: { quantity: { increment: Math.floor(q) } }
-          });
+          wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
         }
 
         // 🆕 SYNC Product.stock (Source of Truth is now the sum of all WarehouseInventory)
@@ -1272,6 +1344,7 @@ export const auditVehicleStock = async (req, res) => {
         productId: { in: items.map(i => i.productId) }
       }
     });
+    // Create a map for O(1) lookup
     const stockMap = new Map(existingStocks.map(s => [s.productId, s.quantity]));
 
     await prisma.$transaction(async (tx) => {
@@ -1289,22 +1362,21 @@ export const auditVehicleStock = async (req, res) => {
       // 2. Prepare data for batch operations
       const auditItemsData = [];
       const transactionsData = [];
+      const stockUpsertValues = [];
       
       for (const item of items) {
         const q = parseFloat(item.quantity);
         if (isNaN(q)) continue;
 
-        // Get current stock for historical record (still need this per item unfortunately)
-        const currentStock = await tx.vehicleStock.findUnique({
-          where: { vehicleId_productId: { vehicleId: id, productId: item.productId } }
-        });
+        const currentQty = stockMap.get(item.productId) || 0;
+        const cleanQty = Math.floor(q);
 
         auditItemsData.push({
           tenantId: req.user.tenantId,
           auditId: audit.id,
           productId: item.productId,
-          oldQuantity: Math.floor(currentStock?.quantity || 0),
-          newQuantity: Math.floor(q)
+          oldQuantity: Math.floor(currentQty),
+          newQuantity: cleanQty
         });
 
         transactionsData.push({
@@ -1313,38 +1385,35 @@ export const auditVehicleStock = async (req, res) => {
           type: 'AUDIT',
           vehicleId: id,
           productId: item.productId,
-          quantity: Math.floor(q),
+          quantity: cleanQty,
           date: new Date()
         });
 
-        // 3. Hard update the stock to the new audited value
-        await tx.vehicleStock.upsert({
-          where: {
-            vehicleId_productId: { vehicleId: id, productId: item.productId }
-          },
-          update: { 
-            quantity: Math.floor(q),
-            openingQuantity: Math.floor(q) 
-          },
-          create: { 
-            tenantId: req.user.tenantId,
-            storeId,
-            vehicleId: id, 
-            productId: item.productId, 
-            quantity: Math.floor(q),
-            openingQuantity: Math.floor(q)
-          }
-        });
+        // Prepare raw values for bulk upsert
+        const randomId = `vstk_${Math.random().toString(36).substring(2, 15)}`;
+        const storeVal = storeId ? `'${storeId}'` : 'NULL';
+        stockUpsertValues.push(`('${randomId}', '${req.user.tenantId}', ${storeVal}, '${id}', '${item.productId}', ${cleanQty}, ${cleanQty})`);
       }
 
-      // 4. Batch create Audit Items and Transactions
+      // 3. Ultra-Fast Bulk Upsert using Raw SQL (PostgreSQL)
+      if (stockUpsertValues.length > 0) {
+        await tx.$executeRawUnsafe(`
+          INSERT INTO "VehicleStock" ("id", "tenantId", "storeId", "vehicleId", "productId", "quantity", "openingQuantity")
+          VALUES ${stockUpsertValues.join(',')}
+          ON CONFLICT ("vehicleId", "productId")
+          DO UPDATE SET 
+            "quantity" = EXCLUDED."quantity",
+            "openingQuantity" = EXCLUDED."openingQuantity"
+        `);
+      }
+      
       if (auditItemsData.length > 0) {
         await tx.stockAuditItem.createMany({ data: auditItemsData });
         await tx.stockTransaction.createMany({ data: transactionsData });
       }
     }, {
-      maxWait: 20000,
-      timeout: 60000
+      maxWait: 30000,
+      timeout: 120000
     });
     console.log('Prisma Transaction committed successfully.');
 

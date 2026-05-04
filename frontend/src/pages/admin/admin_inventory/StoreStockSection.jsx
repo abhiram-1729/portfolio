@@ -135,16 +135,26 @@ const StoreStockSection = ({
                 </div>
 
                 <div className="flex items-center gap-4 shrink-0">
-                  <div className="flex flex-col items-end min-w-[3rem]">
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Stock</span>
-                    <div className="flex items-baseline gap-1">
-                      <span className={`text-base font-black tracking-tighter ${stock.quantity > (stock.product.minStockAlert || 5) ? 'text-gray-950' : 'text-rose-600'}`}>
-                        {stock.quantity}
-                      </span>
-                    </div>
+                  <div className="flex flex-col items-end border-l border-gray-100 pl-4">
+                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">In Vehicles</span>
+                    <span className="text-[10px] font-black text-amber-600 tracking-tighter">
+                      {stock.product.vehicleStock || 0}
+                    </span>
                   </div>
-                  <div className="flex flex-col items-end min-w-[4rem]">
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Valuation</span>
+                  <div className="flex flex-col items-end min-w-[3.5rem] border-l border-gray-100 pl-4">
+                    <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">In Store</span>
+                    <span className={`text-xs font-black tracking-tighter ${stock.quantity > (stock.product.minStockAlert || 5) ? 'text-gray-950' : 'text-rose-600'}`}>
+                      {stock.quantity}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end min-w-[3.5rem] bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Total System</span>
+                    <span className="text-sm font-black text-blue-600 tracking-tighter">
+                      {stock.product.totalStock || stock.quantity}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end min-w-[4.5rem] border-l border-gray-100 pl-4">
+                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Store Value</span>
                     <span className="text-xs font-black text-emerald-600 tracking-tight">₹{(stock.quantity * (stock.product.landingPrice || 0)).toLocaleString()}</span>
                   </div>
                 </div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft, Check, FileUp
+  Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft, Check, FileUp,
+  Barcode, ScanBarcode
 } from 'lucide-react';
+import BarcodeScannerOverlay from '../../../components/BarcodeScannerOverlay';
 import * as XLSX from 'xlsx';
 import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
@@ -29,11 +31,19 @@ const PurchasesSection = ({ can }) => {
     vendorName: '', mobile: '', email: '', address: '',
     gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0'
   });
-  const [quickProductForm, setQuickProductForm] = useState({ name: '', price: '', categoryId: 'default', unitId: '' });
+  const [quickProductForm, setQuickProductForm] = useState({
+    name: '', description: '', mrp: '', price: '', landingPrice: '',
+    purchasePrice: '', discount: '0', discountType: 'RUPEE', categoryId: 'default',
+    subCategoryId: 'default', brandId: 'default', unitId: '', unitValue: '',
+    gst: '0', isFree: false, minShopAmount: '0', status: 'ACTIVE',
+    barcode: '', skuCode: '', stock: '0'
+  });
   const [categories, setCategories] = useState([]);
+  const [subCategories, setSubCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [search, setSearch] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showScanner, setShowScanner] = useState(false);
 
   useEffect(() => {
     const load = async () => {
@@ -48,16 +58,18 @@ const PurchasesSection = ({ can }) => {
 
   const openForm = async () => {
     try {
-      const [v, p, c, u] = await Promise.all([
+      const [v, p, c, u, sc] = await Promise.all([
         procurementAPI.getVendors({ status: 'ACTIVE' }),
         adminAPI.getItems(),
         adminAPI.getCategories(),
-        adminAPI.getUnits()
+        adminAPI.getUnits(),
+        adminAPI.getSubCategories()
       ]);
       setVendors(v.data);
       setProducts(p.data.filter(x => x.status === 'ACTIVE'));
       setCategories(c.data || []);
       setUnits(u.data || []);
+      setSubCategories(sc.data || []);
       setShowForm(true);
     } catch { toast.error('Failed to load data'); }
   };
@@ -78,11 +90,25 @@ const PurchasesSection = ({ can }) => {
   const handleQuickProduct = async (e) => {
     e.preventDefault();
     try {
-      await adminAPI.createItem({ ...quickProductForm, status: 'ACTIVE' });
+      const formData = new FormData();
+      Object.keys(quickProductForm).forEach(key => {
+        if (quickProductForm[key] !== undefined && quickProductForm[key] !== null) {
+          formData.append(key, quickProductForm[key]);
+        }
+      });
+      
+      await adminAPI.createItem(formData);
       toast.success('Product added');
       const p = await adminAPI.getItems();
       setProducts(p.data.filter(x => x.status === 'ACTIVE'));
       setShowQuickProduct(false);
+      setQuickProductForm({
+        name: '', description: '', mrp: '', price: '', landingPrice: '',
+        purchasePrice: '', discount: '0', discountType: 'RUPEE', categoryId: 'default',
+        subCategoryId: 'default', brandId: 'default', unitId: '', unitValue: '',
+        gst: '0', isFree: false, minShopAmount: '0', status: 'ACTIVE',
+        barcode: '', skuCode: '', stock: '0'
+      });
     } catch (err) { toast.error(err.response?.data?.message || 'Error adding product'); }
   };
 
@@ -99,6 +125,19 @@ const PurchasesSection = ({ can }) => {
       ...f,
       items: f.items.map((item, i) => i === idx ? { ...item, [field]: value } : item)
     }));
+  };
+
+  const handleBarcodeScan = (code) => {
+    const product = products.find(p => p.barcode === code || p.skuCode === code);
+    if (product) {
+      setSelectedProduct(product);
+      setSearchPrice(String(product.purchasePrice || product.price || 0));
+      setItemSearch(product.name);
+      setSearchQty('1');
+      toast.success(`Found: ${product.name}`);
+    } else {
+      toast.error('Product not found for this barcode');
+    }
   };
 
   const handleEdit = (p) => {
@@ -135,56 +174,65 @@ const PurchasesSection = ({ can }) => {
     reader.onload = async (evt) => {
       try {
         const bstr = evt.target.result;
-        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wb = XLSX.read(bstr, { type: 'array' });
         const wsname = wb.SheetNames[0];
         const ws = wb.Sheets[wsname];
-        const data = XLSX.utils.sheet_to_json(ws);
+        const rawData = XLSX.utils.sheet_to_json(ws);
 
-        if (data.length === 0) {
+        if (rawData.length === 0) {
           toast.error('Excel sheet is empty');
           return;
         }
 
+        const cleanNum = (val) => {
+          if (val === undefined || val === null || val === '') return 0;
+          if (typeof val === 'number') return val;
+          const cleaned = String(val).replace(/[^0-9.-]/g, '');
+          const num = parseFloat(cleaned);
+          return isNaN(num) ? 0 : num;
+        };
+
         const itemsToAdd = [];
         const missingProductsToCreate = [];
-        const rowData = []; // Store original row data for items to create
+        const rowData = [];
 
-        data.forEach(row => {
-          const normalizedRow = {};
+        rawData.forEach(row => {
+          const norm = {};
           Object.keys(row).forEach(key => {
-            normalizedRow[key.toLowerCase().trim().replace(/\s+/g, '')] = row[key];
+            const k = key.toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            norm[k] = row[key];
           });
 
-          const identifier = String(normalizedRow.barcode || normalizedRow.sku || normalizedRow.skucode || normalizedRow.itemcode || '').trim();
-          const nameMatch = String(normalizedRow.name || normalizedRow.productname || normalizedRow.itemname || normalizedRow.product || '').trim();
+          // Expanded Aliases
+          const name = String(norm.name || norm.productname || norm.itemname || norm.product || norm.item || norm.description || '').trim();
+          const identifier = String(norm.barcode || norm.sku || norm.skucode || norm.itemcode || norm.code || '').trim();
           
-          const qty = Math.round(parseFloat(normalizedRow.quantity || normalizedRow.qty || normalizedRow.totalquantity || normalizedRow.total || 1));
-          const price = parseFloat(normalizedRow.price || normalizedRow.purchaseprice || normalizedRow.cost || normalizedRow.rate || 0);
+          const qty = cleanNum(norm.quantity || norm.qty || norm.qnty || norm.units || norm.pieces || norm.count || norm.total || 1);
+          const price = cleanNum(norm.price || norm.purchaseprice || norm.buyingprice || norm.cost || norm.rate || norm.mrp || 0);
 
-          if (identifier || nameMatch) {
+          if (name || identifier) {
             const product = products.find(p => 
               (identifier && (String(p.barcode).trim() === identifier || String(p.skuCode).trim() === identifier)) ||
-              (nameMatch && p.name.toLowerCase().trim() === nameMatch.toLowerCase())
+              (name && p.name.toLowerCase().trim() === name.toLowerCase())
             );
 
             if (product) {
               itemsToAdd.push({
                 productId: product.id,
-                quantity: String(qty),
+                quantity: String(qty || 1),
                 price: String(price || product.purchasePrice || product.price || 0)
               });
-            } else if (nameMatch || identifier) {
-              // Prepare for bulk creation
+            } else {
               missingProductsToCreate.push({
-                name: nameMatch || `New Product ${identifier}`,
+                name: name || `Product ${identifier}`,
                 barcode: identifier || undefined,
                 skuCode: identifier || undefined,
                 purchasePrice: price,
-                price: price * 1.2, // Default markup
+                price: price * 1.2, // Default selling price markup
                 categoryName: 'Uncategorized',
-                unitType: normalizedRow.unit || 'pcs'
+                unitType: norm.unit || norm.uom || 'pcs'
               });
-              rowData.push({ qty: String(qty), price: String(price) });
+              rowData.push({ qty: String(qty || 1), price: String(price) });
             }
           }
         });
@@ -192,7 +240,7 @@ const PurchasesSection = ({ can }) => {
         let finalItemsToAdd = [...itemsToAdd];
 
         if (missingProductsToCreate.length > 0) {
-          toast.loading(`Creating ${missingProductsToCreate.length} new products...`, { id: 'bulk-create' });
+          const loadingToast = toast.loading(`Creating ${missingProductsToCreate.length} new products...`);
           try {
             const { data: createdItems } = await adminAPI.bulkCreateItems(missingProductsToCreate);
             
@@ -204,13 +252,11 @@ const PurchasesSection = ({ can }) => {
               });
             });
 
-            // Refresh local products list
             const { data: updatedProducts } = await adminAPI.getItems();
             setProducts(updatedProducts);
-            
-            toast.success(`Created ${createdItems.length} new products and added to invoice`, { id: 'bulk-create' });
+            toast.success(`Added ${createdItems.length} new products`, { id: loadingToast });
           } catch (err) {
-            toast.error('Failed to create new products', { id: 'bulk-create' });
+            toast.error('Failed to create some products', { id: loadingToast });
           }
         }
 
@@ -224,10 +270,11 @@ const PurchasesSection = ({ can }) => {
           toast.error('No valid products found in Excel');
         }
       } catch (err) {
+        console.error('Excel Parse Error:', err);
         toast.error('Failed to parse Excel file');
       }
     };
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
     e.target.value = null;
   };
 
@@ -303,41 +350,94 @@ const PurchasesSection = ({ can }) => {
           <h3 className="text-lg font-black text-gray-300">No Purchases Yet</h3>
         </div>
       ) : (
-        <div className="space-y-3">
-          {purchases.filter(p => 
-            !search || 
-            p.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
-            p.vendor?.vendorName.toLowerCase().includes(search.toLowerCase())
-          ).map(p => (
-            <div key={p.id} className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-5 space-y-4 hover:border-emerald-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300 relative">
-              <div className="flex items-start justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-gray-900">#{p.invoiceNumber}</span>
-                    {p.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{p.displayId}</span>}
-                    <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md border ${invoiceStatusColors[p.status] || ''}`}>{p.status}</span>
-                  </div>
-                  <p className="text-[10px] text-gray-400 font-bold">{p.vendor?.vendorName} • {format(new Date(p.invoiceDate), 'dd MMM yyyy')}</p>
-                </div>
-                <div className="flex flex-col items-end gap-1">
-                  <div className="text-right">
-                    <span className="text-base font-black text-gray-900">₹{p.totalAmount.toLocaleString()}</span>
-                    {p.paidAmount > 0 && p.paidAmount < p.totalAmount && (
-                      <p className="text-[10px] text-emerald-600 font-bold">Paid: ₹{p.paidAmount.toLocaleString()}</p>
-                    )}
-                  </div>
-                  <div className="flex gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
-                    {can('PROCUREMENT', 'UPDATE', 'PURCHASES') && (
-                      <button onClick={() => handleEdit(p)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100" title="Edit"><Edit3 size={12} /></button>
-                    )}
-                    {can('PROCUREMENT', 'DELETE', 'PURCHASES') && (
-                      <button onClick={() => handleDelete(p.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100" title="Delete"><Trash2 size={12} /></button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto custom-scrollbar">
+            <table className="w-full table-fixed border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="w-[12%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Invoice</th>
+                  <th className="w-[10%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
+                  <th className="w-[18%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Vendor</th>
+                  <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Charges</th>
+                  <th className="w-[20%] px-4 py-3 text-right text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Financial Summary</th>
+                  <th className="w-[12%] px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Status</th>
+                  <th className="w-[13%] px-4 py-3 text-right text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {purchases.filter(p => 
+                  !search || 
+                  p.invoiceNumber.toLowerCase().includes(search.toLowerCase()) || 
+                  p.vendor?.vendorName.toLowerCase().includes(search.toLowerCase())
+                ).map(p => (
+                  <tr key={p.id} className="hover:bg-emerald-50/30 transition-colors group">
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col gap-0.5">
+                        <span className="text-[11px] font-black text-gray-900 leading-none">#{p.invoiceNumber}</span>
+                        {p.displayId && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter leading-none">{p.displayId}</span>}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="text-[10px] font-black text-gray-500 uppercase">{format(new Date(p.invoiceDate), 'dd MMM yyyy')}</span>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-col">
+                        <span className="text-[10px] font-black text-gray-700 truncate">{p.vendor?.vendorName}</span>
+                        <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{p.vendor?.mobile || 'No Contact'}</span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex flex-wrap gap-1">
+                        {parseFloat(p.transportCharges) > 0 && (
+                          <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">TR: ₹{p.transportCharges}</span>
+                        )}
+                        {parseFloat(p.otherCharges) > 0 && (
+                          <span className="text-[8px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">OT: ₹{p.otherCharges}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter">Total</span>
+                          <span className="text-[11px] font-black text-gray-900">₹{p.totalAmount.toLocaleString()}</span>
+                        </div>
+                        <div className="flex items-center justify-end gap-2">
+                          <span className="text-[8px] font-black text-emerald-500 uppercase tracking-tighter">Paid</span>
+                          <span className="text-[9px] font-black text-emerald-600">₹{p.paidAmount.toLocaleString()}</span>
+                        </div>
+                        {p.totalAmount - p.paidAmount > 0 && (
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-[8px] font-black text-rose-500 uppercase tracking-tighter">Bal</span>
+                            <span className="text-[9px] font-black text-rose-600 font-mono tracking-tighter">₹{(p.totalAmount - p.paidAmount).toLocaleString()}</span>
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg border shadow-sm inline-block ${invoiceStatusColors[p.status] || ''}`}>
+                        {p.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {can('PROCUREMENT', 'UPDATE', 'PURCHASES') && (
+                          <button onClick={() => handleEdit(p)} className="p-2 bg-white text-gray-400 hover:text-emerald-600 rounded-xl border border-gray-100 shadow-sm transition-all hover:scale-110 active:scale-95" title="Edit">
+                            <Edit3 size={14} strokeWidth={3} />
+                          </button>
+                        )}
+                        {can('PROCUREMENT', 'DELETE', 'PURCHASES') && (
+                          <button onClick={() => handleDelete(p.id)} className="p-2 bg-white text-gray-400 hover:text-rose-600 rounded-xl border border-gray-100 shadow-sm transition-all hover:scale-110 active:scale-95" title="Delete">
+                            <Trash2 size={14} strokeWidth={3} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
       </>
@@ -407,9 +507,21 @@ const PurchasesSection = ({ can }) => {
                         }}
                         onFocus={() => setShowItemResults(true)}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowScanner(true)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors"
+                        title="Scan Barcode"
+                      >
+                        <ScanBarcode size={16} />
+                      </button>
                       {showItemResults && itemSearch && (
                         <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
-                          {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()) || p.skuCode?.includes(itemSearch)).slice(0, 10).map(p => (
+                          {products.filter(p => 
+                            p.name.toLowerCase().includes(itemSearch.toLowerCase()) || 
+                            p.skuCode?.toLowerCase().includes(itemSearch.toLowerCase()) ||
+                            p.barcode?.toLowerCase().includes(itemSearch.toLowerCase())
+                          ).slice(0, 10).map(p => (
                             <button
                               key={p.id}
                               type="button"
@@ -424,7 +536,11 @@ const PurchasesSection = ({ can }) => {
                             >
                               <div className="flex flex-col">
                                 <span className="text-xs font-black text-gray-900 group-hover:text-emerald-700">{p.name}</span>
-                                <span className="text-[10px] text-gray-400">{p.skuCode || 'No SKU'}</span>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">Store: {p.warehouseStock || 0}</span>
+                                  <span className="text-[8px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">Veh: {p.vehicleStock || 0}</span>
+                                  <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">Total: {p.totalStock || 0}</span>
+                                </div>
                               </div>
                               <div className="flex flex-col items-end">
                                 <span className="text-xs font-black text-emerald-600">₹{p.purchasePrice || p.price}</span>
@@ -499,39 +615,109 @@ const PurchasesSection = ({ can }) => {
                     </button>
                   </div>
                 </div>
-              <div className="space-y-3" onClick={() => setShowItemResults(false)}>
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500" onClick={() => setShowItemResults(false)}>
                 {form.items.length === 0 ? (
-                  <div className="py-8 text-center bg-gray-50/50 rounded-2xl border border-dashed border-gray-200">
-                    <Package className="mx-auto text-gray-300 mb-2 opacity-50" size={32} />
+                  <div className="py-12 text-center">
+                    <Package className="mx-auto text-gray-200 mb-3" size={48} />
                     <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">No items added yet</p>
                   </div>
                 ) : (
-                  form.items.map((item, idx) => (
-                    <div key={idx} className="flex flex-col sm:flex-row gap-2 bg-gray-50/30 p-3 rounded-2xl border border-gray-100 group relative hover:border-emerald-200 transition-all animate-in slide-in-from-left-2 duration-300">
-                    <div className="flex-1 min-w-0 bg-white border border-gray-100 rounded-xl px-4 py-2 flex items-center shadow-inner">
-                      <span className="text-xs font-bold text-gray-900 truncate">
-                        {products.find(p => p.id === item.productId)?.name || 'Unknown Product'}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="relative">
-                        <span className="absolute -top-4 left-1 text-[8px] font-bold text-gray-400 sm:hidden">QTY</span>
-                        <input type="number" min="1" placeholder="Qty" value={item.quantity} onChange={e => updateItem(idx, 'quantity', e.target.value)}
-                          className="w-16 bg-white rounded-xl px-2 py-2 text-xs font-black border border-gray-200 text-center focus:ring-2 focus:ring-emerald-500" />
-                      </div>
-                      <div className="relative">
-                        <span className="absolute -top-4 left-1 text-[8px] font-bold text-gray-400 sm:hidden">PRICE</span>
-                        <input type="number" placeholder="Price" value={item.price} onChange={e => updateItem(idx, 'price', e.target.value)}
-                          className="w-24 bg-white rounded-xl px-2 py-2 text-xs font-black border border-gray-200 text-center focus:ring-2 focus:ring-emerald-500" />
-                      </div>
-                    <button type="button" onClick={() => removeItem(idx)} 
-                      className="p-2 text-red-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all">
-                      <X size={16} strokeWidth={3} />
-                    </button>
-                  </div>
-                </div>
-              )))}
-            </div>
+                  <table className="w-full table-fixed border-collapse">
+                    <thead>
+                      <tr className="bg-gray-50/50 border-b border-gray-100">
+                        <th className="w-[5%] px-3 py-2 text-left text-[8px] font-black uppercase tracking-widest text-gray-400">#</th>
+                        <th className="w-[30%] px-3 py-2 text-left text-[8px] font-black uppercase tracking-widest text-gray-400">Product Details</th>
+                        <th className="w-[20%] px-3 py-2 text-center text-[8px] font-black uppercase tracking-widest text-gray-400">Stock Status</th>
+                        <th className="w-[10%] px-3 py-2 text-center text-[8px] font-black uppercase tracking-widest text-gray-400">Unit</th>
+                        <th className="w-[10%] px-3 py-2 text-center text-[8px] font-black uppercase tracking-widest text-gray-400">Qty</th>
+                        <th className="w-[12%] px-3 py-2 text-center text-[8px] font-black uppercase tracking-widest text-gray-400">Price</th>
+                        <th className="w-[13%] px-3 py-2 text-right text-[8px] font-black uppercase tracking-widest text-gray-400">Subtotal</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {form.items.map((item, idx) => {
+                        const p = products.find(x => x.id === item.productId);
+                        if (!p) return null;
+                        return (
+                          <tr key={idx} className="hover:bg-emerald-50/20 transition-colors group">
+                            <td className="px-3 py-2.5">
+                              <span className="text-[10px] font-black text-gray-300">{idx + 1}</span>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex flex-col min-w-0">
+                                <span className="text-[10px] font-black text-gray-900 truncate uppercase tracking-tight">{p.name}</span>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">{p.category?.name || 'No Cat'}</span>
+                                  <span className="text-[7px] text-gray-200">•</span>
+                                  <span className="text-[7px] font-black text-blue-400 uppercase tracking-tighter">{p.skuCode || 'NO-SKU'}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex items-center justify-center gap-2">
+                                <div className="flex flex-col items-center">
+                                  <span className="text-[9px] font-black text-emerald-600 leading-none">{p.warehouseStock || 0}</span>
+                                  <span className="text-[6px] font-black text-gray-300 uppercase tracking-tighter">Store</span>
+                                </div>
+                                <div className="w-px h-3 bg-gray-100" />
+                                <div className="flex flex-col items-center">
+                                  <span className="text-[9px] font-black text-amber-600 leading-none">{p.vehicleStock || 0}</span>
+                                  <span className="text-[6px] font-black text-gray-300 uppercase tracking-tighter">Fleet</span>
+                                </div>
+                                <div className="w-px h-3 bg-gray-100" />
+                                <div className="flex flex-col items-center">
+                                  <span className="text-[9px] font-black text-blue-600 leading-none">{p.totalStock || 0}</span>
+                                  <span className="text-[6px] font-black text-gray-300 uppercase tracking-tighter">System</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-center">
+                              {p.unit && (
+                                <span className="text-[9px] font-black text-indigo-500 uppercase tracking-tighter bg-indigo-50 px-1.5 py-0.5 rounded border border-indigo-100">
+                                  {p.unitValue} {p.unit.type}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex justify-center">
+                                <input 
+                                  type="number" 
+                                  min="1" 
+                                  value={item.quantity || ''} 
+                                  onChange={e => updateItem(idx, 'quantity', e.target.value)}
+                                  className="w-14 bg-gray-50 border border-gray-100 rounded-lg px-1.5 py-1 text-[10px] font-black text-center focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                                />
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5">
+                              <div className="flex justify-center">
+                                <input 
+                                  type="number" 
+                                  value={item.price || ''} 
+                                  onChange={e => updateItem(idx, 'price', e.target.value)}
+                                  className="w-20 bg-gray-50 border border-gray-100 rounded-lg px-1.5 py-1 text-[10px] font-black text-center focus:ring-2 focus:ring-emerald-500 outline-none transition-all" 
+                                />
+                              </div>
+                            </td>
+                            <td className="px-3 py-2.5 text-right relative">
+                              <div className="flex flex-col items-end pr-6">
+                                <span className="text-[10px] font-black text-gray-900 leading-none">₹{(parseFloat(item.quantity || 0) * parseFloat(item.price || 0)).toLocaleString()}</span>
+                                <span className="text-[6px] font-black text-gray-300 uppercase tracking-tighter">Subtotal</span>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); removeItem(idx); }}
+                                className="absolute right-1 top-1/2 -translate-y-1/2 p-1.5 text-gray-300 hover:text-rose-500 hover:bg-rose-50 rounded-lg transition-all opacity-0 group-hover:opacity-100"
+                              >
+                                <X size={12} strokeWidth={3} />
+                              </button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                )}
+              </div>
               </div>
               <button 
                 type="submit"
@@ -598,29 +784,132 @@ const PurchasesSection = ({ can }) => {
         </div>
       )}
 
-      {/* Quick Product Modal */}
       {showQuickProduct && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-sm rounded-[2rem] p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200">
-            <h3 className="text-base font-black text-gray-900 border-b pb-2">Quick Add Product</h3>
-            <form onSubmit={handleQuickProduct} className="space-y-3">
-              <input placeholder="Product Name" required value={quickProductForm.name} onChange={e => setQuickProductForm({...quickProductForm, name: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none" />
-              <input type="number" placeholder="Purchase Price" value={quickProductForm.price} onChange={e => setQuickProductForm({...quickProductForm, price: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none" />
-              <select required value={quickProductForm.categoryId} onChange={e => setQuickProductForm({...quickProductForm, categoryId: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none">
-                <option value="default">Select Category</option>
-                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
-              <select required value={quickProductForm.unitId} onChange={e => setQuickProductForm({...quickProductForm, unitId: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-blue-500 border-none outline-none">
-                <option value="">Select Unit</option>
-                {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
-              </select>
-              <div className="flex gap-2 pt-2">
-                <button type="button" onClick={() => setShowQuickProduct(false)} className="flex-1 py-3 text-xs font-black uppercase text-gray-400">Cancel</button>
-                <button className="flex-1 bg-blue-600 text-white py-3 rounded-xl text-xs font-black uppercase tracking-widest">Save Item</button>
+        <div className="fixed inset-0 z-[100] flex justify-end">
+          <div 
+            className="absolute inset-0 bg-gray-900/40 backdrop-blur-sm animate-in fade-in duration-300"
+            onClick={() => setShowQuickProduct(false)}
+          />
+          <div className="relative w-full max-w-xl bg-white h-full shadow-2xl animate-in slide-in-from-right duration-500 flex flex-col">
+            <div className="p-8 border-b border-gray-100 flex items-center justify-between bg-white sticky top-0 z-10">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 uppercase tracking-tight">Full Item Creation</h3>
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Master Inventory Entry</p>
               </div>
-            </form>
+              <button onClick={() => setShowQuickProduct(false)} className="p-3 hover:bg-gray-100 rounded-2xl text-gray-400 transition-all active:scale-90">
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar space-y-8 pb-32">
+              <form id="drawer-product-form" onSubmit={handleQuickProduct} className="space-y-8">
+                {/* Basic Info */}
+                <section className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-emerald-500 pl-3">Basic Information</h4>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Product Name *</label>
+                      <input placeholder="Enter product name" required value={quickProductForm.name} onChange={e => setQuickProductForm({...quickProductForm, name: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">SKU Code</label>
+                      <input placeholder="Internal identifier" value={quickProductForm.skuCode} onChange={e => setQuickProductForm({...quickProductForm, skuCode: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Classification */}
+                <section className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-blue-500 pl-3">Classification</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Category *</label>
+                      <select required value={quickProductForm.categoryId} onChange={e => setQuickProductForm({...quickProductForm, categoryId: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
+                        <option value="default">Select Category</option>
+                        {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Sub-Category</label>
+                      <select value={quickProductForm.subCategoryId} onChange={e => setQuickProductForm({...quickProductForm, subCategoryId: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
+                        <option value="default">Select Sub-Category</option>
+                        {subCategories.filter(sc => sc.categoryId === quickProductForm.categoryId).map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Barcode (EAN/UPC)</label>
+                    <div className="relative">
+                      <Barcode className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300" size={18} />
+                      <input placeholder="Scan or type barcode" value={quickProductForm.barcode} onChange={e => setQuickProductForm({...quickProductForm, barcode: e.target.value})} className="w-full bg-gray-50 rounded-2xl pl-12 pr-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Pricing */}
+                <section className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-amber-500 pl-3">Pricing & Tax</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">MRP (₹)</label>
+                      <input type="number" placeholder="0.00" value={quickProductForm.mrp} onChange={e => setQuickProductForm({...quickProductForm, mrp: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-black border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Purchase Price (₹)</label>
+                      <input type="number" placeholder="0.00" value={quickProductForm.purchasePrice} onChange={e => setQuickProductForm({...quickProductForm, purchasePrice: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-black border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Selling Price * (₹)</label>
+                      <input type="number" placeholder="0.00" required value={quickProductForm.price} onChange={e => setQuickProductForm({...quickProductForm, price: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-black border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">GST (%)</label>
+                      <input type="number" placeholder="0" value={quickProductForm.gst} onChange={e => setQuickProductForm({...quickProductForm, gst: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-black border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                    </div>
+                  </div>
+                </section>
+
+                {/* Stock Details */}
+                <section className="space-y-4">
+                  <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-indigo-500 pl-3">Units & Initial Stock</h4>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Unit Type</label>
+                      <select value={quickProductForm.unitId} onChange={e => setQuickProductForm({...quickProductForm, unitId: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
+                        <option value="">Select Unit</option>
+                        {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Unit Value</label>
+                      <input type="number" placeholder="e.g. 500" value={quickProductForm.unitValue} onChange={e => setQuickProductForm({...quickProductForm, unitValue: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Stock (In Store)</label>
+                    <input type="number" placeholder="0" value={quickProductForm.stock} onChange={e => setQuickProductForm({...quickProductForm, stock: e.target.value})} className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-black border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner" />
+                  </div>
+                </section>
+              </form>
+            </div>
+
+            <div className="p-8 border-t border-gray-100 bg-gray-50/80 backdrop-blur-md absolute bottom-0 left-0 right-0">
+              <button 
+                form="drawer-product-form"
+                className="w-full bg-gray-900 text-white py-5 rounded-[2rem] text-sm font-black uppercase tracking-[0.2em] shadow-2xl hover:bg-black transition-all active:scale-[0.98] flex items-center justify-center gap-3 group"
+              >
+                Create Master Item
+                <Plus size={20} className="group-hover:rotate-90 transition-transform duration-300" />
+              </button>
+            </div>
           </div>
         </div>
+      )}
+      {showScanner && (
+        <BarcodeScannerOverlay
+          onScan={handleBarcodeScan}
+          onClose={() => setShowScanner(false)}
+        />
       )}
     </div>
   );

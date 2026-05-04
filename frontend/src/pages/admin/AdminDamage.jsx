@@ -137,7 +137,13 @@ export default function AdminDamage() {
       const params = {};
       if (storeId) params.storeId = storeId;
       const { data } = await damageAPI.getDamageReports(params);
-      setReports(data);
+      setReports(data || {
+        summary: { total: 0, totalLoss: 0, totalDeductions: 0, appliedDeductions: 0 },
+        lossByType: {},
+        topProducts: [],
+        vgeReport: [],
+        payrollReport: []
+      });
     } catch (err) {
       toast.error('Failed to load reports');
     }

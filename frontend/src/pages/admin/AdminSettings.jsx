@@ -328,16 +328,16 @@ export default function AdminSettings() {
       title: 'Business Profile', 
       icon: Store, 
       items: [
-        { label: 'Basic Information', action: () => setActiveModal('BUSINESS_PROFILE') },
-        { label: 'Contact Details', action: () => setActiveModal('BUSINESS_PROFILE') }
+        { label: 'Basic Information', action: () => setActiveModal('BUSINESS') },
+        { label: 'Contact Details', action: () => setActiveModal('BUSINESS') }
       ]
     },
     { 
       title: 'Tax Settings', 
       icon: Receipt, 
       items: [
-        { label: 'GST Configuration', action: () => setActiveModal('TAX_SETTINGS') },
-        { label: 'Tax Slabs & Rules', action: () => setActiveModal('TAX_SETTINGS') }
+        { label: 'GST Configuration', action: () => setActiveModal('TAX') },
+        { label: 'Tax Slabs & Rules', action: () => setActiveModal('TAX') }
       ]
     },
     { 

@@ -108,6 +108,7 @@ export default function AdminInventory() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
 
   const [allVehiclesStock, setAllVehiclesStock] = useState({}); // { [vehicleId]: inventoryList }
+  const [loadingTracking, setLoadingTracking] = useState(false);
   const [intakeItems, setIntakeItems] = useState([]); // Draft list for bulk stock intake
   const [intakeQuantities, setIntakeQuantities] = useState({}); // { productId: quantity }
   const [quickIntake, setQuickIntake] = useState({ productId: '', quantity: '' });
@@ -244,7 +245,12 @@ export default function AdminInventory() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [masterSearch, warehouseSearch, auditSearch, masterCategory, masterSubCategory, masterStatus, masterFreeOnly, activeTab, subTab]);
+  }, [
+    masterSearch, warehouseSearch, auditSearch, opsSearch, returnSearch, 
+    intakeSearch, vehicleSearch, trackingSearch, openingSearch,
+    masterCategory, masterSubCategory, masterStatus, masterFreeOnly, 
+    activeTab, subTab
+  ]);
 
   const handleQuantityChange = React.useCallback((id, val) => {
     setStockQuantities(prev => ({ ...prev, [id]: val }));
@@ -414,6 +420,17 @@ export default function AdminInventory() {
     } catch (err) {
       console.error('❌ loadAllVehiclesStock Error:', err);
       toast.error('Failed to load tracking data for all vehicles');
+    } finally {
+      setLoadingTracking(false);
+    }
+  };
+
+  const refreshSingleVehicleStock = async (vId) => {
+    try {
+      const res = await adminAPI.getVehicleInventory(vId);
+      setAllVehiclesStock(prev => ({ ...prev, [vId]: res.data }));
+    } catch (err) {
+      console.error(`Failed to refresh stock for vehicle ${vId}:`, err);
     }
   };
 
@@ -907,7 +924,10 @@ export default function AdminInventory() {
       setIsAuditMode(false);
       setAuditQuantities({});
       setAuditRemark('');
-      await loadAllVehiclesStock(); // Refresh tracking data
+      
+      // OPTIMIZATION: Instead of full reload, refresh only the audited vehicle
+      await refreshSingleVehicleStock(viewingVehicleId);
+      
       const aRes = await adminAPI.getAuditHistory({ storeId: storeFilterId });
       setAuditHistory(aRes.data || []);
     } catch (error) {
@@ -1048,6 +1068,7 @@ export default function AdminInventory() {
   const renderTracking = () => (
     <VehicleStockSection
       loadingVehicles={loadingVehicles}
+      loadingTracking={loadingTracking}
       viewingVehicleId={viewingVehicleId}
       setViewingVehicleId={setViewingVehicleId}
       vehicles={vehicles}
