@@ -920,14 +920,14 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                                   <span className="text-[6px] font-black text-gray-400 uppercase">%</span>
                                 </div>
                               </td>
-                              <td className="px-1 py-1.5 text-center">
+                              {/* <td className="px-1 py-1.5 text-center">
                                 <input
                                   type="number"
                                   value={item.unitCostBeforeTax || ''}
                                   onChange={e => updateItem(originalIdx, 'unitCostBeforeTax', e.target.value)}
                                   className="w-14 bg-white border border-gray-200 rounded px-1 py-0.5 text-[8px] font-black text-center focus:ring-1 focus:ring-emerald-500 outline-none"
                                 />
-                              </td>
+                              </td> */}
                               <td className="px-1 py-1.5 text-center">
                                 <span className="text-[8px] font-black text-gray-700">{parseFloat(item.subtotalBeforeTax).toLocaleString()}</span>
                               </td>
