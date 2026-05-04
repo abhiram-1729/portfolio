@@ -1,1 +1,0 @@
-import { PrismaClient } from '@prisma/client'; const prisma = new PrismaClient(); async function main() { try { const p = await prisma.product.findFirst(); console.log('Product fields:', Object.keys(p || {})); } catch (e) { console.log('Error:', e.message); } } main();
