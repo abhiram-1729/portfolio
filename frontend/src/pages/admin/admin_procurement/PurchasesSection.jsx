@@ -61,6 +61,9 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
   const [subCategories, setSubCategories] = useState([]);
   const [units, setUnits] = useState([]);
   const [search, setSearch] = useState('');
+  const [formLoading, setFormLoading] = useState(false);
+  const [actionLoading, setActionLoading] = useState({ id: null, type: null });
+  const [purchaseOrders, setPurchaseOrders] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
 
@@ -79,18 +82,20 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
     setFormLoading(true);
     // We always refetch products to ensure latest prices/taxes are used
     try {
-      const [v, p, c, u, sc] = await Promise.all([
+      const [v, p, c, u, sc, po] = await Promise.all([
         procurementAPI.getVendors({ status: 'ACTIVE' }),
         adminAPI.getItems(),
         adminAPI.getCategories(),
         adminAPI.getUnits(),
-        adminAPI.getSubCategories()
+        adminAPI.getSubCategories(),
+        procurementAPI.getPurchaseOrders({ status: 'APPROVED' })
       ]);
       setVendors(v.data);
       setProducts(p.data.filter(x => x.status === 'ACTIVE'));
       setCategories(c.data || []);
       setUnits(u.data || []);
       setSubCategories(sc.data || []);
+      setPurchaseOrders(po.data || []);
       setShowForm(true);
     } catch { toast.error('Failed to load data'); }
     finally { setFormLoading(false); }
@@ -585,7 +590,9 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
             </table>
           </div>
         </div>
-      </>)}
+        )}
+      </>
+    )}
 
       {showForm && (
         <div className={`bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 ${showQuickProduct || showQuickVendor ? 'hidden' : 'block'}`}>
@@ -837,6 +844,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                 )}
               </div>
               </div>
+            </div>
             <button
               type="submit"
               disabled={isSubmitting}
@@ -850,7 +858,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
             </button>
           </form>
         </div>
-      )}
+                    )}
 
       {/* Quick Vendor Modal */}
       {/* Quick Vendor Form (Inline) */}
