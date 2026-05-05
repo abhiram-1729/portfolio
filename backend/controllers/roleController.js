@@ -18,6 +18,13 @@ export const AVAILABLE_MODULES = [
   'SETTINGS'
 ];
 
+// Granular expense sections for fine-tuned RBAC
+export const EXPENSE_SECTIONS = [
+  { key: 'MONITORING', label: 'Expense Monitoring', desc: 'View all expense submissions' },
+  { key: 'APPROVAL', label: 'Expense Approval', desc: 'Approve, reject, and return expenses' },
+  { key: 'SETTINGS', label: 'Expense Settings', desc: 'Manage categories, limits, and policies' }
+];
+
 export const AVAILABLE_ACTIONS = ['READ', 'CREATE', 'UPDATE', 'DELETE'];
 
 // @desc    Get all custom roles for this tenant
@@ -37,7 +44,8 @@ export const getRoles = async (req, res, next) => {
             success: true,
             data: roles,
             modules: AVAILABLE_MODULES,
-            actions: AVAILABLE_ACTIONS
+            actions: AVAILABLE_ACTIONS,
+            expenseSections: EXPENSE_SECTIONS
         });
     } catch (error) {
         next(error);

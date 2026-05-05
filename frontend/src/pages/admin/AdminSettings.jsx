@@ -364,6 +364,15 @@ export default function AdminSettings() {
         { label: 'Configure Timing & Shifts', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } },
         { label: 'Late Entry Rules', action: () => setActiveModal('LATE_RULES') }
       ]
+    },
+    {
+      title: 'Expense Management',
+      icon: Receipt,
+      items: [
+        { label: 'Expense Categories & Limits', action: () => window.location.href = '/admin/expenses?tab=categories' },
+        { label: 'Approval Policy: Auto-approve CASH expenses on approval', action: () => toast('CASH expenses are auto-paid on approval. This is the default behavior.') },
+        { label: 'Monthly Cutoff: Edits locked after 5th of next month', action: () => toast('Monthly cutoff is enforced automatically by the system.') }
+      ]
     }
   ];
 

@@ -1,26 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { 
-    Receipt, 
-    Search, 
-    Filter, 
-    CheckCircle2, 
-    XCircle, 
-    Eye, 
-    Clock, 
-    User, 
-    Truck,
-    AlertCircle,
-    Calendar,
-    Loader2,
-    Check,
-    X,
-    Settings,
-    Plus
-} from 'lucide-react';
-import { getAllExpenses, updateExpenseStatus, getExpenseCategories, createExpenseCategory } from '../../services/expenseService';
+import { Receipt, CheckCircle2, XCircle, Eye, Clock, User, Truck, Calendar, Loader2, Check, X, Plus, RotateCcw, ShieldCheck, Lock, ChevronDown, Filter, BarChart3, Settings, Trash2, Edit } from 'lucide-react';
+import { getAllExpenses, updateExpenseStatus, bulkUpdateExpenseStatus, getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '../../services/expenseService';
+import ExpenseAnalytics from './ExpenseAnalytics';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
+
+const STATUS_STYLES = {
+    PENDING:      'bg-orange-50 text-orange-600 border-orange-100',
+    APPROVED:     'bg-emerald-50 text-emerald-600 border-emerald-100',
+    REJECTED:     'bg-rose-50 text-rose-600 border-rose-100',
+    PAID:         'bg-blue-50 text-blue-600 border-blue-100',
+};
+
+const ALL_STATUSES = ['', 'PENDING', 'APPROVED', 'REJECTED', 'PAID'];
 
 export default function AdminExpenses() {
     const can = useUserStore(s => s.can);
@@ -28,435 +21,393 @@ export default function AdminExpenses() {
     const [loading, setLoading] = useState(true);
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [statusFilter, setStatusFilter] = useState('');
+    const [paymentFilter, setPaymentFilter] = useState('');
     const [activeTab, setActiveTab] = useState('monitoring');
     const [categories, setCategories] = useState([]);
-    const [showAddCategory, setShowAddCategory] = useState(false);
-    const [newCategory, setNewCategory] = useState({ name: '', limit: '' });
     const [selectedExpense, setSelectedExpense] = useState(null);
+    const [selected, setSelected] = useState([]);
+    const [actionModal, setActionModal] = useState(null); // { expenseId, action }
+    const [remarks, setRemarks] = useState('');
+    const [approverName, setApproverName] = useState('');
+    const [catForm, setCatForm] = useState(null); // null | { id?, name, limit }
+    const [catSaving, setCatSaving] = useState(false);
 
     useEffect(() => {
-        if (activeTab === 'monitoring') {
-            loadExpenses();
-        } else {
-            loadCategories();
-        }
-    }, [date, statusFilter, activeTab]);
+        if (activeTab === 'monitoring') loadExpenses();
+        else if (activeTab === 'categories') loadCategories();
+        setSelected([]);
+    }, [date, statusFilter, paymentFilter, activeTab]);
 
     const loadExpenses = async () => {
         setLoading(true);
         try {
-            const data = await getAllExpenses({ date, status: statusFilter });
-            setExpenses(data);
-        } catch (err) {
-            toast.error('Failed to load expenses');
-        } finally {
-            setLoading(false);
-        }
+            const params = { date, status: statusFilter };
+            if (paymentFilter) params.paymentMode = paymentFilter;
+            setExpenses(await getAllExpenses(params));
+        } catch { toast.error('Failed to load expenses'); }
+        finally { setLoading(false); }
     };
 
     const loadCategories = async () => {
         setLoading(true);
-        try {
-            const data = await getExpenseCategories();
-            setCategories(data);
-        } catch (err) {
-            toast.error('Failed to load categories');
-        } finally {
-            setLoading(false);
-        }
+        try { setCategories(await getExpenseCategories()); }
+        catch { toast.error('Failed to load categories'); }
+        finally { setLoading(false); }
     };
 
-    const handleAddCategory = async (e) => {
-        e.preventDefault();
+    const handleAction = async (id, status, extra = {}) => {
         try {
-            await createExpenseCategory(newCategory);
-            toast.success('Category added');
-            setShowAddCategory(false);
-            setNewCategory({ name: '', limit: '' });
-            loadCategories();
-        } catch (err) {
-            toast.error('Failed to add category');
-        }
-    };
-
-    const handleAction = async (id, status) => {
-        try {
-            await updateExpenseStatus(id, status);
-            toast.success(`Expense ${status.toLowerCase()}ed`);
+            await updateExpenseStatus(id, status, extra);
+            toast.success(`Expense ${status.toLowerCase()}`);
+            setActionModal(null); setRemarks(''); setApproverName('');
             loadExpenses();
-        } catch (err) {
-            toast.error('Failed to update status');
-        }
+        } catch (e) { toast.error(e?.response?.data?.message || 'Failed'); }
+    };
+
+    const handleBulkAction = async (status) => {
+        if (!selected.length) return;
+        try {
+            await bulkUpdateExpenseStatus(selected, status);
+            toast.success(`${selected.length} expenses ${status.toLowerCase()}`);
+            setSelected([]);
+            loadExpenses();
+        } catch (e) { toast.error(e?.response?.data?.message || 'Bulk action failed'); }
+    };
+
+    const toggleSelect = (id) => setSelected(p => p.includes(id) ? p.filter(x => x !== id) : [...p, id]);
+    const toggleAll = () => setSelected(selected.length === expenses.length ? [] : expenses.map(e => e.id));
+
+    const handleSaveCat = async (e) => {
+        e.preventDefault();
+        setCatSaving(true);
+        try {
+            if (catForm.id) {
+                await updateExpenseCategory(catForm.id, { name: catForm.name, limit: catForm.limit });
+                toast.success('Category updated');
+            } else {
+                await createExpenseCategory({ name: catForm.name, limit: catForm.limit });
+                toast.success('Category created');
+            }
+            setCatForm(null);
+            loadCategories();
+        } catch (e) { toast.error(e?.response?.data?.message || 'Failed to save'); }
+        finally { setCatSaving(false); }
+    };
+
+    const handleDeleteCat = async (id) => {
+        if (!confirm('Deactivate this category?')) return;
+        try { await deleteExpenseCategory(id); toast.success('Deactivated'); loadCategories(); }
+        catch { toast.error('Failed'); }
     };
 
     return (
         <div className="space-y-6">
+            {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex flex-col gap-1">
-                    <h2 className="text-2xl font-bold text-gray-900">Expenses</h2>
-                    <p className="text-sm text-gray-500">Review and manage field expenses and categories</p>
+                <div>
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight">Expenses</h2>
+                    <p className="text-sm text-gray-500 mt-0.5">Enterprise expense lifecycle management</p>
                 </div>
-
                 {activeTab === 'monitoring' && (
-                    <div className="flex items-center gap-3">
-                        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm">
-                            <Calendar size={18} className="text-emerald-500 ml-2" />
-                            <input 
-                                type="date" 
-                                value={date}
-                                onChange={(e) => setDate(e.target.value)}
-                                className="bg-transparent border-none focus:outline-none text-sm font-bold text-gray-700 pr-2"
-                            />
+                    <div className="flex flex-wrap items-center gap-2">
+                        <div className="flex items-center gap-2 bg-white border border-gray-100 rounded-2xl px-3 py-2 shadow-sm">
+                            <Calendar size={16} className="text-emerald-500" />
+                            <input type="date" value={date} onChange={e => setDate(e.target.value)}
+                                className="bg-transparent border-none focus:outline-none text-sm font-bold text-gray-700" />
                         </div>
+                        <select value={paymentFilter} onChange={e => setPaymentFilter(e.target.value)}
+                            className="bg-white border border-gray-100 rounded-2xl px-3 py-2 text-xs font-black text-gray-600 shadow-sm outline-none">
+                            <option value="">All Modes</option>
+                            <option value="CASH">Cash</option>
+                            <option value="PERSONAL_CASH">Personal Cash</option>
+                            <option value="UPI">UPI</option>
+                        </select>
                     </div>
                 )}
-                
                 {activeTab === 'categories' && can('EXPENSES', 'CREATE') && (
-                    <button 
-                        onClick={() => setShowAddCategory(true)}
-                        className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
-                    >
-                        <Plus size={18} strokeWidth={2.5} />
-                        Add Type
+                    <button onClick={() => setCatForm({ name: '', limit: '' })}
+                        className="flex items-center gap-2 bg-emerald-600 text-white px-5 py-2.5 rounded-2xl font-bold text-sm hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
+                        <Plus size={16} /> Add Category
                     </button>
                 )}
             </div>
 
-            {/* Main Tabs */}
-            <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl w-fit">
-                <button
-                    onClick={() => setActiveTab('monitoring')}
-                    className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'monitoring' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
-                >
-                    Monitoring
-                </button>
-                <button
-                    onClick={() => setActiveTab('categories')}
-                    className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'categories' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
-                >
-                    Types & Limits
-                </button>
+            {/* Tabs */}
+            <div className="flex gap-1 bg-gray-100 p-1 rounded-2xl w-fit">
+                {[['monitoring','Monitoring'],['analytics','Analytics'],['categories','Categories']].map(([k,l]) => (
+                    <button key={k} onClick={() => setActiveTab(k)}
+                        className={`px-5 py-2 rounded-xl text-xs font-black uppercase tracking-wider transition-all ${activeTab===k ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}>
+                        {l}
+                    </button>
+                ))}
             </div>
 
-            {activeTab === 'monitoring' ? (
+            {activeTab === 'analytics' && <ExpenseAnalytics />}
+
+            {activeTab === 'monitoring' && (
                 <>
                     {/* Status Filters */}
                     <div className="flex flex-wrap gap-2">
-                        {['', 'PENDING', 'APPROVED', 'REJECTED'].map((s) => (
-                            <button
-                                key={s}
-                                onClick={() => setStatusFilter(s)}
-                                className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${statusFilter === s ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'}`}
-                            >
+                        {ALL_STATUSES.map(s => (
+                            <button key={s} onClick={() => setStatusFilter(s)}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${statusFilter===s ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-400 border-slate-100'}`}>
                                 {s || 'All'}
                             </button>
                         ))}
                     </div>
 
-                    <div className="space-y-4">
-                        {loading ? (
-                            <div className="flex flex-col items-center justify-center py-32 text-gray-400 gap-4">
-                                <Loader2 className="animate-spin text-emerald-600" size={48} />
-                                <p className="font-black italic uppercase tracking-widest text-xs">Synchronizing Field Data...</p>
+                    {/* Bulk Actions */}
+                    {selected.length > 0 && (
+                        <div className="flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-lg">
+                            <span className="text-xs font-black">{selected.length} selected</span>
+                            <div className="flex gap-2 ml-auto">
+                                {can('EXPENSES','UPDATE') && (
+                                    <>
+                                        <button onClick={() => handleBulkAction('APPROVED')}
+                                            className="px-4 py-1.5 bg-emerald-500 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-400 transition-all">Approve All</button>
+                                        <button onClick={() => handleBulkAction('REJECTED')}
+                                            className="px-4 py-1.5 bg-rose-500 rounded-xl text-[10px] font-black uppercase hover:bg-rose-400 transition-all">Reject All</button>
+                                        <button onClick={() => handleBulkAction('PAID')}
+                                            className="px-4 py-1.5 bg-blue-600 rounded-xl text-[10px] font-black uppercase hover:bg-blue-500 transition-all">Pay All</button>
+                                    </>
+                                )}
+                                <button onClick={() => setSelected([])} className="p-1.5 hover:bg-white/10 rounded-lg"><X size={14} /></button>
                             </div>
-                        ) : expenses.length === 0 ? (
-                            <div className="bg-white rounded-[2.5rem] p-24 border border-dashed border-gray-200 text-center space-y-4 shadow-inner">
-                                <Receipt size={64} className="mx-auto text-gray-100" />
-                                <div className="space-y-1">
-                                    <h3 className="text-xl font-black text-gray-300">No Expenses Recorded</h3>
-                                    <p className="text-sm text-gray-400 font-bold uppercase tracking-tighter">Everything clear for this range</p>
-                                </div>
-                            </div>
-                        ) : (
-                            <>
-                                {/* Mobile Card View */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
-                                    {expenses.map((exp) => (
-                                        <div key={exp.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group flex flex-col h-full">
-                                            <div className="p-5 flex-1 space-y-4">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                                            exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 
-                                                            exp.status === 'REJECTED' ? 'bg-rose-50 text-rose-600' : 'bg-orange-50 text-orange-600'
-                                                        }`}>
-                                                            <Receipt size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-black text-gray-900 tracking-tight">{exp.type}</h4>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[9px] font-black text-gray-400">{format(new Date(exp.createdAt), 'hh:mm a')}</span>
-                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
-                                                                    exp.paymentMode === 'CASH' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-                                                                }`}>
-                                                                    {exp.paymentMode}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <span className="text-base font-black text-gray-900">₹{exp.amount.toLocaleString()}</span>
-                                                </div>
+                        </div>
+                    )}
 
-                                                <div className="bg-gray-50 p-3 rounded-2xl space-y-1.5 border border-gray-100">
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-tight">
-                                                        <User size={12} className="text-emerald-500" />
-                                                        <span>{exp.user?.name}</span>
+                    {loading ? (
+                        <div className="flex items-center justify-center py-32 gap-4 flex-col text-gray-400">
+                            <Loader2 className="animate-spin text-emerald-600" size={40} />
+                            <p className="font-black text-xs uppercase tracking-widest italic">Loading expenses...</p>
+                        </div>
+                    ) : expenses.length === 0 ? (
+                        <div className="bg-white rounded-[2.5rem] p-24 border border-dashed border-gray-200 text-center shadow-inner">
+                            <Receipt size={56} className="mx-auto text-gray-100 mb-4" />
+                            <h3 className="text-xl font-black text-gray-200">No Expenses</h3>
+                        </div>
+                    ) : (
+                        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50/50">
+                                        <th className="px-4 py-4">
+                                            <input type="checkbox" checked={selected.length === expenses.length && expenses.length > 0}
+                                                onChange={toggleAll} className="rounded" />
+                                        </th>
+                                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Expense</th>
+                                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Agent</th>
+                                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Amount</th>
+                                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                                        <th className="px-4 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {expenses.map(exp => (
+                                        <tr key={exp.id} className="hover:bg-gray-50/30 transition-colors">
+                                            <td className="px-4 py-4">
+                                                <input type="checkbox" checked={selected.includes(exp.id)}
+                                                    onChange={() => toggleSelect(exp.id)} className="rounded" />
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center cursor-pointer border border-gray-100"
+                                                        onClick={() => exp.billImage && setSelectedExpense(exp)}>
+                                                        {exp.billImage ? <Eye size={16} className="text-emerald-600"/> : <Receipt size={16} className="text-gray-300"/>}
                                                     </div>
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-tight">
-                                                        <Truck size={12} className="text-blue-500" />
-                                                        <span>{exp.vehicle?.vehicleNumber}</span>
+                                                    <div>
+                                                        <p className="text-sm font-black text-gray-900">{exp.type}</p>
+                                                        {exp.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{exp.displayId}</span>}
+                                                        <div className="flex items-center gap-1.5 mt-0.5">
+                                                            <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${exp.paymentMode==='CASH'?'bg-emerald-50 text-emerald-600 border-emerald-100':exp.paymentMode==='PERSONAL_CASH'?'bg-purple-50 text-purple-600 border-purple-100':'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                                {exp.paymentMode}
+                                                            </span>
+                                                            <span className="text-[9px] text-gray-400 font-bold">{format(new Date(exp.createdAt),'hh:mm a')}</span>
+                                                        </div>
                                                     </div>
-                                                    {exp.description && (
-                                                        <p className="text-[10px] text-gray-500 font-bold italic mt-1 bg-white p-2 rounded-lg border border-gray-100">
-                                                            "{exp.description}"
-                                                        </p>
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
+                                                <p className="text-xs font-black text-gray-700">{exp.user?.name}</p>
+                                                {exp.vehicle && <p className="text-[9px] font-bold text-blue-500 uppercase">{exp.vehicle.vehicleNumber}</p>}
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
+                                                <span className="text-sm font-black text-gray-900">₹{exp.amount.toLocaleString()}</span>
+                                            </td>
+                                            <td className="px-4 py-4 text-center">
+                                                <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase border ${STATUS_STYLES[exp.status]||'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                                                    {exp.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-4">
+                                                <div className="flex items-center justify-end gap-1.5">
+                                                    {can('EXPENSES','UPDATE') && exp.status === 'PENDING' && (
+                                                        <>
+                                                            <button onClick={() => setActionModal({expenseId:exp.id,action:'APPROVED'})}
+                                                                className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100" title="Approve">
+                                                                <Check size={14} strokeWidth={3}/>
+                                                            </button>
+                                                            <button onClick={() => setActionModal({expenseId:exp.id,action:'REJECTED', isReturn: true})}
+                                                                className="p-2 bg-purple-50 text-purple-600 rounded-xl hover:bg-purple-600 hover:text-white transition-all border border-purple-100" title="Return">
+                                                                <RotateCcw size={14}/>
+                                                            </button>
+                                                            <button onClick={() => handleAction(exp.id,'REJECTED')}
+                                                                className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all border border-rose-100" title="Reject">
+                                                                <X size={14} strokeWidth={3}/>
+                                                            </button>
+                                                        </>
+                                                    )}
+                                                    {can('EXPENSES','UPDATE') && exp.status === 'APPROVED' && (
+                                                        <button onClick={() => setActionModal({expenseId:exp.id,action:'PAID'})}
+                                                            className="p-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-600 hover:text-white transition-all border border-blue-100" title="Mark Paid">
+                                                            <ShieldCheck size={14}/>
+                                                        </button>
+                                                    )}
+                                                    {!['PENDING','APPROVED'].includes(exp.status) && (
+                                                        <span className="text-[9px] text-gray-300 font-black uppercase">—</span>
                                                     )}
                                                 </div>
-                                            </div>
-
-                                            <div className="px-5 pb-5">
-                                              {exp.status === 'PENDING' ? (
-                                                  <div className="flex gap-2">
-                                                      {can('EXPENSES', 'UPDATE') ? (
-                                                        <>
-                                                          <button 
-                                                              onClick={() => handleAction(exp.id, 'APPROVED')}
-                                                              className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
-                                                          >
-                                                              Approve
-                                                          </button>
-                                                          <button 
-                                                              onClick={() => handleAction(exp.id, 'REJECTED')}
-                                                              className="flex-1 bg-gray-100 text-gray-400 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest"
-                                                          >
-                                                              Reject
-                                                          </button>
-                                                        </>
-                                                      ) : (
-                                                        <span className="flex-1 text-center text-[8px] font-black text-orange-500 uppercase py-2 bg-orange-50 rounded-xl">Pending Action</span>
-                                                      )}
-                                                  </div>
-                                              ) : (
-                                                  <div className={`py-2 px-4 rounded-xl text-center font-black text-[10px] uppercase tracking-widest border ${
-                                                      exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
-                                                  }`}>
-                                                      {exp.status}
-                                                  </div>
-                                              )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Desktop Table View */}
-                                <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-                                  <table className="w-full text-left border-collapse">
-                                    <thead>
-                                      <tr className="bg-gray-50/50">
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Expense Detail</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Field Staff</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Amount</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                      {expenses.map((exp) => (
-                                        <tr key={exp.id} className="hover:bg-gray-50/30 transition-colors group">
-                                          <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                                            <div className="flex items-center gap-4">
-                                              <div 
-                                                className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-transform hover:scale-105 shadow-sm ${exp.billImage ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-100 border border-gray-200'}`}
-                                                onClick={() => exp.billImage && setSelectedExpense(exp)}
-                                              >
-                                                {exp.billImage ? <Eye size={18} className="text-emerald-600" /> : <Receipt size={18} className="text-gray-400" />}
-                                              </div>
-                                              <div className="flex flex-col min-w-0">
-                                                <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{exp.type}</span>
-                                                {exp.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded w-fit tracking-wider mb-1">{exp.displayId}</span>}
-                                                <div className="flex items-center gap-2">
-                                                  <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-lg border ${exp.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                                                    {exp.paymentMode}
-                                                  </span>
-                                                  <span className="text-[10px] font-bold text-gray-400">{format(new Date(exp.createdAt), 'hh:mm a')}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </td>
-                                          <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                                            <div className="flex flex-col items-center gap-1">
-                                              <span className="text-xs font-black text-gray-700">{exp.user?.name}</span>
-                                              <div className="flex items-center gap-1 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
-                                                <Truck size={10} />
-                                                {exp.vehicle?.vehicleNumber}
-                                              </div>
-                                            </div>
-                                          </td>
-                                          <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                                            <span className="text-sm font-black text-gray-900">₹{exp.amount.toLocaleString()}</span>
-                                          </td>
-                                          <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                                            <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                              exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                              exp.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-orange-50 text-orange-600 border-orange-100'
-                                            }`}>
-                                              {exp.status}
-                                            </span>
-                                          </td>
-                                          <td className="px-6 py-4 text-right">
-                                            {exp.status === 'PENDING' ? (
-                                              <div className="flex items-center justify-end gap-2">
-                                                {can('EXPENSES', 'UPDATE') ? (
-                                                  <>
-                                                    <button 
-                                                      onClick={() => handleAction(exp.id, 'APPROVED')}
-                                                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                                                    >
-                                                      <Check size={16} strokeWidth={3} />
-                                                    </button>
-                                                    <button 
-                                                      onClick={() => handleAction(exp.id, 'REJECTED')}
-                                                      className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-100"
-                                                    >
-                                                      <X size={16} strokeWidth={3} />
-                                                    </button>
-                                                  </>
-                                                ) : (
-                                                  <span className="text-[9px] font-black text-orange-400 uppercase tracking-widest bg-orange-50 px-2 py-1 rounded-lg">Awaiting Decision</span>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <div className="flex items-center justify-end text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                                                Finalized
-                                              </div>
-                                            )}
-                                          </td>
+                                            </td>
                                         </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
-                            </>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </>
+            )}
+
+            {activeTab === 'categories' && (
+                <div className="space-y-4">
+                    {catForm && (
+                        <div className="bg-white rounded-3xl border border-emerald-100 shadow-sm p-6">
+                            <h4 className="text-sm font-black text-gray-900 mb-4">{catForm.id ? 'Edit' : 'New'} Category</h4>
+                            <form onSubmit={handleSaveCat} className="flex flex-col sm:flex-row gap-3">
+                                <input required placeholder="Category name (e.g. Fuel)" value={catForm.name}
+                                    onChange={e => setCatForm(p=>({...p,name:e.target.value}))}
+                                    className="flex-1 bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                                <input type="number" placeholder="Limit ₹ (optional)" value={catForm.limit}
+                                    onChange={e => setCatForm(p=>({...p,limit:e.target.value}))}
+                                    className="w-40 bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500/20" />
+                                <button type="submit" disabled={catSaving}
+                                    className="px-6 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50">
+                                    {catSaving ? 'Saving...' : (catForm.id ? 'Update' : 'Create')}
+                                </button>
+                                <button type="button" onClick={() => setCatForm(null)}
+                                    className="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl font-black text-xs hover:bg-gray-200 transition-all">
+                                    Cancel
+                                </button>
+                            </form>
+                        </div>
+                    )}
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                        {loading ? (
+                            <div className="flex items-center justify-center py-16"><Loader2 className="animate-spin text-emerald-600" size={28}/></div>
+                        ) : (
+                            <table className="w-full text-left">
+                                <thead>
+                                    <tr className="bg-gray-50">
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Name</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Limit</th>
+                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-50">
+                                    {categories.map(cat => (
+                                        <tr key={cat.id} className="hover:bg-gray-50/30">
+                                            <td className="px-6 py-4 text-sm font-black text-gray-900">{cat.name}</td>
+                                            <td className="px-6 py-4 text-center text-sm font-black text-gray-600">
+                                                {cat.limit ? `₹${cat.limit.toLocaleString()}` : <span className="text-gray-300 italic text-xs">No limit</span>}
+                                            </td>
+                                            <td className="px-6 py-4 text-right">
+                                                <div className="flex items-center justify-end gap-2">
+                                                    {can('EXPENSES','UPDATE') && (
+                                                        <button onClick={() => setCatForm({id:cat.id,name:cat.name,limit:cat.limit||''})}
+                                                            className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"><Edit size={14}/></button>
+                                                    )}
+                                                    {can('EXPENSES','DELETE') && (
+                                                        <button onClick={() => handleDeleteCat(cat.id)}
+                                                            className="p-2 text-rose-400 hover:bg-rose-50 rounded-xl transition-all"><Trash2 size={14}/></button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                    {categories.length === 0 && (
+                                        <tr><td colSpan={3} className="py-16 text-center text-xs font-black text-gray-300 uppercase tracking-widest">No categories yet</td></tr>
+                                    )}
+                                </tbody>
+                            </table>
                         )}
                     </div>
-                </>
-            ) : (
-                <div className="space-y-6">
-                    {/* Desktop Categories Table */}
-                    <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50/50">
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Category Name</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly Limit</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {categories.map(cat => (
-                            <tr key={cat.id} className="hover:bg-emerald-50/10 transition-colors">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 border border-gray-100">
-                                    <Receipt size={20} />
-                                  </div>
-                                  <span className="text-sm font-black text-gray-900 tracking-tight">{cat.name}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className={`text-sm font-black ${cat.limit ? 'text-gray-900' : 'text-gray-300 italic'}`}>
-                                  {cat.limit ? `₹${cat.limit.toLocaleString()}` : 'No Limit Set'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  Active
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                {can('EXPENSES', 'UPDATE') && (
-                                  <button className="p-2 text-gray-300 hover:text-emerald-600 transition-colors">
-                                    <Settings size={16} />
-                                  </button>
-                                )}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Mobile Categories Grid */}
-                    <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {categories.map(cat => (
-                            <div key={cat.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4 hover:border-emerald-200 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
-                                      <Receipt size={20} />
-                                  </div>
-                                  <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">Active</span>
-                                </div>
-                                <div className="space-y-1">
-                                    <h4 className="text-sm font-black uppercase tracking-tight text-slate-900">{cat.name}</h4>
-                                    <p className="text-[10px] font-bold text-slate-400">Monthly Limit: {cat.limit ? `₹${cat.limit.toLocaleString()}` : 'No Limit'}</p>
-                                </div>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             )}
 
-            {/* Add Category Modal */}
-            {showAddCategory && (
+            {/* Actions Modal */}
+            {actionModal && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white w-full max-w-sm rounded-[2rem] p-8 shadow-2xl animate-in zoom-in-95 duration-200 space-y-6">
-                        <div className="flex items-center justify-between">
-                            <h3 className="text-lg font-black text-gray-900 tracking-tight">New Expense Type</h3>
-                            <button onClick={() => setShowAddCategory(false)} className="text-gray-400"><X size={20} /></button>
+                    <div className="bg-white w-full max-w-sm rounded-3xl p-6 shadow-2xl space-y-4 animate-in zoom-in-95">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                actionModal.action === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 
+                                actionModal.action === 'PAID' ? 'bg-blue-50 text-blue-600' : 'bg-purple-50 text-purple-600'
+                            }`}>
+                                {actionModal.action === 'APPROVED' ? <Check size={20}/> : actionModal.action === 'PAID' ? <ShieldCheck size={20}/> : <RotateCcw size={20}/>}
+                            </div>
+                            <div>
+                                <h3 className="text-base font-black text-gray-900">
+                                    {actionModal.isReturn ? 'Return for Revision' : actionModal.action === 'APPROVED' ? 'Confirm Approval' : 'Confirm Payment'}
+                                </h3>
+                                <p className="text-[10px] text-gray-500 font-bold uppercase tracking-widest">
+                                    {actionModal.isReturn ? 'Request changes from agent' : 'Provide verification details'}
+                                </p>
+                            </div>
                         </div>
-                        <form onSubmit={handleAddCategory} className="space-y-4">
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Type Name</label>
-                                <input 
-                                    required
-                                    placeholder="e.g. Fuel, Toll"
-                                    value={newCategory.name}
-                                    onChange={(e) => setNewCategory({...newCategory, name: e.target.value})}
-                                    className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold"
-                                />
+
+                        {(actionModal.action === 'APPROVED' || actionModal.action === 'PAID') && (
+                            <div className="space-y-1.5">
+                                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Approver Name</label>
+                                <input type="text" value={approverName} onChange={e => setApproverName(e.target.value)}
+                                    placeholder="Enter person's name..."
+                                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold outline-none focus:ring-2 focus:ring-slate-500/20" />
                             </div>
-                            <div className="space-y-1">
-                                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Monthly Limit (Optional)</label>
-                                <input 
-                                    type="number"
-                                    placeholder="0"
-                                    value={newCategory.limit}
-                                    onChange={(e) => setNewCategory({...newCategory, limit: e.target.value})}
-                                    className="w-full bg-gray-50 border-none rounded-xl px-4 py-3 text-sm font-bold"
-                                />
-                            </div>
-                            <button className="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-[0.98] transition-all">
-                                Create Expense Type
+                        )}
+
+                        <div className="space-y-1.5">
+                            <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                                {actionModal.isReturn ? 'Reason for Return' : 'Internal Remarks (Optional)'}
+                            </label>
+                            <textarea rows={2} value={remarks} onChange={e => setRemarks(e.target.value)}
+                                placeholder={actionModal.isReturn ? "Explain why you are returning this..." : "Add any notes for the record..."}
+                                className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold resize-none outline-none focus:ring-2 focus:ring-slate-500/20" />
+                        </div>
+
+                        <div className="flex gap-3 pt-2">
+                            <button onClick={() => handleAction(actionModal.expenseId, actionModal.action, { remarks, approverName })}
+                                className={`flex-1 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                                    actionModal.action === 'APPROVED' ? 'bg-emerald-600 hover:bg-emerald-700' : 
+                                    actionModal.action === 'PAID' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-purple-600 hover:bg-purple-700'
+                                }`}>
+                                {actionModal.isReturn ? 'Send Back' : 'Confirm'}
                             </button>
-                        </form>
+                            <button onClick={() => { setActionModal(null); setRemarks(''); setApproverName(''); }}
+                                className="px-4 bg-gray-100 text-gray-600 rounded-xl font-black text-xs hover:bg-gray-200">
+                                Cancel
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* Bill Image Preview Modal */}
+            {/* Bill Preview */}
             {selectedExpense && (
                 <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/90 p-4" onClick={() => setSelectedExpense(null)}>
                     <div className="relative max-w-4xl max-h-screen">
-                        <img src={selectedExpense.billImage} alt="Bill detail" className="max-w-full max-h-[90vh] object-contain" />
-                        <button className="absolute top-4 right-4 text-white bg-white/20 p-2 rounded-full hover:bg-white/40 transition-all">
-                            <X size={24} />
-                        </button>
+                        <img src={selectedExpense.billImage} alt="Bill" className="max-w-full max-h-[90vh] object-contain rounded-2xl"/>
+                        <button className="absolute top-3 right-3 bg-white/20 p-2 rounded-full hover:bg-white/40 text-white"><X size={20}/></button>
                     </div>
                 </div>
             )}
         </div>
     );
 }
-

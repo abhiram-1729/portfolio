@@ -27,16 +27,25 @@ export default function CashWallet() {
     const [showAddExpense, setShowAddExpense] = useState(false);
 
     // Form states
-    const [expenseForm, setExpenseForm] = useState({
-        type: '',
-        amount: '',
-        paymentMode: 'CASH',
-        description: ''
+    const [expenseForm, setExpenseForm] = useState(() => {
+        // Restore offline draft if exists
+        try {
+            const draft = localStorage.getItem('expense_draft');
+            if (draft) return JSON.parse(draft);
+        } catch {}
+        return { type: '', amount: '', paymentMode: 'CASH', description: '' };
     });
     const [billFile, setBillFile] = useState(null);
     const [billPreview, setBillPreview] = useState(null);
     const [submitting, setSubmitting] = useState(false);
     const [claimingId, setClaimingId] = useState(null);
+
+    // Auto-save draft to localStorage
+    useEffect(() => {
+        if (expenseForm.amount || expenseForm.description) {
+            localStorage.setItem('expense_draft', JSON.stringify(expenseForm));
+        }
+    }, [expenseForm]);
 
     useEffect(() => {
         loadData();
@@ -45,14 +54,24 @@ export default function CashWallet() {
     const loadData = async () => {
         setLoading(true);
         try {
-            const [expensesData, catData] = await Promise.all([
-                getMyExpenses(), // Get all recent expenses, not just today
-                getExpenseCategories()
-            ]);
-            setExpenses(expensesData);
-            setCategories(catData);
-            if (catData.length > 0 && !expenseForm.type) {
-                setExpenseForm(prev => ({ ...prev, type: catData[0].name }));
+            // Decouple the requests so if expenses fail, categories still load!
+            let catData = [];
+            try {
+                catData = await getExpenseCategories();
+                setCategories(catData);
+                if (catData.length > 0 && !expenseForm.type) {
+                    setExpenseForm(prev => ({ ...prev, type: catData[0].name }));
+                }
+            } catch (catErr) {
+                console.error("Failed to load categories", catErr);
+            }
+
+            try {
+                const expensesData = await getMyExpenses();
+                setExpenses(expensesData);
+            } catch (expErr) {
+                console.error("Failed to load expenses", expErr);
+                toast.error('Failed to load expense history');
             }
         } catch (err) {
             toast.error('Failed to load wallet data');
@@ -76,6 +95,7 @@ export default function CashWallet() {
 
             await addExpense(formData);
             toast.success('Expense request sent to Admin');
+            localStorage.removeItem('expense_draft');
             setShowAddExpense(false);
             setExpenseForm({ type: categories[0]?.name || '', amount: '', paymentMode: 'CASH', description: '' });
             setBillFile(null);
@@ -203,12 +223,21 @@ export default function CashWallet() {
                                                 <span className="text-base font-black text-slate-900">₹{exp.amount.toLocaleString()}</span>
                                             </div>
                                             <div className="flex items-center gap-2 mt-1">
-                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${exp.status === 'APPROVED' ? 'bg-indigo-100 text-indigo-600' :
+                                                <span className={`text-[9px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest ${
+                                                    exp.status === 'APPROVED' ? 'bg-indigo-100 text-indigo-600' :
                                                     exp.status === 'PAID' ? 'bg-emerald-100 text-emerald-600' :
-                                                        exp.status === 'REJECTED' ? 'bg-rose-100 text-rose-600' : 'bg-orange-100 text-orange-600'
+                                                    exp.status === 'REJECTED' ? 'bg-rose-100 text-rose-600' :
+                                                    exp.status === 'RETURNED' ? 'bg-purple-100 text-purple-600' :
+                                                    exp.status === 'VERIFIED' ? 'bg-teal-100 text-teal-600' :
+                                                    exp.status === 'CLOSED' ? 'bg-gray-200 text-gray-600' :
+                                                    exp.status === 'UNDER_REVIEW' ? 'bg-yellow-100 text-yellow-600' :
+                                                    'bg-orange-100 text-orange-600'
                                                     }`}>
                                                     {exp.status === 'PAID' ? 'CLAIMED' : exp.status}
                                                 </span>
+                                                {exp.paymentMode === 'PERSONAL_CASH' && (
+                                                    <span className="text-[8px] font-black px-1.5 py-0.5 rounded bg-purple-50 text-purple-500 uppercase">Reimb.</span>
+                                                )}
                                                 <span className="text-[10px] font-bold text-slate-300">{format(new Date(exp.createdAt), 'dd MMM, hh:mm a')}</span>
                                             </div>
                                         </div>
@@ -272,7 +301,13 @@ export default function CashWallet() {
                                         }}
                                     >
                                         <option value="" disabled>Select category</option>
-                                        {categories.map(c => (
+                                        {(categories.length > 0 ? categories : [
+                                            { id: 'c1', name: 'Fuel' },
+                                            { id: 'c2', name: 'Toll' },
+                                            { id: 'c3', name: 'Food' },
+                                            { id: 'c4', name: 'Repairs' },
+                                            { id: 'c5', name: 'Other' }
+                                        ]).map(c => (
                                             <option key={c.id} value={c.name}>{c.name}</option>
                                         ))}
                                     </select>
@@ -292,6 +327,27 @@ export default function CashWallet() {
                                             className="w-full bg-slate-50 border-none rounded-2xl pl-10 pr-6 py-4 font-black text-slate-900 text-xl focus:ring-2 focus:ring-emerald-500 transition-all"
                                         />
                                     </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Payment Mode</label>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[{k:'CASH',l:'Cash',c:'emerald'},{k:'PERSONAL_CASH',l:'Personal Cash',c:'purple'},{k:'UPI',l:'UPI',c:'blue'}].map(m => (
+                                            <button key={m.k} type="button"
+                                                onClick={() => setExpenseForm({...expenseForm, paymentMode: m.k})}
+                                                className={`py-3 rounded-2xl text-xs font-black uppercase tracking-wide border transition-all ${
+                                                    expenseForm.paymentMode === m.k
+                                                        ? `bg-${m.c}-50 text-${m.c}-600 border-${m.c}-200 shadow-sm`
+                                                        : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>
+                                                {m.l}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {expenseForm.paymentMode === 'PERSONAL_CASH' && (
+                                        <p className="text-[9px] font-bold text-purple-500 bg-purple-50 px-3 py-1.5 rounded-xl mt-1">
+                                            ℹ️ Personal cash expenses are reimbursements. You can claim the fund after admin approval.
+                                        </p>
+                                    )}
                                 </div>
 
                                 <div className="space-y-1">
