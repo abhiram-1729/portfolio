@@ -212,6 +212,8 @@ export default function App() {
           <Route path="damage" element={<AdminDamage />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="privileges" element={<TenantPrivileges />} />
+          <Route path="stores" element={<TenantStores />} />
+          <Route path="admins" element={<AdminUsers type="admin" />} />
         </Route>
         {/* Tenant Routes */}
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
