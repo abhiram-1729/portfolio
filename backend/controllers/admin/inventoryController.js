@@ -259,7 +259,9 @@ export const updateItem = async (req, res) => {
       subCategoryId,
       brandId,
       barcode,
-      skuCode
+      skuCode,
+      storeId,
+      stock
     } = req.body;
 
     // Ensure we have a valid tenantId
@@ -341,7 +343,8 @@ export const updateItem = async (req, res) => {
       subCategoryId: finalSubCategoryId || undefined,
       brandId: finalBrandId || undefined,
       barcode: barcode === undefined ? undefined : (barcode || null),
-      skuCode: skuCode === undefined ? undefined : (skuCode || null)
+      skuCode: skuCode === undefined ? undefined : (skuCode || null),
+      storeId: (storeId && storeId !== 'null' && storeId !== '') ? storeId : undefined
     };
 
     const item = await prisma.product.update({
@@ -350,31 +353,48 @@ export const updateItem = async (req, res) => {
     });
 
     // Handle manual stock override if provided
-    if (req.body.stock !== undefined) {
-      const newStock = parseInt(req.body.stock) || 0;
+    if (stock !== undefined) {
+      const newStock = parseInt(stock) || 0;
       await prisma.$executeRawUnsafe(`UPDATE "Product" SET "stock" = ${newStock} WHERE "id" = '${id}'`);
       
-      // Also update WarehouseInventory to ensure the 'getItems' mapping reflects the override
-      const warehouseInventories = await prisma.warehouseInventory.findMany({
-        where: { productId: id, tenantId: finalTenantId }
+      // Ensure a warehouse exists for this tenant
+      let warehouse = await prisma.warehouse.findFirst({
+        where: { tenantId: finalTenantId }
       });
 
-      if (warehouseInventories.length > 0) {
-        // Update the first one to the new stock level
-        await prisma.warehouseInventory.update({
-          where: { id: warehouseInventories[0].id },
-          data: { quantity: newStock }
+      if (!warehouse) {
+        warehouse = await prisma.warehouse.create({
+          data: { tenantId: finalTenantId, name: 'Main Warehouse', location: 'Default' }
         });
-
-        // Set others to 0 to ensure the sum equals the newStock
-        if (warehouseInventories.length > 1) {
-          const otherIds = warehouseInventories.slice(1).map(wi => wi.id);
-          await prisma.warehouseInventory.updateMany({
-            where: { id: { in: otherIds } },
-            data: { quantity: 0 }
-          });
-        }
       }
+
+      // Upsert WarehouseInventory to ensure the 'getItems' mapping reflects the override
+      await prisma.warehouseInventory.upsert({
+        where: {
+          warehouseId_productId: {
+            warehouseId: warehouse.id,
+            productId: id
+          }
+        },
+        update: { quantity: newStock },
+        create: {
+          id: `wi_${id.substring(0, 8)}_${warehouse.id.substring(0, 8)}`,
+          tenantId: finalTenantId,
+          warehouseId: warehouse.id,
+          productId: id,
+          quantity: newStock
+        }
+      });
+
+      // If there are other warehouses, set them to 0 to maintain consistency
+      await prisma.warehouseInventory.updateMany({
+        where: { 
+          productId: id, 
+          warehouseId: { not: warehouse.id },
+          tenantId: finalTenantId
+        },
+        data: { quantity: 0 }
+      });
 
       console.log(`[Inventory] Manual stock override for ${item.name}: ${newStock}`);
     }

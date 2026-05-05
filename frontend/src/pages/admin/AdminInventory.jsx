@@ -678,7 +678,8 @@ export default function AdminInventory() {
       isFree: item.isFree || false,
       minShopAmount: item.minShopAmount?.toString() || '0',
       barcode: item.barcode || '',
-      stock: item.stock?.toString() || '0'
+      stock: item.stock?.toString() || '0',
+      storeId: item.storeId || ''
     });
     setEditPreviewUrl(item.image || null);
     setIsEditView(true);
@@ -709,11 +710,7 @@ export default function AdminInventory() {
         }
       });
 
-      // Enforce storeId isolation during update
-      const currentStoreId = storeFilterId || currentUser.storeId;
-      if (currentStoreId) {
-        formData.append('storeId', currentStoreId);
-      }
+      // Store ID is already included in editItem state
 
       if (selectedEditFile) {
         formData.append('image', selectedEditFile);
