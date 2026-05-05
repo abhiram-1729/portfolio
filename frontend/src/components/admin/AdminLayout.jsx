@@ -54,11 +54,15 @@ function cn(...inputs) {
 }
 
 export default function AdminLayout() {
-  const { clearUser, user } = useUserStore();
+  const { clearUser, user, refreshUserProfile } = useUserStore();
   const unreadCount = useNotificationStore(s => s.unreadCount);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    refreshUserProfile();
+  }, []);
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const activeStoreId = searchParams.get('storeId');

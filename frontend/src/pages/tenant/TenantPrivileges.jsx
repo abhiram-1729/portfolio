@@ -68,7 +68,7 @@ const SETTINGS_SECTIONS = [
 ];
 
 const PORTAL_TYPES = [
-  { key: 'ADMIN', label: 'Admin Portal', desc: 'Full backend access', icon: Shield, color: 'emerald' },
+  { key: 'ADMIN', label: 'VillagKart Admin', desc: 'Full backend access', icon: Shield, color: 'emerald' },
   { key: 'AGENT', label: 'Agent Portal', desc: 'Sales & Field activities', icon: Users, color: 'blue' },
   { key: 'SUPERVISOR', label: 'Supervisor Portal', desc: 'Branch management', icon: Key, color: 'amber' },
   { key: 'HELPER', label: 'Helper Portal', desc: 'Logistics support', icon: Plus, color: 'rose' },

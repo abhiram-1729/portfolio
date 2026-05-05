@@ -102,7 +102,7 @@ export default function AdminDashboard() {
         <h2 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard</h2>
         <div className="flex items-center gap-2">
           <p className="text-sm text-gray-500">
-            Adminizing <span className="text-emerald-600 font-bold">{currentUser?.tenantName || currentUser?.tenant?.name || 'Organization'}</span>
+            Managing <span className="text-emerald-600 font-bold">{currentUser?.tenantName || currentUser?.tenant?.name || 'Organization'}</span>
           </p>
           {isTenantRoute && storeFilterId && (
             <>
