@@ -1412,16 +1412,27 @@ model PurchaseInvoice {
 }
 
 model PurchaseInvoiceItem {
-  id        String          @id @default(cuid())
-  tenantId  String          @default("VK001")
-  invoiceId String
-  productId String
-  quantity  Int
-  price     Float
-  total     Float           @default(0)
-  tenant    Tenant          @relation(fields: [tenantId], references: [id])
-  invoice   PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
-  product   Product         @relation(fields: [productId], references: [id])
+  id                     String          @id @default(cuid())
+  tenantId               String          @default("VK001")
+  invoiceId              String
+  productId              String
+  quantity               Int
+  price                  Float
+  unitCostBeforeDiscount Float           @default(0)
+  discountPercent        Float           @default(0)
+  unitCostBeforeTax      Float           @default(0)
+  subtotalBeforeTax      Float           @default(0)
+  taxType                String?         // 'NONE', 'GST', 'VAT'
+  taxPercent             Float?          @default(0)
+  netCost                Float           @default(0)
+  profitMargin           Float           @default(0)
+  unitSellingPrice       Float           @default(0)
+  mfgDate                DateTime?
+  expDate                DateTime?
+  total                  Float           @default(0)
+  tenant                 Tenant          @relation(fields: [tenantId], references: [id])
+  invoice                PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  product                Product         @relation(fields: [productId], references: [id])
 
   @@index([tenantId])
   @@index([invoiceId])

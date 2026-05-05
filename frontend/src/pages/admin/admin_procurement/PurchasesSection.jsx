@@ -10,10 +10,28 @@ import { adminAPI } from '../../../services/adminService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-const PurchasesSection = ({ can }) => {
+const PurchasesSection = ({ can, setHeaderExtra }) => {
   const [purchases, setPurchases] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+
+  useEffect(() => {
+    if (setHeaderExtra && !showForm) {
+      const total = purchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
+      setHeaderExtra(
+        <div className="bg-white rounded-2xl px-6 py-3 border border-gray-100 shadow-sm flex flex-col min-w-[180px]">
+          <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Purchases</span>
+          <span className="text-xl font-black text-gray-900">₹{total.toLocaleString()}</span>
+        </div>
+      );
+    } else if (setHeaderExtra && showForm) {
+      setHeaderExtra(null);
+    }
+
+    return () => {
+      if (setHeaderExtra) setHeaderExtra(null);
+    };
+  }, [purchases, showForm, setHeaderExtra]);
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
@@ -24,6 +42,7 @@ const PurchasesSection = ({ can }) => {
   const [showQuickProduct, setShowQuickProduct] = useState(false);
   const [itemSearch, setItemSearch] = useState('');
   const [showItemResults, setShowItemResults] = useState(false);
+  const [itemFilter, setItemFilter] = useState('');
   const [searchQty, setSearchQty] = useState('1');
   const [searchPrice, setSearchPrice] = useState('0');
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -57,6 +76,8 @@ const PurchasesSection = ({ can }) => {
   }, []);
 
   const openForm = async () => {
+    setFormLoading(true);
+    // We always refetch products to ensure latest prices/taxes are used
     try {
       const [v, p, c, u, sc] = await Promise.all([
         procurementAPI.getVendors({ status: 'ACTIVE' }),
@@ -72,6 +93,7 @@ const PurchasesSection = ({ can }) => {
       setSubCategories(sc.data || []);
       setShowForm(true);
     } catch { toast.error('Failed to load data'); }
+    finally { setFormLoading(false); }
   };
 
   const handleQuickVendor = async (e) => {
@@ -112,8 +134,103 @@ const PurchasesSection = ({ can }) => {
     } catch (err) { toast.error(err.response?.data?.message || 'Error adding product'); }
   };
 
-  const addItem = () => {
-    setForm(f => ({ ...f, items: [...f.items, { productId: '', quantity: '1', price: '0' }] }));
+  const addItem = (product = null) => {
+    const newItem = {
+      productId: product?.id || '',
+      name: product?.name || '',
+      skuCode: product?.skuCode || 'NO-SKU',
+      quantity: '1',
+      unitCostBeforeDiscount: String(product?.purchasePrice || product?.price || '0'),
+      discountPercent: '0',
+      unitCostBeforeTax: String(product?.purchasePrice || product?.price || '0'),
+      subtotalBeforeTax: String(product?.purchasePrice || product?.price || '0'),
+      taxType: (product?.gst && product.gst > 0) ? 'GST' : 'NONE',
+      taxPercent: String(product?.gst || '0'),
+      netCost: String(product?.purchasePrice || product?.price || '0'),
+      profitMargin: '0',
+      unitSellingPrice: String(product?.price || '0'),
+      mfgDate: '',
+      expDate: '',
+      total: String(product?.purchasePrice || product?.price || '0')
+    };
+    setForm(prev => ({ ...prev, items: [...prev.items, calculateItemValues(newItem)] }));
+  };
+
+  const handlePOSelect = (poId) => {
+    if (!poId) {
+      setForm(prev => ({ ...prev, poId: '' }));
+      return;
+    }
+
+    const po = purchaseOrders.find(o => o.id === poId);
+    if (!po) return;
+
+    // Map PO items to Purchase Invoice items
+    const mappedItems = po.items.map(item => {
+      const prod = products.find(p => p.id === item.productId);
+      const cost = item.rate || prod?.purchasePrice || prod?.price || 0;
+      const qty = item.quantity || 1;
+      const taxRate = prod?.gst || 0;
+
+      return {
+        productId: item.productId,
+        name: prod?.name || 'Unknown Product',
+        skuCode: prod?.skuCode || 'NO-SKU',
+        quantity: String(qty),
+        unitCostBeforeDiscount: String(cost),
+        discountPercent: '0',
+        unitCostBeforeTax: String(cost),
+        subtotalBeforeTax: String(qty * cost),
+        taxType: taxRate > 0 ? 'GST' : 'NONE',
+        taxPercent: String(taxRate),
+        netCost: String(cost),
+        profitMargin: '0',
+        unitSellingPrice: String(prod?.price || cost),
+        mfgDate: '',
+        expDate: '',
+        total: String(qty * cost)
+      };
+    });
+
+    setForm(prev => ({
+      ...prev,
+      poId,
+      vendorId: po.vendorId,
+      items: mappedItems.map(i => calculateItemValues(i))
+    }));
+
+    toast.success(`Loaded items from PO #${po.poNumber}`);
+  };
+
+  const calculateItemValues = (item) => {
+    const qty = parseFloat(item.quantity) || 0;
+    const unitCostBD = parseFloat(item.unitCostBeforeDiscount) || 0;
+    const discPer = parseFloat(item.discountPercent) || 0;
+    const taxPer = parseFloat(item.taxPercent) || 0;
+    const unitSellPrice = parseFloat(item.unitSellingPrice) || 0;
+
+    // Total amount after discount (treated as Inclusive)
+    const lineTotal = (unitCostBD * qty) * (1 - discPer / 100);
+    
+    // Tax Amount calculated on the Inclusive Total
+    const taxAmount = lineTotal * (taxPer / 100);
+
+    // Base total (Before Tax) = Total - Tax
+    const subtotalBT = lineTotal - taxAmount;
+    const unitCostBT = qty > 0 ? subtotalBT / qty : 0;
+    
+    const netCost = qty > 0 ? lineTotal / qty : 0;
+    const profitMargin = netCost > 0 ? ((unitSellPrice - netCost) / netCost) * 100 : 0;
+
+    return {
+      ...item,
+      unitCostBeforeTax: unitCostBT.toFixed(2),
+      subtotalBeforeTax: subtotalBT.toFixed(2),
+      taxAmount: taxAmount.toFixed(2),
+      total: lineTotal.toFixed(2),
+      netCost: netCost.toFixed(2),
+      profitMargin: profitMargin.toFixed(2)
+    };
   };
 
   const removeItem = (idx) => {
@@ -123,7 +240,13 @@ const PurchasesSection = ({ can }) => {
   const updateItem = (idx, field, value) => {
     setForm(f => ({
       ...f,
-      items: f.items.map((item, i) => i === idx ? { ...item, [field]: value } : item)
+      items: f.items.map((item, i) => {
+        if (i === idx) {
+          const updatedItem = typeof field === 'object' ? { ...item, ...field } : { ...item, [field]: value };
+          return calculateItemValues(updatedItem);
+        }
+        return item;
+      })
     }));
   };
 
@@ -156,6 +279,7 @@ const PurchasesSection = ({ can }) => {
 
   const handleDelete = async (id) => {
     if (!window.confirm('Are you sure you want to delete this purchase invoice? This will revert stock and vendor balance.')) return;
+    setActionLoading({ id, type: 'delete' });
     try {
       await procurementAPI.deletePurchase(id);
       toast.success('Purchase deleted');
@@ -163,6 +287,8 @@ const PurchasesSection = ({ can }) => {
       setPurchases(data);
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error deleting purchase');
+    } finally {
+      setActionLoading({ id: null, type: null });
     }
   };
 
@@ -243,7 +369,7 @@ const PurchasesSection = ({ can }) => {
           const loadingToast = toast.loading(`Creating ${missingProductsToCreate.length} new products...`);
           try {
             const { data: createdItems } = await adminAPI.bulkCreateItems(missingProductsToCreate);
-            
+
             createdItems.forEach((p, idx) => {
               finalItemsToAdd.push({
                 productId: p.id,
@@ -290,7 +416,23 @@ const PurchasesSection = ({ can }) => {
       setIsSubmitting(true);
       const payload = {
         ...form,
-        items: form.items.map(i => ({ productId: i.productId, quantity: parseInt(i.quantity), price: parseFloat(i.price) }))
+        items: form.items.map(i => ({
+          productId: i.productId,
+          quantity: parseInt(i.quantity),
+          price: parseFloat(i.netCost), // Using netCost as the base price for stock/ledger if needed
+          unitCostBeforeDiscount: parseFloat(i.unitCostBeforeDiscount),
+          discountPercent: parseFloat(i.discountPercent),
+          unitCostBeforeTax: parseFloat(i.unitCostBeforeTax),
+          subtotalBeforeTax: parseFloat(i.subtotalBeforeTax),
+          taxType: i.taxType,
+          taxPercent: parseFloat(i.taxPercent),
+          netCost: parseFloat(i.netCost),
+          total: parseFloat(i.total),
+          profitMargin: parseFloat(i.profitMargin),
+          unitSellingPrice: parseFloat(i.unitSellingPrice),
+          mfgDate: i.mfgDate || null,
+          expDate: i.expDate || null
+        }))
       };
 
       if (form.id) {
@@ -322,25 +464,29 @@ const PurchasesSection = ({ can }) => {
 
   return (
     <div className="space-y-4">
-      {!showForm ? (
+      {(!showForm && !showQuickProduct && !showQuickVendor) && (
         <>
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 bg-white/50 p-3 rounded-[2rem] border border-gray-100">
-        <div className="relative group flex-1 max-w-md w-full">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
-          <input 
-            placeholder="Search invoice or vendor..." 
-            value={search} 
-            onChange={e => setSearch(e.target.value)}
-            className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2.5 text-xs font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300" 
-          />
-        </div>
-        {can('PROCUREMENT', 'CREATE', 'PURCHASES') && (
-          <button onClick={() => { setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] }); openForm(); }}
-            className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0">
-            <Plus size={14} strokeWidth={3} /> New Purchase
-          </button>
-        )}
-      </div>
+          <div className="flex flex-col md:flex-row gap-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="relative flex-1 group">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+              <input
+                type="text"
+                placeholder="Search invoice or vendor..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2.5 text-xs font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300"
+              />
+            </div>
+            {can('PROCUREMENT', 'CREATE', 'PURCHASES') && (
+              <button 
+                onClick={() => { setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] }); openForm(); }}
+                disabled={formLoading}
+                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed">
+                {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} strokeWidth={3} />}
+                {formLoading ? 'Loading...' : 'New Purchase'}
+              </button>
+            )}
+          </div>
 
       {loading ? (
         <div className="flex items-center justify-center py-24"><Loader2 className="animate-spin text-emerald-600" size={40} /></div>
@@ -439,51 +585,41 @@ const PurchasesSection = ({ can }) => {
             </table>
           </div>
         </div>
-      )}
-      </>
-      ) : (
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+      </>)}
+
+      {showForm && (
+        <div className={`bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300 ${showQuickProduct || showQuickVendor ? 'hidden' : 'block'}`}>
           <div className="flex items-center gap-4 border-b border-gray-100 pb-4">
             <button type="button" onClick={() => setShowForm(false)} className="p-2 bg-gray-50 text-gray-600 rounded-xl hover:bg-gray-100 hover:text-emerald-600 transition-all">
               <ArrowLeft size={18} />
             </button>
             <h3 className="text-xl font-black text-gray-900">{form.id ? 'Edit Purchase Invoice' : 'New Purchase Invoice'}</h3>
           </div>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between">
-                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor *</label>
-                    <button type="button" onClick={() => setShowQuickVendor(true)} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-100"><Plus size={10} /> Add New</button>
-                  </div>
-                  <select value={form.vendorId} onChange={e => setForm({...form, vendorId: e.target.value})} required
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none">
-                    <option value="">Select Vendor</option>
-                    {vendors.map(v => <option key={v.id} value={v.id}>{v.vendorName}</option>)}
-                  </select>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor *</label>
+                  <button type="button" onClick={() => setShowQuickVendor(true)} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-100"><Plus size={10} /> Add New</button>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Invoice # *</label>
-                  <input required value={form.invoiceNumber} onChange={e => setForm({...form, invoiceNumber: e.target.value})}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
+                <select value={form.vendorId} onChange={e => setForm({ ...form, vendorId: e.target.value })} required
+                  className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none">
+                  <option value="">Select Vendor</option>
+                  {vendors.map(v => <option key={v.id} value={v.id}>{v.vendorName}</option>)}
+                </select>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Invoice Date</label>
-                  <input type="date" value={form.invoiceDate} onChange={e => setForm({...form, invoiceDate: e.target.value})}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Transport ₹</label>
-                  <input type="number" value={form.transportCharges} onChange={e => setForm({...form, transportCharges: e.target.value})}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Other ₹</label>
-                  <input type="number" value={form.otherCharges} onChange={e => setForm({...form, otherCharges: e.target.value})}
-                    className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none" />
-                </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Link Purchase Order (Optional)</label>
+                <select 
+                  value={form.poId} 
+                  onChange={e => handlePOSelect(e.target.value)}
+                  disabled={!form.vendorId}
+                  className="w-full bg-emerald-50/50 rounded-xl px-4 py-3 text-sm font-bold border border-emerald-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                  <option value="">{form.vendorId ? 'No PO Linked' : 'Select Vendor First'}</option>
+                  {form.vendorId && purchaseOrders.filter(po => po.vendorId === form.vendorId).map(po => (
+                    <option key={po.id} value={po.id}>PO #{po.poNumber} ({po.vendor?.vendorName})</option>
+                  ))}
+                </select>
               </div>
               {/* Items */}
               <div className="space-y-2">
@@ -596,24 +732,6 @@ const PurchasesSection = ({ can }) => {
                       <Check size={16} strokeWidth={3} />
                     </button>
                   </div>
-                  <div className="flex gap-2 self-end">
-                    <input
-                      type="file"
-                      accept=".xlsx, .xls, .csv"
-                      id="excel-upload"
-                      className="hidden"
-                      onChange={handleExcelUpload}
-                    />
-                    <label
-                      htmlFor="excel-upload"
-                      className="text-[10px] font-black text-amber-600 flex items-center gap-1.5 bg-amber-50/50 px-3 py-2 rounded-xl hover:bg-amber-100 transition-all cursor-pointer active:scale-95 border border-amber-100"
-                    >
-                      <FileUp size={12} strokeWidth={3} /> Bulk Upload
-                    </label>
-                    <button type="button" onClick={() => setShowQuickProduct(true)} className="text-[10px] font-black text-blue-600 flex items-center gap-1.5 bg-blue-50/50 px-3 py-2 rounded-xl hover:bg-blue-100 transition-all active:scale-95">
-                      <Plus size={12} strokeWidth={3} /> New Product
-                    </button>
-                  </div>
                 </div>
               <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500" onClick={() => setShowItemResults(false)}>
                 {form.items.length === 0 ? (
@@ -719,68 +837,83 @@ const PurchasesSection = ({ can }) => {
                 )}
               </div>
               </div>
-              <button 
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
-              >
-                {isSubmitting ? (
-                  <><Loader2 className="animate-spin" size={16} /> Saving...</>
-                ) : (
-                  form.id ? 'Update Purchase Invoice' : 'Create Purchase Invoice'
-                )}
-              </button>
-            </form>
+            <button
+              type="submit"
+              disabled={isSubmitting}
+              className="w-full flex items-center justify-center gap-2 bg-emerald-600 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest shadow-xl hover:bg-emerald-700 transition-all disabled:opacity-70 disabled:cursor-not-allowed"
+            >
+              {isSubmitting ? (
+                <><Loader2 className="animate-spin" size={16} /> Saving...</>
+              ) : (
+                form.id ? 'Update Purchase Invoice' : 'Create Purchase Invoice'
+              )}
+            </button>
+          </form>
         </div>
       )}
 
       {/* Quick Vendor Modal */}
+      {/* Quick Vendor Form (Inline) */}
       {showQuickVendor && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-white w-full max-w-xl rounded-[2rem] p-6 shadow-2xl space-y-4 animate-in zoom-in-95 duration-200 overflow-y-auto max-h-[90vh]">
-            <div className="flex items-center justify-between border-b pb-2">
-              <h3 className="text-base font-black text-gray-900">Comprehensive Quick Add Vendor</h3>
-              <button onClick={() => setShowQuickVendor(false)} className="text-gray-400"><X size={18} /></button>
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="flex items-center gap-4 border-b border-gray-100 pb-6">
+            <button type="button" onClick={() => setShowQuickVendor(false)} className="p-3 bg-gray-50 text-gray-400 hover:text-emerald-600 rounded-2xl transition-all active:scale-90">
+              <ArrowLeft size={24} />
+            </button>
+            <div>
+              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Add New Vendor</h3>
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Vendor Master Registration</p>
             </div>
-            <form onSubmit={handleQuickVendor} className="grid grid-cols-2 gap-3">
-              <div className="col-span-2 space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor Name *</label>
-                <input required value={quickVendorForm.vendorName} onChange={e => setQuickVendorForm({...quickVendorForm, vendorName: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Mobile *</label>
-                <input required value={quickVendorForm.mobile} onChange={e => setQuickVendorForm({...quickVendorForm, mobile: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Email</label>
-                <input type="email" value={quickVendorForm.email} onChange={e => setQuickVendorForm({...quickVendorForm, email: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Contact Person</label>
-                <input value={quickVendorForm.contactPerson} onChange={e => setQuickVendorForm({...quickVendorForm, contactPerson: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">GST Number</label>
-                <input value={quickVendorForm.gstNumber} onChange={e => setQuickVendorForm({...quickVendorForm, gstNumber: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Credit Days</label>
-                <input type="number" value={quickVendorForm.creditDays} onChange={e => setQuickVendorForm({...quickVendorForm, creditDays: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Bal (₹)</label>
-                <input type="number" value={quickVendorForm.openingBalance} onChange={e => setQuickVendorForm({...quickVendorForm, openingBalance: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none" />
-              </div>
-              <div className="col-span-2 space-y-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 pl-1">Address</label>
-                <textarea rows="2" value={quickVendorForm.address} onChange={e => setQuickVendorForm({...quickVendorForm, address: e.target.value})} className="w-full bg-gray-50 rounded-xl px-4 py-2 text-xs font-bold focus:ring-2 focus:ring-emerald-500 border-none outline-none resize-none" />
-              </div>
-              <div className="col-span-2 flex gap-3 pt-2">
-                <button type="button" onClick={() => setShowQuickVendor(false)} className="flex-1 py-3.5 text-xs font-black uppercase text-gray-400 hover:text-gray-600 transition-colors">Cancel</button>
-                <button className="flex-[2] bg-emerald-600 text-white py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all">Save Vendor</button>
-              </div>
-            </form>
           </div>
+
+          <form onSubmit={handleQuickVendor} className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="col-span-1 md:col-span-2 space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor Name *</label>
+                <input required value={quickVendorForm.vendorName} onChange={e => setQuickVendorForm({ ...quickVendorForm, vendorName: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Mobile Number *</label>
+                <input required value={quickVendorForm.mobile} onChange={e => setQuickVendorForm({ ...quickVendorForm, mobile: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Email Address</label>
+                <input type="email" value={quickVendorForm.email} onChange={e => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Contact Person</label>
+                <input value={quickVendorForm.contactPerson} onChange={e => setQuickVendorForm({ ...quickVendorForm, contactPerson: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">GST Number</label>
+                <input value={quickVendorForm.gstNumber} onChange={e => setQuickVendorForm({ ...quickVendorForm, gstNumber: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Credit Days</label>
+                <input type="number" value={quickVendorForm.creditDays} onChange={e => setQuickVendorForm({ ...quickVendorForm, creditDays: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Balance (₹)</label>
+                <input type="number" value={quickVendorForm.openingBalance} onChange={e => setQuickVendorForm({ ...quickVendorForm, openingBalance: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+              </div>
+              <div className="col-span-1 md:col-span-2 space-y-1">
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Business Address</label>
+                <textarea rows="3" value={quickVendorForm.address} onChange={e => setQuickVendorForm({ ...quickVendorForm, address: e.target.value })} 
+                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner resize-none" />
+              </div>
+            </div>
+            <div className="flex gap-4 pt-4">
+              <button type="button" onClick={() => setShowQuickVendor(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">Cancel</button>
+              <button className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all">Register Vendor</button>
+            </div>
+          </form>
         </div>
       )}
 
@@ -903,6 +1036,117 @@ const PurchasesSection = ({ can }) => {
               </button>
             </div>
           </div>
+
+          <form onSubmit={handleQuickProduct} className="space-y-10">
+            {/* Basic Information */}
+            <section className="space-y-6">
+              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-emerald-500 pl-3">Basic Information</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="col-span-1 md:col-span-2 space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Product Name *</label>
+                  <input placeholder="Enter product name" required value={quickProductForm.name} onChange={e => setQuickProductForm({ ...quickProductForm, name: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">SKU Code</label>
+                  <input placeholder="Internal identifier" value={quickProductForm.skuCode} onChange={e => setQuickProductForm({ ...quickProductForm, skuCode: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Barcode (EAN/UPC)</label>
+                  <div className="flex gap-2">
+                    <input placeholder="Scan or type barcode" value={quickProductForm.barcode} onChange={e => setQuickProductForm({ ...quickProductForm, barcode: e.target.value })} 
+                      className="flex-1 bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                    <button type="button" onClick={() => setShowScanner(true)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-100 transition-all">
+                      <ScanBarcode size={20} />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            {/* Classification */}
+            <section className="space-y-6">
+              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-blue-500 pl-3">Classification</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Category *</label>
+                  <select required value={quickProductForm.categoryId} onChange={e => setQuickProductForm({ ...quickProductForm, categoryId: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
+                    <option value="default">Select Category</option>
+                    {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Sub-Category</label>
+                  <select value={quickProductForm.subCategoryId} onChange={e => setQuickProductForm({ ...quickProductForm, subCategoryId: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
+                    <option value="default">Select Sub-Category</option>
+                    {subCategories.filter(sc => sc.categoryId === quickProductForm.categoryId).map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            {/* Pricing & Tax */}
+            <section className="space-y-6">
+              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-purple-500 pl-3">Pricing & Tax</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">MRP (₹)</label>
+                  <input type="number" step="0.01" placeholder="0.00" value={quickProductForm.mrp} onChange={e => setQuickProductForm({ ...quickProductForm, mrp: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Purchase Price (₹)</label>
+                  <input type="number" step="0.01" placeholder="0.00" value={quickProductForm.purchasePrice} onChange={e => setQuickProductForm({ ...quickProductForm, purchasePrice: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Selling Price *</label>
+                  <input type="number" step="0.01" placeholder="0.00" required value={quickProductForm.price} onChange={e => setQuickProductForm({ ...quickProductForm, price: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">GST (%)</label>
+                  <select value={quickProductForm.gst} onChange={e => setQuickProductForm({ ...quickProductForm, gst: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all">
+                    {taxSlabs.map(s => <option key={s} value={s}>{s}%</option>)}
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            {/* Units & Initial Stock */}
+            <section className="space-y-6">
+              <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-l-4 border-amber-500 pl-3">Units & Initial Stock</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Unit Type</label>
+                  <select value={quickProductForm.unitId} onChange={e => setQuickProductForm({ ...quickProductForm, unitId: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
+                    <option value="">Select Unit</option>
+                    {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Unit Value</label>
+                  <input placeholder="e.g. 500" value={quickProductForm.unitValue} onChange={e => setQuickProductForm({ ...quickProductForm, unitValue: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Stock (In Store)</label>
+                  <input type="number" placeholder="0" value={quickProductForm.stock} onChange={e => setQuickProductForm({ ...quickProductForm, stock: e.target.value })} 
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
+                </div>
+              </div>
+            </section>
+
+            <div className="flex gap-4 pt-6 border-t border-gray-100">
+              <button type="button" onClick={() => setShowQuickProduct(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">Cancel</button>
+              <button className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all">Create Master Item</button>
+            </div>
+          </form>
         </div>
       )}
       {showScanner && (

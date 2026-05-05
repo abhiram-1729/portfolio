@@ -63,8 +63,19 @@ export const createPurchase = async (req, res) => {
               tenantId,
               productId: item.productId,
               quantity: parseInt(item.quantity),
-              price: parseFloat(item.price),
-              total: parseInt(item.quantity) * parseFloat(item.price)
+              price: parseFloat(item.price), // Line Total / Net Total for this item
+              unitCostBeforeDiscount: parseFloat(item.unitCostBeforeDiscount) || 0,
+              discountPercent: parseFloat(item.discountPercent) || 0,
+              unitCostBeforeTax: parseFloat(item.unitCostBeforeTax) || 0,
+              subtotalBeforeTax: parseFloat(item.subtotalBeforeTax) || 0,
+              taxType: item.taxType || 'NONE',
+              taxPercent: parseFloat(item.taxPercent) || 0,
+              netCost: parseFloat(item.netCost) || 0,
+              profitMargin: parseFloat(item.profitMargin) || 0,
+              unitSellingPrice: parseFloat(item.unitSellingPrice) || 0,
+              mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
+              expDate: item.expDate ? new Date(item.expDate) : null,
+              total: parseFloat(item.total) || (parseInt(item.quantity) * parseFloat(item.price))
             }))
           }
         }
@@ -217,6 +228,7 @@ export const getPurchases = async (req, res) => {
 
     res.json(purchases);
   } catch (error) {
+    console.error('FETCH PURCHASES ERROR:', error);
     res.status(500).json({ message: 'Error fetching purchases', error: error.message });
   }
 };
@@ -250,7 +262,7 @@ export const getPurchaseById = async (req, res) => {
 export const updatePurchase = async (req, res) => {
   try {
     const { id } = req.params;
-    const { invoiceNumber, invoiceDate, transportCharges, otherCharges, remarks, items } = req.body;
+    const { vendorId, poId, invoiceNumber, invoiceDate, transportCharges, otherCharges, remarks, items } = req.body;
 
     const existing = await prisma.purchaseInvoice.findUnique({ where: { id } });
     if (!existing) return res.status(404).json({ message: 'Purchase invoice not found' });
@@ -347,6 +359,8 @@ export const updatePurchase = async (req, res) => {
       const inv = await tx.purchaseInvoice.update({
         where: { id },
         data: {
+          vendorId: vendorId || existing.vendorId,
+          poId: poId !== undefined ? poId : existing.poId,
           invoiceNumber: invoiceNumber || existing.invoiceNumber,
           invoiceDate: isValidDate ? parsedDate : existing.invoiceDate,
           transportCharges: newTransport,

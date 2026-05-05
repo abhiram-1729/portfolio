@@ -94,7 +94,13 @@ export const getPOs = async (req, res) => {
     const { status, vendorId, storeId } = req.query;
     const where = { tenantId: req.user.tenantId };
 
-    if (status) where.status = status;
+    if (status) {
+      if (status.includes(',')) {
+        where.status = { in: status.split(',') };
+      } else {
+        where.status = status;
+      }
+    }
     if (vendorId) where.vendorId = vendorId;
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
