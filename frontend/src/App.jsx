@@ -41,6 +41,7 @@ import AdminProcurement from './pages/admin/AdminProcurement';
 import TenantLayout from './components/tenant/TenantLayout';
 import TenantDashboard from './pages/tenant/TenantDashboard';
 import TenantStores from './pages/tenant/TenantStores';
+import AdminStores from './pages/admin/AdminStores';
 import TenantPrivileges from './pages/tenant/TenantPrivileges';
 import TenantActivityLogs from './pages/tenant/TenantActivityLogs';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
@@ -212,7 +213,7 @@ export default function App() {
           <Route path="damage" element={<AdminDamage />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="privileges" element={<TenantPrivileges />} />
-          <Route path="stores" element={<TenantStores />} />
+          <Route path="stores" element={<AdminStores />} />
           <Route path="admins" element={<AdminUsers type="admin" />} />
         </Route>
         {/* Tenant Routes */}

@@ -44,13 +44,17 @@ export const adminReviewClosing = async (data) => {
 };
 
 // Store Cash Safe Endpoints
-export const getStoreCashRegister = async (date) => {
-  const response = await api.get(`/cash/store-register/${date}`);
+export const getStoreCashRegister = async (date, storeId) => {
+  const params = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get(`/cash/store-register/${date}`, { params });
   return response.data;
 };
 
-export const getStoreCashLedger = async (date) => {
-  const response = await api.get(`/cash/store-register/${date}/ledger`);
+export const getStoreCashLedger = async (date, storeId) => {
+  const params = {};
+  if (storeId) params.storeId = storeId;
+  const response = await api.get(`/cash/store-register/${date}/ledger`, { params });
   return response.data;
 };
 

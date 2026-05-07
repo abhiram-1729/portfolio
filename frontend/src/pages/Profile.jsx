@@ -42,7 +42,7 @@ export default function Profile() {
   };
 
   const ROLE_COLORS = {
-    ADMIN: 'from-orange-500 to-orange-600 shadow-orange-500/20',
+    ADMIN: 'from-emerald-500 to-emerald-600 shadow-emerald-500/20',
     SALES_AGENT: 'from-emerald-500 to-emerald-600 shadow-emerald-500/20',
     CONSUMER: 'from-emerald-800 to-emerald-950 shadow-emerald-950/20',
   };
@@ -97,9 +97,9 @@ export default function Profile() {
           <div className="glass rounded-[2rem] p-6 bg-white/70 border border-emerald-50 shadow-sm relative overflow-hidden">
             {user?.role === 'ADMIN' ? (
               <div className="flex flex-col items-center py-4 text-center">
-                <Shield className="text-orange-500 mb-2" size={32} />
+                <Shield className="text-emerald-500 mb-2" size={32} />
                 <p className="text-sm font-bold text-emerald-950 uppercase tracking-tight">Administrator Status</p>
-                <p className="text-[10px] font-extrabold text-orange-600 mt-1 uppercase tracking-[0.2em]">Full Fleet Access Restricted</p>
+                <p className="text-[10px] font-extrabold text-emerald-600 mt-1 uppercase tracking-[0.2em]">Full Fleet Access Restricted</p>
               </div>
             ) : user?.assignedVehicle ? (
               <div className="space-y-6">
@@ -189,7 +189,7 @@ export default function Profile() {
           <p className="text-[10px] font-black text-emerald-800/40 uppercase tracking-[0.2em] px-2">Account Security</p>
           <div className="glass rounded-[2rem] p-6 bg-white/70 border border-emerald-50 shadow-sm relative overflow-hidden">
             <div className="flex items-center gap-4 mb-5">
-              <div className="w-10 h-10 rounded-xl bg-orange-50 flex items-center justify-center text-orange-500 shadow-inner">
+              <div className="w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-500 shadow-inner">
                 <KeyRound size={20} strokeWidth={2.5} />
               </div>
               <div>
@@ -222,7 +222,7 @@ export default function Profile() {
                     type="password"
                     required
                     placeholder="New password"
-                    className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
+                    className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
                     value={passwords.newPassword}
                     onChange={(e) => setPasswords({ ...passwords, newPassword: e.target.value })}
                   />
@@ -233,7 +233,7 @@ export default function Profile() {
                     type="password"
                     required
                     placeholder="Confirm password"
-                    className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-orange-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
+                    className="w-full bg-slate-50 border border-slate-100/60 rounded-2xl px-5 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none text-emerald-950 font-medium placeholder-emerald-900/20"
                     value={passwords.confirmPassword}
                     onChange={(e) => setPasswords({ ...passwords, confirmPassword: e.target.value })}
                   />
@@ -243,7 +243,7 @@ export default function Profile() {
               <button
                 type="submit"
                 disabled={isUpdating}
-                className="w-full bg-orange-500 text-white p-3.5 rounded-2xl shadow-lg shadow-orange-500/20 hover:bg-orange-600 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest disabled:opacity-70 mt-2"
+                className="w-full bg-emerald-600 text-white p-3.5 rounded-2xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 active:scale-[0.98] transition-all flex items-center justify-center gap-2 font-black uppercase text-xs tracking-widest disabled:opacity-70 mt-2"
               >
                 {isUpdating ? <Loader2 className="animate-spin" size={18} /> : <KeyRound size={18} />}
                 Update Security
@@ -257,7 +257,7 @@ export default function Profile() {
             <button
             id="logout-btn"
             onClick={handleLogout}
-            className="w-full h-16 rounded-[1.5rem] bg-white text-orange-600 font-black text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-orange-950/5 border border-orange-100 hover:bg-orange-50 group"
+            className="w-full h-16 rounded-[1.5rem] bg-white text-emerald-600 font-black text-lg active:scale-[0.98] transition-all flex items-center justify-center gap-3 shadow-xl shadow-emerald-950/5 border border-emerald-100 hover:bg-emerald-50 group"
             >
                 <LogOut size={22} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" />
                 <span className="uppercase text-xs tracking-[0.2em]">Terminate Session</span>

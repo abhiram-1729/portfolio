@@ -15,12 +15,17 @@ import {
     Check,
     X,
     Settings,
-    Plus
+    Plus,
+    Building2,
+    ChevronRight,
+    ChevronLeft
 } from 'lucide-react';
 import { getAllExpenses, updateExpenseStatus, getExpenseCategories, createExpenseCategory } from '../../services/expenseService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import adminAPI from '../../services/adminService';
 
 export default function AdminExpenses() {
     const can = useUserStore(s => s.can);
@@ -34,18 +39,67 @@ export default function AdminExpenses() {
     const [newCategory, setNewCategory] = useState({ name: '', limit: '' });
     const [selectedExpense, setSelectedExpense] = useState(null);
 
+    // Multi-branch state
+    const [searchParams, setSearchParams] = useSearchParams();
+    const storeId = searchParams.get('storeId');
+    const [stores, setStores] = useState([]);
+    const [branchStats, setBranchStats] = useState({});
+    const user = useUserStore(s => s.user);
+    const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN' || (user?.role === 'ADMIN' && !user?.customRoleId) || user?.portalType === 'ADMIN';
+
     useEffect(() => {
+        const fetchStores = async () => {
+            if (isGlobalRole && !storeId) {
+                try {
+                    const res = await adminAPI.getStores();
+                    const storeData = res.data?.success ? res.data.data : (res.data || []);
+                    setStores(storeData);
+
+                    // Fetch stats for overview
+                    const stats = {};
+                    await Promise.all(storeData.map(async (s) => {
+                        try {
+                            const data = await getAllExpenses({ storeId: s.id, date });
+                            stats[s.id] = {
+                                count: data.length,
+                                total: data.reduce((sum, e) => sum + e.amount, 0),
+                                pending: data.filter(e => e.status === 'PENDING').length
+                            };
+                        } catch (e) {
+                            stats[s.id] = { count: 0, total: 0, pending: 0 };
+                        }
+                    }));
+                    setBranchStats(stats);
+                } catch (err) {
+                    console.error('Error fetching stores:', err);
+                }
+            }
+        };
+        fetchStores();
+    }, [isGlobalRole, storeId, date]);
+
+    useEffect(() => {
+        if (!isGlobalRole && !storeId && user?.storeId) {
+            setSearchParams({ storeId: user.storeId });
+        }
+    }, [isGlobalRole, storeId, user]);
+
+    useEffect(() => {
+        if (!storeId && isGlobalRole) return;
+        
         if (activeTab === 'monitoring') {
             loadExpenses();
         } else {
             loadCategories();
         }
-    }, [date, statusFilter, activeTab]);
+    }, [date, statusFilter, activeTab, storeId]);
 
     const loadExpenses = async () => {
         setLoading(true);
+        // Clear previous data
+        setExpenses([]);
         try {
-            const data = await getAllExpenses({ date, status: statusFilter });
+            const data = await getAllExpenses({ date, status: statusFilter, storeId });
             setExpenses(data);
         } catch (err) {
             toast.error('Failed to load expenses');
@@ -89,11 +143,89 @@ export default function AdminExpenses() {
         }
     };
 
+    if (isGlobalRole && !storeId) {
+        return (
+            <div className="space-y-8 animate-in fade-in duration-700">
+                <div className="flex flex-col gap-1">
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tight">Organization Expenses</h2>
+                    <p className="text-sm font-medium text-gray-500 uppercase tracking-widest italic">Global Expenditure Monitoring & Approval Pipeline</p>
+                </div>
+
+                <div className="grid grid-cols-1 gap-4 max-w-5xl">
+                    {stores.map(store => {
+                        const stats = branchStats[store.id] || { count: 0, total: 0, pending: 0 };
+                        return (
+                            <div 
+                                key={store.id}
+                                onClick={() => setSearchParams({ storeId: store.id })}
+                                className="group bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 hover:border-emerald-100 transition-all cursor-pointer relative overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                                    <Receipt size={120} />
+                                </div>
+
+                                <div className="relative z-10 flex items-center justify-between gap-8">
+                                    <div className="flex items-center gap-6">
+                                        <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shrink-0">
+                                            <Building2 size={32} strokeWidth={2.5} />
+                                        </div>
+                                        <div className="flex flex-col">
+                                            <h3 className="text-xl font-black text-gray-900 tracking-tight group-hover:text-emerald-600 transition-colors">{store.name}</h3>
+                                            <div className="flex items-center gap-2 mt-1">
+                                                <span className="text-[10px] font-black px-2.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-md uppercase tracking-widest">
+                                                    {store.code || 'BRANCH'}
+                                                </span>
+                                                <span className="text-xs font-bold text-gray-400 uppercase tracking-tighter flex items-center gap-1.5">
+                                                    • {store.address || 'Location Unspecified'}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-12">
+                                        <div className="hidden lg:flex flex-col items-end">
+                                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Expenditure</span>
+                                            <span className="text-sm font-bold text-gray-900 mt-1">₹{stats.total.toLocaleString()} <span className="text-[10px] text-gray-400 ml-1">({stats.count} Requests)</span></span>
+                                        </div>
+                                        <div className="hidden md:flex flex-col items-end border-l border-gray-100 pl-12">
+                                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Pending Review</span>
+                                            <span className={`text-sm font-bold mt-1 ${stats.pending > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>
+                                                {stats.pending} Required
+                                            </span>
+                                        </div>
+                                        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                                            <ChevronRight size={24} strokeWidth={3} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            </div>
+        );
+    }
+
     return (
-        <div className="space-y-6">
+        <div key={storeId} className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col gap-1">
-                    <h2 className="text-2xl font-bold text-gray-900">Expenses</h2>
+                    <div className="flex items-center gap-3">
+                        {isGlobalRole && storeId && (
+                            <button
+                                onClick={() => setSearchParams({})}
+                                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                            >
+                                <ChevronLeft size={18} />
+                            </button>
+                        )}
+                        <h2 className="text-2xl font-bold text-gray-900">
+                            {(() => {
+                                const selectedStore = stores.find(s => s.id === storeId);
+                                return selectedStore ? `${selectedStore.name} Expenses` : 'Expense Monitoring';
+                            })()}
+                        </h2>
+                    </div>
                     <p className="text-sm text-gray-500">Review and manage field expenses and categories</p>
                 </div>
 

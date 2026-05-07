@@ -1,5 +1,5 @@
 import React from 'react';
-import { Grid, Package, Loader2 } from 'lucide-react';
+import { Grid, Package, Loader2, ArrowLeft } from 'lucide-react';
 
 const StoreStockSection = ({
   loadingInventory,
@@ -10,6 +10,9 @@ const StoreStockSection = ({
   setWarehouseCategory,
   categories,
 }) => {
+  const [currentPage, setCurrentPage] = React.useState(1);
+  const itemsPerPage = 10;
+
   const filteredStock = warehouseStock.filter(s => {
     const matchesSearch = s.product.name.toLowerCase().includes(warehouseSearch.toLowerCase()) ||
       (s.product.barcode && s.product.barcode.toLowerCase().includes(warehouseSearch.toLowerCase())) ||
@@ -17,6 +20,14 @@ const StoreStockSection = ({
     const matchesCategory = warehouseCategory === 'ALL' || s.product.category?.name === warehouseCategory;
     return matchesSearch && matchesCategory;
   });
+
+  // Reset page on search or category change
+  React.useEffect(() => {
+    setCurrentPage(1);
+  }, [warehouseSearch, warehouseCategory]);
+
+  const totalPages = Math.ceil(filteredStock.length / itemsPerPage);
+  const paginatedStock = filteredStock.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
 
   const totalValuation = filteredStock.reduce((acc, s) => acc + (s.quantity * (s.product.landingPrice || s.product.purchasePrice || s.product.price || 0)), 0);
 
@@ -107,7 +118,7 @@ const StoreStockSection = ({
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            {filteredStock.map((stock) => (
+            {paginatedStock.map((stock) => (
               <div key={stock.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all group flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3 min-w-0 flex-1">
                   <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors shrink-0">
@@ -118,7 +129,12 @@ const StoreStockSection = ({
                     )}
                   </div>
                   <div className="flex flex-col min-w-0">
-                    <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
+                      <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shadow-sm ${stock.product.status === 'INACTIVE' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                        {stock.product.status || 'ACTIVE'}
+                      </span>
+                    </div>
                     <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{stock.product.category?.name || 'General'}</span>
                   </div>
                 </div>
@@ -161,6 +177,52 @@ const StoreStockSection = ({
               </div>
             ))}
           </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 mt-8 px-2 border-t border-gray-100 pt-6">
+              <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Showing {Math.min(filteredStock.length, (currentPage - 1) * itemsPerPage + 1)} to {Math.min(filteredStock.length, currentPage * itemsPerPage)} of {filteredStock.length} Items
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={currentPage === 1}
+                  onClick={() => { setCurrentPage(p => Math.max(1, p - 1)); }}
+                  className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                >
+                  <ArrowLeft size={14} /> Previous
+                </button>
+                {(() => {
+                  let pages = [];
+                  let startPage = Math.max(1, currentPage - 2);
+                  let endPage = Math.min(totalPages, startPage + 4);
+                  if (endPage - startPage < 4) startPage = Math.max(1, endPage - 4);
+
+                  for (let i = startPage; i <= endPage; i++) {
+                    if (i > 0) {
+                      pages.push(
+                        <button
+                          key={i}
+                          onClick={() => { setCurrentPage(i); }}
+                          className={`w-10 h-10 rounded-xl text-xs font-black transition-all ${currentPage === i ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-500/20' : 'bg-white border border-gray-100 text-gray-400 hover:border-emerald-200'}`}
+                        >
+                          {i}
+                        </button>
+                      );
+                    }
+                  }
+                  return pages;
+                })()}
+                <button
+                  disabled={currentPage === totalPages}
+                  onClick={() => { setCurrentPage(p => Math.min(totalPages, p + 1)); }}
+                  className="p-2.5 rounded-xl border border-gray-100 bg-white text-gray-600 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-gray-50 transition-all font-black text-[10px] uppercase tracking-widest flex items-center gap-2"
+                >
+                  Next <ArrowLeft size={14} className="rotate-180" />
+                </button>
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>

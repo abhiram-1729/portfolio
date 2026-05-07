@@ -142,7 +142,7 @@ export default function AgentAssets() {
               onClick={() => { setRequestForm({ ...requestForm, type: 'NEW_ASSET' }); setShowRequestModal(true); }}
               className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all text-center"
             >
-              <div className="w-10 h-10 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
                 <Plus size={20} />
               </div>
               <span className="text-[10px] font-black text-gray-700 uppercase">Request New</span>
@@ -178,12 +178,11 @@ export default function AgentAssets() {
                       onClick={() => setExpandedId(isExpanded ? null : assignment.id)}
                       className="w-full p-4 flex items-center gap-3 text-left"
                     >
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${asset?.assetType === 'ELECTRONIC' ? 'bg-blue-50' : 'bg-amber-50'
-                        }`}>
+                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-emerald-50 text-emerald-600`}>
                         {asset?.image ? (
                           <img src={asset.image} alt={asset.name} className="w-full h-full rounded-2xl object-cover" />
                         ) : (
-                          asset?.assetType === 'ELECTRONIC' ? <Monitor size={22} className="text-blue-500" /> : <Box size={22} className="text-amber-500" />
+                          asset?.assetType === 'ELECTRONIC' ? <Monitor size={22} /> : <Box size={22} />
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
@@ -215,7 +214,7 @@ export default function AgentAssets() {
                               setRequestForm({ ...requestForm, type: 'REPLACEMENT', assetId: asset?.id, assetUnitId: unit?.id });
                               setShowRequestModal(true);
                             }}
-                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-blue-50 text-blue-600 font-black text-[10px] uppercase tracking-wider rounded-xl border border-blue-100"
+                            className="flex-1 flex items-center justify-center gap-2 py-3 bg-emerald-50 text-emerald-600 font-black text-[10px] uppercase tracking-wider rounded-xl border border-emerald-100"
                           >
                             <RefreshCcw size={14} /> Replace
                           </button>
@@ -243,9 +242,7 @@ export default function AgentAssets() {
                 <div key={req.id} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm space-y-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${req.type === 'REPLACEMENT' ? 'bg-orange-50 text-orange-500' :
-                        req.type === 'NEW_ASSET' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'
-                        }`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center bg-emerald-50 text-emerald-600`}>
                         {req.type === 'REPLACEMENT' ? <RefreshCcw size={16} /> :
                           req.type === 'NEW_ASSET' ? <Plus size={16} /> : <MessageSquare size={16} />}
                       </div>
@@ -253,9 +250,9 @@ export default function AgentAssets() {
                         {req.type.replace('_', ' ')}
                       </span>
                     </div>
-                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm ${req.status === 'PENDING' ? 'bg-amber-100 text-amber-600' :
-                      req.status === 'APPROVED' ? 'bg-blue-100 text-blue-600' :
-                        req.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
+                    <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm ${req.status === 'PENDING' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' :
+                      req.status === 'APPROVED' ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' :
+                        req.status === 'REJECTED' ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-emerald-50 text-emerald-600 border border-emerald-100'
                       }`}>{req.status}</span>
                   </div>
 
@@ -325,13 +322,13 @@ export default function AgentAssets() {
               )}
 
               {requestForm.type === 'REPLACEMENT' && (
-                <div className="bg-blue-50 p-4 rounded-xl border border-blue-100 flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-blue-500 shadow-sm">
+                <div className="bg-emerald-50 p-4 rounded-xl border border-emerald-100 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-white rounded-lg flex items-center justify-center text-emerald-600 shadow-sm">
                     <RefreshCcw size={20} />
                   </div>
                   <div>
-                    <span className="text-[10px] font-black text-blue-400 uppercase">Replacing</span>
-                    <h4 className="text-xs font-black text-blue-700">{assets.find(a => a.assetUnit?.asset?.id === requestForm.assetId)?.assetUnit?.asset?.name}</h4>
+                    <span className="text-[10px] font-black text-emerald-400 uppercase">Replacing</span>
+                    <h4 className="text-xs font-black text-emerald-700">{assets.find(a => a.assetUnit?.asset?.id === requestForm.assetId)?.assetUnit?.asset?.name}</h4>
                   </div>
                 </div>
               )}

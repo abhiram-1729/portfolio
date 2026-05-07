@@ -9,7 +9,7 @@ import {
 import { Edit, X, Check, Save, User, Clock, Calendar, AlertTriangle, ShieldCheck, Download, Printer, FileText } from 'lucide-react';
 import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 
-const AdminLateEntryReport = () => {
+const AdminLateEntryReport = ({ storeId }) => {
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -35,14 +35,17 @@ const AdminLateEntryReport = () => {
   useEffect(() => {
     fetchReport();
     fetchAnalytics();
-  }, [filters]);
+  }, [filters, storeId]);
 
   const fetchAnalytics = async () => {
     try {
-      const statsRes = await lateEntryService.getAnalyticsStats(filters);
+      const params = { ...filters };
+      if (storeId) params.storeId = storeId;
+
+      const statsRes = await lateEntryService.getAnalyticsStats(params);
       if (statsRes.success) setStats(statsRes.data);
 
-      const topRes = await lateEntryService.getTopOffenders();
+      const topRes = await lateEntryService.getTopOffenders({ storeId });
       if (topRes.success) setTopOffenders(topRes.data);
     } catch (err) {
       console.error('Analytics load error:', err);
@@ -52,7 +55,9 @@ const AdminLateEntryReport = () => {
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const res = await lateEntryService.getAdminReport(filters);
+      const params = { ...filters };
+      if (storeId) params.storeId = storeId;
+      const res = await lateEntryService.getAdminReport(params);
       if (res.success) {
         setRecords(res.data);
       }

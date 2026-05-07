@@ -48,8 +48,8 @@ export const createRoute = async (data) => {
     return response.data;
 };
 
-export const getAdminRoutes = async () => {
-    const response = await api.get('/admin/routes');
+export const getAdminRoutes = async (params) => {
+    const response = await api.get('/admin/routes', { params });
     return response.data;
 };
 
@@ -68,8 +68,8 @@ export const assignRoute = async (data) => {
     return response.data;
 };
 
-export const getRouteAssignments = async () => {
-    const response = await api.get('/admin/routes/assignments');
+export const getRouteAssignments = async (params) => {
+    const response = await api.get('/admin/routes/assignments', { params });
     return response.data;
 };
 
@@ -84,8 +84,8 @@ export const deleteRouteAssignment = async (id) => {
 };
 
 // --- Village APIs ---
-export const getVillages = async () => {
-    const response = await api.get('/admin/villages');
+export const getVillages = async (params) => {
+    const response = await api.get('/admin/villages', { params });
     return response.data;
 };
 

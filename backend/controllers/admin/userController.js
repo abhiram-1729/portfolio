@@ -11,7 +11,7 @@ export const getUsers = async (req, res) => {
     
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       filter.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+    } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
       filter.storeId = req.user.storeId;
     }
 
@@ -37,7 +37,10 @@ export const getUsers = async (req, res) => {
 // Create a new user (Agent/helper/supervisor)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, role, assignedVehicleId, storeId, dailyTarget, vgeType, baseSalary, customRoleId } = req.body;
+    const { name, email, password, mobile, role, assignedVehicleId: rawVehicleId, storeId: rawStoreId, dailyTarget, vgeType, baseSalary, customRoleId: rawRoleId, attendanceEnabled } = req.body;
+    const storeId = (rawStoreId && rawStoreId !== 'null' && rawStoreId !== 'undefined' && rawStoreId !== '') ? rawStoreId : null;
+    const assignedVehicleId = (rawVehicleId && rawVehicleId !== 'null' && rawVehicleId !== 'undefined' && rawVehicleId !== '') ? rawVehicleId : null;
+    const customRoleId = (rawRoleId && rawRoleId !== 'null' && rawRoleId !== 'undefined' && rawRoleId !== '') ? rawRoleId : null;
 
     const userExists = await prisma.user.findFirst({
       where: {
@@ -59,6 +62,9 @@ export const createUser = async (req, res) => {
       storeId: resolvedStoreId
     });
 
+    const dailyTargetVal = dailyTarget ? parseFloat(dailyTarget) : undefined;
+    const baseSalaryVal = baseSalary ? parseFloat(baseSalary) : undefined;
+
     const user = await prisma.user.create({
       data: {
         name,
@@ -71,8 +77,9 @@ export const createUser = async (req, res) => {
         displayId,
         assignedVehicle: assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined,
         store: storeId ? { connect: { id: storeId } } : undefined,
-        dailyTarget: dailyTarget ? parseFloat(dailyTarget) : undefined,
-        baseSalary: baseSalary ? parseFloat(baseSalary) : undefined,
+        dailyTarget: !isNaN(dailyTargetVal) ? dailyTargetVal : undefined,
+        baseSalary: !isNaN(baseSalaryVal) ? baseSalaryVal : undefined,
+        attendanceEnabled: attendanceEnabled !== undefined ? Boolean(attendanceEnabled) : true,
         customRole: customRoleId ? { connect: { id: customRoleId } } : undefined
       }
     });
@@ -90,7 +97,14 @@ export const createUser = async (req, res) => {
     res.status(201).json({ message: 'User created', user: { id: user.id, name: user.name, role: user.role } });
   } catch (error) {
     console.error('[AdminUsers] Create error:', error);
-    res.status(500).json({ message: 'Error creating user', error: error.message });
+    console.error('[AdminUsers] Request Body:', JSON.stringify(req.body));
+    console.error('[AdminUsers] Error Code:', error.code);
+    res.status(500).json({ 
+      message: 'Error creating user', 
+      error: error.message, 
+      code: error.code,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
+    });
   }
 };
 
@@ -98,7 +112,7 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, storeId, status, dailyTarget, vgeType, password, baseSalary, customRoleId } = req.body;
+    const { name, email, mobile, role, assignedVehicleId, storeId, status, dailyTarget, vgeType, password, baseSalary, customRoleId, attendanceEnabled } = req.body;
 
     const updateData = {
       name,
@@ -117,7 +131,8 @@ export const updateUser = async (req, res) => {
       baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined,
       customRole: customRoleId === null 
         ? { disconnect: true } 
-        : (customRoleId ? { connect: { id: customRoleId } } : undefined)
+        : (customRoleId ? { connect: { id: customRoleId } } : undefined),
+      attendanceEnabled: attendanceEnabled !== undefined ? Boolean(attendanceEnabled) : undefined
     };
 
     // Safely update password if provided

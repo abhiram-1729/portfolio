@@ -15,6 +15,7 @@ import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
+import * as adminStoreCtr from '../controllers/admin/storeController.js';
 import * as mediaCtr from '../controllers/admin/mediaController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
@@ -77,6 +78,7 @@ router.route('/inventory/items')
     inventoryCtr.createItem
   );
 router.post('/inventory/items/bulk', inventoryCtr.bulkCreateItems);
+router.post('/inventory/items/bulk-import', inventoryCtr.bulkImportItems);
 router.post('/inventory/items/bulk-delete', inventoryCtr.bulkDeleteItems);
 router.post('/inventory/items/zip-import', zipUpload.single('zipFile'), inventoryCtr.importZipInventory);
 router.route('/inventory/items/:id')
@@ -195,5 +197,13 @@ router.put('/assets/issues/:id', assetCtr.updateIssueStatus);
 router.get('/assets/requests', assetCtr.getAssetRequests);
 router.put('/assets/requests/:id', assetCtr.updateAssetRequestStatus);
 router.get('/assets/reports', assetCtr.getAssetReports);
+
+// Organization Stores (Admin specific)
+router.route('/stores')
+  .get(adminStoreCtr.getAdminStores)
+  .post(adminStoreCtr.createAdminStore);
+router.route('/stores/:id')
+  .put(adminStoreCtr.updateAdminStore)
+  .delete(adminStoreCtr.deleteAdminStore);
 
 export default router;

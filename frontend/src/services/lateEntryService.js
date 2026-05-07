@@ -51,8 +51,8 @@ const lateEntryService = {
     return response.data;
   },
 
-  getTopOffenders: async () => {
-    const response = await api.get('/late-entry/analytics/top-offenders');
+  getTopOffenders: async (params) => {
+    const response = await api.get('/late-entry/analytics/top-offenders', { params });
     return response.data;
   }
 };

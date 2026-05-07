@@ -229,15 +229,21 @@ export const getMyHistory = async (req, res, next) => {
 export const getAllAttendance = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
-    const storeId = req.user.storeId;
-    const { date, userId: filterUserId, startDate, endDate } = req.query;
+    const { date, userId: filterUserId, startDate, endDate, storeId: queryStoreId } = req.query;
 
     const today = getTodayIST();
     const targetDate = date || today;
 
     // Build where clause
     const where = { tenantId };
-    if (storeId) where.storeId = storeId;
+    
+    // Store filter logic
+    if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
+      where.storeId = queryStoreId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+    
     if (filterUserId) where.userId = filterUserId;
 
     if (startDate && endDate) {
@@ -269,7 +275,7 @@ export const getAllAttendance = async (req, res, next) => {
       role: 'SALES_AGENT',
       status: 'ACTIVE'
     };
-    if (storeId) agentWhere.storeId = storeId;
+    if (where.storeId) agentWhere.storeId = where.storeId;
 
     const totalAgents = await prisma.user.count({ where: agentWhere });
     const presentToday = records.length;

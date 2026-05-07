@@ -31,6 +31,7 @@ export const adminAPI = {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   bulkCreateItems: (data) => api.post('/admin/inventory/items/bulk', data),
+  bulkImportItems: (data) => api.post('/admin/inventory/items/bulk-import', data),
   bulkDeleteItems: (ids) => api.post('/admin/inventory/items/bulk-delete', { ids }),
   updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -118,7 +119,7 @@ export const adminAPI = {
   vgeGenerateMonthly: (data) => api.post('/vge/admin/generate-monthly', data || {}),
 
   // Asset Management
-  getAssets: () => api.get('/admin/assets'),
+  getAssets: (params) => api.get('/admin/assets', { params }),
   createAsset: (data) => api.post('/admin/assets', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -129,12 +130,12 @@ export const adminAPI = {
   addAssetUnits: (id, data) => api.post(`/admin/assets/${id}/units`, data),
   assignAsset: (data) => api.post('/admin/assets/assign', data),
   returnAsset: (data) => api.post('/admin/assets/return', data),
-  getAssetTracking: () => api.get('/admin/assets/tracking'),
-  getAssetIssues: () => api.get('/admin/assets/issues'),
+  getAssetTracking: (params) => api.get('/admin/assets/tracking', { params }),
+  getAssetIssues: (params) => api.get('/admin/assets/issues', { params }),
   updateAssetIssue: (id, data) => api.put(`/admin/assets/issues/${id}`, data),
-  getAssetRequests: () => api.get('/admin/assets/requests'),
+  getAssetRequests: (params) => api.get('/admin/assets/requests', { params }),
   updateAssetRequest: (id, data) => api.put(`/admin/assets/requests/${id}`, data),
-  getAssetReports: () => api.get('/admin/assets/reports'),
+  getAssetReports: (params) => api.get('/admin/assets/reports', { params }),
 
   // Asset Categories
   getAssetCategories: (params) => api.get('/admin/asset-categories', { params }),
@@ -149,11 +150,11 @@ export const adminAPI = {
   },
   resolveVillageLink: (url) => api.post('/admin/villages/resolve-link', { url }),
 
-  // Tenant Stores Management
-  getStores: () => api.get('/tenant/stores'),
-  createStore: (data) => api.post('/tenant/stores', data),
-  updateStore: (id, data) => api.put(`/tenant/stores/${id}`, data),
-  deleteStore: (id) => api.delete(`/tenant/stores/${id}`),
+  // Organization Stores Management (Admin Perspective)
+  getStores: () => api.get('/admin/stores'),
+  createStore: (data) => api.post('/admin/stores', data),
+  updateStore: (id, data) => api.put(`/admin/stores/${id}`, data),
+  deleteStore: (id) => api.delete(`/admin/stores/${id}`),
 
   // Role & Privileges Management
   getRoles: () => api.get('/admin/roles'),

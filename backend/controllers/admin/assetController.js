@@ -1,12 +1,21 @@
 import prisma from '../../utils/prisma.js';
 import { uploadToSupabase } from '../../utils/supabaseService.js';
 import { logActivity } from '../../utils/activityLogger.js';
+import { getEffectiveStoreId } from '../../utils/storeResolution.js';
 
 // ─── Asset Master CRUD ────────────────────────────────────
 
 export const getAssetRequests = async (req, res) => {
   try {
+    const storeId = getEffectiveStoreId(req);
     const requests = await prisma.assetRequest.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        OR: [
+          { asset: { storeId: storeId } },
+          { user: { storeId: storeId } }
+        ]
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, name: true, role: true } },
@@ -80,14 +89,11 @@ export const getAssetCatalog = async (req, res) => {
 
 export const getAssets = async (req, res) => {
   try {
-    const { storeId } = req.query;
-    const where = { tenantId: req.user.tenantId };
-
-    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
-      where.storeId = storeId;
-    } else if (req.user.storeId) {
-      where.storeId = req.user.storeId;
-    }
+    const storeId = getEffectiveStoreId(req);
+    const where = { 
+      tenantId: req.user.tenantId,
+      storeId: storeId
+    };
 
     const assets = await prisma.asset.findMany({
       where,
@@ -126,6 +132,7 @@ export const createAsset = async (req, res) => {
       );
     }
 
+    const storeId = getEffectiveStoreId(req);
     const asset = await prisma.asset.create({
       data: {
         name,
@@ -136,6 +143,8 @@ export const createAsset = async (req, res) => {
         image: imageUrl,
         description: description || null,
         estimatedCost: parseFloat(estimatedCost) || 0,
+        tenantId: req.user.tenantId,
+        storeId: storeId
       }
     });
 
@@ -384,8 +393,15 @@ export const returnAsset = async (req, res) => {
 
 export const getAssetTracking = async (req, res) => {
   try {
+    const storeId = getEffectiveStoreId(req);
     const assignments = await prisma.assetAssignment.findMany({
-      where: { isActive: true },
+      where: { 
+        isActive: true,
+        tenantId: req.user.tenantId,
+        assetUnit: {
+          asset: { storeId: storeId }
+        }
+      },
       orderBy: { assignedDate: 'desc' },
       include: {
         user: { select: { id: true, name: true, email: true } },
@@ -407,7 +423,14 @@ export const getAssetTracking = async (req, res) => {
 
 export const getIssues = async (req, res) => {
   try {
+    const storeId = getEffectiveStoreId(req);
     const issues = await prisma.assetIssue.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        assetUnit: {
+          asset: { storeId: storeId }
+        }
+      },
       orderBy: { createdAt: 'desc' },
       include: {
         user: { select: { id: true, name: true } },
@@ -454,8 +477,13 @@ export const updateIssueStatus = async (req, res) => {
 
 export const getAssetReports = async (req, res) => {
   try {
+    const storeId = getEffectiveStoreId(req);
     // Asset utilization
     const assets = await prisma.asset.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        storeId: storeId
+      },
       include: {
         units: { select: { status: true } }
       }
@@ -473,8 +501,16 @@ export const getAssetReports = async (req, res) => {
     }));
 
     // Executive asset report
+    const executiveReportWhere = {
+      isActive: true,
+      tenantId: req.user.tenantId,
+      assetUnit: {
+        asset: { storeId: storeId }
+      }
+    };
+
     const activeAssignments = await prisma.assetAssignment.findMany({
-      where: { isActive: true },
+      where: executiveReportWhere,
       include: {
         user: { select: { id: true, name: true } },
         assetUnit: {

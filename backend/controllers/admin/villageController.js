@@ -41,10 +41,13 @@ export const createVillage = async (req, res, next) => {
 export const getVillages = async (req, res, next) => {
     try {
         const { storeId: queryStoreId } = req.query;
-        const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
-
         const where = { tenantId: req.user.tenantId };
-        if (storeId) where.storeId = storeId;
+        
+        if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
+            where.storeId = queryStoreId;
+        } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
+            where.storeId = req.user.storeId;
+        }
 
         try {
             const villages = await prisma.village.findMany({ 

@@ -42,6 +42,7 @@ export default function AdminRoutes() {
   const [assignments, setAssignments] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -105,17 +106,19 @@ export default function AdminRoutes() {
     setIsRoutesLoading(true);
     setIsAssignmentsLoading(true);
     try {
-      const [vRes, rRes, aRes, vehRes, uRes] = await Promise.all([
+      const [vRes, rRes, aRes, vehRes, uRes, sRes] = await Promise.all([
         routeService.getVillages({ storeId }),
         routeService.getAdminRoutes({ storeId }),
         routeService.getRouteAssignments({ storeId }),
         adminAPI.getVehicles({ storeId }),
-        adminAPI.getUsers({ storeId })
+        adminAPI.getUsers({ storeId }),
+        adminAPI.getStores()
       ]);
       setVillages(vRes);
       setRoutes(rRes);
       setAssignments(aRes);
       setVehicles(vehRes.data);
+      setStores(sRes.data?.success ? sRes.data.data : (sRes.data || []));
       setUsers(uRes.data.filter(u => u.role === 'SALES_AGENT' || u.role === 'SUPERVISOR'));
     } catch (error) {
       toast.error('Failed to fetch data');
@@ -136,20 +139,30 @@ export default function AdminRoutes() {
   useEffect(() => { setRoutePage(1); }, [routeSearchQuery, storeId]);
   useEffect(() => { setAssignmentPage(1); }, [assignmentSearchQuery, storeId]);
 
-  const filteredVillages = villages.filter(v => v.name.toLowerCase().includes(villageSearchQuery.toLowerCase()));
+  const filteredVillages = villages.filter(v => {
+    if (storeId && v.storeId !== storeId) return false;
+    return v.name.toLowerCase().includes(villageSearchQuery.toLowerCase());
+  });
   const totalVillagePages = Math.ceil(filteredVillages.length / ITEMS_PER_PAGE);
   const paginatedVillages = filteredVillages.slice((villagePage - 1) * ITEMS_PER_PAGE, villagePage * ITEMS_PER_PAGE);
 
-  const filteredRoutes = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
+  const filteredRoutes = routes.filter(r => {
+    if (storeId && r.storeId !== storeId) return false;
+    return r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase());
+  });
   const totalRoutePages = Math.ceil(filteredRoutes.length / ITEMS_PER_PAGE);
   const paginatedRoutes = filteredRoutes.slice((routePage - 1) * ITEMS_PER_PAGE, routePage * ITEMS_PER_PAGE);
 
   const q = assignmentSearchQuery.toLowerCase();
-  const filteredAssignments = assignments.filter(a =>
-    a.route?.routeName?.toLowerCase().includes(q) ||
-    a.user?.name?.toLowerCase().includes(q) ||
-    a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
-  );
+  const filteredAssignments = assignments.filter(a => {
+    // If storeId is set, only show assignments for vehicles in that store
+    if (storeId && a.vehicle?.storeId !== storeId) return false;
+    return (
+      a.route?.routeName?.toLowerCase().includes(q) ||
+      a.user?.name?.toLowerCase().includes(q) ||
+      a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
+    );
+  });
   const totalAssignmentPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
   const paginatedAssignments = filteredAssignments.slice((assignmentPage - 1) * ITEMS_PER_PAGE, assignmentPage * ITEMS_PER_PAGE);
 
@@ -271,7 +284,8 @@ export default function AdminRoutes() {
           longitude: villageForm.longitude ? parseFloat(villageForm.longitude) : null,
           radius: parseInt(villageForm.radius) || 500,
           isPolygon: villageForm.isPolygon,
-          boundary: villageForm.boundary
+          boundary: villageForm.boundary,
+          storeId: storeId || currentUser?.storeId
         });
         toast.success('Village created');
       }
@@ -319,10 +333,10 @@ export default function AdminRoutes() {
       };
 
       if (routeForm.id) {
-        await routeService.updateRoute(routeForm.id, payload);
+        await routeService.updateRoute(routeForm.id, { ...payload, storeId: storeId || currentUser?.storeId });
         toast.success('Route updated');
       } else {
-        await routeService.createRoute(payload);
+        await routeService.createRoute({ ...payload, storeId: storeId || currentUser?.storeId });
         toast.success('Route created');
       }
       setIsRouteEditorOpen(false);
@@ -346,10 +360,10 @@ export default function AdminRoutes() {
     setIsSubmitting(true);
     try {
       if (assignmentForm.id) {
-        await routeService.updateRouteAssignment(assignmentForm.id, assignmentForm);
+        await routeService.updateRouteAssignment(assignmentForm.id, { ...assignmentForm, storeId: storeId || currentUser?.storeId });
         toast.success('Assignment updated');
       } else {
-        await routeService.assignRoute(assignmentForm);
+        await routeService.assignRoute({ ...assignmentForm, storeId: storeId || currentUser?.storeId });
         toast.success('Assignment created');
       }
       setShowAssignModal(false);
@@ -362,43 +376,131 @@ export default function AdminRoutes() {
     }
   };
 
-  // Gatekeeper
-  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
-  const isTenantRoute = location.pathname.includes('/tenant/');
+  const renderClassifiedRoutes = () => {
+    if (!storeId) {
+      const personnelByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.id !== currentUser?.id) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
 
-  if (isGlobalRole && isTenantRoute && !storeId) {
-    return (
-      <StoreSelector
-        title="Route & Coverage"
-        description="Please select a store branch to manage its routes and agent assignments."
-        onSelect={(id) => {
-          setSearchParams({ storeId: id });
-        }}
-      />
-    );
-  }
+      return (
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Operations</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to manage its routes and coverage area</p>
+          </div>
+          {stores.map(store => {
+            const storeRoutes = routes.filter(r => r.storeId === store.id);
+            const personnelCount = personnelByStore[store.id] || 0;
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
+              >
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <MapPin size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                  <div className="hidden lg:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Coverage</span>
+                    <span className="text-sm font-bold text-gray-900">{villages.filter(v => v.storeId === store.id).length} Villages</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Active Routes</span>
+                    <span className="text-sm font-bold text-gray-900">{storeRoutes.length} Clusters</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Personnel</span>
+                    <span className="text-sm font-bold text-gray-900">{personnelCount} Members</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ChevronRight size={20} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <MapPin size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+;
+
+  const classifiedView = renderClassifiedRoutes();
+  if (classifiedView) return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
+        <p className="text-sm text-gray-500">Categorize your logistics by branch</p>
+      </div>
+      {classifiedView}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
       {/* Header & Tabs */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
+          <div className="flex items-center gap-3">
+            {storeId && (
+              <button
+                onClick={() => setSearchParams({})}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                title="Back to All Branches"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
+          </div>
           <div className="flex items-center gap-2">
             <p className="text-sm text-gray-500">Manage villages, routes, and agent schedules</p>
-            {isTenantRoute && storeId && (
-              <>
-                <span className="text-gray-300">•</span>
-                <button
-                  onClick={() => setSearchParams({})}
-                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
-                >
-                  Change Store
-                </button>
-              </>
-            )}
+            <span className="text-gray-300">•</span>
+            <select
+              value={storeId || ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSearchParams({ storeId: e.target.value });
+                } else {
+                  setSearchParams({});
+                }
+              }}
+              className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 0.25rem center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1rem'
+              }}
+            >
+              <option value="">All Branches</option>
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
           </div>
-        </div>
 
         <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
           {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
@@ -995,7 +1097,7 @@ export default function AdminRoutes() {
                           return acc;
                         }, []);
 
-                        const availableVillages = villages.filter(v => !assignedVillages.includes(v.name));
+                        const availableVillages = villages.filter(v => !assignedVillages.includes(v.name) && (storeId ? v.storeId === storeId : true));
 
                         if (availableVillages.length === 0) return <p className="text-[10px] text-gray-400 italic p-4 text-center">No villages available for clustering</p>;
 
@@ -1457,7 +1559,7 @@ export default function AdminRoutes() {
                   });
                 }}>
                   <option value="">Select Agent</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {users.filter(u => u.storeId === storeId || !u.storeId).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
 

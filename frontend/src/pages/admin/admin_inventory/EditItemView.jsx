@@ -196,6 +196,16 @@ const EditItemView = ({
                     onChange={(e) => setEditItem({ ...editItem, description: e.target.value })}
                   />
                 </div>
+
+                <div className="pt-4 flex justify-end">
+                  <button
+                    onClick={() => setModalTab('price')}
+                    className="flex items-center gap-2 px-6 py-3 bg-indigo-50 text-indigo-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-indigo-100 transition-all border border-indigo-100 group"
+                  >
+                    Next: Pricing & Meta
+                    <ArrowLeft size={16} className="rotate-180 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -240,17 +250,31 @@ const EditItemView = ({
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">GST Rate (%)</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-sm font-bold text-gray-900 focus:outline-none"
-                    value={editItem.gst || '0'}
-                    onChange={(e) => setEditItem({ ...editItem, gst: e.target.value })}
-                  >
-                    {taxRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
-                  </select>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">GST Rate (%)</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-sm font-bold text-gray-900 focus:outline-none"
+                      value={editItem.gst || '0'}
+                      onChange={(e) => setEditItem({ ...editItem, gst: e.target.value })}
+                    >
+                      {taxRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest pl-1">Tax Amount (₹)</label>
+                    <div className="relative flex items-center bg-emerald-50/30 border border-emerald-100 rounded-2xl px-4 h-[58px]">
+                      <span className="text-emerald-400 font-bold">₹</span>
+                      <span className="ml-2 text-sm font-black text-emerald-700">
+                        {(() => {
+                          const price = parseFloat(editItem.price) || 0;
+                          const gst = parseFloat(editItem.gst) || 0;
+                          return (price - (price / (1 + gst / 100))).toFixed(2);
+                        })()}
+                      </span>
+                      <span className="ml-auto text-[8px] font-black text-emerald-400 uppercase tracking-widest">Incl. GST</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-gray-50">
                 <div className="space-y-1.5">

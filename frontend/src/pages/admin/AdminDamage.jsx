@@ -13,6 +13,7 @@ import { damageAPI } from '../../services/damageService';
 import { adminAPI } from '../../services/adminService';
 import { useUserStore } from '../../store/userStore';
 import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
+import { Building2, ArrowRight, ChevronLeft } from 'lucide-react';
 
 const TABS = [
   { id: 'entries', label: 'Damage Entries', icon: AlertTriangle },
@@ -71,6 +72,8 @@ export default function AdminDamage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [stores, setStores] = useState([]);
+  const [loadingStores, setLoadingStores] = useState(true);
 
   // Modal states
   const [selectedEntry, setSelectedEntry] = useState(null);
@@ -155,6 +158,21 @@ export default function AdminDamage() {
     else if (activeTab === 'deductions') fetchDeductions();
     else if (activeTab === 'reports') fetchReports();
   }, [activeTab, fetchEntries, fetchDeductions, fetchReports]);
+
+  useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const res = await adminAPI.getStores();
+        if (res.data?.success) setStores(res.data.data);
+        else setStores(res.data || []);
+      } catch (err) {
+        console.error('Failed to fetch stores');
+      } finally {
+        setLoadingStores(false);
+      }
+    };
+    fetchStores();
+  }, []);
 
   const fetchCreateData = useCallback(async () => {
     try {
@@ -1322,6 +1340,74 @@ export default function AdminDamage() {
     );
   };
 
+  const renderClassifiedDamage = () => {
+    if (storeId) return null;
+
+    return (
+      <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl mx-auto px-4">
+        <div className="mb-2">
+          <h3 className="text-xl font-black tracking-tight text-gray-900">
+            {(() => {
+              let label = 'Damage & Deductions';
+              if (activeTab === 'entries') label = 'Damage Entries';
+              else if (activeTab === 'deductions') label = 'Deductions';
+              else if (activeTab === 'reports') label = 'Damage Reports';
+              return `Branch ${label}`;
+            })()}
+          </h3>
+          <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to manage its Damage & Deductions</p>
+        </div>
+
+        <div className="grid gap-4">
+          {stores.map(store => (
+            <button
+              key={store.id}
+              onClick={() => {
+                const params = new URLSearchParams(window.location.search);
+                params.set('storeId', store.id);
+                window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
+                window.location.reload(); // Force reload to trigger useEffects with new storeId
+              }}
+              className="group w-full bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-red-200 transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden"
+            >
+              <div className="absolute right-0 top-0 w-32 h-32 bg-red-50 rounded-full -mr-16 -mt-16 group-hover:bg-red-100 transition-all duration-500 opacity-50" />
+              
+              <div className="flex items-center gap-6 z-10">
+                <div className="w-16 h-16 rounded-[1.25rem] bg-red-600 text-white flex items-center justify-center shadow-lg shadow-red-200 group-hover:scale-110 transition-transform duration-500">
+                  <Building2 size={32} strokeWidth={2.5} />
+                </div>
+                <div className="flex flex-col text-left">
+                  <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-1 group-hover:text-red-600 transition-colors">{store.name}</h3>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[10px] font-black bg-red-50 text-red-700 px-3 py-1 rounded-full uppercase tracking-widest">{store.code || 'Branch'}</span>
+                    <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode || 'Active'}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-12 z-10">
+                <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300 group-hover:bg-red-600 group-hover:text-white group-hover:translate-x-1 transition-all duration-500">
+                  <ArrowRight size={24} strokeWidth={3} />
+                </div>
+              </div>
+            </button>
+          ))}
+
+          {stores.length === 0 && !loadingStores && (
+            <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
+              <Building2 size={64} className="mx-auto text-gray-200 mb-4" />
+              <p className="text-lg font-black text-gray-400 uppercase tracking-widest">No Branches Configured</p>
+              <p className="text-sm text-gray-300 mt-2">Add your first store in Settings to start tracking.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const classifiedView = renderClassifiedDamage();
+  if (classifiedView) return classifiedView;
+
   // ───────── MAIN RENDER ─────────
   if (showDetailModal && selectedEntry) {
     return (
@@ -1367,10 +1453,22 @@ export default function AdminDamage() {
           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center shadow-sm">
             <AlertTriangle size={20} className="text-red-600" strokeWidth={2.5} />
           </div>
-          <div>
+          <div className="flex items-center gap-3">
+            {storeId && (
+              <button
+                onClick={() => {
+                  window.history.replaceState({}, '', window.location.pathname);
+                  window.location.reload();
+                }}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-red-600 hover:border-red-100 transition-all shadow-sm active:scale-90"
+                title="Back to All Branches"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
             <h1 className="text-xl font-black text-gray-900 tracking-tight">Damage & Deductions</h1>
-            <p className="text-xs text-gray-400 font-medium tracking-tight">Inventory damage tracking, accountability & financial recovery</p>
           </div>
+          <p className="text-xs text-gray-400 font-medium tracking-tight">Inventory damage tracking, accountability & financial recovery</p>
           {can('INVENTORY', 'CREATE', 'DAMAGE') && (
             <div className="ml-auto flex items-center gap-2 no-print">
               <button

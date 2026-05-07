@@ -63,6 +63,7 @@ export default function AdminSales() {
 
   const [sales, setSales] = useState([]);
   const [stores, setStores] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDate, setFilterDate] = useState('Today');
@@ -176,16 +177,19 @@ export default function AdminSales() {
       if (filterDate === 'Today') {
         params.fromDate = new Date().toISOString().split('T')[0];
       }
-      // Add more filter logic if needed
 
-      const [salesRes, storesRes] = await Promise.all([
+      const [salesRes, storesRes, usersRes] = await Promise.all([
         adminAPI.getSales(params),
-        adminAPI.getStores()
+        adminAPI.getStores(),
+        adminAPI.getUsers()
       ]);
       setSales(salesRes.data);
       if (storesRes.data?.success) {
         setStores(storesRes.data.data);
+      } else {
+        setStores(storesRes.data || []);
       }
+      setUsers(usersRes.data || []);
     } catch (error) {
       toast.error('Failed to fetch sales history');
     } finally {
@@ -597,11 +601,120 @@ export default function AdminSales() {
 
 
 
+  const renderClassifiedSales = () => {
+    if (!storeFilterId) {
+      const salesByStore = sales.reduce((acc, s) => {
+        if (s.storeId) {
+          acc[s.storeId] = (acc[s.storeId] || 0) + (s.totalAmount || 0);
+        }
+        return acc;
+      }, {});
+
+      const ordersByStore = sales.reduce((acc, s) => {
+        if (s.storeId) {
+          acc[s.storeId] = (acc[s.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      const personnelByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.id !== currentUser?.id) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      return (
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Performance</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to view detailed sales history and customer metrics</p>
+          </div>
+          {stores.map(store => {
+            const totalRevenue = salesByStore[store.id] || 0;
+            const totalOrders = ordersByStore[store.id] || 0;
+            const personnelCount = personnelByStore[store.id] || 0;
+            
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
+              >
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <Building2 size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                  <div className="hidden lg:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Revenue</span>
+                    <span className="text-sm font-bold text-gray-900">₹{totalRevenue.toLocaleString()}</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Total Orders</span>
+                    <span className="text-sm font-bold text-gray-900">{totalOrders} Sales</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Personnel</span>
+                    <span className="text-sm font-bold text-gray-900">{personnelCount} Members</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ChevronRight size={20} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <Building2 size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const classifiedView = renderClassifiedSales();
+  if (classifiedView) return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
+        <p className="text-sm text-gray-500">Categorize your sales operations by branch</p>
+      </div>
+      {classifiedView}
+    </div>
+  );
+
   return (
     <div className="main-content-to-print space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
+          <div className="flex items-center gap-3">
+            {storeFilterId && (
+              <button
+                onClick={() => setSearchParams({})}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                title="Back to All Branches"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
+          </div>
           <div className="flex items-center gap-2">
             <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
             {isTenantRoute && (
@@ -632,26 +745,6 @@ export default function AdminSales() {
               </>
             )}
           </div>
-        </div>
-
-        {/* Segmented Control */}
-        <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-80 shadow-inner">
-          {['ALL', 'POS', 'AGENT'].map((type) => (
-            <button
-              key={type}
-              onClick={() => {
-                setSaleType(type);
-                setCurrentPage(1);
-              }}
-              className={`flex-1 py-2 text-[10px] font-black uppercase tracking-[0.2em] rounded-xl transition-all ${
-                saleType === type 
-                  ? 'bg-white text-emerald-600 shadow-sm' 
-                  : 'text-gray-400 hover:text-gray-600'
-              }`}
-            >
-              {type === 'ALL' ? 'All Sales' : type === 'POS' ? 'POS Sales' : 'Agent Sales'}
-            </button>
-          ))}
         </div>
 
         {can('SALES', 'CREATE') && !viewingOrder && (
@@ -1270,30 +1363,53 @@ export default function AdminSales() {
               </div>
             </div>
           )}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+          <div className="flex flex-col lg:flex-row items-center gap-3">
+            <div className="flex-1 w-full flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm transition-all focus-within:border-emerald-200 focus-within:ring-4 focus-within:ring-emerald-500/5">
               <Search size={20} className="text-gray-400" />
               <input
                 type="text"
                 placeholder="Search invoice or mobile..."
-                className="flex-1 bg-transparent border-none focus:outline-none text-sm"
+                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-auto flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100 px-4">
-              <Calendar size={20} className="text-gray-400" />
-              <select
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium appearance-none"
-              >
-                <option>Today</option>
-                <option>Yesterday</option>
-                <option>Last 7 Days</option>
-                <option>All Time</option>
-              </select>
-              <Filter size={18} className="text-gray-400" />
+            
+            <div className="w-full lg:w-auto flex flex-col md:flex-row items-center gap-3">
+              <div className="w-full md:w-auto flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100 px-4">
+                <Calendar size={18} className="text-gray-400" />
+                <select
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="bg-transparent border-none focus:outline-none text-xs font-black uppercase tracking-widest appearance-none cursor-pointer"
+                >
+                  <option>Today</option>
+                  <option>Yesterday</option>
+                  <option>Last 7 Days</option>
+                  <option>All Time</option>
+                </select>
+                <Filter size={16} className="text-gray-400" />
+              </div>
+
+              {/* Segmented Control - Sale Type Tabs */}
+              <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-auto md:min-w-[340px] shadow-inner">
+                {['ALL', 'POS', 'AGENT'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setSaleType(type);
+                      setCurrentPage(1);
+                    }}
+                    className={`flex-1 py-2 px-4 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                      saleType === type 
+                        ? 'bg-white text-emerald-600 shadow-sm border border-emerald-50' 
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {type === 'ALL' ? 'All Sales' : type === 'POS' ? 'POS Sales' : 'Agent Sales'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
 

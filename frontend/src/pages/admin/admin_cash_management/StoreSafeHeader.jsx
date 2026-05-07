@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 const StoreSafeHeader = ({ 
-  storeRegisterData, summaries, user, 
+  storeRegisterData, summaries, user, storeLoading,
   setShowOpenStoreModal, setShowDepositModal, setShowSafeMovementModal, 
   setShowBankModal, setShowCloseStoreModal, setShowEditStoreModal,
   setSafeMovementData, setBankData, setStoreDenomData,
@@ -13,6 +13,27 @@ const StoreSafeHeader = ({
   setEditingDeposit, setDepositData, setShowEditDepositModal,
   handleDeleteDeposit, toast, can, canViewCashSection
 }) => {
+  if (storeLoading) {
+    return (
+      <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden animate-pulse">
+        <div className="flex items-center justify-between gap-6">
+           <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/10" />
+              <div className="space-y-2">
+                <div className="h-4 w-32 bg-white/10 rounded" />
+                <div className="h-3 w-48 bg-white/10 rounded" />
+              </div>
+           </div>
+           <div className="h-10 w-40 bg-white/10 rounded-2xl" />
+        </div>
+        <div className="grid grid-cols-6 gap-4 mt-8">
+           {[...Array(6)].map((_, i) => (
+             <div key={i} className="h-20 bg-white/5 rounded-2xl" />
+           ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden group">
       <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">

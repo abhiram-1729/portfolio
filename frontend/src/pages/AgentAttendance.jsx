@@ -155,37 +155,37 @@ export default function AgentAttendance() {
       label: 'Completed',
       value: summary?.completedDays || 0,
       icon: CheckCircle2,
-      color: 'blue',
-      bg: 'bg-blue-50',
-      text: 'text-blue-600',
-      border: 'border-blue-100'
+      color: 'emerald',
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-700',
+      border: 'border-emerald-100'
     },
     {
       label: 'Total Hours',
       value: summary?.totalHoursWorked?.toFixed(1) || '0',
       icon: Timer,
-      color: 'purple',
-      bg: 'bg-purple-50',
-      text: 'text-purple-600',
-      border: 'border-purple-100'
+      color: 'emerald',
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-800',
+      border: 'border-emerald-100'
     },
     {
       label: 'Avg Hours',
       value: summary?.avgHours?.toFixed(1) || '0',
       icon: TrendingUp,
-      color: 'amber',
-      bg: 'bg-amber-50',
-      text: 'text-amber-600',
-      border: 'border-amber-100'
+      color: 'emerald',
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-600',
+      border: 'border-emerald-100'
     },
     {
       label: 'Total Lates',
       value: summary?.totalLates || 0,
       icon: AlertCircle,
-      color: 'rose',
-      bg: 'bg-rose-50',
-      text: 'text-rose-600',
-      border: 'border-rose-100'
+      color: 'emerald',
+      bg: 'bg-emerald-50',
+      text: 'text-emerald-900',
+      border: 'border-emerald-100'
     }
   ];
 
@@ -259,7 +259,7 @@ export default function AgentAttendance() {
                 </div>
                 <div>
                   <p className="text-[8px] font-bold text-slate-400 uppercase">LOP Days</p>
-                  <p className="text-xl font-black text-red-400">{leaveBalance.lopDays || 0}</p>
+                  <p className="text-xl font-black text-emerald-300">{leaveBalance.lopDays || 0}</p>
                 </div>
                 <div>
                   <p className="text-[8px] font-bold text-slate-400 uppercase">Remaining</p>
@@ -283,7 +283,7 @@ export default function AgentAttendance() {
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-blue-500 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm"
                   title="Print Report"
                 >
                   <Printer size={14} />
@@ -330,14 +330,14 @@ export default function AgentAttendance() {
                               toast.error("Late entry record not found. Please refresh.");
                             }
                           }}
-                          className="text-[9px] font-bold text-blue-600 underline"
+                          className="text-[9px] font-bold text-emerald-600 underline"
                         >
                           Request Waiver
                         </button>
                       )}
                       <span className={`px-2.5 py-1 rounded-full text-[9px] font-black uppercase tracking-widest ${record.status === 'COMPLETED'
                           ? 'bg-emerald-50 text-emerald-600 border border-emerald-100'
-                          : 'bg-amber-50 text-amber-600 border border-amber-100'
+                          : 'bg-emerald-50 text-emerald-400 border border-emerald-100/50'
                         }`}>
                         {record.status === 'COMPLETED' ? 'Completed' : 'Active'}
                       </span>
@@ -354,8 +354,8 @@ export default function AgentAttendance() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 flex-1">
-                      <div className="w-7 h-7 rounded-lg bg-orange-50 flex items-center justify-center">
-                        <LogOut size={13} className="text-orange-600" />
+                      <div className="w-7 h-7 rounded-lg bg-emerald-100/50 flex items-center justify-center text-emerald-700">
+                        <LogOut size={13} className="text-emerald-600" />
                       </div>
                       <div>
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Out</p>
@@ -363,8 +363,8 @@ export default function AgentAttendance() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center">
-                        <Timer size={13} className="text-purple-600" />
+                      <div className="w-7 h-7 rounded-lg bg-emerald-50 flex items-center justify-center text-emerald-600">
+                        <Timer size={13} className="text-emerald-600" />
                       </div>
                       <div>
                         <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest">Hrs</p>
@@ -381,12 +381,12 @@ export default function AgentAttendance() {
         <div className="space-y-4">
           {/* Late Report View */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="bg-rose-50 border border-rose-100 p-4 rounded-2xl">
-              <p className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-1">Total Late Entries</p>
+            <div className="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl">
+              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total Late Entries</p>
               <p className="text-2xl font-black text-slate-900">{lateHistory.length}</p>
             </div>
-            <div className="bg-amber-50 border border-amber-100 p-4 rounded-2xl">
-              <p className="text-[10px] font-black text-amber-600 uppercase tracking-widest mb-1">Active Penalties</p>
+            <div className="bg-emerald-100/30 border border-emerald-100 p-4 rounded-2xl">
+              <p className="text-[10px] font-black text-emerald-800 uppercase tracking-widest mb-1">Active Penalties</p>
               <p className="text-2xl font-black text-slate-900">
                 {lateHistory.reduce((sum, h) => sum + (h.isWaived ? 0 : (h.penaltyValue > 0 ? 1 : 0)), 0)}
               </p>
@@ -409,7 +409,7 @@ export default function AgentAttendance() {
                 </button>
                 <button
                   onClick={handlePrint}
-                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-blue-500 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
+                  className="p-1.5 bg-white border border-slate-100 rounded-lg text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm"
                   title="Print Report"
                 >
                   <Printer size={14} />

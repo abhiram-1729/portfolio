@@ -5,6 +5,7 @@
  */
 
 import prisma from '../utils/prisma.js';
+import { getEffectiveStoreId } from '../utils/storeResolution.js';
 import { 
   updateDailyPerformance, 
   getLeaderboard, 
@@ -19,6 +20,8 @@ import {
   getNextLevelInfo, 
   getNextSlabInfo 
 } from '../services/incentiveEngine.js';
+
+// getEffectiveStoreId is now imported from ../utils/storeResolution.js
 
 
 // ─── AGENT ENDPOINTS ─────────────────────────────────────
@@ -155,7 +158,7 @@ export const getLeaderboardHandler = async (req, res) => {
   try {
     const date = req.query.date || toISTDateString();
     const sortBy = req.query.sortBy || 'totalSales';
-    const { storeId } = req.query;
+    const storeId = getEffectiveStoreId(req);
 
     const leaderboard = await getLeaderboard(date, sortBy, req.user.tenantId, storeId);
     res.json(leaderboard);
@@ -173,19 +176,28 @@ export const getLeaderboardHandler = async (req, res) => {
  */
 export const getAllPerformance = async (req, res) => {
   try {
-    const { date, storeId } = req.query;
+    const { date } = req.query;
     const targetDate = date || toISTDateString();
-
+    const storeId = getEffectiveStoreId(req);
+    console.log(`[VGE-DEBUG] getAllPerformance | storeId: ${storeId} | targetDate: ${targetDate}`);
     const where = { 
       date: targetDate, 
       tenantId: req.user.tenantId 
     };
 
-    if (storeId && storeId !== 'undefined' && storeId !== 'null' && storeId !== '') {
+    const isGlobal = req.user?.role === 'TENANT_OWNER' || req.user?.role === 'SUPER_ADMIN' || (req.user?.role === 'ADMIN' && !req.user?.customRoleId) || req.user?.portalType === 'ADMIN';
+
+    // Strict isolation: If a storeId is requested (or required for branch roles),
+    // we must filter by it. If null is requested (Global only), we fetch all.
+    if (storeId) {
       where.storeId = storeId;
+    } else if (isGlobal && !req.query.storeId) {
+      // For global view, we don't filter by storeId to see all
     } else if (req.user.storeId) {
+      // Fallback for non-global users who somehow missed the storeId in query
       where.storeId = req.user.storeId;
     }
+    console.log(`[VGE-DEBUG] Query where:`, JSON.stringify(where));
 
     const performances = await prisma.vgeDailyPerformance.findMany({
       where,
@@ -238,8 +250,8 @@ export const getAgentPerformance = async (req, res) => {
  */
 export const getMonthlyReport = async (req, res) => {
   try {
-    const { month, storeId: queryStoreId } = req.query;
-    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') ? queryStoreId : req.user.storeId;
+    const { month } = req.query;
+    const storeId = getEffectiveStoreId(req);
     const targetMonth = month || toISTMonthString();
 
     const userWhere = {
@@ -326,8 +338,7 @@ export const getMonthlyReport = async (req, res) => {
  */
 export const getConfig = async (req, res) => {
   try {
-    const { storeId: queryStoreId } = req.query;
-    const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') ? queryStoreId : req.user.storeId;
+    const storeId = getEffectiveStoreId(req);
 
     const config = await fetchIncentiveConfig(req.user.tenantId, storeId);
     res.json(config);
@@ -342,8 +353,8 @@ export const getConfig = async (req, res) => {
  */
 export const updateConfig = async (req, res) => {
   try {
-    const { storeId: bodyStoreId, ...data } = req.body;
-    const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
+    const { ...data } = req.body;
+    const storeId = getEffectiveStoreId(req);
 
     // Remove id and updatedAt from body to prevent overwrite
     delete data.id;

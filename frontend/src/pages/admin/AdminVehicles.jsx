@@ -51,11 +51,13 @@ export default function AdminVehicles() {
 
   const fetchData = async () => {
     try {
-      const [vRes, uRes, sRes] = await Promise.all([adminAPI.getVehicles(), adminAPI.getUsers(), isTenantRoute ? adminAPI.getStores() : null]);
+      const [vRes, uRes, sRes] = await Promise.all([
+        adminAPI.getVehicles(), 
+        adminAPI.getUsers(), 
+        adminAPI.getStores()
+      ]);
       setVehicles(vRes.data);
-      if (isTenantRoute && sRes) {
-        setStores(sRes.data?.success ? sRes.data.data : (sRes.data || []));
-      }
+      setStores(sRes.data?.success ? sRes.data.data : (sRes.data || []));
       // Filter out Consumers AND Admins - only show agents/staff for vehicles
       setUsers(uRes.data.filter(u => u.role !== 'CONSUMER' && u.role !== 'ADMIN'));
     } catch {
@@ -339,9 +341,17 @@ export default function AdminVehicles() {
 
               <div className="flex items-center gap-1">
                 {can('VEHICLES', 'TOGGLE_STATUS') && (
-                  <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                    className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                    {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                  <button
+                    onClick={() => handleToggleStatus(vehicle)}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                      vehicle.status ? "bg-emerald-500" : "bg-gray-200"
+                    )}
+                  >
+                    <span className={cn(
+                      "pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition-all duration-300",
+                      vehicle.status ? "translate-x-4" : "translate-x-0"
+                    )} />
                   </button>
                 )}
                 {can('VEHICLES', 'UPDATE') && (
@@ -418,13 +428,25 @@ export default function AdminVehicles() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex justify-center">
-                    {vehicle.status ? (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-full uppercase tracking-widest">
-                        <CheckCircle2 size={10} /> Active
-                      </span>
+                    {can('VEHICLES', 'TOGGLE_STATUS') ? (
+                      <button
+                        onClick={() => handleToggleStatus(vehicle)}
+                        className={cn(
+                          "relative inline-flex h-6 w-11 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                          vehicle.status ? "bg-emerald-500" : "bg-gray-200"
+                        )}
+                      >
+                        <span className={cn(
+                          "pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition-all duration-300",
+                          vehicle.status ? "translate-x-5" : "translate-x-0"
+                        )} />
+                      </button>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-[10px] font-black text-gray-400 bg-gray-50 px-2 py-1 rounded-full uppercase tracking-widest">
-                        <XCircle size={10} /> Inactive
+                      <span className={cn(
+                        "px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-widest",
+                        vehicle.status ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-50 text-gray-400 border border-gray-100"
+                      )}>
+                        {vehicle.status ? 'Active' : 'Inactive'}
                       </span>
                     )}
                   </div>
@@ -463,12 +485,6 @@ export default function AdminVehicles() {
                 </td>
                 <td className="px-6 py-4">
                   <div className="flex items-center justify-end gap-1 transition-all">
-                    {can('VEHICLES', 'TOGGLE_STATUS') && (
-                      <button onClick={() => handleToggleStatus(vehicle)} title={vehicle.status ? "Mark Inactive" : "Mark Active"}
-                        className={`p-2 rounded-xl transition-all ${vehicle.status ? 'text-orange-400 hover:text-orange-600 hover:bg-orange-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}>
-                        {vehicle.status ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
-                      </button>
-                    )}
                     {can('VEHICLES', 'UPDATE') && (
                       <button onClick={() => openEditModal(vehicle)} title="Edit Details"
                         className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all">
@@ -493,38 +509,62 @@ export default function AdminVehicles() {
   );
 
   const renderClassifiedVehicles = () => {
-    if (isTenantRoute && !storeFilterId) {
+    if (!storeFilterId) {
+      const personnelByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.id !== currentUser?.id) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
-          <div className="col-span-full mb-2">
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
             <h3 className="text-xl font-black tracking-tight text-gray-900">Platform Branches</h3>
-            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to manage its transport assets</p>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to manage its transport assets</p>
           </div>
           {stores.map(store => {
             const groupVehicles = filteredVehicles.filter(v => v.storeId === store.id);
+            const personnelCount = personnelByStore[store.id] || 0;
             return (
               <button
                 key={store.id}
                 onClick={() => setSearchParams({ storeId: store.id })}
-                className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
               >
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
-
-                <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                  <Store size={28} strokeWidth={2.5} />
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <Truck size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
                 </div>
-                <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
-                <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
 
-                <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
-                  <span>{groupVehicles.length} Vehicles</span>
-                  <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
+                <div className="flex items-center gap-8">
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Fleet Capacity</span>
+                    <span className="text-sm font-bold text-gray-900">{groupVehicles.length} Vehicles</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Personnel</span>
+                    <span className="text-sm font-bold text-gray-900">{personnelCount} Members</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ArrowRight size={20} strokeWidth={3} />
+                  </div>
                 </div>
               </button>
             );
           })}
           {stores.length === 0 && (
-            <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
               <Store size={48} className="mx-auto text-gray-300 mb-4" />
               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
             </div>
@@ -796,7 +836,7 @@ export default function AdminVehicles() {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-4">
-                {isTenantRoute && storeFilterId && (
+                {storeFilterId && (
                   <button
                     onClick={() => setSearchParams({})}
                     className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -809,33 +849,29 @@ export default function AdminVehicles() {
               </div>
               <div className="flex items-center gap-2">
                 <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
-                {isTenantRoute && (
-                  <>
-                    <span className="text-gray-300">•</span>
-                    <select
-                      value={storeFilterId || ''}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setSearchParams({ storeId: e.target.value });
-                        } else {
-                          setSearchParams({});
-                        }
-                      }}
-                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 0.25rem center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1rem'
-                      }}
-                    >
-                      <option value="">All Branches</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </>
-                )}
+                <span className="text-gray-300">•</span>
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.25rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
             <div className="flex items-center gap-3">
@@ -865,7 +901,7 @@ export default function AdminVehicles() {
                   <Download size={20} />
                 </button>
               </div>
-              {can('VEHICLES', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
+              {can('VEHICLES', 'CREATE') && storeFilterId && (
                 <button onClick={() => {
                   setNewVehicle({
                     vehicleNumber: '',
@@ -932,7 +968,7 @@ export default function AdminVehicles() {
             </div>
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {users.filter(u => !u.assignedVehicleId).map(user => (
+              {users.filter(u => !u.assignedVehicleId && u.storeId === selectedVehicle?.storeId).map(user => (
                 <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
                   className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
                   <div className="flex items-center gap-3">

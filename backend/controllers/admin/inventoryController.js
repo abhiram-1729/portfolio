@@ -17,19 +17,15 @@ const unitCache = new Map();
 // Item Master
 export const getItems = async (req, res) => {
   try {
-    const { storeId } = req.query;
+    const { storeId, all } = req.query;
     const where = { tenantId: req.user.tenantId };
     
-    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
-      where.OR = [
-        { storeId: storeId },
-        { storeId: null }
-      ];
+    if (all === 'true') {
+      // Show everything for the tenant, no storeId filter
+    } else if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
     } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      where.OR = [
-        { storeId: req.user.storeId },
-        { storeId: null }
-      ];
+      where.storeId = req.user.storeId;
     }
 
     const items = await prisma.product.findMany({
@@ -38,6 +34,7 @@ export const getItems = async (req, res) => {
         category: { select: { name: true } },
         subCategory: { select: { name: true } },
         unit: { select: { name: true, type: true } },
+        store: { select: { name: true } },
         WarehouseInventory: {
           select: { quantity: true }
         },
@@ -58,6 +55,7 @@ export const getItems = async (req, res) => {
         warehouseStock: warehouseQty,
         vehicleStock: vehicleQty,
         totalStock: totalQty,
+        storeName: item.store?.name || 'Global Registry',
         stock: warehouseQty // Keep 'stock' as warehouseQty for backward compatibility where needed
       };
     });
@@ -65,6 +63,160 @@ export const getItems = async (req, res) => {
     res.json(processedItems);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching items', error: error.message });
+  }
+};
+
+export const bulkImportItems = async (req, res) => {
+  try {
+    const { transfers, targetStoreId } = req.body;
+    const tenantId = req.user.tenantId;
+
+    if (!transfers || !Array.isArray(transfers) || !targetStoreId) {
+      return res.status(400).json({ message: 'Missing required parameters' });
+    }
+
+    const results = await prisma.$transaction(async (tx) => {
+      const processed = [];
+
+      // Get or create default warehouse for the tenant
+      let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
+      if (!warehouse) {
+        warehouse = await tx.warehouse.create({
+          data: { tenantId, name: 'Main Warehouse', location: 'Default' }
+        });
+      }
+
+      for (const transfer of transfers) {
+        const { productId, quantity } = transfer;
+
+        if (quantity <= 0) continue;
+
+        // 1. Get Source Product & its Warehouse Stock
+        const sourceProd = await tx.product.findUnique({
+          where: { id: productId },
+          include: { WarehouseInventory: true }
+        });
+
+        if (!sourceProd) {
+          throw new Error(`Source product ${productId} not found`);
+        }
+
+        const sourceTotalStock = sourceProd.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+
+        if (sourceTotalStock < quantity) {
+          throw new Error(`Insufficient warehouse stock for ${sourceProd.name}. Available: ${sourceTotalStock}, Requested: ${quantity}`);
+        }
+
+        // 2. Find or Create Target Product
+        let targetProd = await tx.product.findFirst({
+          where: {
+            tenantId,
+            storeId: targetStoreId,
+            OR: [
+              { name: sourceProd.name },
+              { barcode: sourceProd.barcode && sourceProd.barcode !== '' ? sourceProd.barcode : undefined }
+            ].filter(Boolean)
+          }
+        });
+
+        if (!targetProd) {
+          targetProd = await tx.product.create({
+            data: {
+              name: sourceProd.name,
+              description: sourceProd.description,
+              mrp: sourceProd.mrp,
+              price: sourceProd.price,
+              landingPrice: sourceProd.landingPrice,
+              discount: sourceProd.discount,
+              discountType: sourceProd.discountType,
+              status: sourceProd.status,
+              image: sourceProd.image,
+              categoryId: sourceProd.categoryId,
+              subCategoryId: sourceProd.subCategoryId,
+              brandId: sourceProd.brandId,
+              unitId: sourceProd.unitId,
+              unitValue: sourceProd.unitValue,
+              gst: sourceProd.gst,
+              isFree: sourceProd.isFree,
+              minShopAmount: sourceProd.minShopAmount,
+              barcode: sourceProd.barcode,
+              skuCode: sourceProd.skuCode,
+              minStockAlert: sourceProd.minStockAlert,
+              tenantId,
+              storeId: targetStoreId,
+              stock: 0, // Will be updated via WarehouseInventory logic below
+            }
+          });
+        }
+
+        // 3. Update Warehouse Inventory for Target Product
+        await tx.warehouseInventory.upsert({
+          where: {
+            warehouseId_productId: {
+              warehouseId: warehouse.id,
+              productId: targetProd.id
+            }
+          },
+          update: { quantity: { increment: quantity } },
+          create: {
+            tenantId,
+            warehouseId: warehouse.id,
+            productId: targetProd.id,
+            quantity: quantity
+          }
+        });
+
+        // 4. Update Product Master stock for Target (Aggregate)
+        await tx.product.update({
+          where: { id: targetProd.id },
+          data: { stock: { increment: quantity } }
+        });
+
+        // 5. Deduct from Source Warehouse Inventory
+        // We pick the first warehouse record that has stock for simplicity, or specific one if known
+        // Here we just use the default warehouse as most items are there
+        const sourceWI = await tx.warehouseInventory.findFirst({
+          where: { productId: sourceProd.id, warehouseId: warehouse.id }
+        });
+
+        if (sourceWI && sourceWI.quantity >= quantity) {
+          await tx.warehouseInventory.update({
+            where: { id: sourceWI.id },
+            data: { quantity: { decrement: quantity } }
+          });
+        } else {
+          // If not in default warehouse, find any that has stock
+          const anyWI = await tx.warehouseInventory.findFirst({
+            where: { productId: sourceProd.id, quantity: { gte: quantity } }
+          });
+          if (anyWI) {
+            await tx.warehouseInventory.update({
+              where: { id: anyWI.id },
+              data: { quantity: { decrement: quantity } }
+            });
+          }
+        }
+
+        // 6. Deduct from Source Product Master stock (Aggregate)
+        await tx.product.update({
+          where: { id: sourceProd.id },
+          data: { stock: { decrement: quantity } }
+        });
+
+        processed.push(targetProd);
+      }
+
+      return processed;
+    });
+
+    res.json({ 
+      success: true,
+      message: `Successfully synced ${results.length} products and updated Warehouse inventory.`, 
+      syncedCount: results.length 
+    });
+  } catch (error) {
+    console.error('Sync Error:', error);
+    res.status(500).json({ message: error.message || 'Error syncing items' });
   }
 };
 

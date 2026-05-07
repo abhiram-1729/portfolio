@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Search, X, Loader2, Pencil, Trash2, Truck, Users, ArrowLeft, AlertTriangle,
-  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw, Download, Printer, FileText } from 'lucide-react';
+  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw, Download, Printer, FileText, ChevronLeft } from 'lucide-react';
 import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
@@ -30,6 +30,7 @@ export default function AdminAssets() {
   const [requests, setRequests] = useState([]);
   const [reports, setReports] = useState(null);
   const [assetCategories, setAssetCategories] = useState([]);
+  const [stores, setStores] = useState([]);
 
   // Form states
   const [form, setForm] = useState({ name: '', categoryId: '', assetType: 'NON_ELECTRONIC', model: '', brand: '', description: '', estimatedCost: '' });
@@ -66,14 +67,24 @@ export default function AdminAssets() {
 
   const fetchAll = async () => {
     try {
-      const [aRes, uRes, cRes] = await Promise.all([
+      setLoading(true);
+      // Clear previous data to prevent stale data flicker
+      setAssets([]);
+      setTracking([]);
+      setIssues([]);
+      setRequests([]);
+      setReports(null);
+
+      const [aRes, uRes, cRes, sRes] = await Promise.all([
         adminAPI.getAssets({ storeId }),
         adminAPI.getUsers({ storeId }),
-        adminAPI.getAssetCategories()
+        adminAPI.getAssetCategories(),
+        adminAPI.getStores()
       ]);
       setAssets(aRes.data);
       setUsers(uRes.data.filter(u => u.role === 'SALES_AGENT' || u.role === 'SUPERVISOR' || u.role === 'HELPER'));
       setAssetCategories(cRes.data);
+      if (sRes.data.success) setStores(sRes.data.data);
     } catch (err) {
       toast.error('Failed to load assets');
     } finally {
@@ -83,28 +94,28 @@ export default function AdminAssets() {
 
   const loadTracking = async () => {
     try {
-      const { data } = await adminAPI.getAssetTracking();
+      const { data } = await adminAPI.getAssetTracking({ storeId });
       setTracking(data);
     } catch { toast.error('Failed to load tracking'); }
   };
 
   const loadIssues = async () => {
     try {
-      const { data } = await adminAPI.getAssetIssues();
+      const { data } = await adminAPI.getAssetIssues({ storeId });
       setIssues(data);
     } catch { toast.error('Failed to load issues'); }
   };
 
   const loadReports = async () => {
     try {
-      const { data } = await adminAPI.getAssetReports();
+      const { data } = await adminAPI.getAssetReports({ storeId });
       setReports(data);
     } catch { toast.error('Failed to load reports'); }
   };
 
   const loadRequests = async () => {
     try {
-      const { data } = await adminAPI.getAssetRequests();
+      const { data } = await adminAPI.getAssetRequests({ storeId });
       setRequests(data);
     } catch { toast.error('Failed to load requests'); }
   };
@@ -286,89 +297,120 @@ export default function AdminAssets() {
         )}
       </div>
 
-      {filteredAssets.length === 0 ? (
-        <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
-          <Package size={32} className="mx-auto text-gray-200 mb-2" />
-          <p className="text-sm font-bold text-gray-400">No assets found</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {filteredAssets.map(asset => {
-            const available = (asset.units || []).filter(u => u.status === 'AVAILABLE').length;
-            const assigned = (asset.units || []).filter(u => u.status === 'ASSIGNED').length;
-            const total = asset.units?.length || 0;
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        {filteredAssets.length === 0 ? (
+          <div className="py-24 text-center">
+            <Package size={48} className="mx-auto text-gray-200 mb-4" />
+            <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No assets found in inventory</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-emerald-50/50">
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Asset Identity</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Category & Type</th>
+                  <th className="text-center py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Stock Distribution</th>
+                  <th className="text-right py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Pricing</th>
+                  <th className="text-right py-4 px-8 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {filteredAssets.map(asset => {
+                  const available = (asset.units || []).filter(u => u.status === 'AVAILABLE').length;
+                  const assigned = (asset.units || []).filter(u => u.status === 'ASSIGNED').length;
+                  const total = asset.units?.length || 0;
 
-            return (
-              <div key={asset.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md hover:border-emerald-200 transition-all group">
-                {/* Image / Icon */}
-                <div className="h-32 bg-gradient-to-br from-gray-50 to-gray-100 flex items-center justify-center relative overflow-hidden">
-                  {asset.image ? (
-                    <img src={asset.image} alt={asset.name} className="w-full h-full object-cover" />
-                  ) : (
-                    asset.assetType === 'ELECTRONIC' ? <Monitor size={48} className="text-gray-200" /> : <Box size={48} className="text-gray-200" />
-                  )}
-                  <span className={`absolute top-3 right-3 text-[9px] font-black px-2 py-1 rounded-lg uppercase tracking-wider ${
-                    asset.assetType === 'ELECTRONIC' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
-                  }`}>{asset.category?.name || (asset.assetType === 'ELECTRONIC' ? 'Electronic' : 'Non-Electronic')}</span>
-                </div>
-
-                <div className="p-4 space-y-3">
-                  <div>
-                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">{asset.name}</h3>
-                    <div className="flex items-center gap-2 mt-1 flex-wrap">
-                      {asset.model && <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{asset.model}</span>}
-                      {asset.brand && <span className="text-[10px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{asset.brand}</span>}
-                      <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded">₹{asset.estimatedCost}</span>
-                    </div>
-                  </div>
-
-                  {/* Stock Bar */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="bg-gray-50 rounded-xl p-2 text-center">
-                      <span className="text-[8px] font-black text-gray-400 uppercase block">Total</span>
-                      <span className="text-sm font-black text-gray-800">{total}</span>
-                    </div>
-                    <div className="bg-emerald-50 rounded-xl p-2 text-center">
-                      <span className="text-[8px] font-black text-emerald-500 uppercase block">Free</span>
-                      <span className="text-sm font-black text-emerald-700">{available}</span>
-                    </div>
-                    <div className="bg-blue-50 rounded-xl p-2 text-center">
-                      <span className="text-[8px] font-black text-blue-500 uppercase block">Assigned</span>
-                      <span className="text-sm font-black text-blue-700">{assigned}</span>
-                    </div>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center gap-2 pt-1">
-                    {can('ASSETS', 'CREATE') && (
-                      <button onClick={() => { setUnitsTarget(asset); setShowAddUnitsModal(true); }}
-                        className="flex-1 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 py-2 rounded-xl hover:bg-emerald-100 transition-colors border border-emerald-100">
-                        + Add Units
-                      </button>
-                    )}
-                    {can('ASSETS', 'UPDATE') && (
-                      <button onClick={() => { setEditForm({ id: asset.id, name: asset.name, categoryId: asset.categoryId || '', assetType: asset.assetType, model: asset.model || '', brand: asset.brand || '', description: asset.description || '', estimatedCost: asset.estimatedCost?.toString() || '' }); setShowEditModal(true); }}
-                        className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-colors">
-                        <Pencil size={14} />
-                      </button>
-                    )}
-                    <button onClick={() => setShowDetailModal(asset)}
-                      className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                      <Eye size={14} />
-                    </button>
-                    {can('ASSETS', 'DELETE') && (
-                      <button onClick={() => handleDelete(asset.id, asset.name)}
-                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-colors">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+                  return (
+                    <tr key={asset.id} className="hover:bg-emerald-50/30 transition-colors group">
+                      <td className="py-4 px-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-xl bg-gray-100 flex items-center justify-center overflow-hidden border border-gray-100 shrink-0">
+                            {asset.image ? (
+                              <img src={asset.image} alt={asset.name} className="w-full h-full object-cover" />
+                            ) : (
+                              asset.assetType === 'ELECTRONIC' ? <Monitor size={20} className="text-gray-400" /> : <Box size={20} className="text-gray-400" />
+                            )}
+                          </div>
+                          <div>
+                            <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">{asset.name}</h3>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              {asset.model && <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">{asset.model}</span>}
+                              {asset.brand && <span className="text-[9px] font-bold text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">{asset.brand}</span>}
+                            </div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col gap-1">
+                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100/50 w-fit">
+                            {asset.category?.name || 'Uncategorized'}
+                          </span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
+                            {asset.assetType === 'ELECTRONIC' ? 'Hardware / Electronic' : 'Physical / Asset'}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center justify-center gap-6">
+                          <div className="text-center">
+                            <span className="block text-sm font-black text-gray-800">{total}</span>
+                            <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Total</span>
+                          </div>
+                          <div className="w-px h-6 bg-gray-100" />
+                          <div className="text-center">
+                            <span className="block text-sm font-black text-emerald-600">{available}</span>
+                            <span className="text-[8px] font-black text-emerald-400 uppercase tracking-widest">Free</span>
+                          </div>
+                          <div className="w-px h-6 bg-gray-100" />
+                          <div className="text-center">
+                            <span className="block text-sm font-black text-blue-600">{assigned}</span>
+                            <span className="text-[8px] font-black text-blue-400 uppercase tracking-widest">Assigned</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <span className="text-sm font-black text-gray-900">₹{asset.estimatedCost}</span>
+                        <span className="block text-[8px] font-black text-gray-400 uppercase tracking-widest">Est. Cost</span>
+                      </td>
+                      <td className="py-4 px-8 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {can('ASSETS', 'CREATE') && (
+                            <button onClick={() => { setUnitsTarget(asset); setShowAddUnitsModal(true); }}
+                              className="p-2 text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors border border-emerald-50"
+                              title="Add Units">
+                              <Plus size={16} strokeWidth={2.5} />
+                            </button>
+                          )}
+                          <button onClick={() => setShowDetailModal(asset)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors border border-blue-50"
+                            title="View Details">
+                            <Eye size={16} strokeWidth={2.5} />
+                          </button>
+                          {can('ASSETS', 'UPDATE') && (
+                            <button onClick={() => { setEditForm({ id: asset.id, name: asset.name, categoryId: asset.categoryId || '', assetType: asset.assetType, model: asset.model || '', brand: asset.brand || '', description: asset.description || '', estimatedCost: asset.estimatedCost?.toString() || '' }); setShowEditModal(true); }}
+                              className="p-2 text-gray-500 hover:bg-gray-50 rounded-lg transition-colors border border-gray-100"
+                              title="Edit Info">
+                              <Pencil size={16} strokeWidth={2.5} />
+                            </button>
+                          )}
+                          {can('ASSETS', 'DELETE') && (
+                            <button onClick={() => handleDelete(asset.id, asset.name)}
+                              className="p-2 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors border border-rose-50"
+                              title="Delete Asset">
+                              <Trash2 size={16} strokeWidth={2.5} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 
@@ -661,57 +703,108 @@ export default function AdminAssets() {
         </div>
 
         {/* Executive Report */}
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4 border-b border-gray-50 pb-4">
-            <h3 className="text-sm font-black text-gray-900 uppercase flex items-center gap-2"><Users size={16} className="text-blue-500" /> Executive Asset Report</h3>
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-6 border-b border-gray-50 flex items-center justify-between bg-white">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-blue-50 flex items-center justify-center text-blue-600">
+                <Users size={20} />
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Executive Asset Registry</h3>
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5 italic">Real-time personnel assignment tracking</p>
+              </div>
+            </div>
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleExportPDF('asset-executive-report')}
-                className="p-2 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
+                className="p-2.5 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shadow-sm group"
                 title="Export PDF"
               >
-                <FileText size={14} />
+                <FileText size={16} className="group-hover:scale-110 transition-transform" />
               </button>
               <button
                 onClick={() => handlePrint('asset-executive-report')}
-                className="p-2 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-all"
+                className="p-2.5 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-xl transition-all shadow-sm group"
                 title="Print Report"
               >
-                <Printer size={14} />
+                <Printer size={16} className="group-hover:scale-110 transition-transform" />
               </button>
               <button
                 onClick={() => handleExportExcel('asset-executive-report')}
-                className="flex items-center gap-2 px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg border border-blue-100 hover:bg-blue-100 transition-all font-black text-[9px] uppercase tracking-widest"
+                className="flex items-center gap-2 px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all font-black text-[10px] uppercase tracking-widest shadow-lg shadow-blue-600/20 active:scale-95"
               >
-                <Download size={12} /> Export Excel
+                <Download size={14} /> Export Excel
               </button>
             </div>
           </div>
-          {reports.executiveReport.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-4">No active assignments</p>
-          ) : (
-            <div className="space-y-4">
-              {reports.executiveReport.map((er, i) => (
-                <div key={i} className="bg-gray-50 p-4 rounded-xl space-y-2">
-                  <h4 className="text-sm font-black text-gray-800">{er.user?.name}</h4>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {er.assets.map((a, j) => (
-                      <div key={j} className="bg-white p-3 rounded-lg border border-gray-100 flex items-center justify-between">
-                        <div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-emerald-50/50">
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest border-b border-emerald-100/50">Executive Name</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest border-b border-emerald-100/50">Asset Category / Name</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest border-b border-emerald-100/50">Model / Specs</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest border-b border-emerald-100/50">Serial Number</th>
+                  <th className="text-right py-4 px-8 text-[10px] font-black text-emerald-800 uppercase tracking-widest border-b border-emerald-100/50">Current Condition</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {reports.executiveReport.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="py-12 text-center text-gray-400 font-bold uppercase text-[10px] tracking-widest italic">
+                      No active asset assignments detected
+                    </td>
+                  </tr>
+                ) : (
+                  reports.executiveReport.map((er) => (
+                    er.assets.map((a, idx) => (
+                      <tr key={`${er.user?.id}-${idx}`} className="hover:bg-emerald-50/20 transition-colors group">
+                        <td className="py-4 px-6">
+                          {idx === 0 ? (
+                            <div className="flex items-center gap-2">
+                              <div className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
+                                <Users size={12} />
+                              </div>
+                              <span className="text-xs font-black text-gray-900">{er.user?.name}</span>
+                            </div>
+                          ) : (
+                            <span className="text-[10px] text-gray-300 font-bold ml-9">"</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-6">
                           <span className="text-xs font-bold text-gray-700">{a.assetName}</span>
-                          {a.model && <span className="text-[10px] text-gray-400 block">{a.model}</span>}
-                          {a.serialNumber && <span className="text-[10px] font-mono text-emerald-600 block">{a.serialNumber}</span>}
-                        </div>
-                        <span className={`text-[9px] font-black px-2 py-1 rounded uppercase ${
-                          a.condition === 'NEW' ? 'bg-emerald-100 text-emerald-600' : a.condition === 'GOOD' ? 'bg-blue-100 text-blue-600' : 'bg-amber-100 text-amber-600'
-                        }`}>{a.condition}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+                        </td>
+                        <td className="py-4 px-6">
+                          <span className="text-[10px] font-medium text-gray-400 italic">
+                            {a.model || <span className="text-gray-300 not-italic">---</span>}
+                          </span>
+                        </td>
+                        <td className="py-4 px-6">
+                          {a.serialNumber ? (
+                            <span className="text-[10px] font-mono font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100">
+                              {a.serialNumber}
+                            </span>
+                          ) : (
+                            <span className="text-[10px] text-gray-300 font-mono">N/A</span>
+                          )}
+                        </td>
+                        <td className="py-4 px-8 text-right">
+                          <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-tighter border shadow-sm ${
+                            a.condition === 'NEW' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                            a.condition === 'GOOD' ? 'bg-blue-50 text-blue-600 border-blue-100' : 
+                            'bg-amber-50 text-amber-600 border-amber-100'
+                          }`}>
+                            {a.condition}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -721,111 +814,194 @@ export default function AdminAssets() {
   const renderRequests = () => (
     <div className="space-y-4">
       {requests.length === 0 ? (
-        <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center shadow-sm">
-          <MessageSquare size={32} className="mx-auto text-emerald-200 mb-2" />
-          <p className="text-sm font-bold text-gray-400">No requests found</p>
+        <div className="py-24 bg-white rounded-3xl border border-gray-100 text-center shadow-sm">
+          <MessageSquare size={48} className="mx-auto text-emerald-200 mb-4" />
+          <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No active requests found</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {requests.map(req => (
-            <div key={req.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 space-y-3 flex flex-col transition-all hover:shadow-md hover:border-emerald-200">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-2">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-                    req.type === 'REPLACEMENT' ? 'bg-orange-50 text-orange-500' :
-                    req.type === 'NEW_ASSET' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'
-                  }`}>
-                    {req.type === 'REPLACEMENT' ? <RefreshCcw size={16} /> :
-                     req.type === 'NEW_ASSET' ? <Plus size={16} /> : <MessageSquare size={16} />}
-                  </div>
-                  <div>
-                    <span className="text-[10px] font-black text-gray-900 uppercase tracking-tight block leading-none">
-                      {req.type.replace('_', ' ')}
-                    </span>
-                    <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{req.user?.name}</span>
-                  </div>
-                </div>
-                <span className={`text-[8px] font-black px-2 py-1 rounded-lg uppercase tracking-widest shadow-sm ${
-                  req.status === 'PENDING' ? 'bg-amber-100 text-amber-600' :
-                  req.status === 'APPROVED' ? 'bg-blue-100 text-blue-600' :
-                  req.status === 'REJECTED' ? 'bg-red-100 text-red-600' : 'bg-emerald-100 text-emerald-600'
-                }`}>{req.status}</span>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-xl flex-1">
-                <div className="text-[9px] font-black text-gray-400 uppercase mb-1">Request Details</div>
-                <div className="text-xs font-bold text-gray-700">
-                  {req.asset?.name || 'Requirement'}
-                  {req.asset?.model && <span className="text-gray-400 ml-1 font-medium italic">({req.asset.model})</span>}
-                </div>
-                {req.assetUnit?.serialNumber && (
-                   <div className="text-[9px] font-mono text-emerald-600 mt-0.5">SN: {req.assetUnit.serialNumber}</div>
-                )}
-                {req.description && <p className="text-[10px] text-gray-500 mt-2 italic leading-relaxed">"{req.description}"</p>}
-              </div>
-
-              <div className="flex items-center justify-between text-[9px] font-bold border-t border-gray-50 pt-2">
-                <span className="text-gray-400">{new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
-                <span className={`uppercase tracking-tighter ${
-                  req.priority === 'HIGH' || req.priority === 'CRITICAL' ? 'text-red-500 font-extrabold' : 'text-gray-400'
-                }`}>Priority: {req.priority}</span>
-              </div>
-
-              {req.status === 'PENDING' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
-                <div className="grid grid-cols-2 gap-2 pt-1 mt-auto">
-                   <button 
-                     onClick={() => handleRequestUpdate(req.id, 'APPROVED')}
-                     className="py-2 bg-blue-50 text-blue-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-blue-100 hover:bg-blue-100 transition-all"
-                   >
-                     Approve
-                   </button>
-                   <button 
-                     onClick={() => {
-                        const remark = window.prompt("Reason for rejection?");
-                        if(remark !== null) handleRequestUpdate(req.id, 'REJECTED', remark);
-                     }}
-                     className="py-2 bg-red-50 text-red-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-red-100 hover:bg-red-100 transition-all"
-                   >
-                     Reject
-                   </button>
-                </div>
-              )}
-              
-              {req.status === 'APPROVED' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
-                 <button 
-                    onClick={() => handleRequestUpdate(req.id, 'COMPLETED')}
-                    className="w-full py-2 bg-emerald-50 text-emerald-600 text-[10px] font-black uppercase tracking-wider rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all"
-                  >
-                    Mark Handover Complete
-                  </button>
-              )}
-
-              {req.adminRemark && req.status === 'REJECTED' && (
-                <div className="p-2 bg-red-50 rounded-xl border border-red-100">
-                  <span className="text-[8px] font-black text-red-400 uppercase block mb-0.5">Admin Remark</span>
-                  <p className="text-[10px] text-red-600 italic">"{req.adminRemark}"</p>
-                </div>
-              )}
-            </div>
-          ))}
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-emerald-50/50">
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Type & Priority</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Executive</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Asset Details</th>
+                  <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Description / Reason</th>
+                  <th className="text-center py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Status</th>
+                  <th className="text-right py-4 px-8 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {requests.map(req => (
+                  <tr key={req.id} className="hover:bg-emerald-50/30 transition-colors group">
+                    <td className="py-4 px-6">
+                      <div className="flex flex-col gap-1.5">
+                        <div className="flex items-center gap-2">
+                          <div className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                            req.type === 'REPLACEMENT' ? 'bg-orange-50 text-orange-500' :
+                            req.type === 'NEW_ASSET' ? 'bg-blue-50 text-blue-500' : 'bg-emerald-50 text-emerald-500'
+                          }`}>
+                            {req.type === 'REPLACEMENT' ? <RefreshCcw size={14} /> :
+                             req.type === 'NEW_ASSET' ? <Plus size={14} /> : <MessageSquare size={14} />}
+                          </div>
+                          <span className="text-[10px] font-black text-gray-900 uppercase tracking-tight">
+                            {req.type.replace('_', ' ')}
+                          </span>
+                        </div>
+                        <span className={`text-[8px] font-black px-2 py-0.5 rounded border w-fit uppercase tracking-tighter ${
+                          req.priority === 'HIGH' || req.priority === 'CRITICAL' 
+                          ? 'bg-red-50 text-red-600 border-red-100' 
+                          : 'bg-gray-50 text-gray-400 border-gray-100'
+                        }`}>
+                          {req.priority} Priority
+                        </span>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 border border-slate-200">
+                          <Users size={14} />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-xs font-black text-gray-900">{req.user?.name}</span>
+                          <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">{req.user?.role}</span>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="flex flex-col">
+                        <span className="text-xs font-bold text-gray-800">
+                          {req.asset?.name || <span className="italic text-gray-400">General Requirement</span>}
+                        </span>
+                        {req.asset?.model && <span className="text-[9px] text-gray-400 italic">({req.asset.model})</span>}
+                        {req.assetUnit?.serialNumber && (
+                          <span className="text-[9px] font-mono text-emerald-600 font-bold mt-0.5">SN: {req.assetUnit.serialNumber}</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6">
+                      <div className="max-w-[200px]">
+                        <p className="text-[10px] text-gray-500 italic leading-relaxed line-clamp-2">
+                          {req.description ? `"${req.description}"` : 'No description provided'}
+                        </p>
+                        <span className="text-[8px] text-gray-300 font-bold uppercase mt-1 block">
+                          {new Date(req.createdAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                        </span>
+                        {req.adminRemark && (
+                          <div className="mt-1 p-1.5 bg-red-50 rounded-lg border border-red-100 text-[8px] text-red-600 font-bold">
+                            Remark: {req.adminRemark}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-4 px-6 text-center">
+                      <span className={`text-[9px] font-black px-2.5 py-1 rounded-full uppercase tracking-widest border ${
+                        req.status === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100' :
+                        req.status === 'APPROVED' ? 'bg-blue-50 text-blue-600 border-blue-100' :
+                        req.status === 'REJECTED' ? 'bg-red-50 text-red-600 border-red-100' : 
+                        'bg-emerald-50 text-emerald-600 border-emerald-100'
+                      }`}>
+                        {req.status}
+                      </span>
+                    </td>
+                    <td className="py-4 px-8 text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        {req.status === 'PENDING' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
+                          <>
+                            <button 
+                              onClick={() => handleRequestUpdate(req.id, 'APPROVED')}
+                              className="px-3 py-1.5 bg-blue-50 text-blue-600 text-[9px] font-black uppercase tracking-wider rounded-lg border border-blue-100 hover:bg-blue-100 transition-all shadow-sm"
+                            >
+                              Approve
+                            </button>
+                            <button 
+                              onClick={() => {
+                                 const remark = window.prompt("Reason for rejection?");
+                                 if(remark !== null) handleRequestUpdate(req.id, 'REJECTED', remark);
+                              }}
+                              className="px-3 py-1.5 bg-red-50 text-red-600 text-[9px] font-black uppercase tracking-wider rounded-lg border border-red-100 hover:bg-red-100 transition-all shadow-sm"
+                            >
+                              Reject
+                            </button>
+                          </>
+                        )}
+                        {req.status === 'APPROVED' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
+                           <button 
+                              onClick={() => handleRequestUpdate(req.id, 'COMPLETED')}
+                              className="px-4 py-1.5 bg-emerald-600 text-white text-[9px] font-black uppercase tracking-wider rounded-lg shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+                            >
+                              Handover Complete
+                            </button>
+                        )}
+                        {(req.status === 'REJECTED' || req.status === 'COMPLETED') && (
+                          <span className="text-[9px] font-black text-gray-300 uppercase italic">Archive Only</span>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
   );
 
   // Gatekeeper
-  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
-  const isTenantRoute = location.pathname.includes('/tenant/');
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN';
   
-  if (isGlobalRole && isTenantRoute && !storeId) {
+  if (isGlobalRole && !storeId) {
     return (
-       <StoreSelector 
-         title="Asset Management"
-         description="Please select a store branch to manage its inventory and equipment."
-         onSelect={(id) => {
-           setSearchParams({ storeId: id });
-         }}
-       />
+       <div className="space-y-8 animate-in fade-in duration-500">
+         <div className="flex flex-col gap-1">
+           <h2 className="text-3xl font-black text-gray-900 tracking-tight">Organization Assets</h2>
+           <p className="text-sm font-medium text-gray-500 uppercase tracking-widest">Global Inventory & Branch Distribution Oversight</p>
+         </div>
+
+         <div className="grid grid-cols-1 gap-4 max-w-5xl">
+           {stores.map(store => (
+             <div 
+               key={store.id}
+               onClick={() => setSearchParams({ storeId: store.id })}
+               className="group bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 hover:border-emerald-100 transition-all cursor-pointer relative overflow-hidden"
+             >
+               <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                 <Package size={120} />
+               </div>
+                <div className="relative z-10 flex items-center justify-between gap-8">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shrink-0">
+                      <Package size={32} strokeWidth={2.5} />
+                    </div>
+                    <div className="flex flex-col">
+                      <h3 className="text-xl font-black text-gray-900 tracking-tight group-hover:text-emerald-600 transition-colors">{store.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-black px-2.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-md uppercase tracking-widest">
+                          {store.code || 'BRANCH'}
+                        </span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-tighter flex items-center gap-1.5">
+                          • <Box size={12} /> {store.address || 'Location Unspecified'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-12">
+                    <div className="hidden md:flex flex-col items-end">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset Management</span>
+                      <span className="text-sm font-bold text-gray-900 uppercase italic mt-1">Full Oversight</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                      <ArrowLeft className="rotate-180" size={24} strokeWidth={3} />
+                    </div>
+                  </div>
+                </div>
+             </div>
+           ))}
+         </div>
+       </div>
     );
   }
 
@@ -974,14 +1150,30 @@ export default function AdminAssets() {
   }
 
   return (
-    <div className="space-y-6">
+    <div key={storeId} className="space-y-6">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900">Asset Management</h2>
+        <div className="flex items-center gap-3">
+          {storeId && (
+            <button
+              onClick={() => setSearchParams({})}
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+              title="Back to All Branches"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          <h2 className="text-2xl font-bold text-gray-900">
+            {(() => {
+              const selectedStore = stores.find(s => s.id === storeId);
+              return selectedStore ? `${selectedStore.name} Assets` : 'Asset Management';
+            })()}
+          </h2>
+        </div>
           <div className="flex items-center gap-2">
             <p className="text-sm text-gray-500">Track, assign and manage company assets</p>
-            {isTenantRoute && storeId && (
+            {isGlobalRole && storeId && (
               <>
                 <span className="text-gray-300">•</span>
                 <button 

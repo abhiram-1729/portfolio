@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, CheckCircle2, FileText, Download, Printer } from 'lucide-react';
+import { Plus, User, Phone, Mail, Truck, MoreVertical, X, Loader2, ShieldCheck, UserCog, Users, Pencil, Trash2, Pause, Play, AlertCircle, Search, Store, ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, CheckCircle2, FileText, Download, Printer } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -32,6 +32,7 @@ export default function AdminUsers({ type }) {
     dailyTarget: 10000,
     baseSalary: 12000,
     customRoleId: '',
+    attendanceEnabled: true,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -94,7 +95,7 @@ export default function AdminUsers({ type }) {
       await adminAPI.createUser(newUser);
       toast.success('User created successfully');
       setShowAddModal(false);
-      setNewUser({ name: '', email: '', password: '', mobile: '', role: type === 'admin' ? 'ADMIN' : 'SALES_AGENT', vgeType: 'EMPLOYEE', storeId: storeFilterId || currentUser?.storeId || '', dailyTarget: 10000, baseSalary: 12000, customRoleId: '' });
+      setNewUser({ name: '', email: '', password: '', mobile: '', role: type === 'admin' ? 'ADMIN' : 'SALES_AGENT', vgeType: 'EMPLOYEE', storeId: storeFilterId || currentUser?.storeId || '', dailyTarget: 10000, baseSalary: 12000, customRoleId: '', attendanceEnabled: true });
       fetchUsers();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to create user');
@@ -213,11 +214,16 @@ export default function AdminUsers({ type }) {
 
   const filteredUsers = React.useMemo(() => {
     return users.filter(u => {
+      // 1. Primary Filter by Portal Type (Admin vs Staff)
+      const userIsAdmin = u.role === 'ADMIN' || 
+                         u.customRole?.portalType === 'ADMIN' || 
+                         u.customRole?.portalType === 'SUPERVISOR' ||
+                         u.role === 'TENANT_OWNER';
 
+      if (type === 'admin' && !userIsAdmin) return false;
+      if (type === 'staff' && userIsAdmin) return false;
 
-      // 1. Role Filter based on tab
-      const userIsAdmin = u.role === 'ADMIN' || u.customRole?.portalType === 'ADMIN' || u.customRole?.portalType === 'SUPERVISOR';
-
+      // 2. Tab Filter
       const roleMatches = activeTab === 'all'
         ? true
         : activeTab === 'admin'
@@ -228,12 +234,13 @@ export default function AdminUsers({ type }) {
 
       if (!roleMatches) return false;
 
-      // 2. Hide Current User (Self)
+      // 3. Hide Current User (Self)
       if (u.id === currentUser?.id) return false;
 
-      // 3. Search Filter
-      const searchLower = searchTerm.toLowerCase();
+      // 4. Search Filter
+      const searchLower = (searchTerm || '').toLowerCase();
       if (
+        searchTerm &&
         !u.name?.toLowerCase().includes(searchLower) &&
         !u.mobile?.includes(searchTerm) &&
         !u.role?.toLowerCase().includes(searchLower) &&
@@ -242,14 +249,14 @@ export default function AdminUsers({ type }) {
         return false;
       }
 
-      // 3. Store Filter
+      // 5. Store Filter
       if (storeFilterId && u.storeId !== storeFilterId) {
         return false;
       }
 
       return true;
     });
-  }, [users, activeTab, searchTerm, storeFilterId, currentUser?.id]);
+  }, [users, activeTab, searchTerm, storeFilterId, currentUser?.id, type]);
 
   const handleCustomRoleChange = (roleId, isEdit = false) => {
     const role = customRoles.find(r => r.id === roleId);
@@ -371,9 +378,17 @@ export default function AdminUsers({ type }) {
                   </button>
                 )}
                 {can('STAFF', 'TOGGLE_STATUS') && (
-                  <button onClick={() => handleToggleStatus(user)}
-                    className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}>
-                    {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                  <button
+                    onClick={() => handleToggleStatus(user)}
+                    className={cn(
+                      "relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                      user.status === 'ACTIVE' ? "bg-emerald-500" : "bg-gray-200"
+                    )}
+                  >
+                    <span className={cn(
+                      "pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow-lg ring-0 transition-all duration-300",
+                      user.status === 'ACTIVE' ? "translate-x-4" : "translate-x-0"
+                    )} />
                   </button>
                 )}
                 {can('STAFF', 'DELETE') && (
@@ -426,12 +441,13 @@ export default function AdminUsers({ type }) {
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="bg-gray-50/50">
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Store Context</th>
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
-              {showDetailColumns && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>}
-              {showDetailColumns && <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>}
-              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+              <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Team Member</th>
+              <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Store Context</th>
+              <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Contact Info</th>
+              {showDetailColumns && <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Role / Vehicle</th>}
+              {showDetailColumns && <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly CTC</th>}
+              <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Account Status</th>
+              <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
@@ -440,44 +456,44 @@ export default function AdminUsers({ type }) {
                 key={user.id}
                 className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
               >
-                <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                  <div className="flex items-center gap-4">
-                    <div className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black text-xs border shadow-inner transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-50 text-gray-400 border-gray-100 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-500 transition-all'}`}>
+                <td className="px-3 py-2 border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center font-black text-[10px] border shadow-inner transition-colors ${user.status === 'SUSPENDED' ? 'bg-gray-200 text-gray-500 border-gray-300' : 'bg-gray-50 text-gray-400 border-gray-100 group-hover:bg-emerald-600 group-hover:text-white group-hover:border-emerald-500 transition-all'}`}>
                       {getInitials(user.name)}
                     </div>
                     <div className="flex flex-col">
-                      <span className={`text-sm font-black text-gray-900 tracking-tight leading-none mb-1 ${user.status === 'SUSPENDED' ? 'line-through text-gray-400' : ''}`}>
+                      <span className={`text-xs font-black text-gray-900 tracking-tight leading-none mb-0.5 ${user.status === 'SUSPENDED' ? 'line-through text-gray-400' : ''}`}>
                         {user.name}
                       </span>
                       <div className="flex items-center gap-2">
-                        {user.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{user.displayId}</span>}
-                        <span className="text-[10px] text-gray-400 font-bold tracking-tight">{user.email}</span>
+                        {user.displayId && <span className="text-[8px] font-black text-teal-600 bg-teal-50 px-1 py-0 rounded tracking-wider">{user.displayId}</span>}
+                        <span className="text-[9px] text-gray-400 font-bold tracking-tight">{user.email}</span>
                         {getStatusBadge(user.status)}
                       </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                <td className="px-3 py-2 text-center border-r border-gray-50 group-hover:border-transparent">
                   <div className="flex flex-col items-center">
-                    <span className={`text-xs font-black flex items-center gap-1.5 px-2 py-1 rounded-md border ${user.store ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
-                      <Store size={11} className={user.store ? "text-emerald-500" : "text-orange-500"} /> {user.store?.name || 'Unassigned'}
+                    <span className={`text-[10px] font-black flex items-center gap-1 px-1.5 py-0.5 rounded-md border ${user.store ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-orange-50 text-orange-700 border-orange-100'}`}>
+                      <Store size={10} className={user.store ? "text-emerald-500" : "text-orange-500"} /> {user.store?.name || 'Unassigned'}
                     </span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                <td className="px-3 py-2 text-center border-r border-gray-50 group-hover:border-transparent">
                   <div className="flex flex-col items-center">
-                    <span className="text-xs font-black text-gray-700 flex items-center gap-1.5">
-                      <Phone size={11} className="text-emerald-500" /> {user.mobile || 'No Contact'}
+                    <span className="text-[10px] font-black text-gray-700 flex items-center gap-1">
+                      <Phone size={10} className="text-emerald-500" /> {user.mobile || 'No Contact'}
                     </span>
                   </div>
                 </td>
                 {showDetailColumns && (
-                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <td className="px-3 py-2 text-center border-r border-gray-50 group-hover:border-transparent">
                     {user.role !== 'ADMIN' ? (
-                      <div className="flex flex-col items-center gap-1.5">
+                      <div className="flex flex-col items-center gap-1">
                         {getRoleBadge(user.role, user.customRole)}
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-lg text-[9px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
-                          <Truck size={10} />
+                        <div className={`flex items-center gap-1 px-1.5 py-0 rounded-lg text-[8px] font-black border uppercase tracking-widest ${user.assignedVehicle ? 'bg-blue-50 text-blue-700 border-blue-100' : 'bg-gray-50 text-gray-400 border-gray-100'}`}>
+                          <Truck size={8} />
                           {user.assignedVehicle?.vehicleNumber || 'Unassigned'}
                         </div>
                         {getVgeTypeBadge(user.vgeType)}
@@ -485,15 +501,15 @@ export default function AdminUsers({ type }) {
                     ) : (
                       <div className="flex flex-col items-center gap-1">
                         {getRoleBadge(user.role, user.customRole)}
-                        <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-1">N/A</span>
+                        <span className="text-[8px] font-bold text-gray-300 uppercase tracking-widest mt-0.5">N/A</span>
                       </div>
                     )}
                   </td>
                 )}
                 {showDetailColumns && (
-                  <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <td className="px-3 py-2 text-center border-r border-gray-50 group-hover:border-transparent">
                     {user.role !== 'ADMIN' ? (
-                      <span className="text-sm font-black text-indigo-600">
+                      <span className="text-[11px] font-black text-indigo-600">
                         ₹{(user.baseSalary || 0).toLocaleString()}
                       </span>
                     ) : (
@@ -501,8 +517,33 @@ export default function AdminUsers({ type }) {
                     )}
                   </td>
                 )}
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-end gap-1.5">
+                <td className="px-3 py-2 text-center border-r border-gray-50 group-hover:border-transparent">
+                  <div className="flex items-center justify-center">
+                    {can('STAFF', 'TOGGLE_STATUS') ? (
+                      <button
+                        onClick={() => handleToggleStatus(user)}
+                        className={cn(
+                          "relative inline-flex h-4 w-8 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                          user.status === 'ACTIVE' ? "bg-emerald-500" : "bg-gray-200"
+                        )}
+                      >
+                        <span className={cn(
+                          "pointer-events-none inline-block h-2.5 w-2.5 transform rounded-full bg-white shadow-lg ring-0 transition-all duration-300",
+                          user.status === 'ACTIVE' ? "translate-x-4" : "translate-x-0"
+                        )} />
+                      </button>
+                    ) : (
+                      <span className={cn(
+                        "px-1.5 py-0 rounded text-[8px] font-black uppercase tracking-widest",
+                        user.status === 'ACTIVE' ? "bg-emerald-50 text-emerald-600 border border-emerald-100" : "bg-gray-50 text-gray-400 border border-gray-100"
+                      )}>
+                        {user.status}
+                      </span>
+                    )}
+                  </div>
+                </td>
+                <td className="px-3 py-2">
+                  <div className="flex items-center justify-end gap-1">
                     {can('STAFF', 'UPDATE') && (
                       <button
                         onClick={() => {
@@ -511,18 +552,9 @@ export default function AdminUsers({ type }) {
                           setShowEditModal(true);
                         }}
                         title="Edit Profile"
-                        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
+                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                       >
-                        <Pencil size={15} />
-                      </button>
-                    )}
-                    {can('STAFF', 'TOGGLE_STATUS') && (
-                      <button
-                        onClick={() => handleToggleStatus(user)}
-                        title={user.status === 'ACTIVE' ? 'Suspend Access' : 'Restore Access'}
-                        className={`p-2 rounded-xl transition-all ${user.status === 'ACTIVE' ? 'text-gray-400 hover:text-amber-600 hover:bg-amber-50' : 'text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50'}`}
-                      >
-                        {user.status === 'ACTIVE' ? <Pause size={15} /> : <Play size={15} />}
+                        <Pencil size={13} />
                       </button>
                     )}
                     {can('STAFF', 'DELETE') && (
@@ -530,9 +562,9 @@ export default function AdminUsers({ type }) {
                         onClick={() => handleDeleteUser(user.id)}
                         title="Permanent Removal"
                         disabled={deletingId === user.id}
-                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
+                        className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
                       >
-                        {deletingId === user.id ? <Loader2 size={15} className="animate-spin text-rose-400" /> : <Trash2 size={15} />}
+                        {deletingId === user.id ? <Loader2 size={13} className="animate-spin text-rose-400" /> : <Trash2 size={13} />}
                       </button>
                     )}
                   </div>
@@ -546,45 +578,58 @@ export default function AdminUsers({ type }) {
   );
 
   const renderClassifiedUsers = () => {
-    if (isTenantRoute && !storeFilterId) {
-      const usersByStore = filteredUsers.reduce((acc, u) => {
-        if (u.storeId) {
+    // Show store selection grid if no store is selected
+    if (!storeFilterId) {
+      const personnelByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.id !== currentUser?.id) {
           acc[u.storeId] = (acc[u.storeId] || 0) + 1;
         }
         return acc;
       }, {});
 
       return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 pt-4 animate-in fade-in slide-in-from-bottom-6">
-          <div className="col-span-full mb-2">
-            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Groups</h3>
-            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1">Select a branch to manage its {type === 'admin' ? 'administrators' : 'operational staff'}</p>
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Platform Branches</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to manage its {type === 'admin' ? 'Administrative' : 'Operations'} team</p>
           </div>
           {stores.map(store => {
-            const userCount = usersByStore[store.id] || 0;
+            const personnelCount = personnelByStore[store.id] || 0;
             return (
               <button
                 key={store.id}
                 onClick={() => setSearchParams({ storeId: store.id })}
-                className="text-left bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 hover:-translate-y-1 transition-all duration-300 group relative overflow-hidden"
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
               >
-                <div className="absolute -right-4 -top-4 w-24 h-24 bg-emerald-50 rounded-full blur-2xl group-hover:bg-emerald-100 transition-all opacity-50" />
-
-                <div className="relative z-10 w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center mb-6 group-hover:bg-emerald-600 group-hover:text-white transition-colors">
-                  <Store size={28} strokeWidth={2.5} />
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <Store size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
                 </div>
-                <h4 className="relative z-10 text-lg font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
-                <p className="relative z-10 text-[10px] font-bold text-gray-400 uppercase tracking-widest">{store.code || 'Branch'}</p>
 
-                <div className="relative z-10 mt-8 flex items-center justify-between text-[10px] font-black uppercase text-emerald-600 tracking-widest bg-emerald-50/50 p-3 rounded-xl group-hover:bg-emerald-50 transition-colors">
-                  <span>{userCount} {activeTab === 'admin' ? 'Admins' : 'Staff'}</span>
-                  <span className="group-hover:translate-x-1 transition-transform flex items-center justify-center w-5 h-5 bg-emerald-200 rounded-full text-emerald-700">→</span>
+                <div className="flex items-center gap-6">
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Total Personnel</span>
+                    <span className="text-sm font-bold text-gray-900">{personnelCount} Members</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ArrowRight size={20} strokeWidth={3} />
+                  </div>
                 </div>
               </button>
             );
           })}
           {stores.length === 0 && (
-            <div className="col-span-full py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
               <Store size={48} className="mx-auto text-gray-300 mb-4" />
               <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
             </div>
@@ -683,9 +728,9 @@ export default function AdminUsers({ type }) {
           </button>
         </div>
 
-        <div className="bg-white rounded-[2.5rem] border border-gray-50 shadow-2xl shadow-slate-200/50 overflow-hidden">
-          <div className="p-8 md:p-12">
-            <form onSubmit={handleCreateUser} className="max-w-4xl mx-auto space-y-10">
+        <div className="bg-white rounded-[1.5rem] border border-gray-50 shadow-2xl shadow-slate-200/50 overflow-hidden">
+          <div className="p-4 md:p-6">
+            <form onSubmit={handleCreateUser} className="max-w-4xl mx-auto space-y-4">
               {/* Primary Identity Section */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-6">
@@ -694,7 +739,7 @@ export default function AdminUsers({ type }) {
                       <User size={12} className="text-emerald-500" /> Full Legal Name <span className="text-rose-500">*</span>
                     </label>
                     <input type="text" required placeholder="e.g. Abhiram R"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
                       value={newUser.name} onChange={(e) => setNewUser({ ...newUser, name: e.target.value })} />
                   </div>
 
@@ -703,7 +748,7 @@ export default function AdminUsers({ type }) {
                       <Mail size={12} className="text-emerald-500" /> Official Email Address <span className="text-rose-500">*</span>
                     </label>
                     <input type="email" required placeholder="name@villagekart.com"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
                       value={newUser.email} onChange={(e) => setNewUser({ ...newUser, email: e.target.value })} />
                   </div>
                 </div>
@@ -714,7 +759,7 @@ export default function AdminUsers({ type }) {
                       <Phone size={12} className="text-emerald-500" /> Mobile Number <span className="text-rose-500">*</span>
                     </label>
                     <input type="tel" required placeholder="e.g. +91 98765 43210"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
                       value={newUser.mobile} onChange={(e) => setNewUser({ ...newUser, mobile: e.target.value })} />
                   </div>
 
@@ -723,14 +768,14 @@ export default function AdminUsers({ type }) {
                       <ShieldCheck size={12} className="text-emerald-500" /> Security Password <span className="text-rose-500">*</span>
                     </label>
                     <input type="password" required placeholder="Set strong password"
-                      className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4.5 text-base focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
+                      className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-2.5 text-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white outline-none transition-all font-bold tracking-tight"
                       value={newUser.password} onChange={(e) => setNewUser({ ...newUser, password: e.target.value })} />
                   </div>
                 </div>
               </div>
 
               {/* Roles & Permissions Section */}
-              <div className="bg-slate-50/50 p-8 rounded-[2rem] border border-slate-100 space-y-8">
+              <div className="bg-slate-50/50 p-5 rounded-[1.5rem] border border-slate-100 space-y-5">
                 <div className="flex items-center gap-3 border-b border-slate-100 pb-4">
                   <ShieldCheck size={20} className="text-emerald-500" />
                   <h4 className="text-xs font-black uppercase tracking-widest text-slate-800">Permissions & Access Context</h4>
@@ -762,38 +807,60 @@ export default function AdminUsers({ type }) {
                     </select>
                   </div>
 
-                  {isTenantRoute && (
-                    <div className="space-y-2">
-                      <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Base Branch</label>
-                      <select className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-emerald-700 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all disabled:bg-slate-100"
-                        value={newUser.storeId || ''} onChange={(e) => setNewUser({ ...newUser, storeId: e.target.value })} disabled={!!storeFilterId}>
-                        {stores.map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                    </div>
-                  )}
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Primary Base Branch</label>
+                    <select className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-emerald-700 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all disabled:bg-slate-100"
+                      value={newUser.storeId || ''} onChange={(e) => setNewUser({ ...newUser, storeId: e.target.value })} disabled={!!storeFilterId}>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
 
-                  {newUser.role !== 'ADMIN' && (
+                {newUser.role !== 'ADMIN' && (
+                  <>
                     <div className="space-y-2">
                       <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Monthly Package (₹)</label>
                       <input type="number" required placeholder="e.g. 15000"
                         className="w-full bg-white border border-slate-200 rounded-2xl px-5 py-4 text-sm font-black text-indigo-600 focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all"
                         value={newUser.baseSalary} onChange={(e) => setNewUser({ ...newUser, baseSalary: e.target.value })} />
                     </div>
-                  )}
-                </div>
-              </div>
 
-              <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-4">
+                    <div className="pt-8 border-t border-slate-200/50 flex items-center justify-between col-span-full">
+                      <div className="space-y-1">
+                        <h5 className="text-xs font-black text-slate-800 tracking-tight">Attendance Authorization</h5>
+                        <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest leading-none">Enable Punch-in / Punch-out capabilities for this user</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setNewUser({ ...newUser, attendanceEnabled: !newUser.attendanceEnabled })}
+                        className={cn(
+                          "relative inline-flex h-7 w-14 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                          newUser.attendanceEnabled ? "bg-emerald-600" : "bg-slate-200"
+                        )}
+                      >
+                        <span
+                          className={cn(
+                            "pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow-lg ring-0 transition-all duration-300",
+                            newUser.attendanceEnabled ? "translate-x-7" : "translate-x-1"
+                          )}
+                        />
+                      </button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            <div className="flex flex-col md:flex-row items-center justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setShowAddModal(false)}
-                  className="w-full md:w-auto px-10 py-5 rounded-2xl font-black text-xs uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all">
+                  className="w-full md:w-auto px-6 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest text-gray-400 hover:text-gray-900 transition-all">
                   Discard
                 </button>
                 <button type="submit" disabled={isSubmitting}
-                  className={cn('w-full md:w-auto px-16 py-5 rounded-2xl shadow-2xl shadow-emerald-500/30 text-white font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-3',
+                  className={cn('w-full md:w-auto px-10 py-3 rounded-xl shadow-xl shadow-emerald-500/20 text-white font-black text-[10px] uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2',
                     isSubmitting ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700')}>
-                  {isSubmitting ? <><Loader2 className="animate-spin" size={18} /> Validating...</> : <><CheckCircle2 size={18} /> Confirm Membership</>}
+                  {isSubmitting ? <><Loader2 className="animate-spin" size={14} /> Syncing...</> : <><CheckCircle2 size={14} /> Confirm Membership</>}
                 </button>
               </div>
             </form>
@@ -803,13 +870,252 @@ export default function AdminUsers({ type }) {
     );
   }
 
+  const renderEditView = () => {
+    if (!editingUser) return null;
+
+    return (
+      <div className="animate-in fade-in slide-in-from-bottom-4 duration-300 max-w-5xl">
+        {/* Header with Back Button */}
+        <div className="flex items-center gap-4 mb-8">
+          <button
+            onClick={() => setShowEditModal(false)}
+            className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm"
+          >
+            <ArrowLeft size={20} strokeWidth={2.5} />
+          </button>
+          <div className="flex flex-col">
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none">Edit Member</h2>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mt-2">Update Access & Details</p>
+          </div>
+        </div>
+
+        {/* Main Form Area */}
+        <div className="bg-white rounded-[1.5rem] border border-gray-100 shadow-xl overflow-hidden p-0.5">
+           <form onSubmit={handleUpdateUser} className="p-4 md:p-6 space-y-5">
+              {/* Profile Section */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Name</label>
+                  <div className="relative group">
+                    <User size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+                    <input
+                      type="text"
+                      required
+                      className="w-full bg-gray-50/50 border border-transparent rounded-xl pl-12 pr-4 py-2.5 text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                      value={editingUser.name}
+                      onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Official Email</label>
+                    <div className="relative group">
+                      <Mail size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+                      <input
+                        type="email"
+                        required
+                        className="w-full bg-gray-50/50 border border-transparent rounded-[1.25rem] pl-14 pr-6 py-4 text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                        value={editingUser.email}
+                        onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Mobile Number</label>
+                    <div className="relative group">
+                      <Phone size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-indigo-600 transition-colors" />
+                      <input
+                        type="tel"
+                        required
+                        className="w-full bg-gray-50/50 border border-transparent rounded-[1.25rem] pl-14 pr-6 py-4 text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-100 focus:ring-4 focus:ring-indigo-500/5 outline-none transition-all"
+                        value={editingUser.mobile}
+                        onChange={(e) => setEditingUser({ ...editingUser, mobile: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Permissions & Context Section */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-8 border-t border-gray-100">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-indigo-600 uppercase tracking-widest ml-1">Privilege Level</label>
+                  <div className="relative group">
+                    <ShieldCheck size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-indigo-500 z-10" />
+                    <select
+                      required
+                      className="w-full bg-indigo-50/50 border border-indigo-100/50 rounded-[1.25rem] pl-14 pr-10 py-4 text-sm font-black text-indigo-700 appearance-none outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer"
+                      value={editingUser.customRoleId || ''}
+                      onChange={(e) => handleCustomRoleChange(e.target.value, true)}
+                    >
+                      <option value="">Standard {activeTab === 'admin' ? 'Administrator' : 'Sales Member'}</option>
+                      {customRoles.map(role => (
+                        <option key={role.id} value={role.id}>{role.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Staff Classification</label>
+                  <select
+                    className="w-full bg-gray-50/50 border border-transparent rounded-[1.25rem] px-6 py-4 text-sm font-black text-gray-700 appearance-none outline-none focus:bg-white focus:border-indigo-100 transition-all"
+                    value={editingUser.vgeType}
+                    onChange={(e) => setEditingUser({ ...editingUser, vgeType: e.target.value })}
+                  >
+                    <option value="EMPLOYEE">Full-time Employee</option>
+                    <option value="FREELANCER">Freelancer (Apps only)</option>
+                  </select>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Primary Base Branch</label>
+                  <div className="relative group">
+                    <Store size={18} className="absolute left-5 top-1/2 -translate-y-1/2 text-indigo-600 z-10" />
+                    <select
+                      className="w-full bg-indigo-50/50 border border-indigo-100/50 rounded-[1.25rem] pl-14 pr-10 py-4 text-sm font-black text-indigo-900 appearance-none outline-none focus:bg-white focus:ring-4 focus:ring-indigo-500/10 transition-all cursor-pointer"
+                      value={editingUser.storeId || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, storeId: e.target.value })}
+                      disabled={!!storeFilterId}
+                    >
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+
+              {/* Attendance & Compensation */}
+              {editingUser.role !== 'ADMIN' && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-gray-100">
+                  <div className="p-6 bg-indigo-50/30 rounded-[2rem] border border-indigo-100/50 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <h5 className="text-sm font-black text-indigo-900 tracking-tight">Attendance Access</h5>
+                      <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-widest leading-none">Toggle Punching Privileges</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setEditingUser({ ...editingUser, attendanceEnabled: !editingUser.attendanceEnabled })}
+                      className={cn(
+                        "relative inline-flex h-8 w-16 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                        editingUser.attendanceEnabled ? "bg-indigo-600" : "bg-slate-200"
+                      )}
+                    >
+                      <span
+                        className={cn(
+                          "pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-xl ring-0 transition-all duration-300",
+                          editingUser.attendanceEnabled ? "translate-x-8" : "translate-x-1"
+                        )}
+                      />
+                    </button>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Monthly Package (₹)</label>
+                    <input
+                      type="number"
+                      required
+                      className="w-full bg-gray-50/50 border border-transparent rounded-[1.25rem] px-6 py-4 text-lg font-black text-indigo-600 focus:bg-white focus:border-indigo-100 outline-none transition-all"
+                      value={editingUser.baseSalary || ''}
+                      onChange={(e) => setEditingUser({ ...editingUser, baseSalary: e.target.value })}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Account Security & Status */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-8 border-t border-gray-100">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Account Access Status</label>
+                  <div className={cn("p-6 rounded-[2rem] border flex items-center justify-between transition-colors", 
+                    editingUser.status === 'ACTIVE' ? "bg-emerald-50/50 border-emerald-100" : "bg-rose-50/50 border-rose-100"
+                  )}>
+                    <div className="space-y-1">
+                      <h5 className={cn("text-sm font-black tracking-tight", 
+                        editingUser.status === 'ACTIVE' ? "text-emerald-900" : "text-rose-900"
+                      )}>
+                        {editingUser.status === 'ACTIVE' ? 'Active / Authorized' : 'Suspended / Blocked'}
+                      </h5>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none">Security Control</p>
+                    </div>
+                    {can('STAFF', 'TOGGLE_STATUS') && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingUser({ ...editingUser, status: editingUser.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
+                        className={cn("relative inline-flex h-8 w-16 shrink-0 cursor-pointer items-center rounded-full border-2 border-transparent transition-colors duration-300 focus:outline-none",
+                          editingUser.status === 'ACTIVE' ? "bg-emerald-600" : "bg-rose-500"
+                        )}
+                      >
+                        <span className={cn("pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow-xl ring-0 transition-all duration-300",
+                          editingUser.status === 'ACTIVE' ? "translate-x-8" : "translate-x-1"
+                        )} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black text-gray-400 uppercase tracking-widest ml-1">Update Password</label>
+                  <input
+                    type="text"
+                    placeholder="Leave blank to keep current"
+                    className="w-full bg-gray-50/50 border border-transparent rounded-[1.25rem] px-6 py-4 text-sm font-bold text-gray-900 focus:bg-white focus:border-indigo-100 outline-none transition-all"
+                    value={editingUser.password || ''}
+                    onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-col md:flex-row items-center justify-end gap-4 pt-8">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="w-full md:w-auto px-10 py-5 rounded-[1.25rem] font-black text-[10px] uppercase tracking-[0.2em] text-gray-400 hover:text-gray-900 transition-all"
+                >
+                  Cancel & Return
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className={cn(
+                    "w-full md:w-auto px-16 py-5 rounded-[1.25rem] font-black text-[10px] uppercase tracking-[0.2em] transition-all active:scale-95 flex items-center justify-center gap-3 shadow-2xl",
+                    isSubmitting ? "bg-indigo-400 cursor-not-allowed" : "bg-indigo-600 hover:bg-indigo-700 text-white shadow-indigo-600/30"
+                  )}
+                >
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="animate-spin" size={18} />
+                      Syncing Data...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 size={18} />
+                      Save Changes
+                    </>
+                  )}
+                </button>
+              </div>
+           </form>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      {/* Sub-Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between pb-2 gap-4">
-        <div className="flex flex-col gap-1">
+    <div className="p-2 md:p-4 space-y-3">
+      {showEditModal && editingUser ? (
+        renderEditView()
+      ) : (
+        <>
+          {/* Header Section */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            {isTenantRoute && storeFilterId && (
+            {storeFilterId && (
               <button
                 onClick={() => setSearchParams({})}
                 className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
@@ -859,7 +1165,7 @@ export default function AdminUsers({ type }) {
           </div>
           <div className="flex items-center gap-2 mt-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{filteredUsers.length} members found</p>
-            {isTenantRoute && (
+            {true && (
               <>
                 <span className="text-gray-300">•</span>
                 <select
@@ -889,257 +1195,85 @@ export default function AdminUsers({ type }) {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <div className="relative group hidden sm:block">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 transition-colors group-focus-within:text-emerald-500" size={16} />
-            <input
-              type="text"
-              placeholder="Search by name or phone..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleExportPDF}
-              className="p-2.5 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
-              title="Export PDF"
-            >
-              <FileText size={18} />
-            </button>
-            <button
-              onClick={handleExportExcel}
-              className="p-2.5 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm"
-              title="Export Excel"
-            >
-              <Download size={18} />
-            </button>
-            <button
-              onClick={handlePrint}
-              className="p-2.5 bg-white border border-gray-100 rounded-xl text-blue-600 hover:bg-blue-50 hover:border-blue-100 transition-all shadow-sm"
-              title="Print List"
-            >
-              <Printer size={18} />
-            </button>
-          </div>
-          {can('STAFF', 'CREATE') && !(isTenantRoute && !storeFilterId) && (
-            <button
-              onClick={() => {
-                setNewUser({
-                  name: '',
-                  email: '',
-                  password: '',
-                  mobile: '',
-                  role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
-                  vgeType: 'EMPLOYEE',
-                  storeId: storeFilterId || currentUser?.storeId || '',
-                  dailyTarget: 10000,
-                  baseSalary: 12000,
-                });
-                setShowAddModal(true);
-              }}
-              className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
-            >
-              <Plus size={18} />
-              <span className="hidden md:inline">Hire Member</span>
-              <span className="md:hidden">Add</span>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Mobile Search - Only visible on small screens */}
-      <div className="sm:hidden relative group px-1">
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-        <input
-          type="text"
-          placeholder="Search staff members..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
-        />
-      </div>
-
-      {filteredUsers.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-3xl border border-dashed border-gray-200">
-          <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <AlertCircle size={28} className="text-gray-400" />
-          </div>
-          <p className="text-sm font-bold text-gray-500 uppercase tracking-wider">No {type === 'admin' ? 'organization admins' : 'operational staff'} found</p>
-        </div>
-      ) : (
-        renderClassifiedUsers()
-      )}
-      {/* Edit User Modal */}
-      {showEditModal && editingUser && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-[2px] p-4">
-          <div className="bg-white w-full max-w-sm rounded-3xl p-5 shadow-2xl animate-in zoom-in-95 duration-200 border border-indigo-50">
-            <div className="flex items-center justify-between mb-5">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-600">
-                  <UserCog size={20} />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Edit Member</h3>
-                  <p className="text-[10px] uppercase font-bold text-gray-400 tracking-wider">Update Access & Details</p>
-                </div>
-              </div>
+        
+        {/* Search & Actions */}
+        {storeFilterId && (
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm">
+            <div className="relative flex-1 w-full group">
+              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+              <input
+                type="text"
+                placeholder={`Search ${activeTab === 'admin' ? 'Admins' : 'Staff'} by name, mobile or role...`}
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
+              />
+            </div>
+            <div className="flex items-center gap-2">
               <button
-                onClick={() => setShowEditModal(false)}
-                className="p-2 hover:bg-gray-50 rounded-full text-gray-400 transition-colors"
-                type="button"
+                onClick={handleExportExcel}
+                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                title="Export to Excel"
               >
-                <X size={18} />
+                <FileText size={18} />
+              </button>
+              <button
+                onClick={handleExportPDF}
+                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                title="Download PDF Report"
+              >
+                <Download size={18} />
+              </button>
+              <button
+                onClick={handlePrint}
+                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                title="Print Current List"
+              >
+                <Printer size={18} />
+              </button>
+              <button
+                onClick={() => {
+                  setNewUser({
+                    name: '',
+                    email: '',
+                    password: '',
+                    mobile: '',
+                    role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
+                    vgeType: 'EMPLOYEE',
+                    storeId: storeFilterId || currentUser?.storeId || '',
+                    dailyTarget: 10000,
+                    baseSalary: 12000,
+                  });
+                  setShowAddModal(true);
+                }}
+                className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
+              >
+                <Plus size={18} />
+                <span className="hidden md:inline">Hire Member</span>
+                <span className="md:hidden">Add</span>
               </button>
             </div>
-
-            <form onSubmit={handleUpdateUser} className="space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Full Name</label>
-                <input
-                  type="text"
-                  required
-                  placeholder="Full Name"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
-                  value={editingUser.name}
-                  onChange={(e) => setEditingUser({ ...editingUser, name: e.target.value })}
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Email</label>
-                  <input
-                    type="email"
-                    required
-                    placeholder="Email"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
-                    value={editingUser.email}
-                    onChange={(e) => setEditingUser({ ...editingUser, email: e.target.value })}
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Mobile</label>
-                  <input
-                    type="tel"
-                    required
-                    placeholder="Mobile"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white outline-none"
-                    value={editingUser.mobile}
-                    onChange={(e) => setEditingUser({ ...editingUser, mobile: e.target.value })}
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-indigo-600 ml-1">Assigned Privilege Level *</label>
-                <div className="relative">
-                  <ShieldCheck size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-500 z-10" />
-                  <select
-                    required
-                    className="w-full bg-indigo-50 border border-indigo-100 rounded-xl pl-12 pr-4 py-3 text-sm appearance-none outline-none font-bold text-indigo-700 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
-                    value={editingUser.customRoleId || ''}
-                    onChange={(e) => handleCustomRoleChange(e.target.value, true)}
-                  >
-                    <option value="">Standard {activeTab === 'admin' ? 'Administrator' : 'Sales Member'}</option>
-                    {customRoles.map(role => (
-                      <option key={role.id} value={role.id}>{role.name}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Staff Classification</label>
-                <select
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm appearance-none outline-none focus:bg-white transition-all font-bold text-gray-700"
-                  value={editingUser.vgeType}
-                  onChange={(e) => setEditingUser({ ...editingUser, vgeType: e.target.value })}
-                >
-                  <option value="EMPLOYEE">Full-time Employee</option>
-                  <option value="FREELANCER">Freelancer (Apps only)</option>
-                </select>
-              </div>
-
-              {isTenantRoute && (
-                <div className="space-y-1 focus-within:text-indigo-600 relative">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1 transition-colors">Assigned Branch</label>
-                  <div className="relative">
-                    <Store size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-indigo-600 z-10" />
-                    <select
-                      className="w-full bg-indigo-50 border border-indigo-100/50 rounded-xl pl-10 pr-4 py-2.5 text-sm outline-none appearance-none text-indigo-900 font-bold focus:ring-2 focus:ring-indigo-500/50 transition-all cursor-pointer"
-                      value={editingUser.storeId || ''}
-                      onChange={(e) => setEditingUser({ ...editingUser, storeId: e.target.value })}
-                      disabled={!!storeFilterId}
-                    >
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-              )}
-
-              {editingUser.role !== 'ADMIN' && (
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Monthly CTC (₹)</label>
-                  <input
-                    type="number"
-                    required
-                    placeholder="Monthly Base"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none font-bold text-indigo-600"
-                    value={editingUser.baseSalary || ''}
-                    onChange={(e) => setEditingUser({ ...editingUser, baseSalary: e.target.value })}
-                  />
-                </div>
-              )}
-
-              {can('STAFF', 'TOGGLE_STATUS') && (
-                <div className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                  <div className="flex flex-col">
-                    <span className="text-sm font-bold text-gray-700">Account Access</span>
-                    <span className={`text-[10px] font-black uppercase ${editingUser.status === 'ACTIVE' ? 'text-emerald-600' : 'text-rose-500'}`}>
-                      {editingUser.status === 'ACTIVE' ? 'ACTIVE / AUTHORIZED' : 'SUSPENDED / BLOCKED'}
-                    </span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditingUser({ ...editingUser, status: editingUser.status === 'ACTIVE' ? 'SUSPENDED' : 'ACTIVE' })}
-                    className={cn('w-12 h-6 rounded-full relative transition-colors shadow-inner', editingUser.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-rose-400')}
-                  >
-                    <div className={cn('absolute top-1 w-4 h-4 rounded-full bg-white shadow-md transition-all duration-300', editingUser.status === 'ACTIVE' ? 'right-1' : 'left-1')} />
-                  </button>
-                </div>
-              )}
-
-              <div className="space-y-1">
-                <label className="text-[10px] font-bold text-gray-400 uppercase ml-1">Update Password</label>
-                <input
-                  type="text"
-                  placeholder="Leave blank to keep current"
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-2.5 text-sm focus:bg-white focus:ring-2 focus:ring-indigo-500/20 transition-all outline-none"
-                  value={editingUser.password || ''}
-                  onChange={(e) => setEditingUser({ ...editingUser, password: e.target.value })}
-                />
-              </div>
-
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className="w-full bg-indigo-600 text-white font-bold py-3.5 rounded-xl shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 active:scale-[0.98] transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />
-                      Saving...
-                    </>
-                  ) : 'Save Changes'}
-                </button>
-              </div>
-            </form>
           </div>
+        )}
+      </div>
+    </div>
+
+      {/* Mobile Search - Only visible on small screens */}
+      {storeFilterId && (
+        <div className="sm:hidden relative group px-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+          <input
+            type="text"
+            placeholder="Search staff members..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
+          />
         </div>
+      )}
+
+        {renderClassifiedUsers()}
+      </>
       )}
     </div>
   );

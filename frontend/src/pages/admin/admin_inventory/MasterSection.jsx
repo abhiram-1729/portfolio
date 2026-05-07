@@ -89,14 +89,30 @@ const MasterSection = ({
                   {item.unitValue || ''} {item.unit.type}
                 </span>
               )}
-              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600')}`}>
-                {item.status || 'ACTIVE'}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleStatus(item)}
+                  className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${item.status === 'INACTIVE' ? 'bg-gray-200' : 'bg-emerald-500'}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.status === 'INACTIVE' ? 'translate-x-0' : 'translate-x-4'}`}
+                  />
+                </button>
+                <span className={`text-[7px] font-black uppercase tracking-widest ${item.status === 'INACTIVE' ? 'text-gray-400' : 'text-emerald-600'}`}>
+                  {item.status || 'ACTIVE'}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">{item.category?.name || 'Uncategorized'}</span>
               <span className="text-[8px] text-gray-300 font-bold">•</span>
               <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest">{item.subCategory?.name || 'General Item'}</span>
+              {item.storeName && (
+                <>
+                  <span className="text-[8px] text-gray-300 font-bold">•</span>
+                  <span className="text-[8px] text-emerald-600 uppercase font-black tracking-widest">Branch: {item.storeName}</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <div className="flex flex-col">
@@ -214,6 +230,11 @@ const MasterSection = ({
                         <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter truncate max-w-[80px]">
                           {item.category?.name || 'General'}
                         </span>
+                        {item.storeName && (
+                          <span className="text-[7px] font-black text-emerald-600 uppercase tracking-tighter truncate max-w-[80px]">
+                            • {item.storeName}
+                          </span>
+                        )}
                         {item.displayId && <span className="text-[7px] font-black text-teal-600 bg-teal-50 px-1 rounded tracking-widest">{item.displayId}</span>}
                       </div>
                     </div>
@@ -252,9 +273,20 @@ const MasterSection = ({
                   </div>
                 </td>
                 <td className="px-3 py-2 text-center">
-                  <span className={`text-[8px] font-black px-2 py-0.5 rounded-full uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-500 text-white')}`}>
-                    {item.status || 'ACTIVE'}
-                  </span>
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => handleToggleStatus(item)}
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${item.status === 'INACTIVE' ? 'bg-gray-200' : 'bg-emerald-500'}`}
+                      title={item.status === 'INACTIVE' ? "Activate Item" : "Deactivate Item"}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.status === 'INACTIVE' ? 'translate-x-0' : 'translate-x-5'}`}
+                      />
+                    </button>
+                    <span className={`text-[7px] font-black uppercase tracking-widest ${item.status === 'INACTIVE' ? 'text-gray-400' : 'text-emerald-600'}`}>
+                      {item.status || 'ACTIVE'}
+                    </span>
+                  </div>
                 </td>
                 <td className="pr-4 py-2">
                   <div className="flex items-center justify-end gap-0.5 transition-all">

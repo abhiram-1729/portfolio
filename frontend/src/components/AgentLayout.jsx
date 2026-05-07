@@ -57,8 +57,8 @@ export default function AgentLayout() {
     );
   }
 
-  // Show punch-in screen if agent hasn't punched in
-  if (isAgent && attendanceChecked && !hasPunchedIn) {
+  // Show punch-in screen only if agent has attendance enabled and hasn't punched in yet
+  if (isAgent && user?.attendanceEnabled !== false && attendanceChecked && !hasPunchedIn) {
     return <PunchInScreen onPunchIn={handlePunchIn} />;
   }
 

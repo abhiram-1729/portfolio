@@ -60,6 +60,7 @@ export const loginUser = async (req, res, next) => {
                 customRoleName: user.customRole?.name || null,
                 permissions: user.customRole?.permissions || null,
                 portalType: user.customRole?.portalType || null,
+                attendanceEnabled: user.attendanceEnabled,
                 token: token,
             });
         } else {

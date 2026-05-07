@@ -1,16 +1,28 @@
 import { useState, useEffect } from 'react';
 import { attendanceAPI } from '../../services/api';
-import { Clock, Users, UserCheck, UserX, Timer, TrendingUp, CalendarDays, Search, LogIn, LogOut, Truck, ChevronLeft, ChevronRight, AlertCircle, Activity, Camera, X, MapPin, Settings, FileText } from 'lucide-react';
+import adminAPI from '../../services/adminService';
+import { Clock, Users, UserCheck, UserX, Timer, TrendingUp, CalendarDays, Search, LogIn, LogOut, Truck, ChevronLeft, ChevronRight, AlertCircle, Activity, Camera, X, MapPin, Settings, FileText, Building2 } from 'lucide-react';
 import AdminLateEntryReport from './AdminLateEntryReport';
 import AdminLateEntryConfig from './AdminLateEntryConfig';
+import { useSearchParams, useLocation } from 'react-router-dom';
+import { useUserStore } from '../../store/userStore';
+import toast from 'react-hot-toast';
 
 export default function AdminAttendance() {
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [stores, setStores] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [photoModal, setPhotoModal] = useState(null); // { url, agentName, type, time, lat, lng }
   const [activeTab, setActiveTab] = useState('live'); // 'live' | 'late-reports'
+
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeFilterId = searchParams.get('storeId');
+  const currentUser = useUserStore(s => s.user);
+  const location = useLocation();
+  const isTenantRoute = location.pathname.includes('/tenant/');
 
   // Default date = today IST
   const now = new Date();
@@ -29,11 +41,27 @@ export default function AdminAttendance() {
       const params = viewMode === 'daily' 
         ? { date: selectedDate }
         : { startDate, endDate };
-      const { data } = await attendanceAPI.getAll(params);
-      setRecords(data.records || []);
-      setSummary(data.summary || null);
+      
+      if (storeFilterId) params.storeId = storeFilterId;
+
+      const [attRes, storesRes, usersRes] = await Promise.all([
+        attendanceAPI.getAll(params),
+        adminAPI.getStores(),
+        adminAPI.getUsers()
+      ]);
+
+      setRecords(attRes.data.records || []);
+      setSummary(attRes.data.summary || null);
+      
+      if (storesRes.data?.success) {
+        setStores(storesRes.data.data);
+      } else {
+        setStores(storesRes.data || []);
+      }
+      setUsers(usersRes.data || []);
     } catch (err) {
       console.error('Failed to fetch attendance:', err);
+      toast.error('Failed to fetch attendance data');
     } finally {
       setLoading(false);
     }
@@ -41,7 +69,7 @@ export default function AdminAttendance() {
 
   useEffect(() => {
     fetchAttendance();
-  }, [selectedDate, viewMode, startDate, endDate]);
+  }, [selectedDate, viewMode, startDate, endDate, storeFilterId]);
 
   const changeDate = (delta) => {
     const d = new Date(selectedDate);
@@ -108,10 +136,115 @@ export default function AdminAttendance() {
   const getPhotoUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    // Prepend API URL if it's a relative path
     const apiBase = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5001';
     return `${apiBase}${url.startsWith('/') ? '' : '/'}${url}`;
   };
+
+  const renderClassifiedAttendance = () => {
+    if (!storeFilterId && activeTab === 'live') {
+      const recordsByStore = records.reduce((acc, r) => {
+        if (r.storeId) {
+          acc[r.storeId] = (acc[r.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      const activeByStore = records.reduce((acc, r) => {
+        if (r.storeId && r.status === 'ACTIVE') {
+          acc[r.storeId] = (acc[r.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      const totalAgentsByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.role === 'SALES_AGENT') {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      return (
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Attendance Overview</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Real-time presence monitoring across all retail branches</p>
+          </div>
+          {stores.map(store => {
+            const presentCount = recordsByStore[store.id] || 0;
+            const activeCount = activeByStore[store.id] || 0;
+            const totalAgents = totalAgentsByStore[store.id] || 0;
+            const absentCount = Math.max(0, totalAgents - presentCount);
+            
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
+              >
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <Building2 size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                  <div className="hidden lg:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-emerald-600 tracking-widest">Present</span>
+                    <span className="text-sm font-bold text-emerald-700">{presentCount} Agents</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-blue-600 tracking-widest">Active Now</span>
+                    <span className="text-sm font-bold text-blue-700">{activeCount} On Field</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-rose-600 tracking-widest">Absent</span>
+                    <span className="text-sm font-bold text-rose-700">{absentCount} Missing</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ChevronRight size={20} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <Building2 size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const classifiedView = renderClassifiedAttendance();
+  if (classifiedView) return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
+            <Clock size={24} strokeWidth={2.5} />
+          </div>
+          <div>
+            <h1 className="text-2xl font-black text-gray-900 tracking-tight">Attendance</h1>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Multi-Branch Presence Tracker</p>
+          </div>
+        </div>
+      </div>
+      {classifiedView}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -173,6 +306,15 @@ export default function AdminAttendance() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
+          {storeFilterId && (
+            <button
+              onClick={() => setSearchParams({})}
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+              title="Back to All Branches"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
           <div className="w-12 h-12 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
             <Clock size={24} strokeWidth={2.5} />
           </div>
@@ -181,23 +323,25 @@ export default function AdminAttendance() {
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agent Punch-In Tracker with Photo Proof</p>
           </div>
         </div>
-        <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
-          <button
-            onClick={() => setActiveTab('live')}
-            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              activeTab === 'live' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >Live Tracker</button>
-          <button
-            onClick={() => setActiveTab('late-reports')}
-            className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-              activeTab === 'late-reports' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >Late Reports</button>
-        </div>
+        {storeFilterId && (
+          <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
+            <button
+              onClick={() => setActiveTab('live')}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                activeTab === 'live' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >Live Tracker</button>
+            <button
+              onClick={() => setActiveTab('late-reports')}
+              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                activeTab === 'late-reports' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+              }`}
+            >Late Reports</button>
+          </div>
+        )}
       </div>
 
-      {activeTab === 'late-reports' && <AdminLateEntryReport />}
+      {storeFilterId && activeTab === 'late-reports' && <AdminLateEntryReport storeId={storeFilterId} />}
 
       {activeTab === 'live' && (
         <>

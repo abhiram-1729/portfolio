@@ -2,7 +2,9 @@ import prisma from '../utils/prisma.js';
 import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { getEffectiveStoreId } from '../utils/storeResolution.js';
 
+// getEffectiveStoreId is now imported from ../utils/storeResolution.js
 
 // @desc    Submit opening cash for a vehicle (agent — kept for backward compat but agents are blocked on frontend)
 // @route   POST /api/cash/opening
@@ -33,7 +35,7 @@ export const submitOpeningCash = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 userId,
                 date: dateString,
@@ -46,14 +48,14 @@ export const submitOpeningCash = async (req, res, next) => {
         logActivity({
             userId: req.user.id,
             tenantId: req.user.tenantId,
-            storeId: req.user.storeId,
+            storeId: getEffectiveStoreId(req),
             action: 'OPENING_CASH_SUBMITTED',
             details: `Submitted opening cash of ₹${totalOpeningCash} for Shift ${shift}`,
             metadata: { vehicleId, amount: totalOpeningCash, shift, date: dateString }
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, getEffectiveStoreId(req));
 
         res.status(201).json(openingCash);
 
@@ -109,7 +111,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 userId,
                 date: dateString,
@@ -139,7 +141,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
                 },
                 create: {
                     tenantId: req.user.tenantId,
-                    storeId: req.user.storeId,
+                    storeId: getEffectiveStoreId(req),
                     vehicleId,
                     userId,
                     date: dateString,
@@ -159,7 +161,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
         }
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, getEffectiveStoreId(req));
 
         res.status(201).json(openingCash);
 
@@ -332,7 +334,7 @@ export const submitClosingCash = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 userId,
                 date: dateString,
@@ -355,7 +357,7 @@ export const submitClosingCash = async (req, res, next) => {
         logActivity({
             userId: req.user.id,
             tenantId: req.user.tenantId,
-            storeId: req.user.storeId,
+            storeId: getEffectiveStoreId(req),
             action: 'CLOSING_CASH_SUBMITTED',
             details: isNoService ? `Reported No Service for Shift ${shift}` : `Submitted closing cash for Shift ${shift}. Difference: ₹${difference}`,
             metadata: { 
@@ -369,7 +371,7 @@ export const submitClosingCash = async (req, res, next) => {
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, getEffectiveStoreId(req));
 
         res.status(201).json(closingCash);
 
@@ -542,14 +544,13 @@ export const getCashStatus = async (req, res, next) => {
 // @access  Admin
 export const getAdminCashSummary = async (req, res, next) => {
     try {
-        const { date, storeId } = req.query;
+        const { date } = req.query;
         const dateString = date || format(new Date(), 'yyyy-MM-dd');
 
+        const storeId = getEffectiveStoreId(req);
         const vehicleFilter = { tenantId: req.user.tenantId, status: true };
-        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+        if (storeId) {
             vehicleFilter.storeId = storeId;
-        } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-            vehicleFilter.storeId = req.user.storeId;
         }
 
         const vehicles = await prisma.vehicle.findMany({
@@ -737,7 +738,7 @@ export const adminUpdateReconciliation = async (req, res, next) => {
 
         if (!isNoService) {
             // Validate against Store Safe
-            const storeId = req.user.storeId;
+            const storeId = getEffectiveStoreId(req);
             if (!storeId) {
                 res.status(400);
                 throw new Error('Admin must belong to a Store to manage cash.');
@@ -792,7 +793,7 @@ export const adminUpdateReconciliation = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 date,
                 shift,
@@ -823,7 +824,7 @@ export const adminUpdateReconciliation = async (req, res, next) => {
                 },
                 create: {
                     tenantId: req.user.tenantId,
-                    storeId: req.user.storeId,
+                    storeId: getEffectiveStoreId(req),
                     vehicleId,
                     userId: req.user.id,
                     date,
@@ -853,10 +854,10 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         }
 
         // Recalculate daily summary
-        const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
+        const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, getEffectiveStoreId(req));
 
         // SYNC: Update the Store Deposit if it already exists for this shift
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
         const deposit = await prisma.storeDeposit.findUnique({
             where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
         });
@@ -1078,8 +1079,22 @@ export const getFinanceReports = async (req, res, next) => {
 
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
             baseFilter.storeId = storeId;
-        } else if (req.user.storeId) {
-            baseFilter.storeId = req.user.storeId;
+        } else {
+            // For restricted roles, always lock to their store
+            const isRestricted = req.user?.role === 'SALES_AGENT' || req.user?.role === 'MECHANIC';
+            const isGlobal = 
+                req.user?.role === 'TENANT_OWNER' || 
+                req.user?.role === 'SUPER_ADMIN' || 
+                (req.user?.role === 'ADMIN' && !req.user?.customRoleId) ||
+                req.user?.portalType === 'ADMIN';
+
+            if (isRestricted) {
+                baseFilter.storeId = req.user.storeId;
+            } else if (!isGlobal && req.user.storeId) {
+                // If not global and has a storeId (e.g. Branch Manager), lock to it
+                baseFilter.storeId = req.user.storeId;
+            }
+            // If global and no storeId requested, we leave it out of filter to get all stores
         }
 
         // 1. Daily Summary (Daily Cash Sheet)
@@ -1105,8 +1120,19 @@ export const getFinanceReports = async (req, res, next) => {
         };
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
             expenseFilter.storeId = storeId;
-        } else if (req.user.storeId) {
-            expenseFilter.storeId = req.user.storeId;
+        } else {
+            const isRestricted = req.user?.role === 'SALES_AGENT' || req.user?.role === 'MECHANIC';
+            const isGlobal = 
+                req.user?.role === 'TENANT_OWNER' || 
+                req.user?.role === 'SUPER_ADMIN' || 
+                (req.user?.role === 'ADMIN' && !req.user?.customRoleId) ||
+                req.user?.portalType === 'ADMIN';
+
+            if (isRestricted) {
+                expenseFilter.storeId = req.user.storeId;
+            } else if (!isGlobal && req.user.storeId) {
+                expenseFilter.storeId = req.user.storeId;
+            }
         }
 
         const expenses = await prisma.expense.groupBy({
@@ -1137,10 +1163,47 @@ export const getFinanceReports = async (req, res, next) => {
             };
         }));
 
+        // 4. Branch-wise Shift Statistics
+        const [openingsByStore, closingsByStore, pendingByStore] = await Promise.all([
+            prisma.openingCash.groupBy({
+                by: ['storeId'],
+                where: { date: targetDate, tenantId },
+                _count: { id: true }
+            }),
+            prisma.closingCash.groupBy({
+                by: ['storeId'],
+                where: { date: targetDate, tenantId },
+                _count: { id: true }
+            }),
+            prisma.closingCash.groupBy({
+                by: ['storeId'],
+                where: { date: targetDate, tenantId, status: 'SUBMITTED' },
+                _count: { id: true }
+            })
+        ]);
+
+        const storeStats = {};
+        openingsByStore.forEach(o => {
+            const sid = o.storeId || 'none';
+            if (!storeStats[sid]) storeStats[sid] = { active: 0, pending: 0 };
+            storeStats[sid].active += o._count.id;
+        });
+        closingsByStore.forEach(c => {
+            const sid = c.storeId || 'none';
+            if (!storeStats[sid]) storeStats[sid] = { active: 0, pending: 0 };
+            storeStats[sid].active -= c._count.id; // Active = Opened - Closed
+        });
+        pendingByStore.forEach(p => {
+            const sid = p.storeId || 'none';
+            if (!storeStats[sid]) storeStats[sid] = { active: 0, pending: 0 };
+            storeStats[sid].pending = p._count.id;
+        });
+
         res.json({
             dailySheet: dailySummaries,
             expenseBreakdown: expenses,
-            profitability
+            profitability,
+            branchStats: storeStats
         });
     } catch (error) {
         next(error);
@@ -1203,10 +1266,10 @@ export const adminReviewClosingCash = async (req, res, next) => {
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, date, req.user.tenantId, getEffectiveStoreId(req));
 
         // SYNC: Update the Store Deposit if it already exists for this shift
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
         const deposit = await prisma.storeDeposit.findUnique({
             where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
         });
@@ -1263,7 +1326,7 @@ export const adminReviewClosingCash = async (req, res, next) => {
 export const getStoreCashRegister = async (req, res, next) => {
     try {
         const { date } = req.params;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId) {
             res.status(400);
@@ -1432,7 +1495,7 @@ export const getStoreCashRegister = async (req, res, next) => {
 export const getStoreCashLedger = async (req, res, next) => {
     try {
         const { date } = req.params;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId) {
             res.status(400);
@@ -1703,7 +1766,7 @@ export const getStoreCashLedger = async (req, res, next) => {
 export const createSafeTransaction = async (req, res, next) => {
     try {
         const { date, amount, type, denominations, description } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || !amount || !type) {
             res.status(400);
@@ -1787,7 +1850,7 @@ export const createSafeTransaction = async (req, res, next) => {
 export const openStoreCashRegister = async (req, res, next) => {
     try {
         const { date, openingCash, denominations } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || openingCash === undefined || !denominations) {
             res.status(400);
@@ -1822,7 +1885,7 @@ export const openStoreCashRegister = async (req, res, next) => {
 export const closeStoreCashRegister = async (req, res, next) => {
     try {
         const { date, actualClosingCash, denominations, remarks } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || actualClosingCash === undefined || !denominations) {
             res.status(400);
@@ -1913,7 +1976,7 @@ export const closeStoreCashRegister = async (req, res, next) => {
 export const resetStoreCashRegister = async (req, res, next) => {
     try {
         const { date } = req.params;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         await prisma.storeCashRegister.delete({
             where: { storeId_date: { storeId, date } }
@@ -1931,7 +1994,7 @@ export const resetStoreCashRegister = async (req, res, next) => {
 export const createStoreDeposit = async (req, res, next) => {
     try {
         const { date, shift, amount, denominations, description } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || !shift || amount === undefined || !denominations || !description) {
             res.status(400);
@@ -1967,7 +2030,7 @@ export const createStoreDeposit = async (req, res, next) => {
 export const updateStoreCashRegister = async (req, res, next) => {
     try {
         const { date, openingCash, denominations, status, actualClosingCash, isClosingUpdate } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date) {
             res.status(400);
@@ -2057,7 +2120,7 @@ export const deleteStoreDeposit = async (req, res, next) => {
 export const adminAddBankDeposit = async (req, res, next) => {
     try {
         const { date, amount, branchName, receiptImage, depositedBy, adminId, remark } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || !amount || !branchName || !depositedBy) {
             res.status(400);

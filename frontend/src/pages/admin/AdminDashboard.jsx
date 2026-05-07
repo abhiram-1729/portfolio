@@ -19,13 +19,15 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
 import { useSearchParams, useLocation } from 'react-router-dom';
-import StoreSelector from './StoreSelector';
+import { Building2, ArrowRight, ChevronLeft } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { user: currentUser } = useUserStore();
   const [stats, setStats] = useState(null);
   const [cashStats, setCashStats] = useState([]);
   const [vgeStats, setVgeStats] = useState([]);
+  const [stores, setStores] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
 
   const [searchParams, setSearchParams] = useSearchParams();
@@ -35,14 +37,23 @@ export default function AdminDashboard() {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [statsRes, cashRes, vgeRes] = await Promise.all([
+        const [statsRes, cashRes, vgeRes, storesRes, usersRes] = await Promise.all([
           adminAPI.getDashboardStats({ storeId: storeFilterId }),
           getAdminReconciliation(format(new Date(), 'yyyy-MM-dd'), storeFilterId),
-          adminAPI.vgeAllPerformance({ date: format(new Date(), 'yyyy-MM-dd'), storeId: storeFilterId })
+          adminAPI.vgeAllPerformance({ date: format(new Date(), 'yyyy-MM-dd'), storeId: storeFilterId }),
+          adminAPI.getStores(),
+          adminAPI.getUsers()
         ]);
         setStats(statsRes.data);
         setCashStats(cashRes);
         setVgeStats(vgeRes.data.slice(0, 3)); // Top 3
+
+        if (storesRes.data?.success) {
+          setStores(storesRes.data.data);
+        } else {
+          setStores(storesRes.data || []);
+        }
+        setUsers(usersRes.data || []);
       } catch (error) {
         toast.error('Failed to load dashboard data');
         console.error(error);
@@ -63,7 +74,78 @@ export default function AdminDashboard() {
   }
 
   // Visibility gating
-  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'ADMIN' && !currentUser?.customRoleId;
+  const isGlobalRole = (currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'ADMIN' || currentUser?.portalType === 'ADMIN' || currentUser?.portalType === 'SUPERVISOR');
+
+  const renderClassifiedDashboard = () => {
+    // If we have a storeId in the URL, we show the detailed dashboard
+    if (storeFilterId) return null;
+
+    // Show the branch list if no specific store is selected in the URL
+    // This allows global admins to switch branches even if they have a default one assigned
+    if (true) {
+      const staffByStore = users.reduce((acc, u) => {
+        if (u.storeId) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      return (
+        <div className="space-y-6 max-w-5xl mx-auto px-4 py-8 animate-in fade-in slide-in-from-bottom-8 duration-700">
+          <div className="flex flex-col gap-2 mb-8">
+            <h1 className="text-4xl font-black text-gray-900 tracking-tight">Your Branches</h1>
+            <p className="text-gray-500 font-medium">Select a branch to view its Dashboard</p>
+          </div>
+
+          <div className="grid gap-4">
+            {stores.map(store => (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:border-emerald-200 transition-all duration-500 flex flex-col md:flex-row md:items-center justify-between gap-6 relative overflow-hidden"
+              >
+                {/* Decorative background element */}
+                <div className="absolute right-0 top-0 w-32 h-32 bg-emerald-50 rounded-full -mr-16 -mt-16 group-hover:bg-emerald-100 transition-all duration-500 opacity-50" />
+
+                <div className="flex items-center gap-6 z-10">
+                  <div className="w-16 h-16 rounded-[1.25rem] bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-200 group-hover:scale-110 transition-transform duration-500">
+                    <Building2 size={32} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h3 className="text-2xl font-black text-gray-900 tracking-tight mb-1 group-hover:text-emerald-600 transition-colors">{store.name}</h3>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[10px] font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full uppercase tracking-widest">{store.code || 'Branch'}</span>
+                      <span className="text-xs font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode || 'Active'}</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-12 z-10">
+                  <div className="flex flex-col items-end">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Total Personnel</span>
+                    <span className="text-xl font-black text-slate-800">{staffByStore[store.id] || 0} <span className="text-xs font-bold text-gray-400">Members</span></span>
+                  </div>
+                  <div className="w-14 h-14 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300 group-hover:bg-emerald-600 group-hover:text-white group-hover:translate-x-1 transition-all duration-500">
+                    <ArrowRight size={24} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            ))}
+
+            {stores.length === 0 && (
+              <div className="py-20 text-center bg-white rounded-[3rem] border-2 border-dashed border-gray-100">
+                <Building2 size={64} className="mx-auto text-gray-200 mb-4" />
+                <p className="text-lg font-black text-gray-400 uppercase tracking-widest">No Branches Configured</p>
+                <p className="text-sm text-gray-300 mt-2">Add your first store in Settings to start tracking.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   const hasDashboardView = (currentUser?.permissions?.DASHBOARD || []).includes('READ');
   const showWidget = (key) => isGlobalRole || hasDashboardView;
 
@@ -81,34 +163,35 @@ export default function AdminDashboard() {
   ];
 
   const totalSales = stats?.totalSales || 1; // Avoid division by zero
+  const isOperationalRoute = location.pathname.includes('/tenant') || location.pathname.includes('/admin');
 
-  const isTenantRoute = location.pathname.includes('/tenant/');
-  
-  if (isGlobalRole && isTenantRoute && !storeFilterId) {
-    return (
-       <StoreSelector 
-         title="Dashboard Overview"
-         description="Choose a specific store branch to visualize its live dashboard metrics."
-         onSelect={(id) => {
-           setSearchParams({ storeId: id });
-         }}
-       />
-    );
-  }
+  const classifiedView = renderClassifiedDashboard();
+  if (classifiedView) return classifiedView;
 
   return (
     <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col gap-2">
-        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard</h2>
+        <div className="flex items-center gap-3">
+          {storeFilterId && (
+            <button
+              onClick={() => setSearchParams({})}
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+              title="Back to All Branches"
+            >
+              <ChevronLeft size={18} />
+            </button>
+          )}
+          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Dashboard</h2>
+        </div>
         <div className="flex items-center gap-2">
           <p className="text-sm text-gray-500">
             Adminizing <span className="text-emerald-600 font-bold">{currentUser?.tenantName || currentUser?.tenant?.name || 'Organization'}</span>
           </p>
-          {isTenantRoute && storeFilterId && (
+          {isOperationalRoute && storeFilterId && (
             <>
               <span className="text-gray-300">•</span>
-              <button 
-                onClick={() => setSearchParams({})} 
+              <button
+                onClick={() => setSearchParams({})}
                 className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
               >
                 Change Store

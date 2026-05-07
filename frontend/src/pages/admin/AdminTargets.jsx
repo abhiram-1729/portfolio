@@ -64,8 +64,12 @@ const getLevelInfo = (levelName) => {
 export default function AdminTargets() {
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
-  const [searchParams] = useSearchParams();
-  const storeFilterId = searchParams.get('storeId');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const storeId = searchParams.get('storeId');
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN';
+
+  const [stores, setStores] = useState([]);
+  const [allBranchStats, setAllBranchStats] = useState({});
 
   const [performances, setPerformances] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -84,24 +88,45 @@ export default function AdminTargets() {
   const loadDailyData = useCallback(async () => {
     try {
       setLoading(true);
+      // Clear previous data to prevent stale data flicker
+      setPerformances([]);
+      setMonthlySummaries([]);
+      setAllBranchStats({});
+
       const res = await adminAPI.vgeAllPerformance({ 
         date: selectedDate,
-        storeId: storeFilterId || currentUser?.storeId
+        storeId: storeId
       });
+      
+      console.log(`[VGE-UI] loadDailyData | storeId: ${storeId} | count: ${res.data.length}`);
+
+      // If we're in cross-branch view (no storeId), aggregate stats for the overview
+      if (!storeId) {
+        const stats = res.data.reduce((acc, p) => {
+          const sid = p.storeId || 'unassigned';
+          if (!acc[sid]) acc[sid] = { sales: 0, incentive: 0, agents: 0 };
+          acc[sid].sales += p.totalSales;
+          acc[sid].incentive += p.totalIncentive;
+          acc[sid].agents += 1;
+          return acc;
+        }, {});
+        setAllBranchStats(stats);
+      }
+
       setPerformances(res.data);
     } catch (err) {
       toast.error('Failed to load performance data');
     } finally {
       setLoading(false);
     }
-  }, [selectedDate]);
+  }, [selectedDate, storeId]);
 
   const loadMonthlyData = useCallback(async () => {
     try {
       setLoading(true);
       const res = await adminAPI.vgeMonthlyReport({ 
         month: selectedMonth,
-        storeId: storeFilterId || currentUser?.storeId
+        storeId: storeId
       });
       setMonthlySummaries(res.data);
     } catch (err) {
@@ -109,11 +134,11 @@ export default function AdminTargets() {
     } finally {
       setLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, storeId]);
 
   const loadConfig = useCallback(async () => {
     try {
-      const res = await adminAPI.vgeGetConfig({ storeId: storeFilterId || currentUser?.storeId });
+      const res = await adminAPI.vgeGetConfig({ storeId: storeId || currentUser?.storeId });
       const loadedConfig = res.data;
       if (!Array.isArray(loadedConfig.rules)) {
         if (typeof loadedConfig.rules === 'string') {
@@ -129,17 +154,27 @@ export default function AdminTargets() {
   }, []);
 
   useEffect(() => {
+    const fetchStores = async () => {
+      try {
+        const res = await adminAPI.getStores();
+        setStores(res.data.success ? res.data.data : (res.data || []));
+      } catch (e) {}
+    };
+    if (isGlobalRole) fetchStores();
+  }, [isGlobalRole]);
+
+  useEffect(() => {
     if (activeTab === 'daily') loadDailyData();
     if (activeTab === 'monthly' || activeTab === 'payouts') loadMonthlyData();
-    if (activeTab === 'config') loadConfig();
-  }, [activeTab, loadDailyData, loadMonthlyData, loadConfig]);
+    if (activeTab === 'config' && storeId) loadConfig();
+  }, [activeTab, loadDailyData, loadMonthlyData, loadConfig, storeId]);
 
   const handleRecalculate = async () => {
     try {
       setIsSubmitting(true);
       await adminAPI.vgeRecalculate({ 
         date: selectedDate,
-        storeId: storeFilterId || currentUser?.storeId
+        storeId: storeId || currentUser?.storeId
       });
       toast.success('Recalculation triggered');
       loadDailyData();
@@ -155,7 +190,7 @@ export default function AdminTargets() {
       setIsSubmitting(true);
       const res = await adminAPI.vgeEndOfDay({ 
         date: selectedDate,
-        storeId: storeFilterId || currentUser?.storeId
+        storeId: storeId || currentUser?.storeId
       });
       toast.success(res.data.message);
       loadDailyData();
@@ -171,7 +206,7 @@ export default function AdminTargets() {
       setIsSubmitting(true);
       const res = await adminAPI.vgeGenerateMonthly({ 
         month: selectedMonth,
-        storeId: storeFilterId || currentUser?.storeId
+        storeId: storeId || currentUser?.storeId
       });
       toast.success(res.data.message);
       loadMonthlyData();
@@ -190,7 +225,7 @@ export default function AdminTargets() {
       if (!Array.isArray(data.rules)) data.rules = [];
       await adminAPI.vgeUpdateConfig({ 
         ...data,
-        storeId: storeFilterId || currentUser?.storeId
+        storeId: storeId || currentUser?.storeId
       });
       toast.success('Configuration saved');
     } catch (err) {
@@ -325,16 +360,99 @@ export default function AdminTargets() {
     );
   }
 
-  return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
-      <div className="flex items-center justify-between pb-4">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-            <Target size={24} />
+  // ─── Branch Overview ─────────────────
+  if (isGlobalRole && !storeId) {
+    return (
+      <div key="overview" className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700 p-4 md:p-6">
+        <div className="flex items-center gap-4">
+          <div className="w-14 h-14 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-lg shadow-emerald-200">
+            <Trophy size={30} strokeWidth={2.5} />
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-xl font-black text-gray-900 tracking-tight">VGE Performance</h2>
+            <h2 className="text-3xl font-black text-gray-900 tracking-tight">VGE Performance</h2>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-0.5 italic">Multi-branch targets & incentive monitoring</p>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Performance Overview</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Real-time sales tracking and incentive distribution across all retail branches</p>
+          </div>
+
+          {stores.map(store => {
+            const stats = allBranchStats[store.id] || { sales: 0, incentive: 0, agents: 0 };
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-500 flex items-center justify-between gap-6 relative overflow-hidden"
+              >
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-600 transition-all duration-500" />
+                
+                <div className="flex items-center gap-6">
+                  <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shrink-0">
+                    <Store size={32} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-xl font-black text-gray-900 tracking-tight leading-none mb-2">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-md tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.address && <span className="text-xs font-bold text-gray-400 truncate max-w-[200px]">• {store.address}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-12">
+                  <div className="hidden md:flex items-center gap-10">
+                    <div className="flex flex-col items-end">
+                      <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Total Sales</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xl font-black ${stats.sales > 0 ? 'text-gray-900' : 'text-gray-400'}`}>₹{stats.sales.toLocaleString()}</span>
+                        <TrendingUp size={16} className={stats.sales > 0 ? 'text-emerald-500' : 'text-gray-200'} />
+                      </div>
+                    </div>
+                    
+                    <div className="flex flex-col items-end border-l border-gray-100 pl-10">
+                      <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest mb-1">Active Agents</span>
+                      <div className="flex items-center gap-2">
+                        <span className={`text-xl font-black ${stats.agents > 0 ? 'text-blue-600' : 'text-gray-400'}`}>{stats.agents}</span>
+                        <Users size={16} className={stats.agents > 0 ? 'text-blue-400' : 'text-gray-200'} />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="w-12 h-12 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-300 group-hover:bg-emerald-600 group-hover:text-white group-hover:scale-110 transition-all duration-500 shadow-inner shrink-0">
+                    <ChevronRight size={24} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div key={storeId || 'branch'} className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
+      <div className="flex items-center justify-between pb-4">
+        <div className="flex items-center gap-4">
+          {isGlobalRole && storeId && (
+            <button 
+              onClick={() => setSearchParams({})} 
+              className="p-3 rounded-2xl bg-white border border-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm group"
+            >
+              <ArrowLeft size={20} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" />
+            </button>
+          )}
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 bg-emerald-600 rounded-2xl flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+              <Target size={24} />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-xl font-black text-gray-900 tracking-tight">VGE Performance</h2>
               <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest border border-emerald-100">
                 {performances.length} Agents
               </span>
@@ -342,11 +460,11 @@ export default function AdminTargets() {
             <div className="flex items-center gap-2 mt-0.5">
               <p className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
                 <Store size={10} />
-                {currentUser?.storeId ? (performances[0]?.user?.store?.name || 'Assigned Branch') : (storeFilterId ? 'Selected Branch' : 'Cross-Branch View')}
+                {currentUser?.storeId ? (performances[0]?.user?.store?.name || 'Assigned Branch') : (storeId ? 'Selected Branch' : 'Cross-Branch View')}
               </p>
-              {(currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN') && (
+              {isGlobalRole && (
                 <button 
-                  onClick={() => window.location.href = '/admin'} 
+                  onClick={() => setSearchParams({})} 
                   className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest underline underline-offset-2 ml-1"
                 >
                   Change Store
@@ -355,6 +473,7 @@ export default function AdminTargets() {
             </div>
           </div>
         </div>
+      </div>
         <div className="text-right hidden sm:block">
           <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Tracking</p>
           <p className="text-xs font-bold text-gray-500">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</p>

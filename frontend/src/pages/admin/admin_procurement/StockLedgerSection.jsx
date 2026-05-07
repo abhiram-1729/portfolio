@@ -87,8 +87,8 @@ const StockLedgerSection = () => {
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${typeColors[entry.type] || ''}`}>{entry.type.replace('_', ' ')}</span>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <span className={`text-xs font-black ${['PURCHASE', 'TRANSFER_IN'].includes(entry.type) ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {['PURCHASE', 'TRANSFER_IN'].includes(entry.type) ? '+' : '-'}{entry.quantity}
+                    <span className={`text-xs font-black ${entry.quantity >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {entry.quantity >= 0 ? '+' : ''}{entry.quantity}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-center text-xs font-bold text-gray-700">{entry.balanceAfter}</td>

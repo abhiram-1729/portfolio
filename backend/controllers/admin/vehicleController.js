@@ -10,7 +10,7 @@ export const getVehicles = async (req, res) => {
 
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+    } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
       where.storeId = req.user.storeId;
     }
 
@@ -86,12 +86,12 @@ export const createVehicle = async (req, res) => {
 
     console.log('✅ Uploaded to Supabase:', { rcDocument, insuranceDocument, permitDocument });
 
-    const resolvedStoreId = (storeId && storeId !== 'null' && storeId !== '') ? storeId : req.user.storeId;
+    const cleanStoreId = (storeId && storeId !== 'null' && storeId !== 'undefined' && storeId !== '') ? storeId : (req.user.storeId || null);
 
     const displayId = await generateId({
       entity: 'VH',
       tenantId: req.user.tenantId,
-      storeId: resolvedStoreId
+      storeId: cleanStoreId
     });
 
     const vehicle = await prisma.vehicle.create({
@@ -104,7 +104,7 @@ export const createVehicle = async (req, res) => {
         insuranceDocument,
         permitDocument,
         tenantId: req.user.tenantId,
-        storeId: resolvedStoreId
+        storeId: cleanStoreId
       }
     });
 

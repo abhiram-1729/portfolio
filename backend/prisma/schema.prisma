@@ -103,6 +103,7 @@ model User {
   vgeType            String                @default("EMPLOYEE")
   storeId            String?
   displayId          String?               @unique
+  attendanceEnabled  Boolean               @default(true)
   customRoleId       String?
   tenant             Tenant                @relation(fields: [tenantId], references: [id])
   assignedVehicle    Vehicle?              @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
@@ -146,6 +147,7 @@ model User {
   lateExceptions     LateEntryException[]  @relation("UserExceptions")
   approvedExceptions LateEntryException[]  @relation("ApprovedBy")
   leaveBalances      LeaveBalance[]
+  createdStores      Store[]               @relation("StoreCreator")
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -1140,6 +1142,8 @@ model Store {
   stateCode              String                   @default("AP")
   latitude               Float?
   longitude              Float?
+  creatorId              String?
+  creator                User?                    @relation("StoreCreator", fields: [creatorId], references: [id], onDelete: Restrict, onUpdate: Restrict)
   tenant                 Tenant                   @relation(fields: [tenantId], references: [id])
   users                  User[]
   vehicles               Vehicle[]
