@@ -16,8 +16,9 @@ export const getCoverageStatus = async () => {
     return response.data;
 };
 
-export const markCoverage = async (slot) => {
-    const response = await api.post('/routes/mark-coverage', { slot });
+export const markCoverage = async (data) => {
+    // data can be { slot } or { shiftId, shiftName, slot }
+    const response = await api.post('/routes/mark-coverage', data);
     return response.data;
 };
 
