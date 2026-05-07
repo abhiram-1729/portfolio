@@ -51,6 +51,13 @@ const CASH_SECTIONS_LIST = [
   { key: 'SHIFT_DEPOSIT', label: 'Shift Deposit', desc: 'Bank deposit tracking' }
 ];
 
+const EXPENSE_SECTIONS_LIST = [
+  { key: 'MONITORING', label: 'Expense Monitoring', desc: 'View all expense submissions' },
+  { key: 'APPROVAL', label: 'Expense Approval', desc: 'Approve, reject, and return expenses' },
+  { key: 'SETTINGS', label: 'Expense Settings', desc: 'Manage categories, limits & policies' }
+];
+
+
 const PROCUREMENT_SECTIONS_LIST = [
   { key: 'VENDORS', label: 'Vendors', desc: 'Vendor management' },
   { key: 'MAPPING', label: 'Item Mapping', desc: 'Product-Vendor mapping' },
@@ -68,7 +75,7 @@ const SETTINGS_SECTIONS = [
 ];
 
 const PORTAL_TYPES = [
-  { key: 'ADMIN', label: 'Admin Portal', desc: 'Full backend access', icon: Shield, color: 'emerald' },
+  { key: 'ADMIN', label: 'VillagKart Admin', desc: 'Full backend access', icon: Shield, color: 'emerald' },
   { key: 'AGENT', label: 'Agent Portal', desc: 'Sales & Field activities', icon: Users, color: 'blue' },
   { key: 'SUPERVISOR', label: 'Supervisor Portal', desc: 'Branch management', icon: Key, color: 'amber' },
   { key: 'HELPER', label: 'Helper Portal', desc: 'Logistics support', icon: Plus, color: 'rose' },
@@ -768,6 +775,82 @@ export default function TenantPrivileges() {
                                 ? 'bg-emerald-600 text-white'
                                 : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
                                 }`}
+                            >
+                              {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Granular Expense Sections Table */}
+                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-rose-50 text-rose-600 flex items-center justify-center">
+                          <Receipt size={24} />
+                        </div>
+                        <div>
+                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Expense Control</h4>
+                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Granular approval & monitoring access</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => {
+                          const sections = {};
+                          EXPENSE_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                          setFormPerms(prev => ({ ...prev, EXPENSES: ['READ', 'UPDATE'], EXPENSE_SECTIONS: sections }));
+                        }}
+                        className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest"
+                      >
+                        Select All Sections
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 border-t border-gray-50 pt-4">
+                      <div className="grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 py-2 border-b border-gray-50">
+                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Expense Section</span>
+                        {ACTIONS.map(a => (
+                          <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
+                        ))}
+                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
+                      </div>
+                      {EXPENSE_SECTIONS_LIST.map((section) => {
+                        const sectionPerms = (formPerms.EXPENSE_SECTIONS || {})[section.key] || [];
+                        const allSelected = ACTIONS.every(a => sectionPerms.includes(a.key));
+                        const someSelected = sectionPerms.length > 0;
+                        return (
+                          <div key={section.key} className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-2 rounded-xl transition-all ${someSelected ? 'bg-rose-50/20' : 'hover:bg-gray-50/50'}`}>
+                            <div className="flex flex-col min-w-0">
+                              <span className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{section.label}</span>
+                              <span className="text-[7px] text-gray-400 font-bold uppercase tracking-widest truncate">{section.desc}</span>
+                            </div>
+                            {ACTIONS.map(action => {
+                              const isChecked = sectionPerms.includes(action.key);
+                              return (
+                                <button
+                                  key={`exp-${section.key}-${action.key}`}
+                                  onClick={() => setFormPerms(prev => {
+                                    const sections = prev.EXPENSE_SECTIONS || {};
+                                    const cur = sections[section.key] || [];
+                                    const next = cur.includes(action.key) ? cur.filter(a => a !== action.key) : [...cur, action.key];
+                                    return { ...prev, EXPENSE_SECTIONS: { ...sections, [section.key]: next }, EXPENSES: (prev.EXPENSES || []).includes('READ') ? prev.EXPENSES : [...(prev.EXPENSES || []), 'READ'] };
+                                  })}
+                                  className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center transition-all border ${isChecked ? 'bg-rose-500 text-white border-rose-500 shadow-md' : 'bg-white border-gray-100 text-gray-200 hover:border-gray-200'}`}
+                                >
+                                  {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-400 opacity-20" />}
+                                </button>
+                              );
+                            })}
+                            <button
+                              onClick={() => setFormPerms(prev => {
+                                const sections = prev.EXPENSE_SECTIONS || {};
+                                const cur = sections[section.key] || [];
+                                const allSel = ACTIONS.every(a => cur.includes(a.key));
+                                return { ...prev, EXPENSE_SECTIONS: { ...sections, [section.key]: allSel ? [] : ACTIONS.map(a => a.key) }, EXPENSES: (prev.EXPENSES || []).includes('READ') ? prev.EXPENSES : [...(prev.EXPENSES || []), 'READ'] };
+                              })}
+                              className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${allSelected ? 'bg-rose-600 text-white' : 'bg-gray-100 text-gray-400 hover:bg-gray-200'}`}
                             >
                               {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
                             </button>

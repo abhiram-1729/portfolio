@@ -42,33 +42,6 @@ const prisma = basePrisma.$extends({
               args.where = { ...args.where, tenantId };
             }
 
-            // Redirect findUnique to findFirst to include tenantId
-            if (operation === 'findUnique') {
-              const modelName = model.charAt(0).toLowerCase() + model.slice(1);
-              if (basePrisma[modelName]) {
-                const refinedWhere = { ...args.where, tenantId };
-
-                // Flatten composite unique keys for findFirst compatibility
-                // (e.g., { vehicleId_date: { vehicleId, date } } -> { vehicleId, date })
-                for (const key in args.where) {
-                  if (key.includes('_') && typeof args.where[key] === 'object' && !Array.isArray(args.where[key])) {
-                    // Check if it's a composite key (values are not filters like 'in', 'gt', etc.)
-                    const values = args.where[key];
-                    const isFilter = Object.keys(values).some(k => ['in', 'not', 'gt', 'lt', 'gte', 'lte', 'contains'].includes(k));
-                    if (!isFilter) {
-                      Object.assign(refinedWhere, values);
-                      delete refinedWhere[key];
-                    }
-                  }
-                }
-
-                return basePrisma[modelName].findFirst({
-                  ...args,
-                  where: refinedWhere
-                });
-              }
-            }
-
             // Injection for Write operations
             if (operation === 'create' || operation === 'upsert') {
               const relationalMandatory = ['Order', 'User', 'Store', 'Tenant']; // Models where scalars are hidden in CreateInput (mostly Order)
@@ -137,9 +110,9 @@ const prisma = basePrisma.$extends({
               }
             }
 
-            if (['findMany', 'findFirst', 'count', 'groupBy', 'aggregate', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
+            if (['findMany', 'findUnique', 'findFirst', 'count', 'groupBy', 'aggregate', 'update', 'updateMany', 'upsert', 'delete', 'deleteMany'].includes(operation)) {
               const where = args.where || {};
-              const hasUniqueKey = Object.keys(where).some(k => k.includes('_'));
+              const hasUniqueKey = where.id || where.uuid || where.email || where.displayId || Object.keys(where).some(k => k.includes('_'));
               if (!where.tenantId && !hasUniqueKey) {
                 args.where = { ...where, tenantId };
               }

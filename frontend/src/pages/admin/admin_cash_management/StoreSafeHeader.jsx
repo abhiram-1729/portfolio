@@ -33,7 +33,11 @@ const StoreSafeHeader = ({
                     <div className="flex flex-col gap-2">
                       <span className="flex items-center gap-2">
                         <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active • Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                          Active • Balance: ₹{storeRegisterData?.liveMetrics?.availableCash?.toLocaleString()} 
+                          <span className="text-white/20 mx-2">|</span>
+                          Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}
+                        </span>
                       </span>
 
                       {storeRegisterData.previousRegister && Math.abs(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash) > 0.01 && (

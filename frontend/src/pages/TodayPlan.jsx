@@ -102,6 +102,13 @@ export default function TodayPlan() {
         const latest = data.activeShift.activities[0];
         if (!latest.endTime) setActiveVillageVisit(latest);
       }
+
+      // Auto-resume live tracking if shift is active but tracking stopped (e.g. app restart)
+      if (data.activeShift && !locationService.isTrackingActive()) {
+        console.log('[TodayPlan] Resuming live tracking for active shift...');
+        locationService.startLiveTracking();
+        setIsTracking(true);
+      }
     } catch (err) {
       console.error('Failed to fetch shift status');
     }
