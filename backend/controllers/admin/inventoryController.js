@@ -207,6 +207,9 @@ export const bulkImportItems = async (req, res) => {
       }
 
       return processed;
+    }, {
+      maxWait: 20000,
+      timeout: 60000
     });
 
     res.json({ 

@@ -416,6 +416,13 @@ export default function AdminInventory() {
     });
   }, [stockQuantities, vehicleInventoryMap]);
 
+  const hasInvalidRegistryQuantities = React.useMemo(() => {
+    return Object.entries(registryQuantities).some(([pid, qty]) => {
+      const prod = registryItems.find(p => p.id === pid);
+      return prod && (parseInt(qty) || 0) > (prod.stock || 0);
+    });
+  }, [registryQuantities, registryItems]);
+
   const groupedRefills = React.useMemo(() => {
     const groups = {};
     (refillRequests || []).forEach(req => {
@@ -1188,7 +1195,7 @@ export default function AdminInventory() {
                               </div>
                             </td>
                             <td className="px-4 py-4 border-y border-r border-gray-100 rounded-r-[1.5rem] group-hover:border-emerald-100 text-center" onClick={(e) => e.stopPropagation()}>
-                              <div className={`flex items-center gap-2 bg-white border-2 rounded-xl p-1 transition-all ${isSelected ? 'border-emerald-500 ring-4 ring-emerald-500/10' : 'border-gray-100 group-hover:border-emerald-200'}`}>
+                              <div className={`flex items-center gap-2 bg-white border-2 rounded-xl p-1 transition-all ${isSelected ? ( (registryQuantities[item.id] || 0) > (item.stock || 0) ? 'border-rose-500 ring-4 ring-rose-500/10' : 'border-emerald-500 ring-4 ring-emerald-500/10' ) : 'border-gray-100 group-hover:border-emerald-200'}`}>
                                 <input
                                   type="number"
                                   min="0"
@@ -1221,8 +1228,8 @@ export default function AdminInventory() {
             <div className="bg-white/90 backdrop-blur-2xl p-1.5 rounded-[2rem] border-4 border-white shadow-[0_20px_50px_-12px_rgba(16,185,129,0.4)]">
               <button
                 onClick={handleBulkImport}
-                disabled={isUploading}
-                className="w-full bg-emerald-600 text-white py-3 rounded-[1.5rem] shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-[0.2em] group relative overflow-hidden"
+                disabled={isUploading || hasInvalidRegistryQuantities}
+                className="w-full bg-emerald-600 text-white py-3 rounded-[1.5rem] shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-[0.2em] group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600 opacity-0 group-hover:opacity-10 transition-opacity" />
                 {isUploading ? (

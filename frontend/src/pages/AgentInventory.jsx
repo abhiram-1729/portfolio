@@ -299,7 +299,13 @@ export default function AgentInventory() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded border border-emerald-100 shadow-sm">Stock Audit</span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shadow-sm ${
+                            audit.type === 'AUDIT' ? 'text-emerald-600 bg-emerald-50 border-emerald-100' :
+                            audit.type === 'LOAD' ? 'text-blue-600 bg-blue-50 border-blue-100' :
+                            'text-amber-600 bg-amber-50 border-amber-100'
+                          }`}>
+                            {audit.type === 'AUDIT' ? 'Stock Audit' : audit.type === 'LOAD' ? 'Stock Loading' : 'Stock Refill'}
+                          </span>
                           <span className="text-[9px] font-bold text-slate-400">{format(new Date(audit.createdAt), 'hh:mm a')}</span>
                         </div>
                         <p className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1">
@@ -326,7 +332,11 @@ export default function AgentInventory() {
                         <div className="grid grid-cols-12 gap-2 px-2 mb-1">
                           <span className="col-span-6 text-[8px] font-black text-slate-400 uppercase tracking-widest">Adjusted Product</span>
                           <span className="col-span-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">System</span>
-                          <span className="col-span-2 text-[8px] font-black text-emerald-600 uppercase tracking-widest text-center">Audited</span>
+                          <span className={`col-span-2 text-[8px] font-black uppercase tracking-widest text-center ${
+                            audit.type === 'AUDIT' ? 'text-emerald-600' : 'text-blue-600'
+                          }`}>
+                            {audit.type === 'AUDIT' ? 'Audited' : 'Loaded'}
+                          </span>
                           <span className="col-span-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Var</span>
                         </div>
                         {audit.items?.map((item) => {
