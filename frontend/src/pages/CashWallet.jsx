@@ -272,13 +272,13 @@ export default function CashWallet() {
                 {/* Modals */}
                 {showAddExpense && (
                     <div className="fixed inset-0 z-[100] bg-slate-900/60 backdrop-blur-md flex items-end sm:items-center justify-center animate-in fade-in duration-300 p-4">
-                        <div className="bg-white w-full max-w-lg rounded-t-[3rem] sm:rounded-[3rem] p-8 space-y-6 shadow-2xl animate-in slide-in-from-bottom duration-500">
+                        <div className="bg-white w-full max-w-md rounded-t-[2.5rem] sm:rounded-[2.5rem] p-6 space-y-5 shadow-2xl animate-in slide-in-from-bottom duration-500">
                             <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
-                                        <Receipt size={24} />
+                                    <div className="w-10 h-10 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600">
+                                        <Receipt size={20} />
                                     </div>
-                                    <h3 className="text-xl font-black text-slate-900 tracking-tight">New Expense Request</h3>
+                                    <h3 className="text-lg font-black text-slate-900 tracking-tight">New Expense Request</h3>
                                 </div>
                                 <button onClick={() => setShowAddExpense(false)} className="p-2 bg-slate-50 rounded-xl text-slate-400">
                                     <X size={20} />
@@ -292,12 +292,12 @@ export default function CashWallet() {
                                         required
                                         value={expenseForm.type}
                                         onChange={(e) => setExpenseForm({ ...expenseForm, type: e.target.value })}
-                                        className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none"
+                                        className="w-full bg-slate-50 border-none rounded-xl px-5 py-3 font-black text-slate-900 focus:ring-2 focus:ring-emerald-500 transition-all appearance-none text-sm"
                                         style={{
                                             backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%230f172a' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                                            backgroundPosition: 'right 1rem center',
+                                            backgroundPosition: 'right 0.75rem center',
                                             backgroundRepeat: 'no-repeat',
-                                            backgroundSize: '1.25rem'
+                                            backgroundSize: '1rem'
                                         }}
                                     >
                                         <option value="" disabled>Select Expense Purpose</option>
@@ -331,7 +331,7 @@ export default function CashWallet() {
                                 <div className="space-y-1">
                                     <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 pl-1">Amount Requested</label>
                                     <div className="relative">
-                                        <span className="absolute left-6 top-1/2 -translate-y-1/2 font-black text-slate-400">₹</span>
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-xs font-black text-slate-400">₹</span>
                                         <input
                                             type="number"
                                             required
@@ -339,7 +339,7 @@ export default function CashWallet() {
                                             placeholder="0.00"
                                             value={expenseForm.amount}
                                             onChange={(e) => setExpenseForm({ ...expenseForm, amount: e.target.value })}
-                                            className="w-full bg-slate-50 border-none rounded-2xl pl-10 pr-6 py-4 font-black text-slate-900 text-xl focus:ring-2 focus:ring-emerald-500 transition-all"
+                                            className="w-full bg-slate-50 border-none rounded-xl pl-8 pr-4 py-3 font-black text-slate-900 text-base focus:ring-2 focus:ring-emerald-500 transition-all placeholder:text-slate-200"
                                         />
                                     </div>
                                 </div>
@@ -350,7 +350,7 @@ export default function CashWallet() {
                                         {[{k:'CASH',l:'Cash',c:'emerald'},{k:'PERSONAL_CASH',l:'Personal Cash',c:'purple'},{k:'UPI',l:'UPI',c:'blue'}].map(m => (
                                             <button key={m.k} type="button"
                                                 onClick={() => setExpenseForm({...expenseForm, paymentMode: m.k})}
-                                                className={`py-3 rounded-2xl text-xs font-black uppercase tracking-wide border transition-all ${
+                                                className={`py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wide border transition-all ${
                                                     expenseForm.paymentMode === m.k
                                                         ? `bg-${m.c}-50 text-${m.c}-600 border-${m.c}-200 shadow-sm`
                                                         : 'bg-white text-slate-400 border-slate-100 hover:border-slate-200'}`}>
@@ -372,7 +372,7 @@ export default function CashWallet() {
                                         placeholder="Enter details..."
                                         value={expenseForm.description}
                                         onChange={(e) => setExpenseForm({ ...expenseForm, description: e.target.value })}
-                                        className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 transition-all h-24 resize-none"
+                                        className="w-full bg-slate-50 border-none rounded-xl px-5 py-3 font-bold text-slate-900 focus:ring-2 focus:ring-emerald-500 transition-all h-20 resize-none text-sm placeholder:text-slate-300"
                                     />
                                 </div>
 
@@ -400,13 +400,13 @@ export default function CashWallet() {
                                                 <div className="relative w-full aspect-video rounded-xl overflow-hidden shadow-md">
                                                     <img src={billPreview} alt="Preview" className="w-full h-full object-cover" />
                                                     <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                                        <Camera className="text-white" size={32} />
+                                                        <Camera className="text-white" size={24} />
                                                     </div>
                                                 </div>
                                             ) : (
                                                 <>
-                                                    <Camera className="text-slate-300" size={32} />
-                                                    <span className="text-xs font-bold text-slate-400">Capture Bill Photo</span>
+                                                    <Camera className="text-slate-300" size={24} />
+                                                    <span className="text-[10px] font-bold text-slate-400">Capture Bill Photo</span>
                                                 </>
                                             )}
                                         </label>
@@ -416,9 +416,9 @@ export default function CashWallet() {
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-sm uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-3 disabled:opacity-50"
+                                    className="w-full bg-slate-900 text-white py-4 rounded-xl font-black text-xs uppercase tracking-[0.2em] shadow-xl active:scale-[0.98] transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                                 >
-                                    {submitting ? <Loader2 className="animate-spin" /> : <>Send for Approval</>}
+                                    {submitting ? <Loader2 className="animate-spin" size={16} /> : <>Send for Approval</>}
                                 </button>
                             </form>
                         </div>
