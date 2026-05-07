@@ -39,25 +39,37 @@ export const exportExpensesToExcel = (expenses, fileName = 'Expense_Report.xlsx'
             ? new Date(exp.updatedAt).toLocaleDateString('en-GB') 
             : '-';
 
-        // Extract Metadata Tags
-        let remarks = exp.description || '-';
+        // Extract and Clean Remarks based on User Role
+        let fullDescription = exp.description || '';
+        
+        // Remove metadata tags first
+        fullDescription = fullDescription.replace(/\[(APPROVED|PAID)_BY:.+?\]/g, '').trim();
+        
+        // Split by remarks (timestamps like \n[dd/mm/yy)
+        const descParts = fullDescription.split(/\n\[\d{2}\/\d{2}\/\d{2}/);
+        const agentSide = descParts[0].replace(/\[PERSONAL_CASH\]\s*/, '').trim();
+        const adminSide = descParts.slice(1).map(p => {
+            const colonIdx = p.indexOf(']:');
+            return colonIdx !== -1 ? p.substring(colonIdx + 2).trim() : p.trim();
+        }).filter(Boolean).join('; ');
+
+        const isAgent = ['SALES_AGENT', 'VGE', 'HELPER'].includes(exp.user?.role);
+        
+        let remarks = '-';
+        if (isAgent) {
+            remarks = agentSide || '-';
+        } else {
+            // For Store Related, show admin remarks if available, otherwise show the original description
+            remarks = adminSide || agentSide || '-';
+        }
+
+        // Extract Approver Names (already handled by the tags removed above, but we need the names)
         let approvedBy = '-';
         let paidBy = '-';
-
-        const approvedMatch = remarks.match(/\[APPROVED_BY:(.+?)\]/);
-        if (approvedMatch) {
-            approvedBy = approvedMatch[1].trim();
-            remarks = remarks.replace(/\[APPROVED_BY:(.+?)\]/g, '').trim();
-        }
-
-        const paidMatch = remarks.match(/\[PAID_BY:(.+?)\]/);
-        if (paidMatch) {
-            paidBy = paidMatch[1].trim();
-            remarks = remarks.replace(/\[PAID_BY:(.+?)\]/g, '').trim();
-        }
-        
-        // Clean up empty remarks after extracting
-        if (!remarks || remarks === '') remarks = '-';
+        const approvedMatch = (exp.description || '').match(/\[APPROVED_BY:(.+?)\]/);
+        if (approvedMatch) approvedBy = approvedMatch[1].trim();
+        const paidMatch = (exp.description || '').match(/\[PAID_BY:(.+?)\]/);
+        if (paidMatch) paidBy = paidMatch[1].trim();
 
         return [
             index + 1,

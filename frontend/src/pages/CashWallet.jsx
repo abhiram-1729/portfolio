@@ -245,7 +245,11 @@ export default function CashWallet() {
 
                                     {exp.description && (
                                         <p className="text-xs font-medium text-slate-500 bg-slate-50 p-3 rounded-xl border border-slate-100 italic">
-                                            "{exp.description}"
+                                            "{(() => {
+                                                const clean = exp.description.replace(/\[(APPROVED|PAID)_BY:.+?\]/g, '').trim();
+                                                const parts = clean.split(/\n\[\d{2}\/\d{2}\/\d{2}/);
+                                                return parts[0].trim();
+                                            })()}"
                                         </p>
                                     )}
 

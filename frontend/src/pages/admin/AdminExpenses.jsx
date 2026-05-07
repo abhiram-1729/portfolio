@@ -243,10 +243,26 @@ export default function AdminExpenses() {
                                                                 {exp.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded">{exp.displayId}</span>}
                                                                 {exp.vendorBillNumber && <span className="text-[9px] font-black text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded border border-slate-100">Bill #{exp.vendorBillNumber}</span>}
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 mt-1">
-                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border ${exp.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : exp.paymentMode === 'PERSONAL_CASH' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                                            <div className="flex flex-col gap-1 mt-1.5">
+                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded border w-fit ${exp.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : exp.paymentMode === 'PERSONAL_CASH' ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
                                                                     {exp.paymentMode}
                                                                 </span>
+                                                                {exp.description && (
+                                                                    <p className="text-[9px] font-bold text-gray-400 italic leading-tight max-w-[200px]">
+                                                                        {(() => {
+                                                                            const isAgent = ['SALES_AGENT', 'VGE', 'HELPER'].includes(exp.user?.role);
+                                                                            const clean = exp.description.replace(/\[(APPROVED|PAID)_BY:.+?\]/g, '').trim();
+                                                                            const parts = clean.split(/\n\[\d{2}\/\d{2}\/\d{2}/);
+                                                                            const agentSide = parts[0].trim();
+                                                                            const adminSide = parts.slice(1).map(p => {
+                                                                                const colonIdx = p.indexOf(']:');
+                                                                                return colonIdx !== -1 ? p.substring(colonIdx + 2).trim() : p.trim();
+                                                                            }).filter(Boolean).join('; ');
+
+                                                                            return isAgent ? agentSide : (adminSide || agentSide);
+                                                                        })()}
+                                                                    </p>
+                                                                )}
                                                                 <span className="text-[9px] text-gray-400 font-bold">{format(new Date(exp.createdAt), 'hh:mm a')}</span>
                                                             </div>
                                                         </div>
