@@ -437,6 +437,14 @@ export default function AdminSettings() {
         { label: 'Asset Type Management', action: () => setActiveModal('ASSET_CATEGORIES') }
       ]
     },
+    {
+      title: 'Expense Management',
+      icon: Receipt,
+      items: [
+        { label: 'Categories', action: () => setActiveModal('EXPENSES') },
+        { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES') }
+      ]
+    },
     { 
       title: 'Payment Settings', 
       icon: CreditCard, 
@@ -485,16 +493,6 @@ export default function AdminSettings() {
       items: [
         { label: 'Configure Timing & Shifts', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } },
         { label: 'Late Entry Rules', action: () => setActiveModal('LATE_RULES') }
-      ]
-    },
-    {
-      title: 'Expense Management',
-      icon: Receipt,
-      items: [
-        { label: 'Master Categories & Limits', action: () => setActiveModal('EXPENSES') },
-        { label: 'Sub-Category Hierarchy', action: () => setActiveModal('SUB_EXPENSES') },
-        { label: 'Approval Policy: Auto-approve CASH expenses on approval', action: () => toast('CASH expenses are auto-paid on approval. This is the default behavior.') },
-        { label: 'Monthly Cutoff: Edits locked after 5th of next month', action: () => toast('Monthly cutoff is enforced automatically by the system.') }
       ]
     }
   ];
@@ -1313,7 +1311,7 @@ export default function AdminSettings() {
   if (activeModal === 'EXPENSES') {
     return (
       <div className="space-y-6 pb-20 max-w-7xl mx-auto">
-        {renderHeader('Expense Management', 'Categories & Spending Thresholds', Receipt, 'text-emerald-600 bg-emerald-100')}
+        {renderHeader('Categories', 'Spending Thresholds & Classification', Receipt, 'text-emerald-600 bg-emerald-100')}
         <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
           <div className="bg-white rounded-[2rem] p-8 border border-gray-50 shadow-xl h-fit">
             <h4 className="text-[10px] font-black text-emerald-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
@@ -1345,7 +1343,7 @@ export default function AdminSettings() {
              <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Hash size={18} className="text-emerald-400 opacity-60" />
-                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Master Expense Classification</h4>
+                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Master Category Index</h4>
               </div>
               <div className="flex items-center gap-4">
                 <button onClick={handleApplyDefaultHierarchy} disabled={saving}
@@ -1411,7 +1409,7 @@ export default function AdminSettings() {
 
     return (
       <div className="space-y-6 pb-20 max-w-7xl mx-auto">
-        {renderHeader('Expense Hierarchy', 'Nested Classification & Mapping', Hash, 'text-emerald-600 bg-emerald-100')}
+        {renderHeader('Sub Categories', 'Nested Classification & Mapping', Hash, 'text-emerald-600 bg-emerald-100')}
         <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
           <div className="bg-white rounded-[2rem] p-8 border border-gray-50 shadow-xl h-fit">
             <h4 className="text-[10px] font-black text-emerald-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
@@ -1456,7 +1454,7 @@ export default function AdminSettings() {
              <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
                 <Hash size={18} className="text-emerald-400 opacity-60" />
-                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Granular Expense Index</h4>
+                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Sub Category Index</h4>
               </div>
               <div className="flex items-center gap-4">
                 <div className="relative">
