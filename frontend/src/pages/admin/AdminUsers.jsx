@@ -7,6 +7,7 @@ import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { generateReportPDF } from './adminreports/ReportUtils';
+import { cn } from '../../utils/cn';
 export default function AdminUsers({ type }) {
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
@@ -34,6 +35,7 @@ export default function AdminUsers({ type }) {
     customRoleId: '',
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitting = isSubmitting; // Alias for backward compatibility if any
   const [showEditModal, setShowEditModal] = useState(false);
   const [editingUser, setEditingUser] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
@@ -1145,6 +1147,3 @@ export default function AdminUsers({ type }) {
   );
 }
 
-function cn(...inputs) {
-  return inputs.filter(Boolean).join(' ');
-}

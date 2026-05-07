@@ -60,7 +60,7 @@ export default function CashWallet() {
                 catData = await getExpenseCategories();
                 setCategories(catData);
                 if (catData.length > 0 && !expenseForm.type) {
-                    setExpenseForm(prev => ({ ...prev, type: catData[0].name }));
+                    setExpenseForm(prev => ({ ...prev, type: catData[0].displayName || catData[0].name }));
                 }
             } catch (catErr) {
                 console.error("Failed to load categories", catErr);
@@ -97,7 +97,7 @@ export default function CashWallet() {
             toast.success('Expense request sent to Admin');
             localStorage.removeItem('expense_draft');
             setShowAddExpense(false);
-            setExpenseForm({ type: categories[0]?.name || '', amount: '', paymentMode: 'CASH', description: '' });
+            setExpenseForm({ type: categories[0]?.displayName || categories[0]?.name || '', amount: '', paymentMode: 'CASH', description: '' });
             setBillFile(null);
             setBillPreview(null);
             loadData();
@@ -300,16 +300,31 @@ export default function CashWallet() {
                                             backgroundSize: '1.25rem'
                                         }}
                                     >
-                                        <option value="" disabled>Select category</option>
-                                        {(categories.length > 0 ? categories : [
-                                            { id: 'c1', name: 'Fuel' },
-                                            { id: 'c2', name: 'Toll' },
-                                            { id: 'c3', name: 'Food' },
-                                            { id: 'c4', name: 'Repairs' },
-                                            { id: 'c5', name: 'Other' }
-                                        ]).map(c => (
-                                            <option key={c.id} value={c.name}>{c.name}</option>
-                                        ))}
+                                        <option value="" disabled>Select Expense Purpose</option>
+                                        {(() => {
+                                            const cats = categories.length > 0 ? categories : [
+                                                { id: 'c1', name: 'Fuel' },
+                                                { id: 'c2', name: 'Toll' },
+                                                { id: 'c3', name: 'Food' },
+                                                { id: 'c4', name: 'Repairs' },
+                                                { id: 'c5', name: 'Other' }
+                                            ];
+                                            const masters = cats.filter(c => !(c.displayName || c.name).includes(' | '));
+                                            return masters.map(master => {
+                                                const masterDisplay = master.displayName || master.name;
+                                                const subs = cats.filter(c => (c.displayName || c.name).startsWith(`${masterDisplay} | `));
+                                                if (subs.length === 0) return <option key={master.id} value={masterDisplay}>{masterDisplay}</option>;
+                                                return (
+                                                    <optgroup key={master.id} label={masterDisplay}>
+                                                        <option value={masterDisplay}>General {masterDisplay}</option>
+                                                        {subs.map(sub => {
+                                                            const subDisplay = (sub.displayName || sub.name).split(' | ')[1];
+                                                            return <option key={sub.id} value={sub.displayName || sub.name}>{subDisplay}</option>;
+                                                        })}
+                                                    </optgroup>
+                                                );
+                                            });
+                                        })()}
                                     </select>
                                 </div>
 

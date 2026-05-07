@@ -185,9 +185,9 @@ export default function OpeningCashEntry() {
                 <AlertCircle size={28} />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-black text-slate-900 tracking-tight">Assignment Missing</h3>
+                <h3 className="text-base font-black text-slate-900 tracking-tight">On-Duty / Awaiting Float</h3>
                 <p className="text-xs font-bold text-slate-500 max-w-[240px] mx-auto leading-relaxed">
-                  Opening cash is managed by admin. Please wait for the daily float to be assigned.
+                  Your attendance is recorded. Please wait for your supervisor to assign the daily cash float.
                 </p>
               </div>
               <button

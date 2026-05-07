@@ -941,7 +941,9 @@ export default function AdminVehicles() {
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="font-bold text-gray-900 text-sm">{user.name}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border tracking-tighter mt-0.5 ${user.role === 'SALES_AGENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                        {user.role === 'SALES_AGENT' ? 'Field Agent' : user.role === 'HELPER' ? 'Helper' : user.role}
+                      </span>
                     </div>
                   </div>
                   {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}

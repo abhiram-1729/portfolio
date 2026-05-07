@@ -11,7 +11,14 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private (VGE)
 export const addExpense = async (req, res, next) => {
     try {
-        const { type, amount, paymentMode, description, billImage, vehicleId, vendorId, vendorBillNumber, gstNumber, gstAmount } = req.body;
+        const {
+            type,
+            amount,
+            paymentMode,
+            description,
+            billImage,
+            vehicleId
+        } = req.body;
         const userId = req.user.id;
         const dateString = format(new Date(), 'yyyy-MM-dd');
         const parsedAmount = parseFloat(amount);
@@ -49,9 +56,7 @@ export const addExpense = async (req, res, next) => {
                 throw new Error(`This category (${type}) has a single-transaction limit of ₹${categoryConfig.limit}.`);
             }
         } catch (e) {
-            // If error is our own, rethrow it
             if (e.message?.includes('limit')) throw e;
-            // Otherwise category check failed silently (table may not exist with field)
         }
 
         let imageUrl = billImage;
@@ -107,7 +112,7 @@ export const addExpense = async (req, res, next) => {
 
         // CASH expenses affect daily cash immediately
         if (paymentMode === 'CASH') {
-            await recalculateDailySummary(expense.vehicleId, dateString);
+            await recalculateDailySummary(expense.vehicleId, dateString, req.user.tenantId, req.user.storeId);
         }
 
         res.status(201).json(expense);
@@ -168,8 +173,21 @@ export const getAllExpenses = async (req, res, next) => {
             tenantId: req.user.tenantId,
             ...(userId && { userId }),
             ...(status && { status }),
-            ...(paymentMode && { paymentMode })
         };
+
+        if (paymentMode) {
+            if (paymentMode === 'PERSONAL_CASH') {
+                where.paymentMode = 'CASH';
+                where.description = { contains: '[PERSONAL_CASH]' };
+            } else if (paymentMode === 'CASH') {
+                where.paymentMode = 'CASH';
+                where.NOT = {
+                    description: { contains: '[PERSONAL_CASH]' }
+                };
+            } else {
+                where.paymentMode = paymentMode;
+            }
+        }
 
         if (startDate && endDate) {
             where.date = { gte: startDate, lte: endDate };
@@ -220,6 +238,8 @@ export const updateExpenseStatus = async (req, res, next) => {
         const { id } = req.params;
         const { status, remarks, utrNumber, approverName } = req.body;
 
+        const effectivePaymentRef = utrNumber;
+
         // Only statuses that exist in the current DB enum
         const allowedStatuses = ['APPROVED', 'REJECTED', 'PAID', 'PENDING'];
         if (!allowedStatuses.includes(status)) {
@@ -244,9 +264,12 @@ export const updateExpenseStatus = async (req, res, next) => {
 
 
 
-        // CASH expense: auto-move to PAID on APPROVED
+        // Admin manually approves/rejects/pays
         let targetStatus = status;
-        if (status === 'APPROVED' && currentExpense.paymentMode === 'CASH') {
+        
+        // AUTO-PAY logic:
+        // 1. Store Expenses (vehicleId: null) -> PAID immediately on APPROVED
+        if (status === 'APPROVED' && !currentExpense.vehicleId) {
             targetStatus = 'PAID';
         }
 
@@ -258,12 +281,16 @@ export const updateExpenseStatus = async (req, res, next) => {
 
         const effectiveApprover = (approverName || req.user.name).trim();
 
-        if (targetStatus === 'APPROVED' && !updatedDescription.includes('[APPROVED_BY:')) {
-            updatedDescription = `${updatedDescription} [APPROVED_BY:${effectiveApprover}]`.trim();
-        } 
-        if (targetStatus === 'PAID') {
-            if (status === 'APPROVED' && !updatedDescription.includes('[APPROVED_BY:')) {
+        if (targetStatus === 'APPROVED') {
+            if (!updatedDescription.includes('[APPROVED_BY:')) {
                 updatedDescription = `${updatedDescription} [APPROVED_BY:${effectiveApprover}]`.trim();
+            }
+        } else if (targetStatus === 'PAID') {
+            if (status === 'APPROVED' || !updatedDescription.includes('[APPROVED_BY:')) {
+                // If it was already approved, don't duplicate, but if coming from PENDING to PAID directly (cash)
+                if (!updatedDescription.includes('[APPROVED_BY:')) {
+                    updatedDescription = `${updatedDescription} [APPROVED_BY:${effectiveApprover}]`.trim();
+                }
             }
             if (!updatedDescription.includes('[PAID_BY:')) {
                 updatedDescription = `${updatedDescription} [PAID_BY:${effectiveApprover}]`.trim();
@@ -283,7 +310,7 @@ export const updateExpenseStatus = async (req, res, next) => {
 
         // Recalculate cash if needed
         if (expense.paymentMode === 'CASH') {
-            await recalculateDailySummary(expense.vehicleId, expense.date);
+            await recalculateDailySummary(expense.vehicleId, expense.date, req.user.tenantId, req.user.storeId);
         }
 
         res.json(expense);
@@ -336,14 +363,17 @@ export const bulkUpdateStatus = async (req, res, next) => {
         // Process each expense (CASH auto-pays on approval)
         const updatePromises = expenses.map(exp => {
             let targetStatus = status;
-            if (status === 'APPROVED' && exp.paymentMode === 'CASH') {
+
+            // AUTO-PAY logic:
+            // 1. Store Expenses (vehicleId: null) -> PAID immediately on APPROVED
+            if (status === 'APPROVED' && !exp.vehicleId) {
                 targetStatus = 'PAID';
             }
-            
+
             let updatedDescription = exp.description || '';
             if (targetStatus === 'APPROVED' && !updatedDescription.includes('[APPROVED_BY:')) {
                 updatedDescription = `${updatedDescription} [APPROVED_BY:${req.user.name}]`.trim();
-            } 
+            }
             if (targetStatus === 'PAID') {
                 if (status === 'APPROVED' && !updatedDescription.includes('[APPROVED_BY:')) {
                     updatedDescription = `${updatedDescription} [APPROVED_BY:${req.user.name}]`.trim();
@@ -482,7 +512,12 @@ export const getExpenseAnalytics = async (req, res, next) => {
         for (const exp of expenses) {
             byCategory[exp.type] = (byCategory[exp.type] || 0) + exp.amount;
             byAgent[exp.user?.name || 'Unknown'] = (byAgent[exp.user?.name || 'Unknown'] || 0) + exp.amount;
-            byPaymentMode[exp.paymentMode] = (byPaymentMode[exp.paymentMode] || 0) + exp.amount;
+
+            let mode = exp.paymentMode;
+            if (exp.description?.includes('[PERSONAL_CASH]')) {
+                mode = 'PERSONAL_CASH';
+            }
+            byPaymentMode[mode] = (byPaymentMode[mode] || 0) + exp.amount;
             byStatus[exp.status] = (byStatus[exp.status] || 0) + 1;
             byDate[exp.date] = (byDate[exp.date] || 0) + exp.amount;
         }
@@ -507,21 +542,45 @@ export const getExpenseAnalytics = async (req, res, next) => {
     }
 };
 
-// @desc    Expense Category Management - List
+// @desc    Expense Category Management - List (Role-Filtered)
 // @route   GET /api/expenses/admin/categories
-// @access  Admin
+// @access  Private
 export const getExpenseCategories = async (req, res, next) => {
     try {
-        console.log(`[getExpenseCategories] Called by user: ${req.user.name} (Tenant: ${req.user.tenantId})`);
-        const categories = await prisma.expenseCategory.findMany({
-            where: { status: true, tenantId: req.user.tenantId }
+        console.log(`[getExpenseCategories] Called by user: ${req.user.name} (Role: ${req.user.role}, Tenant: ${req.user.tenantId})`);
+
+        const allCategories = await prisma.expenseCategory.findMany({
+            where: { status: true, tenantId: req.user.tenantId },
+            orderBy: { name: 'asc' }
         });
-        console.log(`[getExpenseCategories] Found ${categories.length} categories.`);
-        res.json(categories);
+
+        // Role-based filtering using naming convention:
+        // [AGENT] prefix  → visible to SALES_AGENT, HELPER only
+        // [STORE] prefix  → visible to ADMIN, TENANT_OWNER, SUPERVISOR, SUPER_ADMIN only
+        // No prefix       → visible to everyone
+        const agentRoles = ['SALES_AGENT', 'HELPER'];
+        const isAgent = agentRoles.includes(req.user.role);
+
+        const filtered = allCategories
+            .filter(cat => {
+                const n = cat.name;
+                if (n.startsWith('[AGENT]')) return isAgent;
+                if (n.startsWith('[STORE]')) return !isAgent;
+                return true; // untagged = visible to all
+            })
+            .map(cat => ({
+                ...cat,
+                // Strip [AGENT] / [STORE] prefix for clean display
+                displayName: cat.name.replace(/^\[(AGENT|STORE)\]\s*/i, '')
+            }));
+
+        console.log(`[getExpenseCategories] Returning ${filtered.length} of ${allCategories.length} categories for role: ${req.user.role}`);
+        res.json(filtered);
     } catch (error) {
         next(error);
     }
 };
+
 
 // @desc    Expense Category Management - Create
 // @route   POST /api/expenses/admin/categories
@@ -529,6 +588,14 @@ export const getExpenseCategories = async (req, res, next) => {
 export const createExpenseCategory = async (req, res, next) => {
     try {
         const { name, limit } = req.body;
+        const existing = await prisma.expenseCategory.findFirst({
+            where: { tenantId: req.user.tenantId, name }
+        });
+
+        if (existing) {
+            return res.status(400).json({ message: 'Category name already exists' });
+        }
+
         const category = await prisma.expenseCategory.create({
             data: {
                 tenantId: req.user.tenantId,
@@ -538,6 +605,9 @@ export const createExpenseCategory = async (req, res, next) => {
         });
         res.status(201).json(category);
     } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ message: 'Category name already exists' });
+        }
         next(error);
     }
 };
@@ -549,12 +619,27 @@ export const updateExpenseCategory = async (req, res, next) => {
     try {
         const { id } = req.params;
         const { name, limit } = req.body;
+
+        if (name) {
+            const existing = await prisma.expenseCategory.findFirst({
+                where: {
+                    tenantId: req.user.tenantId,
+                    name,
+                    id: { not: id }
+                }
+            });
+            if (existing) return res.status(400).json({ message: 'Category name already exists' });
+        }
+
         const category = await prisma.expenseCategory.update({
             where: { id, tenantId: req.user.tenantId },
             data: { name, limit: limit ? parseFloat(limit) : null }
         });
         res.json(category);
     } catch (error) {
+        if (error.code === 'P2002') {
+            return res.status(400).json({ message: 'Category name already exists' });
+        }
         next(error);
     }
 };
