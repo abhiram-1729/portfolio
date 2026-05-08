@@ -244,7 +244,14 @@ export default function AdminInventory() {
         setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
       }
       if (storeRes.data?.success) {
-        setStores(storeRes.data.data);
+        const fetchedStores = storeRes.data.data;
+        setStores(fetchedStores);
+        // Auto-select if only one store exists
+        if (fetchedStores.length === 1 && !storeFilterId) {
+          const params = new URLSearchParams(searchParams);
+          params.set('storeId', fetchedStores[0].id);
+          setSearchParams(params);
+        }
       }
       setSales(salesRes.data || []);
       setUsers(usersRes.data || []);

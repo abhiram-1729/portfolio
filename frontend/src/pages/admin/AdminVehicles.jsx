@@ -57,9 +57,15 @@ export default function AdminVehicles() {
         adminAPI.getStores()
       ]);
       setVehicles(vRes.data);
-      setStores(sRes.data?.success ? sRes.data.data : (sRes.data || []));
+      const fetchedStores = sRes.data?.success ? sRes.data.data : (sRes.data || []);
+      setStores(fetchedStores);
       // Filter out Consumers AND Admins - only show agents/staff for vehicles
       setUsers(uRes.data.filter(u => u.role !== 'CONSUMER' && u.role !== 'ADMIN'));
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeFilterId) {
+        setSearchParams({ storeId: fetchedStores[0].id });
+      }
     } catch {
       toast.error('Failed to fetch vehicle data');
     } finally {

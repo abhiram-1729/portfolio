@@ -184,12 +184,14 @@ export default function AdminSales() {
         adminAPI.getUsers()
       ]);
       setSales(salesRes.data);
-      if (storesRes.data?.success) {
-        setStores(storesRes.data.data);
-      } else {
-        setStores(storesRes.data || []);
-      }
+      const fetchedStores = storesRes.data?.success ? storesRes.data.data : (storesRes.data || []);
+      setStores(fetchedStores);
       setUsers(usersRes.data || []);
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeFilterId) {
+        setSearchParams({ storeId: fetchedStores[0].id });
+      }
     } catch (error) {
       toast.error('Failed to fetch sales history');
     } finally {

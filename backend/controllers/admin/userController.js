@@ -176,51 +176,73 @@ export const deactivateUser = async (req, res) => {
       const user = await tx.user.findUnique({ where: { id, tenantId: req.user.tenantId } });
       if (!user) throw new Error('User not found in your tenant');
 
-      // 1. Inventory Cleanup
+      // 0. Unlink from restrictive parent-like relations
+      await tx.store.updateMany({
+        where: { creatorId: id },
+        data: { creatorId: null }
+      });
+
+      // 1. Inventory & Refill Cleanup
       const userCarts = await tx.cart.findMany({ where: { userId: id }, select: { id: true } });
       if (userCarts.length > 0) {
         await tx.cartItem.deleteMany({ where: { cartId: { in: userCarts.map(c => c.id) } } });
       }
       await tx.cart.deleteMany({ where: { userId: id } });
-
-      // Clean Refill-related
+      
       await tx.refillItem.deleteMany({ where: { refillRequest: { userId: id } } });
       await tx.refillRequest.deleteMany({ where: { userId: id } });
+      await tx.refillRequest.updateMany({ where: { approvedById: id }, data: { approvedById: null } });
 
-      // 2. Financial Purge (Large Data Block)
+      // 2. Financial & Sales Purge
+      await tx.orderReturn.deleteMany({ where: { OR: [{ order: { userId: id } }, { returnedById: id }] } });
       await tx.orderItem.deleteMany({ where: { order: { userId: id } } });
       await tx.payment.deleteMany({ where: { order: { userId: id } } });
       await tx.order.deleteMany({ where: { userId: id } });
       
       await tx.openingCash.deleteMany({ where: { userId: id } });
       await tx.closingCash.deleteMany({ where: { userId: id } });
+      await tx.cashTransfer.deleteMany({ where: { userId: id } });
+      await tx.dailyCashSummary.deleteMany({ where: { userId: id } });
+      await tx.bankDeposit.deleteMany({ where: { adminId: id } });
+      await tx.safeTransaction.deleteMany({ where: { userId: id } });
+      await tx.storeDeposit.deleteMany({ where: { userId: id } });
 
-      // 3. Activity, Performance & Location
+      // 3. Operational Logs & Performance
+      await tx.shiftLog.deleteMany({ where: { userId: id } });
+      await tx.attendance.deleteMany({ where: { userId: id } });
       await tx.vgeDailyPerformance.deleteMany({ where: { userId: id } });
       await tx.vgeMonthlySummary.deleteMany({ where: { userId: id } });
       await tx.routeAssignment.deleteMany({ where: { userId: id } });
       await tx.locationCheckIn.deleteMany({ where: { userId: id } });
+      await tx.villageActivity.deleteMany({ where: { userId: id } });
+      await tx.locationLog.deleteMany({ where: { userId: id } });
+      await tx.stockTransaction.deleteMany({ where: { userId: id } });
 
-      // 4. Notifications & Communication
+      // 4. Damage & Deductions
+      await tx.damageDeduction.deleteMany({ where: { OR: [{ userId: id }, { appliedById: id }] } });
+      await tx.damageEntry.deleteMany({ where: { OR: [{ reportedById: id }, { reviewedById: id }] } });
+
+      // 5. Notifications & HR
       await tx.notification.deleteMany({ where: { userId: id } });
+      await tx.lateEntry.deleteMany({ where: { userId: id } });
+      await tx.lateEntryException.deleteMany({ where: { OR: [{ userId: id }, { approvedById: id }] } });
+      await tx.leaveBalance.deleteMany({ where: { userId: id } });
 
-      // 5. Assets Management Purge
+      // 6. Assets Management
       await tx.assetAssignment.deleteMany({ where: { userId: id } });
       await tx.assetIssue.deleteMany({ where: { userId: id } });
       await tx.assetRequest.deleteMany({ where: { userId: id } });
 
-      // 6. Detailed Operational Logs
+      // 7. Store Operational State
+      await tx.storeCashRegister.updateMany({ where: { openedById: id }, data: { openedById: null } });
+      await tx.storeCashRegister.updateMany({ where: { closedById: id }, data: { closedById: null } });
+
+      // 8. Detailed Operational Logs
       await tx.stockAudit.deleteMany({ where: { userId: id } });
       await tx.expense.deleteMany({ where: { userId: id } });
-      await tx.cashTransfer.deleteMany({ where: { userId: id } });
-      await tx.dailyCashSummary.deleteMany({ where: { userId: id } });
+      await tx.activityLog.deleteMany({ where: { OR: [{ userId: id }, { targetUserId: id }] } });
 
-      // 7. Unlink and Purge User
-      await tx.user.update({
-        where: { id },
-        data: { assignedVehicleId: null }
-      });
-
+      // 9. Final Purge
       await tx.user.delete({ where: { id } });
 
       logActivity({
@@ -231,7 +253,7 @@ export const deactivateUser = async (req, res) => {
         metadata: { deletedUserId: id }
       });
     }, {
-      timeout: 20000 // Increase timeout to 20s for deep cleanup
+      timeout: 30000 // Increase timeout to 30s for deep cleanup
     });
     
     res.json({ message: 'User and all history permanently deleted.' });

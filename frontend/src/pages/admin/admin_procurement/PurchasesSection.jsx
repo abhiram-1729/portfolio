@@ -537,11 +537,12 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                 <table className="w-full table-fixed border-collapse">
                   <thead>
                     <tr className="bg-gray-50/50 border-b border-gray-100">
-                      <th className="w-1/5 px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Invoice</th>
-                      <th className="w-1/5 px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
-                      <th className="w-1/5 px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Vendor</th>
-                      <th className="w-1/5 px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Total Amount</th>
-                      <th className="w-1/5 px-4 py-3 text-right text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Actions</th>
+                      <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Invoice</th>
+                      <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">PO</th>
+                      <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
+                      <th className="w-[25%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Vendor</th>
+                      <th className="w-[15%] px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Total</th>
+                      <th className="w-[15%] px-4 py-3 text-right text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -556,6 +557,11 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                             <span className="text-[11px] font-black text-gray-900 leading-none">#{p.invoiceNumber}</span>
                             {p.displayId && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter leading-none">{p.displayId}</span>}
                           </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <span className="text-[10px] font-black text-blue-600 uppercase tracking-tighter">
+                            {p.po ? (p.po.displayId || `PO${p.po.poNumber}`) : '—'}
+                          </span>
                         </td>
                         <td className="px-4 py-3">
                           <span className="text-[10px] font-black text-gray-500 uppercase">{format(new Date(p.invoiceDate), 'dd MMM yyyy')}</span>

@@ -84,7 +84,14 @@ export default function AdminAssets() {
       setAssets(aRes.data);
       setUsers(uRes.data.filter(u => u.role === 'SALES_AGENT' || u.role === 'SUPERVISOR' || u.role === 'HELPER'));
       setAssetCategories(cRes.data);
-      if (sRes.data.success) setStores(sRes.data.data);
+      if (sRes.data.success) {
+        const fetchedStores = sRes.data.data;
+        setStores(fetchedStores);
+        // Auto-select if only one store exists
+        if (fetchedStores.length === 1 && !storeId) {
+          setSearchParams({ storeId: fetchedStores[0].id });
+        }
+      }
     } catch (err) {
       toast.error('Failed to load assets');
     } finally {

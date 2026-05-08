@@ -44,7 +44,7 @@ const RESPONSIBILITY_LABELS = {
 };
 
 export default function AdminDamage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const storeId = searchParams.get('storeId');
   const { user, can } = useUserStore();
 
@@ -163,8 +163,13 @@ export default function AdminDamage() {
     const fetchStores = async () => {
       try {
         const res = await adminAPI.getStores();
-        if (res.data?.success) setStores(res.data.data);
-        else setStores(res.data || []);
+        const fetchedStores = res.data?.success ? res.data.data : (res.data || []);
+        setStores(fetchedStores);
+        
+        // Auto-select if only one store exists
+        if (fetchedStores.length === 1 && !storeId) {
+          setSearchParams({ storeId: fetchedStores[0].id });
+        }
       } catch (err) {
         console.error('Failed to fetch stores');
       } finally {

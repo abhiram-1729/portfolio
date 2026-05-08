@@ -157,11 +157,17 @@ export default function AdminTargets() {
     const fetchStores = async () => {
       try {
         const res = await adminAPI.getStores();
-        setStores(res.data.success ? res.data.data : (res.data || []));
+        const fetchedStores = res.data.success ? res.data.data : (res.data || []);
+        setStores(fetchedStores);
+
+        // Auto-select if only one store exists
+        if (fetchedStores.length === 1 && !storeId) {
+          setSearchParams({ storeId: fetchedStores[0].id });
+        }
       } catch (e) {}
     };
     if (isGlobalRole) fetchStores();
-  }, [isGlobalRole]);
+  }, [isGlobalRole, storeId]);
 
   useEffect(() => {
     if (activeTab === 'daily') loadDailyData();

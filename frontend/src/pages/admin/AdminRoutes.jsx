@@ -118,8 +118,14 @@ export default function AdminRoutes() {
       setRoutes(rRes);
       setAssignments(aRes);
       setVehicles(vehRes.data);
-      setStores(sRes.data?.success ? sRes.data.data : (sRes.data || []));
+      const fetchedStores = sRes.data?.success ? sRes.data.data : (sRes.data || []);
+      setStores(fetchedStores);
       setUsers(uRes.data.filter(u => u.role === 'SALES_AGENT' || u.role === 'SUPERVISOR'));
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeId) {
+        setSearchParams({ storeId: fetchedStores[0].id });
+      }
     } catch (error) {
       toast.error('Failed to fetch data');
       console.error(error);

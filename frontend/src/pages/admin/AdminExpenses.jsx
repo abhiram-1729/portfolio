@@ -55,6 +55,11 @@ export default function AdminExpenses() {
                     const storeData = res.data?.success ? res.data.data : (res.data || []);
                     setStores(storeData);
 
+                    // Auto-select if only one store exists
+                    if (storeData.length === 1 && !storeId) {
+                        setSearchParams({ storeId: storeData[0].id });
+                    }
+
                     // Fetch stats for overview
                     const stats = {};
                     await Promise.all(storeData.map(async (s) => {

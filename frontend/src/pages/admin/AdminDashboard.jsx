@@ -88,8 +88,14 @@ export default function AdminDashboard() {
       setCashStats(cashRes);
       setVgeStats(vgeRes.data);
       setLiveLocations(locRes.data || []);
-      setStores(storesRes.data?.success ? storesRes.data.data : (storesRes.data || []));
+      const fetchedStores = storesRes.data?.success ? storesRes.data.data : (storesRes.data || []);
+      setStores(fetchedStores);
       setUsers(usersRes.data || []);
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeIdParam) {
+        setSearchParams({ storeId: fetchedStores[0].id });
+      }
     } catch (error) {
       toast.error('Failed to update operational data');
       console.error(error);

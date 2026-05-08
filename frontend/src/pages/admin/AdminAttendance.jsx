@@ -53,12 +53,14 @@ export default function AdminAttendance() {
       setRecords(attRes.data.records || []);
       setSummary(attRes.data.summary || null);
       
-      if (storesRes.data?.success) {
-        setStores(storesRes.data.data);
-      } else {
-        setStores(storesRes.data || []);
-      }
+      const fetchedStores = storesRes.data?.success ? storesRes.data.data : (storesRes.data || []);
+      setStores(fetchedStores);
       setUsers(usersRes.data || []);
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeFilterId) {
+        setSearchParams({ storeId: fetchedStores[0].id });
+      }
     } catch (err) {
       console.error('Failed to fetch attendance:', err);
       toast.error('Failed to fetch attendance data');

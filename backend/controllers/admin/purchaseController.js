@@ -240,6 +240,7 @@ export const getPurchases = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         vendor: { select: { vendorName: true, mobile: true } },
+        po: { select: { poNumber: true, displayId: true } },
         items: {
           include: { product: { select: { name: true } } }
         },

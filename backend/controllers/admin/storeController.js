@@ -128,9 +128,26 @@ export const deleteAdminStore = async (req, res, next) => {
       });
     }
 
-    await prisma.store.delete({
-      where: { id }
-    });
+    // --- NUCLEAR STORE PURGE ---
+    await prisma.$transaction(async (tx) => {
+      // 1. Cleanup operational state
+      await tx.storeCashRegister.deleteMany({ where: { storeId: id } });
+      await tx.businessSettings.deleteMany({ where: { storeId: id } });
+      await tx.storeDeposit.deleteMany({ where: { storeId: id } });
+      
+      // 2. Unlink or Cleanup references
+      // If there are vehicles or users, we already check for them above, 
+      // but let's be safe and clear any lingering unlinked references if necessary.
+      
+      // 3. Delete related logs that might block
+      await tx.activityLog.deleteMany({ where: { storeId: id } });
+      await tx.notification.deleteMany({ where: { storeId: id } });
+
+      // 4. Final Delete
+      await tx.store.delete({
+        where: { id }
+      });
+    }, { timeout: 15000 });
 
     res.json({ success: true, message: 'Store deleted successfully' });
   } catch (error) {

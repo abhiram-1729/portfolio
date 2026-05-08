@@ -66,7 +66,12 @@ export default function AdminUsers({ type }) {
     try {
       const res = await adminAPI.getStores();
       if (res.data?.success) {
-        setStores(res.data.data);
+        const fetchedStores = res.data.data;
+        setStores(fetchedStores);
+        // Auto-select if only one store exists
+        if (fetchedStores.length === 1 && !storeFilterId) {
+          setSearchParams({ storeId: fetchedStores[0].id });
+        }
       }
     } catch (error) {
       console.error('Failed to fetch stores:', error);
