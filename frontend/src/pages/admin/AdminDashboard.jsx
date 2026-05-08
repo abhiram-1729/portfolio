@@ -177,7 +177,7 @@ export default function AdminDashboard() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-2 border-b border-gray-100">
         <div className="flex items-center gap-4">
-          {isGlobalRole && (
+          {isGlobalRole && stores.length > 1 && (
             <button onClick={() => setSearchParams({})} className="p-2 bg-white border border-gray-200 rounded-lg text-gray-400 hover:text-emerald-600 hover:border-emerald-200 transition-all">
               <ChevronLeft size={20} />
             </button>

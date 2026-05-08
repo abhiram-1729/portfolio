@@ -121,7 +121,7 @@ export default function AdminProcurement() {
   }, [availableTabs, activeTab, setSearchParams]);
 
   return (
-    <div className="space-y-6">
+    <div className="h-[calc(100vh-11rem)] overflow-hidden flex flex-col space-y-3">
       {isGlobalRole && !storeId ? (
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-700 pb-20">
           <div className="flex flex-col gap-1">
@@ -180,11 +180,11 @@ export default function AdminProcurement() {
           </div>
         </div>
       ) : (
-        <div key={storeId} className="animate-in fade-in duration-700">
+        <div key={storeId} className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-700">
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
-              {isGlobalRole && (
+              {isGlobalRole && stores.length > 1 && (
                 <button
                   onClick={() => setSearchParams({})}
                   className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -211,7 +211,7 @@ export default function AdminProcurement() {
           </div>
 
           {/* Tab Content */}
-          <div key={storeId} className="animate-in fade-in duration-500">
+          <div key={storeId} className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-500 overflow-hidden">
             {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}

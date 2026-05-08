@@ -216,7 +216,7 @@ export default function AdminExpenses() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col gap-1">
                     <div className="flex items-center gap-3">
-                        {isGlobalRole && storeId && (
+                        {isGlobalRole && storeId && stores.length > 1 && (
                             <button
                                 onClick={() => setSearchParams({})}
                                 className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"

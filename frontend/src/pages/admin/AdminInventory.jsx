@@ -1688,17 +1688,17 @@ export default function AdminInventory() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3">
-                {storeFilterId && (
+                {storeFilterId && stores.length > 1 && (
                   <button
                     onClick={() => {
                       const params = { tab: activeTab };
                       if (subTab) params.sub = subTab;
                       setSearchParams(params);
                     }}
-                    className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                    title="Back to All Branches"
+                    className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                    title="Back to Organizational Overview"
                   >
-                    <ChevronLeft size={18} />
+                    <ChevronLeft size={20} />
                   </button>
                 )}
                 <h2 className="text-2xl font-bold text-gray-900">

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Plus, Pencil, Trash2, Users, X, Loader2, Check,
-  ChevronRight, Key, Save, AlertTriangle, CheckCircle2, XCircle,
+  ChevronRight, ChevronDown, Key, Save, AlertTriangle, CheckCircle2, XCircle,
   Truck, ShoppingCart, PieChart, Receipt, Target, Eye, EyeOff, LayoutGrid, Coins, Grid, MapPin,
   Package, Wallet, BarChart, ClipboardList, BarChart3, Settings
 } from 'lucide-react';
@@ -20,16 +20,16 @@ const DASHBOARD_WIDGETS = [
 ];
 
 const MODULES = [
-  { key: 'DASHBOARD', label: 'Dashboard', desc: 'Main overview & metrics', categories: ['ADMIN', 'AGENT', 'SUPERVISOR', 'HELPER'] },
-  { key: 'STAFF', label: 'Staff Management', desc: 'Admin, Agents & Field Force', categories: ['ADMIN', 'SUPERVISOR'] },
-  { key: 'VEHICLES', label: 'Fleet Management', desc: 'Vehicles & Assets', categories: ['ADMIN', 'SUPERVISOR'] },
-  { key: 'SALES', label: 'Sales', desc: 'Order management', categories: ['ADMIN', 'AGENT'] },
-  { key: 'TARGETS', label: 'Targets', desc: 'VGE incentives', categories: ['ADMIN', 'SUPERVISOR'] },
-  { key: 'ASSETS', label: 'Assets', desc: 'Equipment tracking', categories: ['ADMIN', 'HELPER'] },
-  { key: 'EXPENSES', label: 'Expenses', desc: 'Reimbursements', categories: ['ADMIN', 'AGENT'] },
-  { key: 'NOTIFICATIONS', label: 'Notifications', desc: 'Alert management', categories: ['ADMIN', 'AGENT', 'SUPERVISOR', 'HELPER'] },
-  { key: 'HR', label: 'HR', desc: 'Attendance, Leave, Payroll', categories: ['ADMIN', 'SUPERVISOR'] },
-  { key: 'SETTINGS', label: 'Settings', desc: 'System configuration', categories: ['ADMIN'] },
+  { key: 'DASHBOARD', label: 'Dashboard', desc: 'Main overview & metrics' },
+  { key: 'STAFF', label: 'Staff Management', desc: 'Admin, Agents & Field Force' },
+  { key: 'VEHICLES', label: 'Fleet Management', desc: 'Vehicles & Assets' },
+  { key: 'SALES', label: 'Sales', desc: 'Order management' },
+  { key: 'TARGETS', label: 'Targets', desc: 'VGE incentives' },
+  { key: 'ASSETS', label: 'Assets', desc: 'Equipment tracking' },
+  { key: 'EXPENSES', label: 'Expenses', desc: 'Reimbursements' },
+  { key: 'NOTIFICATIONS', label: 'Notifications', desc: 'Alert management' },
+  { key: 'HR', label: 'HR', desc: 'Attendance, Leave, Payroll' },
+  { key: 'SETTINGS', label: 'Settings', desc: 'System configuration' },
 ];
 
 const INVENTORY_SECTIONS = [
@@ -51,6 +51,13 @@ const CASH_SECTIONS_LIST = [
   { key: 'SHIFT_DEPOSIT', label: 'Shift Deposit', desc: 'Bank deposit tracking' }
 ];
 
+const EXPENSE_SECTIONS_LIST = [
+  { key: 'MONITORING', label: 'Expense Monitoring', desc: 'View all expense submissions' },
+  { key: 'APPROVAL', label: 'Expense Approval', desc: 'Approve, reject, and return expenses' },
+  { key: 'SETTINGS', label: 'Expense Settings', desc: 'Manage categories, limits & policies' }
+];
+
+
 const PROCUREMENT_SECTIONS_LIST = [
   { key: 'VENDORS', label: 'Vendors', desc: 'Vendor management' },
   { key: 'MAPPING', label: 'Item Mapping', desc: 'Product-Vendor mapping' },
@@ -67,12 +74,28 @@ const SETTINGS_SECTIONS = [
   { key: 'POS_TERMINAL', label: 'POS Terminal Access', desc: 'Direct link to POS interface' }
 ];
 
-const PORTAL_TYPES = [
-  { key: 'ADMIN', label: 'Admin Portal', desc: 'Full backend access', icon: Shield, color: 'emerald' },
-  { key: 'AGENT', label: 'Agent Portal', desc: 'Sales & Field activities', icon: Users, color: 'blue' },
-  { key: 'SUPERVISOR', label: 'Supervisor Portal', desc: 'Branch management', icon: Key, color: 'amber' },
-  { key: 'HELPER', label: 'Helper Portal', desc: 'Logistics support', icon: Plus, color: 'rose' },
+const ROUTE_SECTIONS_LIST = [
+  { key: 'VILLAGES', label: 'Village Registry', desc: 'Manage village data' },
+  { key: 'ROUTES', label: 'Route Master', desc: 'Define sales routes' },
+  { key: 'ASSIGNMENTS', label: 'Vehicle Assignment', desc: 'Assign routes to vehicles' }
 ];
+
+const REPORT_SECTIONS_LIST = [
+  { key: 'OVERVIEW', label: 'Business Overview', desc: 'High-level metrics' },
+  { key: 'ITEM_WISE', label: 'Item Wise Sales', desc: 'Product performance' },
+  { key: 'CATEGORY_WISE', label: 'Category Wise', desc: 'Category analytics' },
+  { key: 'DAY_WISE', label: 'Day Wise Sales', desc: 'Daily trends' },
+  { key: 'ROUTE_VILLAGE', label: 'Route & Village', desc: 'Geographic performance' },
+  { key: 'AGENT_PERFORMANCE', label: 'Agent Performance', desc: 'Staff leaderboard' },
+  { key: 'LOCATION_TRACKING', label: 'Location Tracking', desc: 'GPS history' },
+  { key: 'VEHICLE_WISE', label: 'Vehicle Wise', desc: 'Fleet performance' },
+  { key: 'PAYMENT_MODE', label: 'Payment Analysis', desc: 'Cash vs Digital' },
+  { key: 'RETURN', label: 'Return Reports', desc: 'Stock returns' },
+  { key: 'DAMAGE', label: 'Damage Reports', desc: 'Loss tracking' },
+  { key: 'SESSION', label: 'Session Reports', desc: 'EOD settlements' },
+  { key: 'INVOICE', label: 'Invoice Reports', desc: 'Bill history' }
+];
+
 
 const ACTIONS = [
   { key: 'READ', label: 'View', color: 'emerald' },
@@ -82,6 +105,142 @@ const ACTIONS = [
   { key: 'TOGGLE_STATUS', label: 'Status', color: 'purple' },
 ];
 
+const ToggleSwitch = ({ checked, onChange, disabled = false }) => {
+  return (
+    <div className="flex items-center justify-center w-10 h-10">
+      <motion.button
+        whileTap={!disabled ? { scale: 0.95 } : {}}
+        onClick={(e) => {
+          e.preventDefault();
+          if (!disabled) onChange();
+        }}
+        disabled={disabled}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-all duration-300 focus:outline-none ${checked ? 'bg-emerald-500' : 'bg-gray-200'
+          } ${disabled ? 'opacity-20 cursor-not-allowed' : 'cursor-pointer hover:brightness-110'}`}
+      >
+        <motion.span
+          animate={{ x: checked ? 18 : 2 }}
+          transition={{ type: "spring", stiffness: 500, damping: 30 }}
+          className="inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out"
+        />
+      </motion.button>
+    </div>
+  );
+};
+
+const CollapsibleSection = ({ title, desc, icon: Icon, children, isOpen, onToggle }) => {
+  return (
+    <div className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm transition-all hover:border-emerald-100">
+      <button
+        onClick={onToggle}
+        className="w-full px-8 py-6 flex items-center justify-between hover:bg-gray-50/50 transition-all text-left"
+      >
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
+            <Icon size={24} />
+          </div>
+          <div>
+            <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">{title}</h4>
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{desc}</p>
+          </div>
+        </div>
+        <div className={`transform transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}>
+          <ChevronDown size={20} className="text-gray-400" />
+        </div>
+      </button>
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+          >
+            <div className="px-8 pb-8 border-t border-gray-50 pt-6">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+};
+
+const PermissionTable = ({ modules, isGranular = false, sectionKey = '', formPerms, togglePermission, toggleAllForModule }) => {
+  return (
+    <div className="space-y-2">
+      {/* Table Header */}
+      <div className="hidden sm:grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 pb-1 border-b border-gray-50">
+        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Module</span>
+        {ACTIONS.map(a => (
+          <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
+        ))}
+        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
+      </div>
+
+      {modules.map((mod) => {
+        let currentPerms = [];
+        if (isGranular) {
+          currentPerms = (formPerms[sectionKey] || {})[mod.key] || [];
+        } else {
+          currentPerms = formPerms[mod.key] || [];
+        }
+
+        const allSelected = ACTIONS.every(a => currentPerms.includes(a.key));
+        const someSelected = currentPerms.length > 0;
+
+        return (
+          <div
+            key={mod.key}
+            className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-3 rounded-2xl border transition-all ${someSelected ? 'bg-emerald-50/30 border-emerald-100/50' : 'bg-gray-50/50 border-gray-100/50 hover:bg-gray-50'
+              }`}
+          >
+            <div className="flex flex-col min-w-0">
+              <span className="text-xs font-black text-gray-800 uppercase tracking-tight truncate">{mod.label}</span>
+              <span className="text-[8px] text-gray-400 font-bold hidden sm:block truncate">{mod.desc}</span>
+            </div>
+
+            {ACTIONS.map((action) => {
+              const isChecked = currentPerms.includes(action.key);
+
+              return (
+                <ToggleSwitch
+                  key={`${mod.key}-${action.key}`}
+                  checked={isChecked}
+                  onChange={() => {
+                    if (isGranular) {
+                      // Custom granular toggle logic
+                      const sections = { ...(formPerms[sectionKey] || {}) };
+                      const cur = sections[mod.key] || [];
+                      const next = cur.includes(action.key) ? cur.filter(a => a !== action.key) : [...cur, action.key];
+                      togglePermission(sectionKey, mod.key, action.key, true, next);
+                    } else {
+                      togglePermission(mod.key, action.key);
+                    }
+                  }}
+                />
+              );
+            })}
+
+            <ToggleSwitch
+              checked={allSelected}
+              onChange={() => {
+                if (isGranular) {
+                  const sections = { ...(formPerms[sectionKey] || {}) };
+                  sections[mod.key] = allSelected ? [] : ACTIONS.map(a => a.key);
+                  togglePermission(sectionKey, mod.key, 'ALL', true, sections[mod.key]);
+                } else {
+                  toggleAllForModule(mod.key);
+                }
+              }}
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
 export default function TenantPrivileges() {
   const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -90,12 +249,22 @@ export default function TenantPrivileges() {
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
+  const [activeTab, setActiveTab] = useState('permissions'); // 'permissions' | 'users'
+  const [roleUsers, setRoleUsers] = useState([]);
+  const [fetchingUsers, setFetchingUsers] = useState(false);
+  const [headerEditing, setHeaderEditing] = useState(false);
+  const [openSections, setOpenSections] = useState(['core']);
+
+  const toggleAccordion = (key) => {
+    setOpenSections(prev =>
+      prev.includes(key) ? prev.filter(k => k !== key) : [...prev, key]
+    );
+  };
 
   // Form state
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPerms, setFormPerms] = useState({});
-  const [formPortalType, setFormPortalType] = useState('ADMIN');
 
   useEffect(() => {
     fetchRoles();
@@ -118,7 +287,9 @@ export default function TenantPrivileges() {
     setFormName('');
     setFormDesc('');
     setFormPerms({});
-    setFormPortalType('ADMIN');
+    setActiveTab('permissions');
+    setRoleUsers([]);
+    setHeaderEditing(true);
     setShowModal(true);
   };
 
@@ -128,8 +299,40 @@ export default function TenantPrivileges() {
     setFormName(role.name);
     setFormDesc(role.description || '');
     setFormPerms(role.permissions || {});
-    setFormPortalType(role.portalType || 'ADMIN');
+    setActiveTab('permissions');
+    setRoleUsers([]);
+    setHeaderEditing(false);
     setShowModal(true);
+    fetchRoleUsers(role.id);
+  };
+
+  const fetchRoleUsers = async (roleId) => {
+    setFetchingUsers(true);
+    try {
+      const res = await adminAPI.getUsers({ roleId });
+      setRoleUsers(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+    } catch (err) {
+      console.error('Failed to fetch role users:', err);
+    } finally {
+      setFetchingUsers(false);
+    }
+  };
+
+  const handleDeleteUser = async (userId, userName) => {
+    if (!window.confirm(`Are you absolutely sure? This will PERMANENTLY DELETE ${userName} and all their historical data (orders, attendance, cash transfers, etc). This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await adminAPI.deleteUser(userId);
+      toast.success(`${userName} permanently deleted`);
+      // Refresh list
+      if (selectedRole) fetchRoleUsers(selectedRole.id);
+      fetchRoles(); // Refresh counts
+    } catch (err) {
+      console.error('Failed to delete user:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete user');
+    }
   };
 
 
@@ -282,7 +485,7 @@ export default function TenantPrivileges() {
       const current = prev.SETTINGS_TARGET_SECTIONS || [];
       const has = current.includes(sectionKey);
       const modPerms = prev.SETTINGS || [];
-      
+
       return {
         ...prev,
         SETTINGS_TARGET_SECTIONS: has
@@ -306,8 +509,23 @@ export default function TenantPrivileges() {
     });
   };
 
-  const togglePermission = (moduleKey, actionKey) => {
+  const togglePermission = (moduleKey, actionKey, isGranular = false, nextGranularPerms = null) => {
     setFormPerms(prev => {
+      if (isGranular) {
+        const sectionId = actionKey; // actionKey is used as the granular key (e.g., 'STORE_STOCK')
+        const sections = { ...(prev[moduleKey] || {}) };
+        sections[sectionId] = nextGranularPerms;
+
+        // Map the section Key to the correct parent module READ permission
+        const parentModule = moduleKey.split('_')[0];
+
+        return {
+          ...prev,
+          [moduleKey]: sections,
+          [parentModule]: ['READ']
+        };
+      }
+
       const current = prev[moduleKey] || [];
       const has = current.includes(actionKey);
       const nextPerms = has
@@ -343,38 +561,55 @@ export default function TenantPrivileges() {
 
   const selectAllPermissions = () => {
     const all = {};
+    // Main Modules
     MODULES.forEach(m => { all[m.key] = ACTIONS.map(a => a.key); });
-    all.DASHBOARD = ['READ'];
-    all.STAFF = ACTIONS.map(a => a.key);
-    all.VEHICLES = ACTIONS.map(a => a.key);
-    all.ROUTES = ACTIONS.map(a => a.key);
-    all.INVENTORY = ['READ'];
-    all.INVENTORY_SECTIONS = {};
-    INVENTORY_SECTIONS.forEach(s => {
-      all.INVENTORY_SECTIONS[s.key] = ACTIONS.map(a => a.key);
-    });
 
-    all.ROUTE_TARGET_SECTIONS = ['VILLAGES', 'ROUTES', 'ASSIGNMENTS'];
-    all.INVENTORY_TARGET_SECTIONS = ['MASTER', 'STORE_STOCK', 'VEHICLE_STOCK', 'LOADING', 'RETURN', 'REFILLS', 'DAMAGE', 'AUDITS'];
-    all.CASH_TARGET_SECTIONS = ['STORE_SAFE', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER', 'SHIFT_DEPOSIT'];
-    all.REPORT_TARGET_SECTIONS = ['OVERVIEW', 'ITEM_WISE', 'CATEGORY_WISE', 'DAY_WISE', 'ROUTE_VILLAGE', 'AGENT_PERFORMANCE', 'LOCATION_TRACKING', 'VEHICLE_WISE', 'PAYMENT_MODE', 'RETURN', 'DAMAGE', 'SESSION', 'INVOICE'];
-    all.PROCUREMENT_TARGET_SECTIONS = ['VENDORS', 'MAPPING', 'PO', 'GRN', 'PURCHASES', 'LEDGER', 'PAYMENTS', 'REPORTS'];
-    all.SETTINGS_TARGET_SECTIONS = ['POS_CONFIG', 'POS_TERMINAL'];
+    // Sub-sections (Nested)
+    all.INVENTORY_SECTIONS = {};
+    INVENTORY_SECTIONS.forEach(s => { all.INVENTORY_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    all.CASH_SECTIONS = {};
+    CASH_SECTIONS_LIST.forEach(s => { all.CASH_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    all.EXPENSE_SECTIONS = {};
+    EXPENSE_SECTIONS_LIST.forEach(s => { all.EXPENSE_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    all.PROCUREMENT_SECTIONS = {};
+    PROCUREMENT_SECTIONS_LIST.forEach(s => { all.PROCUREMENT_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    // Target Lists (Granular)
+    all.ROUTE_TARGET_SECTIONS = {};
+    ROUTE_SECTIONS_LIST.forEach(s => { all.ROUTE_TARGET_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    all.REPORT_TARGET_SECTIONS = {};
+    REPORT_SECTIONS_LIST.forEach(s => { all.REPORT_TARGET_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    all.SETTINGS_TARGET_SECTIONS = {};
+    SETTINGS_SECTIONS.forEach(s => { all.SETTINGS_TARGET_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    // Widgets
     all.DASHBOARD_WIDGETS = DASHBOARD_WIDGETS.map(w => w.key);
+
     setFormPerms(all);
   };
 
   const clearAllPermissions = () => {
-    setFormPerms({
-      DASHBOARD_WIDGETS: [],
-      INVENTORY_SECTIONS: {},
-      ROUTE_TARGET_SECTIONS: [],
-      INVENTORY_TARGET_SECTIONS: [],
-      CASH_TARGET_SECTIONS: [],
-      REPORT_TARGET_SECTIONS: [],
-      PROCUREMENT_TARGET_SECTIONS: [],
-      SETTINGS_TARGET_SECTIONS: []
+    setFormPerms({});
+  };
+
+  const toggleAllPermissions = () => {
+    const isAnySelected = Object.keys(formPerms).some(k => {
+      const val = formPerms[k];
+      if (Array.isArray(val)) return val.length > 0;
+      if (typeof val === 'object' && val !== null) return Object.values(val).some(arr => Array.isArray(arr) && arr.length > 0);
+      return false;
     });
+
+    if (isAnySelected) {
+      clearAllPermissions();
+    } else {
+      selectAllPermissions();
+    }
   };
 
   const handleSave = async () => {
@@ -388,16 +623,14 @@ export default function TenantPrivileges() {
         await adminAPI.updateRole(selectedRole.id, {
           name: formName,
           description: formDesc,
-          permissions: formPerms,
-          portalType: formPortalType
+          permissions: formPerms
         });
         toast.success('Role updated');
       } else {
         await adminAPI.createRole({
           name: formName,
           description: formDesc,
-          permissions: formPerms,
-          portalType: formPortalType
+          permissions: formPerms
         });
         toast.success('Role created');
       }
@@ -441,652 +674,348 @@ export default function TenantPrivileges() {
   if (showModal) {
     return (
       <div className="space-y-6 max-w-5xl mx-auto animate-in fade-in duration-300">
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowModal(false)}
-            className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all shadow-sm"
-          >
-            <ChevronRight className="rotate-180" size={20} />
-          </button>
-          <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">
-              {isEditing ? 'Edit Role' : 'Create New Role'}
-            </h2>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
-              Define access privileges
-            </p>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={() => setShowModal(false)}
+              className="w-10 h-10 bg-white border border-gray-200 rounded-xl flex items-center justify-center text-gray-500 hover:bg-gray-50 transition-all shadow-sm"
+            >
+              <ChevronRight className="rotate-180" size={20} />
+            </button>
+            <div>
+              <h2 className="text-2xl font-black text-gray-900 tracking-tight">
+                {isEditing ? 'Edit Role' : 'Create New Role'}
+              </h2>
+              <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
+                Define access privileges
+              </p>
+            </div>
           </div>
+
+          {isEditing && (
+            <div className="flex bg-gray-100 p-1 rounded-2xl border border-gray-200">
+              <button
+                onClick={() => setActiveTab('permissions')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'permissions' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                  }`}
+              >
+                <Key size={14} /> Permissions
+              </button>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === 'users' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400 hover:text-gray-600'
+                  }`}
+              >
+                <Users size={14} /> Assigned Users ({roleUsers.length})
+              </button>
+            </div>
+          )}
+        </div>
+
+        <div className="flex flex-col md:flex-row gap-4">
+          <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex-1 flex items-start justify-between gap-6">
+            <div className="flex flex-col gap-2 flex-1">
+              <div className="space-y-1">
+                {headerEditing && <label className="text-[9px] font-black uppercase tracking-widest text-emerald-600 ml-1">Role Identity</label>}
+                <input
+                  type="text"
+                  value={formName}
+                  onChange={(e) => setFormName(e.target.value)}
+                  placeholder="Role Name"
+                  disabled={!headerEditing}
+                  className={`text-2xl font-black tracking-tight w-full transition-all duration-300 ${headerEditing
+                      ? 'bg-gray-50 border border-emerald-200 rounded-xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-emerald-500/5 outline-none'
+                      : 'bg-transparent border-none p-0 text-gray-900 cursor-default outline-none'
+                    }`}
+                />
+              </div>
+              <div className="space-y-1">
+                {headerEditing && <label className="text-[9px] font-black uppercase tracking-widest text-gray-400 ml-1">Public Description</label>}
+                <input
+                  type="text"
+                  value={formDesc}
+                  onChange={(e) => setFormDesc(e.target.value)}
+                  placeholder="Add a description for this role..."
+                  disabled={!headerEditing}
+                  className={`text-sm font-bold w-full transition-all duration-300 ${headerEditing
+                      ? 'bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-gray-700 focus:ring-4 focus:ring-gray-500/5 outline-none'
+                      : 'bg-transparent border-none p-0 text-gray-400 cursor-default outline-none'
+                    }`}
+                />
+              </div>
+            </div>
+            <button
+              onClick={() => setHeaderEditing(!headerEditing)}
+              className={`p-3 rounded-2xl transition-all shadow-sm flex items-center justify-center ${headerEditing
+                  ? 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
+                  : 'bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100'
+                }`}
+            >
+              {headerEditing ? <Check size={18} strokeWidth={2.5} /> : <Pencil size={18} strokeWidth={2.5} />}
+            </button>
+          </div>
+
+          {isEditing && (
+            <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex items-center gap-10 min-w-fit">
+              <div className="flex flex-col">
+                <span className="text-3xl font-black text-emerald-600 tracking-tight">{getPermCount(formPerms)}</span>
+                <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest mt-1">Permissions</span>
+              </div>
+              <div className="w-px h-10 bg-gray-200" />
+              <div className="flex flex-col">
+                <span className="text-3xl font-black text-emerald-600 tracking-tight">{roleUsers.length}</span>
+                <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest mt-1">User assigned</span>
+              </div>
+              <div className="w-px h-10 bg-gray-200" />
+              <div className="flex flex-col">
+                <span className="text-3xl font-black text-emerald-600 tracking-tight">
+                  {Object.keys(formPerms).filter(k => Array.isArray(formPerms[k]) && formPerms[k].length > 0).length +
+                    (formPerms.INVENTORY_SECTIONS ? Object.keys(formPerms.INVENTORY_SECTIONS).filter(k => (formPerms.INVENTORY_SECTIONS[k] || []).length > 0).length : 0) +
+                    (formPerms.CASH_SECTIONS ? Object.keys(formPerms.CASH_SECTIONS).filter(k => (formPerms.CASH_SECTIONS[k] || []).length > 0).length : 0) +
+                    (formPerms.EXPENSE_SECTIONS ? Object.keys(formPerms.EXPENSE_SECTIONS).filter(k => (formPerms.EXPENSE_SECTIONS[k] || []).length > 0).length : 0) +
+                    (formPerms.PROCUREMENT_SECTIONS ? Object.keys(formPerms.PROCUREMENT_SECTIONS).filter(k => (formPerms.PROCUREMENT_SECTIONS[k] || []).length > 0).length : 0)
+                  }
+                </span>
+                <span className="text-[10px] font-black text-gray-900 uppercase tracking-widest mt-1">Modules</span>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-          <div className="p-8 space-y-8">
-            {/* Role Info */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Role Name *</label>
-                <input
-                  type="text"
-                  placeholder="e.g., Field Manager"
-                  value={formName}
-                  onChange={(e) => setFormName(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Portal Type *</label>
-                <select
-                  value={formPortalType}
-                  onChange={(e) => setFormPortalType(e.target.value)}
-                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all appearance-none"
-                >
-                  {PORTAL_TYPES.map(pt => (
-                    <option key={pt.key} value={pt.key}>{pt.label}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="space-y-1.5">
-              <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Description</label>
-              <input
-                type="text"
-                placeholder="Brief description..."
-                value={formDesc}
-                onChange={(e) => setFormDesc(e.target.value)}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-200 outline-none transition-all"
-              />
-            </div>
-
-            {/* Quick Actions */}
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                <Key size={14} className="text-emerald-600" /> Permission Matrix
-              </h3>
-              <div className="flex gap-2">
-                <button onClick={selectAllPermissions} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest">
-                  Select All
-                </button>
-                <button onClick={clearAllPermissions} className="text-[9px] font-black text-gray-400 bg-gray-50 px-3 py-1.5 rounded-lg border border-gray-100 hover:bg-gray-100 transition-all uppercase tracking-widest">
-                  Clear All
-                </button>
-              </div>
-            </div>
-
-            {/* Permission Matrix */}
-            <div className="space-y-6">
-              <div className="space-y-3">
-                <div className="flex items-center gap-2 px-2 py-1.5 rounded-lg border w-fit bg-emerald-50 border-emerald-100 text-emerald-600">
-                  <Shield size={14} />
-                  <span className="text-[10px] font-black uppercase tracking-widest">All System Privileges</span>
-                </div>
-
-                <div className="space-y-2">
-                  {/* Desktop Header */}
-                  <div className="hidden sm:grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 pb-1 border-b border-gray-50">
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Module</span>
-                    {ACTIONS.map(a => (
-                      <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
-                    ))}
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
-                  </div>
-
-                  {MODULES.filter(mod => mod.categories.includes(formPortalType)).map((mod) => {
-                    const modulePerms = formPerms[mod.key] || [];
-                    const allSelected = ACTIONS.every(a => modulePerms.includes(a.key));
-                    const someSelected = modulePerms.length > 0;
-
-                    return (
-                      <div
-                        key={mod.key}
-                        className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-3 rounded-2xl border transition-all ${someSelected ? 'bg-emerald-50/30 border-emerald-100/50' : 'bg-gray-50/50 border-gray-100/50 hover:bg-gray-50'
-                          }`}
-                      >
-                        {/* Module Name */}
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-black text-gray-800 uppercase tracking-tight truncate">{mod.label}</span>
-                          <span className="text-[8px] text-gray-400 font-bold hidden sm:block truncate">{mod.desc}</span>
-                        </div>
-
-                        {/* Action Checkboxes */}
-                        {ACTIONS.map((action, idx) => {
-                          const isChecked = modulePerms.includes(action.key);
-                          const isDisabled = mod.key === 'DASHBOARD' && action.key !== 'READ';
-
-                          if (isDisabled) {
-                            return (
-                              <div key={`${mod.key}-${action.key}`} className="w-10 h-10 mx-auto flex items-center justify-center opacity-10">
-                                <XCircle size={18} strokeWidth={2.5} className="text-gray-200" />
-                              </div>
-                            );
-                          }
-
-                          return (
-                            <button
-                              key={`${mod.key}-${action.key}`}
-                              onClick={() => togglePermission(mod.key, action.key)}
-                              className={`w-10 h-10 mx-auto rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                ? `bg-emerald-500 text-white border-emerald-500 shadow-lg shadow-emerald-500/20`
-                                : 'bg-white border-gray-200 text-gray-300 hover:border-gray-300'
-                                }`}
-                              style={isChecked ? {
-                                backgroundColor: '#10b981',
-                                borderColor: '#10b981',
-                                color: 'white'
-                              } : {}}
-                            >
-                              {isChecked ? <CheckCircle2 size={18} strokeWidth={3} /> : <XCircle size={18} strokeWidth={2.5} className="text-rose-500" />}
-                            </button>
-                          );
-                        })}
-
-                        {/* Toggle All */}
-                        {mod.key === 'DASHBOARD' ? (
-                          <div className="w-8 h-8 mx-auto" />
-                        ) : (
-                          <button
-                            onClick={() => toggleAllForModule(mod.key)}
-                            className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${allSelected
-                              ? 'bg-emerald-600 text-white'
-                              : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                              }`}
-                          >
-                            {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-
-              {/* Granular Business Modules */}
-              <div className="space-y-6 pt-8 border-t border-gray-100">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 rounded-2xl bg-emerald-50 text-emerald-600">
-                    <Grid size={20} strokeWidth={2.5} />
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-black text-gray-900 uppercase tracking-tight">Business Operations</h3>
-                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">Granular Section Visibility</p>
+          <div className="p-8 space-y-8 min-h-[60vh]">
+            {activeTab === 'permissions' ? (
+              <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                {/* Quick Actions */}
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                    <Key size={14} className="text-emerald-600" /> Permission Matrix
+                  </h3>
+                  <div className="flex items-center gap-3 bg-gray-50/50 px-4 py-1.5 rounded-xl border border-gray-100">
+                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
+                      {Object.keys(formPerms).some(k => {
+                        const v = formPerms[k];
+                        return Array.isArray(v) ? v.length > 0 : Object.values(v || {}).some(arr => arr.length > 0);
+                      }) ? 'Deselect All' : 'Select All'}
+                    </span>
+                    <ToggleSwitch
+                      checked={Object.keys(formPerms).some(k => {
+                        const v = formPerms[k];
+                        return Array.isArray(v) ? v.length > 0 : Object.values(v || {}).some(arr => arr.length > 0);
+                      })}
+                      onChange={toggleAllPermissions}
+                    />
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  {/* Granular Inventory Table */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <Package size={24} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Inventory Management</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Granular Section Controls</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
+                {/* Permission Matrix */}
+                <div className="space-y-6">
+
+                  {/* Core System Modules */}
+                  <CollapsibleSection
+                    title="Core System Operations"
+                    desc="Primary resource and workflow management"
+                    icon={Shield}
+                    isOpen={openSections.includes('core')}
+                    onToggle={() => toggleAccordion('core')}
+                  >
+                    <PermissionTable
+                      modules={MODULES}
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
+
+                  {/* Business Operations */}
+                  <CollapsibleSection
+                    title="Business Operations"
+                    desc="Inventory, Stock & Store Registry"
+                    icon={Package}
+                    isOpen={openSections.includes('business')}
+                    onToggle={() => toggleAccordion('business')}
+                  >
+                    <div className="space-y-6">
+                      <div className="flex items-center justify-between px-2">
+                        <h5 className="text-[10px] font-black uppercase tracking-widest text-emerald-600">Inventory Sections</h5>
                         <button
                           onClick={() => {
                             const sections = {};
                             INVENTORY_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, INVENTORY: ['READ'], INVENTORY_SECTIONS: sections }));
+                            setFormPerms(prev => ({ ...prev, INVENTORY_SECTIONS: sections }));
                           }}
-                          className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest"
+                          className="text-[9px] font-black text-emerald-600 hover:underline uppercase tracking-widest"
                         >
                           Select All Sections
                         </button>
                       </div>
+                      <PermissionTable
+                        modules={INVENTORY_SECTIONS}
+                        isGranular={true}
+                        sectionKey="INVENTORY_SECTIONS"
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                      />
                     </div>
+                  </CollapsibleSection>
 
-                    <div className="space-y-2 border-t border-gray-50 pt-4">
-                      {/* Sub-table Header */}
-                      <div className="grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 py-2 border-b border-gray-50">
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Inventory Section</span>
-                        {ACTIONS.map(a => (
-                          <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
-                        ))}
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
-                      </div>
+                  {/* Cash Flow */}
+                  <CollapsibleSection
+                    title="Cash Flow & Settlement"
+                    desc="Daily reconcile & safe management"
+                    icon={Coins}
+                    isOpen={openSections.includes('cash')}
+                    onToggle={() => toggleAccordion('cash')}
+                  >
+                    <PermissionTable
+                      modules={CASH_SECTIONS_LIST}
+                      isGranular={true}
+                      sectionKey="CASH_SECTIONS"
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
 
-                      {INVENTORY_SECTIONS.map((section) => {
-                        const sectionPerms = (formPerms.INVENTORY_SECTIONS || {})[section.key] || [];
-                        const allSelected = ACTIONS.every(a => sectionPerms.includes(a.key));
-                        const someSelected = sectionPerms.length > 0;
+                  {/* Expense Control */}
+                  <CollapsibleSection
+                    title="Expense Control"
+                    desc="Reimbursements & Claims Management"
+                    icon={Wallet}
+                    isOpen={openSections.includes('expenses')}
+                    onToggle={() => toggleAccordion('expenses')}
+                  >
+                    <PermissionTable
+                      modules={EXPENSE_SECTIONS_LIST}
+                      isGranular={true}
+                      sectionKey="EXPENSE_SECTIONS"
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
 
-                        return (
-                          <div
-                            key={section.key}
-                            className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-2 rounded-xl transition-all ${someSelected ? 'bg-emerald-50/20' : 'hover:bg-gray-50/50'
-                              }`}
-                          >
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{section.label}</span>
-                              <span className="text-[7px] text-gray-400 font-bold uppercase tracking-widest truncate">{section.desc}</span>
-                            </div>
+                  {/* Procurement */}
+                  <CollapsibleSection
+                    title="Procurement & Vendor Management"
+                    desc="Purchase orders & stock sourcing"
+                    icon={ShoppingCart}
+                    isOpen={openSections.includes('procurement')}
+                    onToggle={() => toggleAccordion('procurement')}
+                  >
+                    <PermissionTable
+                      modules={PROCUREMENT_SECTIONS_LIST}
+                      isGranular={true}
+                      sectionKey="PROCUREMENT_SECTIONS"
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
 
-                            {ACTIONS.map(action => {
-                              const isChecked = sectionPerms.includes(action.key);
-                              return (
-                                <button
-                                  key={`${section.key}-${action.key}`}
-                                  onClick={() => toggleInventorySectionPermission(section.key, action.key)}
-                                  className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                    ? `bg-emerald-500 text-white border-emerald-500 shadow-md`
-                                    : 'bg-white border-gray-100 text-gray-200 hover:border-gray-200'
-                                    }`}
-                                >
-                                  {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-400 opacity-20" />}
-                                </button>
-                              );
-                            })}
+                  {/* Route Planning */}
+                  <CollapsibleSection
+                    title="Route Planning"
+                    desc="Sales routes & delivery paths"
+                    icon={MapPin}
+                    isOpen={openSections.includes('routes')}
+                    onToggle={() => toggleAccordion('routes')}
+                  >
+                    <PermissionTable
+                      modules={ROUTE_SECTIONS_LIST}
+                      isGranular={true}
+                      sectionKey="ROUTE_TARGET_SECTIONS"
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
 
-                            <button
-                              onClick={() => toggleAllForInventorySection(section.key)}
-                              className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${allSelected
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                }`}
-                            >
-                              {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
+                  {/* Reports & Analytics */}
+                  <CollapsibleSection
+                    title="Reports & Analytics"
+                    desc="Data insights & export permissions"
+                    icon={BarChart3}
+                    isOpen={openSections.includes('reports')}
+                    onToggle={() => toggleAccordion('reports')}
+                  >
+                    <PermissionTable
+                      modules={REPORT_SECTIONS_LIST}
+                      isGranular={true}
+                      sectionKey="REPORT_TARGET_SECTIONS"
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
 
-                  {/* Granular Cash Flow Table */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <Coins size={24} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Cash Flow</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Reconciliation & Safe Control</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            const sections = {};
-                            CASH_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, CASH: ['READ'], CASH_SECTIONS: sections }));
-                          }}
-                          className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest"
-                        >
-                          Select All Sections
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 border-t border-gray-50 pt-4">
-                      <div className="grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 py-2 border-b border-gray-50">
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cash Section</span>
-                        {ACTIONS.map(a => (
-                          <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
-                        ))}
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
-                      </div>
-
-                      {CASH_SECTIONS_LIST.map((section) => {
-                        const sectionPerms = (formPerms.CASH_SECTIONS || {})[section.key] || [];
-                        const allSelected = ACTIONS.every(a => sectionPerms.includes(a.key));
-                        const someSelected = sectionPerms.length > 0;
-
-                        return (
-                          <div
-                            key={section.key}
-                            className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-2 rounded-xl transition-all ${someSelected ? 'bg-emerald-50/20' : 'hover:bg-gray-50/50'
-                              }`}
-                          >
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{section.label}</span>
-                              <span className="text-[7px] text-gray-400 font-bold uppercase tracking-widest truncate">{section.desc}</span>
-                            </div>
-
-                            {ACTIONS.map(action => {
-                              const isChecked = sectionPerms.includes(action.key);
-                              return (
-                                <button
-                                  key={`${section.key}-${action.key}`}
-                                  onClick={() => toggleCashSectionPermission(section.key, action.key)}
-                                  className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                    ? `bg-emerald-500 text-white border-emerald-500 shadow-md`
-                                    : 'bg-white border-gray-100 text-gray-200 hover:border-gray-200'
-                                    }`}
-                                >
-                                  {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-400 opacity-20" />}
-                                </button>
-                              );
-                            })}
-
-                            <button
-                              onClick={() => toggleAllForCashSection(section.key)}
-                              className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${allSelected
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                }`}
-                            >
-                              {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Granular Procurement Table */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <ClipboardList size={24} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Procurement</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Vendor & Purchase Management</p>
-                        </div>
-                      </div>
-                      <div className="flex gap-2">
-                        <button
-                          onClick={() => {
-                            const sections = {};
-                            PROCUREMENT_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, PROCUREMENT: ['READ'], PROCUREMENT_SECTIONS: sections }));
-                          }}
-                          className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest"
-                        >
-                          Select All Sections
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="space-y-2 border-t border-gray-50 pt-4">
-                      <div className="grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 px-4 py-2 border-b border-gray-50">
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Procurement Section</span>
-                        {ACTIONS.map(a => (
-                          <span key={a.key} className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">{a.label}</span>
-                        ))}
-                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest text-center">All</span>
-                      </div>
-
-                      {PROCUREMENT_SECTIONS_LIST.map((section) => {
-                        const sectionPerms = (formPerms.PROCUREMENT_SECTIONS || {})[section.key] || [];
-                        const allSelected = ACTIONS.every(a => sectionPerms.includes(a.key));
-                        const someSelected = sectionPerms.length > 0;
-
-                        return (
-                          <div
-                            key={section.key}
-                            className={`grid grid-cols-[1fr_repeat(5,60px)_40px] gap-2 items-center px-4 py-2 rounded-xl transition-all ${someSelected ? 'bg-emerald-50/20' : 'hover:bg-gray-50/50'
-                              }`}
-                          >
-                            <div className="flex flex-col min-w-0">
-                              <span className="text-[11px] font-black text-gray-800 uppercase tracking-tight truncate">{section.label}</span>
-                              <span className="text-[7px] text-gray-400 font-bold uppercase tracking-widest truncate">{section.desc}</span>
-                            </div>
-
-                            {ACTIONS.map(action => {
-                              const isChecked = sectionPerms.includes(action.key);
-                              return (
-                                <button
-                                  key={`${section.key}-${action.key}`}
-                                  onClick={() => toggleProcurementSectionPermission(section.key, action.key)}
-                                  className={`w-9 h-9 mx-auto rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                    ? `bg-emerald-500 text-white border-emerald-500 shadow-md`
-                                    : 'bg-white border-gray-100 text-gray-200 hover:border-gray-200'
-                                    }`}
-                                >
-                                  {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-400 opacity-20" />}
-                                </button>
-                              );
-                            })}
-
-                            <button
-                              onClick={() => toggleAllForProcurementSection(section.key)}
-                              className={`w-8 h-8 mx-auto rounded-lg flex items-center justify-center transition-all text-[8px] font-black uppercase ${allSelected
-                                ? 'bg-emerald-600 text-white'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                }`}
-                            >
-                              {allSelected ? <Check size={12} strokeWidth={3} /> : 'All'}
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-
-                  {/* Granular System Settings Table */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <Settings size={24} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">System & POS Settings</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Global Configurations & Billing</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {ACTIONS.map(action => {
-                          const isChecked = (formPerms.SETTINGS || []).includes(action.key);
-                          return (
-                            <div key={action.key} className="flex flex-col items-center gap-1">
-                              <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">{action.label}</span>
-                              <button
-                                onClick={() => togglePermission('SETTINGS', action.key)}
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                  ? `bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20`
-                                  : 'bg-white border-gray-200 text-gray-300 hover:border-emerald-100 hover:text-emerald-500'
-                                  }`}
-                              >
-                                {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-500" />}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                          <Eye size={14} className="text-gray-400" />
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Visible Sections</span>
-                        </div>
-                        <button
-                          onClick={() => setFormPerms(prev => ({ 
-                            ...prev, 
-                            SETTINGS_TARGET_SECTIONS: SETTINGS_SECTIONS.map(s => s.key), 
-                            SETTINGS: (prev.SETTINGS || []).includes('READ') ? prev.SETTINGS : [...(prev.SETTINGS || []), 'READ'] 
-                          }))}
-                          className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 transition-colors uppercase tracking-widest bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50"
-                        >
-                          Select All
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-100">
-                        {SETTINGS_SECTIONS.map((section) => {
-                          const isSelected = (formPerms.SETTINGS_TARGET_SECTIONS || []).includes(section.key);
-                          return (
-                            <button
-                              key={section.key}
-                              onClick={() => toggleSettingsSection(section.key)}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isSelected
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                                : 'bg-white text-gray-400 border-gray-200 hover:border-emerald-200'
-                                }`}
-                            >
-                              {isSelected ? <Check size={12} strokeWidth={4} /> : <div className="w-3" />}
-                              {section.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Route Planning Row */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <MapPin size={24} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Route Planning</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Geographic Assets</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        {ACTIONS.map(action => {
-                          const isChecked = (formPerms.ROUTES || []).includes(action.key);
-                          return (
-                            <div key={`ROUTES-${action.key}`} className="flex flex-col items-center gap-1.5">
-                              <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">{action.label}</span>
-                              <button
-                                onClick={() => togglePermission('ROUTES', action.key)}
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                  ? `bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20`
-                                  : 'bg-white border-gray-200 text-gray-300 hover:border-emerald-100 hover:text-emerald-500'
-                                  }`}
-                              >
-                                {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-500" />}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                          <Eye size={14} className="text-gray-400" />
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Visible Sections</span>
-                        </div>
-                        <button
-                          onClick={() => setFormPerms(prev => ({ ...prev, ROUTE_TARGET_SECTIONS: ['VILLAGES', 'ROUTES', 'ASSIGNMENTS'] }))}
-                          className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 transition-colors uppercase tracking-widest bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50"
-                        >
-                          Select All
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-100">
-                        {[
-                          { key: 'VILLAGES', label: 'Villages' },
-                          { key: 'ROUTES', label: 'Routes' },
-                          { key: 'ASSIGNMENTS', label: 'Assignments' }
-                        ].map((section) => {
-                          const isSelected = (formPerms.ROUTE_TARGET_SECTIONS || []).includes(section.key);
-                          return (
-                            <button
-                              key={section.key}
-                              onClick={() => toggleRouteSection(section.key)}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isSelected
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                                : 'bg-white text-gray-400 border-gray-200 hover:border-emerald-200'
-                                }`}
-                            >
-                              {isSelected ? <Check size={12} strokeWidth={4} /> : <div className="w-3" />}
-                              {section.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Reports Row */}
-                  <div className="bg-white rounded-3xl border border-gray-100 p-6 space-y-6 shadow-sm hover:border-emerald-100 transition-all">
-                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
-                          <BarChart3 size={24} />
-                        </div>
-                        <div>
-                          <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Reports & Analytics</h4>
-                          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Business Insights</p>
-                        </div>
-                      </div>
-                      {/* <div className="flex items-center gap-3">
-                        {ACTIONS.map(action => {
-                          const isChecked = (formPerms.REPORTS || []).includes(action.key);
-                          return (
-                            <div key={`REPORTS-${action.key}`} className="flex flex-col items-center gap-1.5">
-                              <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">{action.label}</span>
-                              <button
-                                onClick={() => togglePermission('REPORTS', action.key)}
-                                className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all border ${isChecked
-                                    ? `bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-600/20`
-                                    : 'bg-white border-gray-200 text-gray-300 hover:border-emerald-100 hover:text-emerald-500'
-                                  }`}
-                              >
-                                {isChecked ? <CheckCircle2 size={16} strokeWidth={3} /> : <XCircle size={16} strokeWidth={2.5} className="text-rose-500" />}
-                              </button>
-                            </div>
-                          );
-                        })}
-                      </div> */}
-                    </div>
-
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between px-2">
-                        <div className="flex items-center gap-2">
-                          <Eye size={14} className="text-gray-400" />
-                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-[0.1em]">Visible Reports</span>
-                        </div>
-                        <button
-                          onClick={() => setFormPerms(prev => ({ ...prev, REPORT_TARGET_SECTIONS: ['OVERVIEW', 'ITEM_WISE', 'CATEGORY_WISE', 'DAY_WISE', 'ROUTE_VILLAGE', 'AGENT_PERFORMANCE', 'LOCATION_TRACKING', 'VEHICLE_WISE', 'PAYMENT_MODE', 'RETURN', 'DAMAGE', 'SESSION', 'INVOICE'] }))}
-                          className="text-[8px] font-black text-emerald-600 hover:text-emerald-800 transition-colors uppercase tracking-widest bg-emerald-50/50 px-3 py-1.5 rounded-lg border border-emerald-100/50"
-                        >
-                          Select All
-                        </button>
-                      </div>
-
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2 p-3 bg-gray-50/80 rounded-2xl border border-gray-100">
-                        {[
-                          { key: 'OVERVIEW', label: 'Overview' },
-                          { key: 'ITEM_WISE', label: 'Item-wise Sales' },
-                          { key: 'CATEGORY_WISE', label: 'Category-wise' },
-                          { key: 'DAY_WISE', label: 'Day-wise Sales' },
-                          { key: 'ROUTE_VILLAGE', label: 'Route & Village' },
-                          { key: 'AGENT_PERFORMANCE', label: 'Agent Performance' },
-                          { key: 'LOCATION_TRACKING', label: 'Location Tracking' },
-                          { key: 'VEHICLE_WISE', label: 'Substore (Vehicle)' },
-                          { key: 'PAYMENT_MODE', label: 'Payment Mode' },
-                          { key: 'RETURN', label: 'Return Report' },
-                          { key: 'DAMAGE', label: 'Damage Report' },
-                          { key: 'SESSION', label: 'Session Report' },
-                          { key: 'INVOICE', label: 'Invoice Report' }
-                        ].map((section) => {
-                          const isSelected = (formPerms.REPORT_TARGET_SECTIONS || []).includes(section.key);
-                          return (
-                            <button
-                              key={section.key}
-                              onClick={() => toggleReportSection(section.key)}
-                              className={`flex items-center gap-2 px-3 py-2 rounded-xl border text-[10px] font-black uppercase tracking-widest transition-all ${isSelected
-                                ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm'
-                                : 'bg-white text-gray-400 border-gray-200 hover:border-emerald-200'
-                                }`}
-                            >
-                              {isSelected ? <Check size={12} strokeWidth={4} /> : <div className="w-3" />}
-                              {section.label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  </div>
+                  {/* System Settings */}
+                  <CollapsibleSection
+                    title="System & POS Settings"
+                    desc="POS configurations & global settings"
+                    icon={Settings}
+                    isOpen={openSections.includes('settings')}
+                    onToggle={() => toggleAccordion('settings')}
+                  >
+                    <PermissionTable
+                      modules={SETTINGS_SECTIONS}
+                      isGranular={true}
+                      sectionKey="SETTINGS_TARGET_SECTIONS"
+                      formPerms={formPerms}
+                      togglePermission={togglePermission}
+                      toggleAllForModule={toggleAllForModule}
+                    />
+                  </CollapsibleSection>
                 </div>
               </div>
-            </div>
+
+            ) : (
+              <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
+                    <Users size={14} className="text-emerald-600" /> Currently Assigned Staff
+                  </h3>
+                </div>
+
+                {fetchingUsers ? (
+                  <div className="flex flex-col items-center justify-center py-20 gap-4">
+                    <Loader2 className="animate-spin text-emerald-600" size={32} />
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Fetching users...</p>
+                  </div>
+                ) : roleUsers.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-20 bg-gray-50 rounded-[2rem] border border-dashed border-gray-200">
+                    <Users size={40} className="text-gray-200 mb-4" />
+                    <h3 className="text-sm font-black text-gray-400 uppercase tracking-tight">No Users Assigned</h3>
+                    <p className="text-[10px] text-gray-400 font-bold mt-1 uppercase tracking-widest">No organization members have this role yet</p>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3">
+                    {roleUsers.map((user) => (
+                      <div key={user.id} className="group flex items-center justify-between p-4 bg-white rounded-2xl border border-gray-100 hover:border-emerald-100 hover:shadow-md transition-all">
+                        <div className="flex items-center gap-4">
+                          <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-600 flex items-center justify-center font-black text-xs">
+                            {user.name?.charAt(0) || user.email?.charAt(0)}
+                          </div>
+                          <div>
+                            <p className="text-sm font-black text-gray-900 uppercase tracking-tight leading-none">{user.name}</p>
+                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1.5">{user.email}</p>
+                          </div>
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteUser(user.id, user.name)}
+                          className="p-2.5 bg-rose-50 text-rose-500 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-100 border border-rose-100"
+                          title="Permanently Delete Account"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Modal Footer */}
@@ -1208,23 +1137,6 @@ export default function TenantPrivileges() {
                 </div>
               </div>
 
-              {/* Module pills */}
-              <div className="flex flex-wrap gap-1.5">
-                {role.permissions && Object.entries(role.permissions)
-                  .filter(([, actions]) => Array.isArray(actions) && actions.length > 0)
-                  .slice(0, 6)
-                  .map(([mod, actions]) => (
-                    <span key={mod} className="text-[8px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-600 px-2 py-1 rounded-lg border border-emerald-100">
-                      {mod} ({actions.length})
-                    </span>
-                  ))
-                }
-                {role.permissions && Object.keys(role.permissions).filter(k => (role.permissions[k] || []).length > 0).length > 6 && (
-                  <span className="text-[8px] font-black uppercase tracking-wider bg-gray-50 text-gray-400 px-2 py-1 rounded-lg">
-                    +{Object.keys(role.permissions).filter(k => (role.permissions[k] || []).length > 0).length - 6} more
-                  </span>
-                )}
-              </div>
 
               {/* Actions */}
               <div className="flex gap-2 pt-2 border-t border-gray-50">
@@ -1232,7 +1144,7 @@ export default function TenantPrivileges() {
                   onClick={() => openEditModal(role)}
                   className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-50 text-emerald-600 rounded-xl font-black text-[10px] uppercase tracking-wider border border-emerald-100 hover:bg-emerald-100 transition-all"
                 >
-                  <Pencil size={12} /> Edit
+                  <Eye size={12} /> View Details
                 </button>
                 <button
                   onClick={() => handleDelete(role.id)}
