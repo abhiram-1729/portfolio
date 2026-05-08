@@ -51,6 +51,7 @@ import SalesHistory from './pages/SalesHistory';
 import OrderDetail from './pages/OrderDetail';
 import AgentAttendance from './pages/AgentAttendance';
 import AdminAttendance from './pages/admin/AdminAttendance';
+import CreateExpense from './pages/CreateExpense';
 
 // Admin Reports
 import OverviewReport from './pages/admin/adminreports/OverviewReport';
@@ -169,6 +170,7 @@ export default function App() {
           <Route path="sales-history" element={<SalesHistory />} />
           <Route path="order-detail/:id" element={<OrderDetail />} />
           <Route path="attendance" element={<AgentAttendance />} />
+          <Route path="create-expense" element={<CreateExpense />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />

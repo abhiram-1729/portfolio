@@ -17,7 +17,10 @@ export const addExpense = async (req, res, next) => {
             paymentMode,
             description,
             billImage,
-            vehicleId
+            vehicleId,
+            paidTo,
+            paidDate,
+            billDate
         } = req.body;
         const userId = req.user.id;
         const dateString = format(new Date(), 'yyyy-MM-dd');
@@ -84,6 +87,15 @@ export const addExpense = async (req, res, next) => {
             dbDescription = '[PERSONAL_CASH] ' + dbDescription;
         }
 
+        // VIRTUAL FIELDS FALLBACK: Store structured data in description to avoid DB schema errors
+        const metadata = {
+            paidTo: paidTo || null,
+            paidDate: paidDate || null,
+            billDate: billDate || null,
+            virtual: true
+        };
+        dbDescription = `${dbDescription} [METADATA:${JSON.stringify(metadata)}]`.trim();
+
         const expense = await prisma.expense.create({
             data: {
                 tenantId: req.user.tenantId,
@@ -96,7 +108,7 @@ export const addExpense = async (req, res, next) => {
                 paymentMode: dbPaymentMode,
                 description: dbDescription,
                 billImage: imageUrl,
-                date: dateString,
+                date: billDate || dateString,
                 status: 'PENDING'
             }
         });
@@ -150,10 +162,21 @@ export const getMyExpenses = async (req, res, next) => {
         });
 
         const mappedExpenses = expenses.map(e => {
-            if (e.description?.startsWith('[PERSONAL_CASH] ')) {
-                return { ...e, paymentMode: 'PERSONAL_CASH', description: e.description.replace('[PERSONAL_CASH] ', '') };
+            let processed = { ...e };
+            if (e.description?.includes('[METADATA:')) {
+                try {
+                    const metaMatch = e.description.match(/\[METADATA:({.+?})\]/);
+                    if (metaMatch) {
+                        const meta = JSON.parse(metaMatch[1]);
+                        processed = { ...processed, ...meta };
+                        processed.description = processed.description.replace(metaMatch[0], '').trim();
+                    }
+                } catch (err) { }
             }
-            return e;
+            if (processed.description?.startsWith('[PERSONAL_CASH] ')) {
+                return { ...processed, paymentMode: 'PERSONAL_CASH', description: processed.description.replace('[PERSONAL_CASH] ', '') };
+            }
+            return processed;
         });
 
         res.json(mappedExpenses);
@@ -218,10 +241,21 @@ export const getAllExpenses = async (req, res, next) => {
         });
 
         const mappedExpenses = expenses.map(e => {
-            if (e.description?.startsWith('[PERSONAL_CASH] ')) {
-                return { ...e, paymentMode: 'PERSONAL_CASH', description: e.description.replace('[PERSONAL_CASH] ', '') };
+            let processed = { ...e };
+            if (e.description?.includes('[METADATA:')) {
+                try {
+                    const metaMatch = e.description.match(/\[METADATA:({.+?})\]/);
+                    if (metaMatch) {
+                        const meta = JSON.parse(metaMatch[1]);
+                        processed = { ...processed, ...meta };
+                        processed.description = processed.description.replace(metaMatch[0], '').trim();
+                    }
+                } catch (err) { }
             }
-            return e;
+            if (processed.description?.startsWith('[PERSONAL_CASH] ')) {
+                return { ...processed, paymentMode: 'PERSONAL_CASH', description: processed.description.replace('[PERSONAL_CASH] ', '') };
+            }
+            return processed;
         });
 
         res.json(mappedExpenses);
@@ -267,14 +301,20 @@ export const updateExpenseStatus = async (req, res, next) => {
         // Admin manually approves/rejects/pays
         let targetStatus = status;
         
-        // AUTO-PAY logic:
-        // 1. Store Expenses (vehicleId: null) -> PAID immediately on APPROVED
-        if (status === 'APPROVED' && !currentExpense.vehicleId) {
+        // AUTO-PAY logic: All expenses (Store & Agent) -> PAID immediately on APPROVED
+        if (status === 'APPROVED') {
             targetStatus = 'PAID';
         }
 
-        // Build description with remarks
+        // Build description with remarks while preserving metadata
         let updatedDescription = currentExpense.description || '';
+        let metadataTag = '';
+        const metaMatch = updatedDescription.match(/\[METADATA:({.+?})\]/);
+        if (metaMatch) {
+            metadataTag = metaMatch[0];
+            updatedDescription = updatedDescription.replace(metadataTag, '').trim();
+        }
+
         if (remarks) {
             updatedDescription = `${updatedDescription}\n[${format(new Date(), 'dd/MM/yy HH:mm')} - ${req.user.name}]: ${remarks}`;
         }
@@ -295,6 +335,18 @@ export const updateExpenseStatus = async (req, res, next) => {
             if (!updatedDescription.includes('[PAID_BY:')) {
                 updatedDescription = `${updatedDescription} [PAID_BY:${effectiveApprover}]`.trim();
             }
+        }
+
+        const { paymentDetails } = req.body;
+        if (paymentDetails) {
+            const payStr = `[PAYMENT: ${paymentDetails.type} | Paid: ₹${paymentDetails.paid} | Bal: ₹${paymentDetails.balance}]`;
+            if (!updatedDescription.includes(payStr)) {
+                updatedDescription = `${updatedDescription} ${payStr}`.trim();
+            }
+        }
+
+        if (metadataTag) {
+            updatedDescription = `${updatedDescription} ${metadataTag}`.trim();
         }
 
         const updateData = {

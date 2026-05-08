@@ -2,7 +2,9 @@ import prisma from '../utils/prisma.js';
 import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
 import { logActivity } from '../utils/activityLogger.js';
+import { getEffectiveStoreId } from '../utils/storeResolution.js';
 
+// getEffectiveStoreId is now imported from ../utils/storeResolution.js
 
 // @desc    Submit opening cash for a vehicle (agent — kept for backward compat but agents are blocked on frontend)
 // @route   POST /api/cash/opening
@@ -33,7 +35,7 @@ export const submitOpeningCash = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 userId,
                 date: dateString,
@@ -46,14 +48,14 @@ export const submitOpeningCash = async (req, res, next) => {
         logActivity({
             userId: req.user.id,
             tenantId: req.user.tenantId,
-            storeId: req.user.storeId,
+            storeId: getEffectiveStoreId(req),
             action: 'OPENING_CASH_SUBMITTED',
             details: `Submitted opening cash of ₹${totalOpeningCash} for Shift ${shift}`,
             metadata: { vehicleId, amount: totalOpeningCash, shift, date: dateString }
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, getEffectiveStoreId(req));
 
         res.status(201).json(openingCash);
 
@@ -109,7 +111,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 userId,
                 date: dateString,
@@ -139,7 +141,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
                 },
                 create: {
                     tenantId: req.user.tenantId,
-                    storeId: req.user.storeId,
+                    storeId: getEffectiveStoreId(req),
                     vehicleId,
                     userId,
                     date: dateString,
@@ -159,7 +161,7 @@ export const adminSubmitOpeningCash = async (req, res, next) => {
         }
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, getEffectiveStoreId(req));
 
         res.status(201).json(openingCash);
 
@@ -269,7 +271,7 @@ export const submitClosingCash = async (req, res, next) => {
                 vehicleId,
                 date: dateString,
                 paymentMode: 'CASH',
-                status: 'PAID', // Only count after agent claims
+                status: { in: ['APPROVED', 'PAID'] },
                 createdAt: { gte: shiftOpening.createdAt }
             }
         });
@@ -310,7 +312,7 @@ export const submitClosingCash = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 userId,
                 date: dateString,
@@ -333,7 +335,7 @@ export const submitClosingCash = async (req, res, next) => {
         logActivity({
             userId: req.user.id,
             tenantId: req.user.tenantId,
-            storeId: req.user.storeId,
+            storeId: getEffectiveStoreId(req),
             action: 'CLOSING_CASH_SUBMITTED',
             details: isNoService ? `Reported No Service for Shift ${shift}` : `Submitted closing cash for Shift ${shift}. Difference: ₹${difference}`,
             metadata: {
@@ -347,7 +349,7 @@ export const submitClosingCash = async (req, res, next) => {
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, dateString, req.user.tenantId, getEffectiveStoreId(req));
 
         res.status(201).json(closingCash);
 
@@ -443,17 +445,26 @@ export const getCashStatus = async (req, res, next) => {
 
         const totalCardSales = orderSalesRes.find(o => o.paymentMode === 'CARD')?._sum.totalAmount || 0;
 
-        const expensesResult = await prisma.expense.aggregate({
-            _sum: { amount: true },
+        const vehicleExpenses = await prisma.expense.findMany({
             where: {
                 tenantId: req.user.tenantId,
                 vehicleId,
                 date: dateString,
                 paymentMode: 'CASH',
-                NOT: { status: 'REJECTED' }
+                status: { in: ['PENDING', 'APPROVED', 'PAID'] }
+            },
+            select: { amount: true, description: true }
+        });
+
+        let totalExpenses = 0;
+        vehicleExpenses.forEach(exp => {
+            const payMatch = exp.description?.match(/\[PAYMENT:.*?Paid: ₹([\d.]+)\]/);
+            if (payMatch && payMatch[1]) {
+                totalExpenses += parseFloat(payMatch[1]);
+            } else {
+                totalExpenses += exp.amount;
             }
         });
-        const totalExpenses = expensesResult._sum.amount || 0;
 
         // Per-shift sales/expenses split
         const s1CashSales = opening1 ? (closing1?.cashSales || totalCashSales) : 0;
@@ -520,14 +531,13 @@ export const getCashStatus = async (req, res, next) => {
 // @access  Admin
 export const getAdminCashSummary = async (req, res, next) => {
     try {
-        const { date, storeId } = req.query;
+        const { date } = req.query;
         const dateString = date || format(new Date(), 'yyyy-MM-dd');
 
+        const storeId = getEffectiveStoreId(req);
         const vehicleFilter = { tenantId: req.user.tenantId, status: true };
-        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+        if (storeId) {
             vehicleFilter.storeId = storeId;
-        } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-            vehicleFilter.storeId = req.user.storeId;
         }
 
         const vehicles = await prisma.vehicle.findMany({
@@ -594,7 +604,7 @@ export const getAdminCashSummary = async (req, res, next) => {
                 vehicleId: { in: vehicles.map(v => v.id) },
                 date: dateString,
                 paymentMode: 'CASH',
-                NOT: { status: 'REJECTED' }
+                status: { in: ['APPROVED', 'PAID'] }
             }
         });
 
@@ -715,7 +725,7 @@ export const adminUpdateReconciliation = async (req, res, next) => {
 
         if (!isNoService) {
             // Validate against Store Safe
-            const storeId = req.user.storeId;
+            const storeId = getEffectiveStoreId(req);
             if (!storeId) {
                 res.status(400);
                 throw new Error('Admin must belong to a Store to manage cash.');
@@ -770,7 +780,7 @@ export const adminUpdateReconciliation = async (req, res, next) => {
             },
             create: {
                 tenantId: req.user.tenantId,
-                storeId: req.user.storeId,
+                storeId: getEffectiveStoreId(req),
                 vehicleId,
                 date,
                 shift,
@@ -801,7 +811,7 @@ export const adminUpdateReconciliation = async (req, res, next) => {
                 },
                 create: {
                     tenantId: req.user.tenantId,
-                    storeId: req.user.storeId,
+                    storeId: getEffectiveStoreId(req),
                     vehicleId,
                     userId: req.user.id,
                     date,
@@ -831,10 +841,10 @@ export const adminUpdateReconciliation = async (req, res, next) => {
         }
 
         // Recalculate daily summary
-        const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
+        const updatedSummary = await recalculateDailySummary(vehicleId, date, req.user.tenantId, getEffectiveStoreId(req));
 
         // SYNC: Update the Store Deposit if it already exists for this shift
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
         const deposit = await prisma.storeDeposit.findUnique({
             where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
         });
@@ -952,18 +962,27 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
 
         const cardSales = orderSalesRes.find(o => o.paymentMode === 'CARD')?._sum.totalAmount || 0;
 
-        // 3. Calculate Approved/Pending Cash Expenses
-        const expensesRes = await prisma.expense.aggregate({
-            _sum: { amount: true },
+        // 3. Calculate Approved/Pending Cash Expenses (Smart sum for Partial Payments)
+        const cashExpenses = await prisma.expense.findMany({
             where: {
                 tenantId,
                 vehicleId,
                 date,
                 paymentMode: 'CASH',
-                status: 'PAID' // Deduct only after agent claims
+                status: { in: ['PENDING', 'APPROVED', 'PAID'] }
+            },
+            select: { amount: true, description: true }
+        });
+
+        let expenses = 0;
+        cashExpenses.forEach(exp => {
+            const payMatch = exp.description?.match(/\[PAYMENT:.*?Paid: ₹([\d.]+)\]/);
+            if (payMatch && payMatch[1]) {
+                expenses += parseFloat(payMatch[1]);
+            } else {
+                expenses += exp.amount;
             }
         });
-        const expenses = expensesRes._sum.amount || 0;
 
         // 4. Get Actual Cash from the LATEST closing (Shift 2 takes priority, fallback to Shift 1)
         const closing2 = await prisma.closingCash.findUnique({
@@ -1056,8 +1075,22 @@ export const getFinanceReports = async (req, res, next) => {
 
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
             baseFilter.storeId = storeId;
-        } else if (req.user.storeId) {
-            baseFilter.storeId = req.user.storeId;
+        } else {
+            // For restricted roles, always lock to their store
+            const isRestricted = req.user?.role === 'SALES_AGENT' || req.user?.role === 'MECHANIC';
+            const isGlobal =
+                req.user?.role === 'TENANT_OWNER' ||
+                req.user?.role === 'SUPER_ADMIN' ||
+                (req.user?.role === 'ADMIN' && !req.user?.customRoleId) ||
+                req.user?.portalType === 'ADMIN';
+
+            if (isRestricted) {
+                baseFilter.storeId = req.user.storeId;
+            } else if (!isGlobal && req.user.storeId) {
+                // If not global and has a storeId (e.g. Branch Manager), lock to it
+                baseFilter.storeId = req.user.storeId;
+            }
+            // If global and no storeId requested, we leave it out of filter to get all stores
         }
 
         // 1. Daily Summary (Daily Cash Sheet)
@@ -1083,8 +1116,19 @@ export const getFinanceReports = async (req, res, next) => {
         };
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
             expenseFilter.storeId = storeId;
-        } else if (req.user.storeId) {
-            expenseFilter.storeId = req.user.storeId;
+        } else {
+            const isRestricted = req.user?.role === 'SALES_AGENT' || req.user?.role === 'MECHANIC';
+            const isGlobal =
+                req.user?.role === 'TENANT_OWNER' ||
+                req.user?.role === 'SUPER_ADMIN' ||
+                (req.user?.role === 'ADMIN' && !req.user?.customRoleId) ||
+                req.user?.portalType === 'ADMIN';
+
+            if (isRestricted) {
+                expenseFilter.storeId = req.user.storeId;
+            } else if (!isGlobal && req.user.storeId) {
+                expenseFilter.storeId = req.user.storeId;
+            }
         }
 
         const expenses = await prisma.expense.groupBy({
@@ -1115,10 +1159,47 @@ export const getFinanceReports = async (req, res, next) => {
             };
         }));
 
+        // 4. Branch-wise Shift Statistics
+        const [openingsByStore, closingsByStore, pendingByStore] = await Promise.all([
+            prisma.openingCash.groupBy({
+                by: ['storeId'],
+                where: { date: targetDate, tenantId },
+                _count: { id: true }
+            }),
+            prisma.closingCash.groupBy({
+                by: ['storeId'],
+                where: { date: targetDate, tenantId },
+                _count: { id: true }
+            }),
+            prisma.closingCash.groupBy({
+                by: ['storeId'],
+                where: { date: targetDate, tenantId, status: 'SUBMITTED' },
+                _count: { id: true }
+            })
+        ]);
+
+        const storeStats = {};
+        openingsByStore.forEach(o => {
+            const sid = o.storeId || 'none';
+            if (!storeStats[sid]) storeStats[sid] = { active: 0, pending: 0 };
+            storeStats[sid].active += o._count.id;
+        });
+        closingsByStore.forEach(c => {
+            const sid = c.storeId || 'none';
+            if (!storeStats[sid]) storeStats[sid] = { active: 0, pending: 0 };
+            storeStats[sid].active -= c._count.id; // Active = Opened - Closed
+        });
+        pendingByStore.forEach(p => {
+            const sid = p.storeId || 'none';
+            if (!storeStats[sid]) storeStats[sid] = { active: 0, pending: 0 };
+            storeStats[sid].pending = p._count.id;
+        });
+
         res.json({
             dailySheet: dailySummaries,
             expenseBreakdown: expenses,
-            profitability
+            profitability,
+            branchStats: storeStats
         });
     } catch (error) {
         next(error);
@@ -1181,10 +1262,10 @@ export const adminReviewClosingCash = async (req, res, next) => {
         });
 
         // Recalculate daily summary
-        await recalculateDailySummary(vehicleId, date, req.user.tenantId, req.user.storeId);
+        await recalculateDailySummary(vehicleId, date, req.user.tenantId, getEffectiveStoreId(req));
 
         // SYNC: Update the Store Deposit if it already exists for this shift
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
         const deposit = await prisma.storeDeposit.findUnique({
             where: { storeId_date_shift: { storeId, date, shift: parseInt(shift) } }
         });
@@ -1241,7 +1322,7 @@ export const adminReviewClosingCash = async (req, res, next) => {
 export const getStoreCashRegister = async (req, res, next) => {
     try {
         const { date } = req.params;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId) {
             res.status(400);
@@ -1425,7 +1506,7 @@ export const getStoreCashRegister = async (req, res, next) => {
 export const getStoreCashLedger = async (req, res, next) => {
     try {
         const { date } = req.params;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId) {
             res.status(400);
@@ -1503,7 +1584,16 @@ export const getStoreCashLedger = async (req, res, next) => {
                 status: { in: ['APPROVED', 'PAID'] },
                 date: date
             },
-            include: {
+            select: {
+                id: true,
+                type: true,
+                amount: true,
+                description: true,
+                status: true,
+                paymentMode: true,
+                vehicleId: true,
+                createdAt: true,
+                displayId: true,
                 user: { select: { name: true } }
             },
             orderBy: { createdAt: 'asc' }
@@ -1564,21 +1654,38 @@ export const getStoreCashLedger = async (req, res, next) => {
 
         // 4. Store Expenses Outflows
         storeExpenses.forEach(e => {
+            let displayAmount = e.amount;
+            let isPartial = false;
+
+            // Extract actual paid amount from metadata if it's a partial payment
+            if (e.description && e.description.includes('[PAYMENT:')) {
+                const paidMatch = e.description.match(/Paid:\s*₹?(\d+(\.\d+)?)/i);
+                if (paidMatch && paidMatch[1]) {
+                    displayAmount = parseFloat(paidMatch[1]);
+                    if (e.description.includes('PARTIAL')) {
+                        isPartial = true;
+                    }
+                }
+            }
+
             entries.push({
                 id: e.id,
                 type: 'EXPENSE_OUTFLOW',
-                label: `Expense: ${e.type}`,
-                amount: e.amount,
+                label: `Expense: ${e.type}${isPartial ? ' (PARTIAL)' : ''}`,
+                amount: displayAmount,
                 direction: 'OUT',
                 timestamp: e.createdAt,
                 userName: e.user?.name || 'Staff',
                 reference: e.id,
-                referenceName: e.type,
+                referenceName: `${e.displayId || 'EXP'} • ${e.type}${isPartial ? ' [Partial]' : ''}`,
                 metadata: {
                     description: e.description,
                     status: e.status,
                     paymentMode: e.paymentMode,
-                    vehicleId: e.vehicleId
+                    vehicleId: e.vehicleId,
+                    fullAmount: e.amount,
+                    isPartial: isPartial,
+                    displayId: e.displayId
                 }
             });
         });
@@ -1639,28 +1746,30 @@ export const getStoreCashLedger = async (req, res, next) => {
         });
         entries.sort((a, b) => new Date(a.timestamp) - new Date(b.timestamp));
 
-        // Compute running balance — tracks Available Cash at Counter
+        // Compute running balance — tracks Total Store Cash (Available + Safe)
         const ledger = entries.map(entry => {
             const before = runningBalance;
 
-            if (entry.type === 'SAFE_MOVEMENT') {
-                // Moving to safe REDUCES counter cash; withdrawing FROM safe ADDS to counter cash
-                if (entry.direction === 'OUT_TO_SAFE') runningBalance -= entry.amount;
-                else if (entry.direction === 'IN_FROM_SAFE') runningBalance += entry.amount;
-            } else if (entry.type === 'STORE_SALE') {
-                // Only the cash portion of a POS sale enters the counter
+            if (entry.type === 'STORE_SALE') {
+                // Only the cash portion of a POS sale enters the store's physical cash
                 runningBalance += (entry.cashImpact || 0);
             } else if (entry.direction === 'IN') {
                 runningBalance += entry.amount;
             } else if (entry.direction === 'OUT') {
-                // IMPORTANT: Only deduct from STORE CASH if it's a direct store cash expense
-                // Agent cash expenses are deducted from THEIR bag (Vehicle Summary), not the Store Safe.
-                const isStoreCash = entry.metadata?.paymentMode === 'CASH' && !entry.metadata?.vehicleId;
-                const isReimbursement = entry.metadata?.paymentMode === 'PERSONAL_CASH'; 
-                
-                if (isStoreCash || isReimbursement) {
+                // Determine if this outflow should deduct from physical store balance
+                if (entry.type === 'EXPENSE_OUTFLOW') {
+                    const isStoreCash = entry.metadata?.paymentMode === 'CASH' && !entry.metadata?.vehicleId;
+                    const isReimbursement = entry.metadata?.paymentMode === 'PERSONAL_CASH';
+                    if (isStoreCash || isReimbursement) {
+                        runningBalance -= entry.amount;
+                    }
+                } else {
+                    // Agent Outflows (Float) and Bank Transfers ALWAYS deduct from store cash
                     runningBalance -= entry.amount;
                 }
+            } else if (entry.type === 'SAFE_MOVEMENT') {
+                // Internal movements (Counter <-> Safe) do not change the TOTAL store balance
+                // runningBalance += 0;
             }
 
             return {
@@ -1732,7 +1841,7 @@ export const getStoreCashLedger = async (req, res, next) => {
 export const createSafeTransaction = async (req, res, next) => {
     try {
         const { date, amount, type, denominations, description } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || !amount || !type) {
             res.status(400);
@@ -1816,7 +1925,7 @@ export const createSafeTransaction = async (req, res, next) => {
 export const openStoreCashRegister = async (req, res, next) => {
     try {
         const { date, openingCash, denominations } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || openingCash === undefined || !denominations) {
             res.status(400);
@@ -1857,7 +1966,7 @@ export const openStoreCashRegister = async (req, res, next) => {
 export const closeStoreCashRegister = async (req, res, next) => {
     try {
         const { date, actualClosingCash, denominations, remarks } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || actualClosingCash === undefined || !denominations) {
             res.status(400);
@@ -1948,7 +2057,7 @@ export const closeStoreCashRegister = async (req, res, next) => {
 export const resetStoreCashRegister = async (req, res, next) => {
     try {
         const { date } = req.params;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         await prisma.storeCashRegister.delete({
             where: { storeId_date: { storeId, date } }
@@ -1966,7 +2075,7 @@ export const resetStoreCashRegister = async (req, res, next) => {
 export const createStoreDeposit = async (req, res, next) => {
     try {
         const { date, shift, amount, denominations, description } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || !shift || amount === undefined || !denominations || !description) {
             res.status(400);
@@ -2002,7 +2111,7 @@ export const createStoreDeposit = async (req, res, next) => {
 export const updateStoreCashRegister = async (req, res, next) => {
     try {
         const { date, openingCash, denominations, status, actualClosingCash, isClosingUpdate } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date) {
             res.status(400);
@@ -2092,7 +2201,7 @@ export const deleteStoreDeposit = async (req, res, next) => {
 export const adminAddBankDeposit = async (req, res, next) => {
     try {
         const { date, amount, branchName, receiptImage, depositedBy, adminId, remark } = req.body;
-        const storeId = req.user.storeId;
+        const storeId = getEffectiveStoreId(req);
 
         if (!storeId || !date || !amount || !branchName || !depositedBy) {
             res.status(400);
