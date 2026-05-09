@@ -15,9 +15,9 @@ if (!connectionString) {
 const pool = new pg.Pool({
   connectionString,
   ssl: { rejectUnauthorized: false },
-  max: 10,                 // Reduced from 20 to avoid EMAXCONNSESSION (15 limit)
-  idleTimeoutMillis: 30000, // Reduced from 60s
-  connectionTimeoutMillis: 20000, // Reduced from 30s
+  max: 5,                  // Reduced to avoid EMAXCONNSESSION (15 limit) during HMR
+  idleTimeoutMillis: 10000, // Free connections faster
+  connectionTimeoutMillis: 20000,
 });
 
 const adapter = new PrismaPg(pool);
