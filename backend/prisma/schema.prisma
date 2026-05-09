@@ -765,9 +765,9 @@ model Expense {
   billImage            String?
   status               ExpenseStatus      @default(PENDING)
   date                 String
-  paidTo               String?
-  paidDate             String?
-  billDate             String?
+  // paidTo               String?
+  // paidDate             String?
+  // billDate             String?
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
   tenantId             String             @default("VK001")
