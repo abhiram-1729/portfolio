@@ -136,31 +136,73 @@ const GRNSection = ({ can }) => {
                 <h3 className="text-lg font-black text-gray-300">No Open POs for GRN</h3>
               </div>
             ) : (
-              <div className="space-y-2">
-                {pos.map(po => (
-                  <button key={po.id} onClick={() => selectPO(po.id)}
-                    className="w-full text-left bg-white p-4 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all flex items-center justify-between group">
-                    <div>
-                      <span className="text-sm font-black text-gray-900 group-hover:text-emerald-700 transition-colors">PO #{po.poNumber}</span>
-                      <p className="text-[10px] text-gray-400 font-bold">{po.vendor?.vendorName} • {format(new Date(po.poDate), 'dd MMM yyyy')} • {po.items?.length} items</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[8px] font-black uppercase px-2 py-0.5 rounded-md bg-blue-50 text-blue-600">{po.status}</span>
-                      <ChevronRight size={16} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />
-                    </div>
-                  </button>
-                ))}
+              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="bg-gray-50/50">
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">PO Details</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vendor</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Date</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Items</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {pos.map(po => (
+                      <tr 
+                        key={po.id} 
+                        onClick={() => selectPO(po.id)}
+                        className="hover:bg-emerald-50/30 transition-all cursor-pointer group"
+                      >
+                        <td className="px-6 py-4">
+                          <span className="text-sm font-black text-gray-900 group-hover:text-emerald-600 transition-colors">PO #{po.poNumber}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] font-bold text-gray-600">{po.vendor?.vendorName}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{format(new Date(po.poDate), 'dd MMM yyyy')}</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2 py-1 rounded-md">{po.items?.length || 0} ITEMS</span>
+                        </td>
+                        <td className="px-6 py-4 text-center">
+                          <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg ${
+                            po.status === 'DELIVERED' ? 'bg-blue-50 text-blue-600' : 'bg-emerald-50 text-emerald-600'
+                          }`}>
+                            {po.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <div className="flex justify-end">
+                            <div className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                              <ChevronRight size={14} strokeWidth={3} />
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </>
         ) : (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5 space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
-            <div className="flex items-center justify-between">
-              <div>
-                <h4 className="text-sm font-black text-gray-900">{editGRN ? `Edit GRN #${editGRN.displayId}` : `GRN for PO #${poDetail?.poNumber}`}</h4>
-                <p className="text-[10px] text-gray-400 font-bold">{poDetail?.vendor?.vendorName}</p>
+            <div className="flex items-center justify-between border-b border-gray-50 pb-4">
+              <div className="flex items-center gap-4">
+                <button 
+                  onClick={() => { setSelectedPO(null); setPODetail(null); setEditGRN(null); }}
+                  className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-95"
+                >
+                  <ChevronRight size={18} className="rotate-180" />
+                </button>
+                <div>
+                  <h4 className="text-sm font-black text-gray-900">{editGRN ? `Edit GRN #${editGRN.displayId}` : `GRN for PO #${poDetail?.poNumber}`}</h4>
+                  <p className="text-[10px] text-gray-400 font-bold">{poDetail?.vendor?.vendorName}</p>
+                </div>
               </div>
-              <button onClick={() => { setSelectedPO(null); setPODetail(null); setEditGRN(null); }} className="text-gray-400 hover:text-gray-600"><X size={20} /></button>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-left">
@@ -207,46 +249,73 @@ const GRNSection = ({ can }) => {
           </div>
         )
       ) : (
-        <div className="space-y-3">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
           {grns.length === 0 ? (
-            <div className="bg-white rounded-3xl p-16 border border-dashed border-gray-200 text-center">
+            <div className="p-16 border-dashed border-gray-200 text-center">
               <History size={48} className="mx-auto text-gray-200 mb-3" />
               <h3 className="text-lg font-black text-gray-300">No Receipt History</h3>
             </div>
           ) : (
-            grns.map(grn => (
-              <div key={grn.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 hover:border-emerald-100 transition-all group animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-start justify-between">
-                  <div>
-                    <div className="flex items-center gap-2">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="bg-gray-50/50">
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">GRN Details</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Related PO</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Vendor</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Date</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Items Received</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {grns.map(grn => (
+                  <tr key={grn.id} className="hover:bg-gray-50/50 transition-all group">
+                    <td className="px-6 py-4">
                       <span className="text-sm font-black text-gray-900">GRN #{grn.displayId}</span>
-                      <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${grn.status === 'COMPLETE' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>{grn.status}</span>
-                    </div>
-                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">PO #{grn.po?.poNumber} • {grn.po?.vendor?.vendorName} • {format(new Date(grn.createdAt), 'dd MMM yyyy')}</p>
-                  </div>
-                  <div className="flex gap-1.5">
-                    {can('PROCUREMENT', 'UPDATE', 'GRN') && (
-                      <button onClick={() => handleEditGRN(grn)} className="p-2 bg-gray-50 text-gray-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-gray-100">
-                        <Edit3 size={14} />
-                      </button>
-                    )}
-                    {can('PROCUREMENT', 'DELETE', 'GRN') && (
-                      <button onClick={() => handleDeleteGRN(grn.id)} className="p-2 bg-rose-50 text-rose-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-100">
-                        <Trash2 size={14} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-1.5 mt-3">
-                  {grn.items?.slice(0, 3).map(item => (
-                    <span key={item.id} className="text-[9px] font-bold bg-gray-50 text-gray-600 px-2 py-1 rounded-lg">
-                      {item.product?.name} × {item.receivedQty}
-                    </span>
-                  ))}
-                  {grn.items?.length > 3 && <span className="text-[9px] font-bold text-gray-400">+{grn.items.length - 3} more</span>}
-                </div>
-              </div>
-            ))
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[11px] font-bold text-gray-500">PO #{grn.po?.poNumber}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[11px] font-bold text-gray-600">{grn.po?.vendor?.vendorName}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className="text-[11px] font-bold text-gray-400 uppercase tracking-tight">{format(new Date(grn.createdAt), 'dd MMM yyyy')}</span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex flex-wrap gap-1">
+                        {grn.items?.slice(0, 2).map(item => (
+                          <span key={item.id} className="text-[9px] font-bold bg-gray-50 text-gray-600 px-2 py-1 rounded-lg border border-gray-100">
+                            {item.product?.name} × {item.receivedQty}
+                          </span>
+                        ))}
+                        {grn.items?.length > 2 && <span className="text-[9px] font-bold text-gray-400 self-center ml-1">+{grn.items.length - 2} more</span>}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`text-[8px] font-black uppercase px-2 py-1 rounded-lg ${grn.status === 'COMPLETE' ? 'bg-emerald-50 text-emerald-600' : 'bg-orange-50 text-orange-600'}`}>
+                        {grn.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2">
+                        {can('PROCUREMENT', 'UPDATE', 'GRN') && (
+                          <button onClick={() => handleEditGRN(grn)} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-emerald-50 hover:text-emerald-600 transition-all" title="Edit GRN">
+                            <Edit3 size={14} />
+                          </button>
+                        )}
+                        {can('PROCUREMENT', 'DELETE', 'GRN') && (
+                          <button onClick={() => handleDeleteGRN(grn.id)} className="p-2 bg-gray-50 text-gray-400 rounded-xl hover:bg-rose-50 hover:text-rose-600 transition-all" title="Delete GRN">
+                            <Trash2 size={14} />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           )}
         </div>
       )}
