@@ -70,6 +70,9 @@ export const authAPI = {
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/password', data),
+  uploadMyDocument: (formData) => api.post('/auth/me/documents', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 export const productsAPI = {

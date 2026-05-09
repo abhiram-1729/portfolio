@@ -44,6 +44,11 @@ router.route('/users')
 router.route('/users/:id')
   .put(userCtr.updateUser)
   .delete(userCtr.deactivateUser);
+router.post('/users/:userId/documents', uploadMiddleware.single('document'), userCtr.uploadUserDocument);
+router.put('/users/documents/:documentId', userCtr.updateUserDocumentStatus);
+router.route('/users/shifts')
+  .get(userCtr.getShifts)
+  .post(userCtr.createShift);
 
 // Vehicles
 router.route('/vehicles')

@@ -108,8 +108,8 @@ export default function AdminLayout() {
       const timer = setTimeout(() => {
         const element = document.getElementById(`nav-group-${lastOpenedMenu.replace(/\s+/g, '-').toLowerCase()}`);
         if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
+          element.scrollIntoView({
+            behavior: 'smooth',
             block: 'center',
             inline: 'nearest'
           });
@@ -143,7 +143,7 @@ export default function AdminLayout() {
       icon: Package,
       module: 'INVENTORY',
       subItems: [
-        { to: '/admin/inventory?tab=main_master', label: 'Registry', icon: Shield, section: 'MAIN_MASTER' },
+        // { to: '/admin/inventory?tab=main_master', label: 'Registry', icon: Shield, section: 'MAIN_MASTER' },
         { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid, section: 'MASTER' },
         { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package, section: 'STORE_STOCK' },
         { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck, section: 'VEHICLE_STOCK' },
@@ -441,12 +441,12 @@ export default function AdminLayout() {
                     <span className="text-xs font-black text-gray-900 leading-none mb-1 uppercase tracking-tight">{user?.name}</span>
                     <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">{user?.role?.replace('_', ' ')}</span>
                   </div>
-                  <ChevronDown 
-                    size={14} 
+                  <ChevronDown
+                    size={14}
                     className={cn(
                       "text-gray-400 transition-transform duration-300",
                       isUserDropdownOpen && "rotate-180 text-emerald-600"
-                    )} 
+                    )}
                   />
                 </button>
 
@@ -456,7 +456,7 @@ export default function AdminLayout() {
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p>
                       <p className="text-xs font-black text-gray-900 truncate">{user?.email || user?.name}</p>
                     </div>
-                    
+
                     <div className="p-2">
                       {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
                         <button

@@ -31,8 +31,8 @@ const prisma = basePrisma.$extends({
         try {
           const tenantId = getTenantId();
 
-          // Skip isolation for Tenant model itself
-          if (model === 'Tenant') {
+          // Skip isolation for models without tenantId column
+          if (model === 'Tenant' || model === 'UserDocument') {
             return query(args);
           }
 

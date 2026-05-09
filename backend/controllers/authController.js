@@ -92,7 +92,8 @@ export const getUserProfile = async (req, res, next) => {
                 tenant: { select: { name: true, logo: true } },
                 store: { select: { name: true, code: true } },
                 assignedVehicle: true,
-                customRole: true
+                customRole: true,
+                documents: true
             }
         });
 
@@ -145,6 +146,47 @@ export const updatePassword = async (req, res, next) => {
         });
 
         res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+import { uploadToSupabase } from '../utils/supabaseService.js';
+
+// @desc    Upload document for current user
+// @route   POST /api/auth/me/documents
+// @access  Private
+export const uploadMyDocument = async (req, res, next) => {
+    try {
+        const { type, documentNumber } = req.body;
+        
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const fileUrl = await uploadToSupabase(
+            req.file.buffer,
+            req.file.originalname,
+            req.file.mimetype,
+            'users',
+            'kyc'
+        );
+
+        if (!fileUrl) {
+            return res.status(500).json({ message: 'Failed to upload to cloud storage' });
+        }
+
+        const document = await prisma.userDocument.create({
+            data: {
+                userId: req.user.id,
+                type,
+                documentNumber,
+                fileUrl,
+                status: 'PENDING'
+            }
+        });
+
+        res.status(201).json({ message: 'Document uploaded successfully', document });
     } catch (error) {
         next(error);
     }

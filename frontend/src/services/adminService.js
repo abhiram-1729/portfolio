@@ -14,6 +14,12 @@ export const adminAPI = {
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   deactivateUser: (id) => api.delete(`/admin/users/${id}`),
+  uploadUserDocument: (userId, data) => api.post(`/admin/users/${userId}/documents`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  updateUserDocumentStatus: (documentId, status) => api.put(`/admin/users/documents/${documentId}`, { status }),
+  getShifts: () => api.get('/admin/users/shifts'),
+  createShift: (data) => api.post('/admin/users/shifts', data),
 
   // Vehicles
   getVehicles: (params) => api.get('/admin/vehicles', { params }),

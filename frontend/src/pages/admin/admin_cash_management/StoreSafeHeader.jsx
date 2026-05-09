@@ -285,10 +285,6 @@ const StoreSafeHeader = ({
                   <p className="text-xl font-black text-white tabular-nums">
                     ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
                   </p>
-                  <div className="mt-2 pt-2 border-t border-emerald-800/50 flex items-center justify-between">
-                    <span className="text-[8px] font-bold text-emerald-500 uppercase">Total Cash</span>
-                    <span className="text-[10px] font-black text-emerald-300">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</span>
-                  </div>
                 </div>
               </div>
             )}
