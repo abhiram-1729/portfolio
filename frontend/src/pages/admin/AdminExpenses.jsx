@@ -530,7 +530,7 @@ export default function AdminExpenses() {
         }
     };
 
-    if (isGlobalRole && !storeId) {
+    if (isGlobalRole && !storeId && stores.length > 1) {
         return (
             <div className="space-y-6 animate-in fade-in duration-700">
                 <div className="flex flex-col gap-1">

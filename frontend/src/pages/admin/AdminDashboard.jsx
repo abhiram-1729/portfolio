@@ -121,9 +121,9 @@ export default function AdminDashboard() {
     );
   }
 
-  const isGlobalRole = (currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'ADMIN' || currentUser?.portalType === 'ADMIN' || currentUser?.portalType === 'SUPERVISOR');
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN' || currentUser?.portalType === 'SUPERVISOR';
   
-  if (!storeIdParam && isGlobalRole) {
+  if (!storeIdParam && isGlobalRole && stores.length > 1) {
     const staffByStore = users.reduce((acc, u) => {
       if (u.storeId) acc[u.storeId] = (acc[u.storeId] || 0) + 1;
       return acc;

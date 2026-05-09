@@ -1601,7 +1601,7 @@ export default function AdminInventory() {
     />
   );
   const renderClassifiedInventory = () => {
-    if (storeFilterId || activeTab === 'main_master' || !isGlobalRole) return null;
+    if (storeFilterId || activeTab === 'main_master' || !isGlobalRole || stores.length <= 1) return null;
 
     const salesByStore = sales.reduce((acc, s) => {
       if (s.storeId) {
