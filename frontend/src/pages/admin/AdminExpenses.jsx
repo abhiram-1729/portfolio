@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Receipt, CheckCircle2, XCircle, Eye, Clock, User, Truck, Calendar, Loader2, Check, X, Plus, RotateCcw, ShieldCheck, Lock, ChevronDown, Filter, BarChart3, Settings, Trash2, Edit, Upload, Camera, Info, FileText, Download } from 'lucide-react';
+import { Receipt, CheckCircle2, XCircle, Eye, Clock, User, Truck, Calendar, Loader2, Check, X, Plus, RotateCcw, ShieldCheck, Lock, ChevronDown, Filter, BarChart3, Settings, Trash2, Edit, Upload, Camera, Info, FileText, Download, Banknote } from 'lucide-react';
 import { getAllExpenses, updateExpenseStatus, bulkUpdateExpenseStatus } from '../../services/expenseService';
+import { getStoreCashRegister } from '../../services/cashService';
 import { exportExpensesToExcel } from '../../utils/expenseExportHelper';
 import ExpenseAnalytics from './ExpenseAnalytics';
 import { format } from 'date-fns';
@@ -13,6 +14,267 @@ const STATUS_STYLES = {
     REJECTED: 'bg-rose-50 text-rose-600 border-rose-100',
     PAID: 'bg-blue-50 text-blue-600 border-blue-100',
 };
+
+const getRemarks = (desc) => {
+    if (!desc) return '';
+    const match = desc.match(/\[REMARKS: (.*?)\]/);
+    return match ? match[1] : '';
+};
+
+function ExpenseActionModal({ isOpen, onClose, actionData, onAction, registerBalance }) {
+    const [approvalType, setApprovalType] = useState('FULL');
+    const [payingAmount, setPayingAmount] = useState('');
+    const [approvedAmount, setApprovedAmount] = useState('');
+    const [remarks, setRemarks] = useState('');
+    const [balance, setBalance] = useState(0);
+
+    useEffect(() => {
+        if (actionData?.expense) {
+            setApprovedAmount(actionData.expense.amount);
+            setPayingAmount(actionData.expense.amount);
+            setBalance(0);
+            setRemarks('');
+            setApprovalType('FULL');
+        }
+    }, [actionData]);
+
+    if (!isOpen || !actionData) return null;
+
+    const { expense, action, isReturn } = actionData;
+
+    const handleConfirm = () => {
+        onAction(expense.id, action === 'APPROVED' ? 'APPROVED' : (isReturn ? 'RETURNED' : 'REJECTED'), {
+            remarks,
+            paymentDetails: action === 'APPROVED' ? {
+                type: approvalType,
+                approved: approvedAmount,
+                paid: payingAmount,
+                balance: balance
+            } : undefined
+        });
+    };
+
+    const isOverApproved = Number(approvedAmount) > expense.amount;
+    const isOverPaid = Number(payingAmount) > Number(approvedAmount || 0);
+    const isValid = !isOverApproved && !isOverPaid && Number(payingAmount || 0) >= 0;
+
+    return (
+        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/30 backdrop-blur-[2px] p-4">
+            <div className="bg-white rounded-[1.5rem] w-full max-w-md overflow-hidden shadow-2xl border border-gray-100">
+                {/* Header */}
+                <div className="px-6 py-4 flex items-center justify-between border-b border-gray-50 bg-white">
+                    <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${action === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                            {action === 'APPROVED' ? <Banknote size={20} /> : <XCircle size={20} />}
+                        </div>
+                        <h3 className="text-lg font-bold text-gray-800 tracking-tight">
+                            {action === 'APPROVED' ? 'Confirm Approval' : (isReturn ? 'Return Expense' : 'Reject Expense')}
+                        </h3>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 transition-all">
+                        <X size={18} />
+                    </button>
+                </div>
+
+                {action === 'APPROVED' ? (
+                    <div className="max-h-[85vh] overflow-y-auto">
+                        {/* Tabs */}
+                        <div className="px-6 py-4">
+                            <div className="flex bg-gray-100/60 p-1 rounded-xl gap-1">
+                                <button
+                                    onClick={() => {
+                                        setApprovalType('FULL');
+                                        setApprovedAmount(expense.amount);
+                                        setPayingAmount(expense.amount);
+                                        setBalance(0);
+                                    }}
+                                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${approvalType === 'FULL' ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <CheckCircle2 size={14} /> Full Approval
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setApprovalType('PARTIAL');
+                                        setApprovedAmount(expense.amount);
+                                        setPayingAmount('');
+                                        setBalance(0);
+                                    }}
+                                    className={`flex-1 py-2.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-2 ${approvalType === 'PARTIAL' ? 'bg-white text-orange-500 shadow-sm border border-orange-100' : 'text-gray-400 hover:text-gray-600'}`}
+                                >
+                                    <Clock size={14} /> Partial Approval
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Voucher Summary Card - Restored & Refined */}
+                        <div className="px-6 pb-4">
+                            <div className="bg-gray-50/50 border border-gray-100 rounded-2xl p-5 relative">
+                                <div className="absolute top-5 right-5">
+                                    <span className="px-2.5 py-0.5 rounded-full bg-orange-50 text-orange-500 text-[9px] font-bold uppercase border border-orange-100/50">Pending</span>
+                                </div>
+                                
+                                <div className="grid grid-cols-2 gap-x-6 gap-y-4">
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">VOUCHER</p>
+                                        <p className="text-lg font-black text-gray-900 leading-none">{expense.displayId?.split('-').pop() || '—'}</p>
+                                    </div>
+                                    <div></div>
+
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">CATEGORY</p>
+                                        <p className="text-[11px] font-bold text-gray-700 truncate">{expense.type?.split(' | ')[0] || expense.type}</p>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">DATE</p>
+                                        <p className="text-[11px] font-bold text-gray-700">{expense.billDate ? format(new Date(expense.billDate), 'dd-MM-yyyy') : '—'}</p>
+                                    </div>
+
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">PAID TO</p>
+                                        <p className="text-[11px] font-bold text-gray-700 truncate">{expense.paidTo || '—'}</p>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">MODE</p>
+                                        <p className="text-[11px] font-bold text-gray-700 uppercase">{expense.paymentMode || '—'}</p>
+                                    </div>
+
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">CREATED BY</p>
+                                        <p className="text-[11px] font-bold text-gray-700 truncate">{expense.user?.name || '—'}</p>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">BILL AMOUNT</p>
+                                        <p className="text-lg font-black text-emerald-600 leading-none">₹{expense.amount.toLocaleString()}</p>
+                                    </div>
+
+                                    {getRemarks(expense.description) && (
+                                        <div className="col-span-2 space-y-0.5 pt-3 border-t border-gray-100">
+                                            <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">REMARKS</p>
+                                            <p className="text-[10px] text-gray-500 leading-relaxed italic line-clamp-2">{getRemarks(expense.description)}</p>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Inputs */}
+                        <div className="px-6 space-y-4 pb-6">
+                            {approvalType === 'PARTIAL' && (
+                                <div className="space-y-1.5">
+                                    <div className="flex justify-between items-center px-1">
+                                        <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Approved Amount</label>
+                                        <span className={`text-[10px] font-bold ${isOverApproved ? 'text-rose-500 animate-pulse' : 'text-gray-400'}`}>
+                                            Bill: ₹{expense.amount.toLocaleString()}
+                                        </span>
+                                    </div>
+                                    <div className="relative">
+                                        <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">₹</span>
+                                        <input
+                                            type="number"
+                                            value={approvedAmount}
+                                            onChange={e => {
+                                                const val = e.target.value;
+                                                setApprovedAmount(val);
+                                                const approved = Number(val || 0);
+                                                const paid = Number(payingAmount || 0);
+                                                setBalance(approved - paid);
+                                            }}
+                                            className={`w-full bg-gray-50 border rounded-xl pl-8 pr-4 py-3 text-sm font-bold outline-none transition-all ${isOverApproved ? 'border-rose-300 focus:border-rose-500 bg-rose-50/10' : 'border-gray-200 focus:border-emerald-500'}`}
+                                        />
+                                    </div>
+                                    {isOverApproved && (
+                                        <p className="text-[10px] font-bold text-rose-500 ml-1">Error: Amount exceeds bill limit (₹{expense.amount}).</p>
+                                    )}
+                                </div>
+                            )}
+
+                            <div className="space-y-1.5">
+                                <div className="flex justify-between items-center px-1">
+                                    <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider">Pay Now</label>
+                                    <span className={`text-[10px] font-bold ${isOverPaid ? 'text-rose-500 animate-pulse' : 'text-gray-400'}`}>
+                                        Max: ₹{Number(approvedAmount || 0).toLocaleString()}
+                                    </span>
+                                </div>
+                                <div className="relative">
+                                    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-bold">₹</span>
+                                    <input
+                                        type="number"
+                                        value={payingAmount}
+                                        onChange={e => {
+                                            const val = e.target.value;
+                                            setPayingAmount(val);
+                                            const approved = Number(approvedAmount || 0);
+                                            const paid = Number(val || 0);
+                                            setBalance(approved - paid);
+                                        }}
+                                        placeholder="0.00"
+                                        className={`w-full bg-gray-50 border rounded-xl pl-8 pr-4 py-3 text-sm font-bold outline-none transition-all ${isOverPaid ? 'border-rose-300 focus:border-rose-500 bg-rose-50/10' : 'border-gray-200 focus:border-emerald-500'}`}
+                                    />
+                                </div>
+                                {isOverPaid && (
+                                    <p className="text-[10px] font-bold text-rose-500 ml-1">Error: Payment cannot exceed approval (₹{Number(approvedAmount || 0)}).</p>
+                                )}
+                            </div>
+
+                            <div className="space-y-1.5">
+                                <label className="text-[11px] font-bold text-gray-600 uppercase tracking-wider ml-1">Optional Remarks</label>
+                                <textarea
+                                    rows={2}
+                                    value={remarks}
+                                    onChange={e => setRemarks(e.target.value)}
+                                    placeholder="Add any internal notes..."
+                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-xs font-medium resize-none outline-none focus:bg-white focus:border-emerald-500 transition-all"
+                                />
+                            </div>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="p-6 bg-gray-50/50 border-t border-gray-100 flex items-center justify-between">
+                            <div className="flex flex-col">
+                                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wider leading-none mb-1.5">Pending Balance</p>
+                                <p className={`text-lg font-bold leading-none ${balance > 0 ? 'text-orange-500' : (balance < 0 ? 'text-rose-500' : 'text-emerald-600')}`}>
+                                    ₹{balance.toLocaleString()}
+                                </p>
+                            </div>
+                            <button
+                                onClick={handleConfirm}
+                                disabled={!isValid}
+                                className={`px-6 py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg active:scale-95 ${isValid ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-600/20' : 'bg-gray-200 text-gray-400 cursor-not-allowed shadow-none'}`}
+                            >
+                                {approvalType === 'FULL' ? 'Confirm Full Approval' : 'Confirm Partial Approval'}
+                            </button>
+                        </div>
+                    </div>
+                ) : (
+                    <div className="p-6 space-y-5">
+                        <div className="space-y-2">
+                            <label className="text-[11px] font-bold uppercase text-rose-500 ml-1 tracking-wider">Reason for {isReturn ? 'Return' : 'Rejection'} <span className="text-rose-600">*</span></label>
+                            <textarea
+                                rows={3}
+                                value={remarks}
+                                onChange={e => setRemarks(e.target.value)}
+                                placeholder={`Please explain why this is being ${isReturn ? 'returned' : 'rejected'}...`}
+                                className="w-full bg-rose-50/20 border border-rose-100 rounded-xl px-4 py-3 text-xs font-medium resize-none outline-none focus:bg-white focus:border-rose-300 transition-all"
+                            />
+                        </div>
+                        <div className="flex gap-4">
+                            <button onClick={onClose} className="flex-1 py-3.5 rounded-xl border border-gray-200 text-xs font-bold text-gray-400 hover:bg-gray-50 transition-all">
+                                Cancel
+                            </button>
+                            <button
+                                disabled={!remarks.trim()}
+                                onClick={handleConfirm}
+                                className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-3.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all shadow-lg shadow-rose-600/20 active:scale-95"
+                            >
+                                {isReturn ? 'Confirm Return' : 'Confirm Reject'}
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
 
 const ALL_STATUSES = ['', 'PENDING', 'APPROVED', 'REJECTED', 'PAID'];
 
@@ -45,10 +307,7 @@ export default function AdminExpenses() {
         billDate: format(new Date(), 'yyyy-MM-dd')
     });
     const [paymentReference, setPaymentReference] = useState('');
-    const [approvalType, setApprovalType] = useState('FULL');
-    const [payingAmount, setPayingAmount] = useState('');
-    const [approvedAmount, setApprovedAmount] = useState('');
-    const [balance, setBalance] = useState(0);
+    const [registerBalance, setRegisterBalance] = useState(0);
 
     useEffect(() => {
         if (activeTab === 'monitoring') loadExpenses();
@@ -93,9 +352,18 @@ export default function AdminExpenses() {
             await updateExpenseStatus(id, status, extra);
             toast.success(`Expense ${status.toLowerCase()}`);
             setActionModal(null); setRemarks(''); setApproverName(''); setPaymentReference('');
-            setApprovalType('FULL'); setPayingAmount(''); setApprovedAmount(''); setBalance(0);
             loadExpenses();
         } catch (e) { toast.error(e?.response?.data?.message || 'Failed'); }
+    };
+
+    const fetchRegisterBalance = async () => {
+        try {
+            const dateStr = format(new Date(), 'yyyy-MM-dd');
+            const data = await getStoreCashRegister(dateStr);
+            setRegisterBalance(data?.liveMetrics?.availableCash || 0);
+        } catch (err) {
+            console.error('Failed to fetch register balance:', err);
+        }
     };
 
     const handleBulkAction = async (status) => {
@@ -366,10 +634,7 @@ export default function AdminExpenses() {
                                                             <>
                                                                 <button onClick={() => {
                                                                     setActionModal({ expenseId: exp.id, action: 'APPROVED', expense: exp });
-                                                                    setApprovalType('FULL');
-                                                                    setApprovedAmount(exp.amount);
-                                                                    setPayingAmount(exp.amount);
-                                                                    setBalance(0);
+                                                                    fetchRegisterBalance();
                                                                 }}
                                                                     className="p-1 bg-emerald-50 text-emerald-600 rounded-md hover:bg-emerald-600 hover:text-white transition-all border border-emerald-100" title="Approve">
                                                                     <Check size={10} strokeWidth={3} />
@@ -404,209 +669,15 @@ export default function AdminExpenses() {
 
             {activeTab === 'analytics' && <ExpenseAnalytics />}
 
-            {/* Actions Modal */}
-            {actionModal && (
-                <div className="fixed inset-0 z-[110] flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-                    <div className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl">
-                        {/* Header - Compact */}
-                        <div className="px-5 py-3 border-b border-gray-50 flex items-center justify-between bg-white">
-                            <div className="flex items-center gap-2.5">
-                                <div className={`w-7 h-7 rounded-full flex items-center justify-center ${actionModal.action === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-                                    <span className="text-xs font-black">{actionModal.action === 'APPROVED' ? '₹' : '!'}</span>
-                                </div>
-                                <h3 className="text-[13px] font-black text-gray-800 uppercase tracking-tight">
-                                    {actionModal.action === 'APPROVED' ? 'Approval' : (actionModal.isReturn ? 'Return' : 'Reject')}
-                                </h3>
-                            </div>
-                            <button onClick={() => setActionModal(null)} className="p-1.5 hover:bg-gray-100 rounded-full text-gray-400 transition-all">
-                                <X size={16} />
-                            </button>
-                        </div>
+            <ExpenseActionModal
+                isOpen={!!actionModal}
+                onClose={() => setActionModal(null)}
+                actionData={actionModal}
+                onAction={handleAction}
+                registerBalance={registerBalance}
+            />
 
-                        {/* Detailed Summary - Ultra Compact Grid */}
-                        <div className="px-5 py-3 bg-slate-50/80 border-b border-slate-100/50">
-                            <div className="grid grid-cols-3 gap-x-4 gap-y-2">
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Voucher</p>
-                                    <p className="text-[10px] font-bold text-slate-900 truncate">{actionModal.expense.displayId?.split('-').pop() || '—'}</p>
-                                </div>
-                                <div className="col-span-2">
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Category</p>
-                                    <p className="text-[10px] font-bold text-slate-900 truncate">
-                                        {actionModal.expense.type?.split(' | ')[1] || actionModal.expense.type}
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Bill Amt</p>
-                                    <p className="text-[11px] font-black text-emerald-600">₹{actionModal.expense.amount.toLocaleString()}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Paid To</p>
-                                    <p className="text-[10px] font-bold text-slate-900 truncate">{actionModal.expense.paidTo || '—'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Date</p>
-                                    <p className="text-[10px] font-bold text-slate-900">{actionModal.expense.billDate ? format(new Date(actionModal.expense.billDate), 'dd MMM') : '—'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Created By</p>
-                                    <p className="text-[10px] font-bold text-slate-900 truncate">{actionModal.expense.user?.name || '—'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Mode</p>
-                                    <p className="text-[10px] font-bold text-slate-900 truncate">{actionModal.expense.paymentMode || '—'}</p>
-                                </div>
-                                <div>
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Status</p>
-                                    <span className={`text-[9px] font-black px-1.5 py-0.5 rounded-full uppercase border ${STATUS_STYLES[actionModal.expense.status] || 'bg-gray-50 border-gray-100'}`}>
-                                        {actionModal.expense.status}
-                                    </span>
-                                </div>
-                                <div className="col-span-3 mt-1 pt-2 border-t border-slate-100/60">
-                                    <p className="text-[8px] font-black uppercase text-slate-400 tracking-wider mb-0.5">Remarks</p>
-                                    <p className="text-[10px] text-slate-500 italic leading-relaxed">
-                                        {getRemarks(actionModal.expense.description) || '—'}
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {actionModal.action === 'APPROVED' ? (
-                            <>
-                                {/* Selection Tabs - Mini */}
-                                <div className="p-4 pb-2">
-                                    <div className="flex bg-gray-50 p-1 rounded-xl gap-1">
-                                        <button
-                                            onClick={() => {
-                                                setApprovalType('FULL');
-                                                setApprovedAmount(actionModal.expense.amount);
-                                                setPayingAmount(actionModal.expense.amount);
-                                                setBalance(0);
-                                            }}
-                                            className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${approvalType === 'FULL' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
-                                        >
-                                            Full
-                                        </button>
-                                        <button
-                                            onClick={() => {
-                                                setApprovalType('PARTIAL');
-                                                setApprovedAmount(actionModal.expense.amount);
-                                                setPayingAmount('');
-                                                setBalance(0);
-                                            }}
-                                            className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all ${approvalType === 'PARTIAL' ? 'bg-white text-orange-600 shadow-sm' : 'text-gray-400'}`}
-                                        >
-                                            Partial
-                                        </button>
-                                    </div>
-                                </div>
-
-                                {/* Form Body - Compact */}
-                                <div className="px-4 py-2 space-y-3">
-                                    <div className="grid grid-cols-2 gap-3">
-                                        {approvalType === 'PARTIAL' && (
-                                            <div className="space-y-1">
-                                            <label className="text-[9px] font-black uppercase text-gray-500 ml-1">Apprvd Amt</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">₹</span>
-                                                <input
-                                                    type="number"
-                                                    value={approvedAmount}
-                                                    onChange={e => {
-                                                        const val = e.target.value;
-                                                        const numVal = Number(val);
-                                                        setApprovedAmount(val);
-                                                        setBalance(actionModal.expense.amount - numVal);
-                                                    }}
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-6 pr-3 py-2 text-xs font-black outline-none focus:ring-2 focus:ring-emerald-500/10"
-                                                />
-                                            </div>
-                                            </div>
-                                        )}
-                                        <div className={approvalType === 'FULL' ? "col-span-2 space-y-1" : "space-y-1"}>
-                                            <label className="text-[9px] font-black uppercase text-gray-500 ml-1">Pay Now</label>
-                                            <div className="relative">
-                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[10px] font-bold">₹</span>
-                                                <input
-                                                    type="number"
-                                                    value={payingAmount}
-                                                    onChange={e => {
-                                                        const val = e.target.value;
-                                                        setPayingAmount(val);
-                                                        const approved = Number(approvedAmount || 0);
-                                                        const paid = Number(val || 0);
-                                                        setBalance(approved - paid);
-                                                    }}
-                                                    placeholder="0"
-                                                    className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-6 pr-3 py-2 text-xs font-black outline-none focus:ring-2 focus:ring-emerald-500/10"
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-[9px] font-black uppercase text-gray-500 ml-1">Remarks</label>
-                                        <textarea
-                                            rows={2}
-                                            value={remarks}
-                                            onChange={e => setRemarks(e.target.value)}
-                                            placeholder="Optional remarks..."
-                                            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-[11px] font-medium resize-none outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
-                                        />
-                                    </div>
-                                </div>
-
-                                {/* Footer - Mini */}
-                                <div className="px-4 py-4 bg-slate-50 border-t border-gray-100 flex items-center justify-between">
-                                    <div className="flex flex-col">
-                                        <p className="text-[9px] font-black text-slate-400 uppercase leading-none mb-1">Balance</p>
-                                        <p className="text-sm font-black text-orange-600 leading-none">₹{Number(balance || 0).toLocaleString()}</p>
-                                    </div>
-                                    <button
-                                        onClick={() => handleAction(actionModal.expenseId, 'APPROVED', {
-                                            remarks,
-                                            paymentDetails: {
-                                                type: approvalType,
-                                                approved: approvedAmount,
-                                                paid: payingAmount,
-                                                balance: balance
-                                            }
-                                        })}
-                                        className="bg-emerald-600 hover:bg-emerald-700 text-white px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-emerald-200"
-                                    >
-                                        Confirm
-                                    </button>
-                                </div>
-                            </>
-                        ) : (
-                            <div className="p-5 space-y-4">
-                                <div className="space-y-1.5">
-                                    <label className="text-[10px] font-black uppercase text-rose-500 ml-1">Reason for {actionModal.isReturn ? 'Return' : 'Rejection'} <span className="text-rose-600">*</span></label>
-                                    <textarea
-                                        rows={3}
-                                        value={remarks}
-                                        onChange={e => setRemarks(e.target.value)}
-                                        placeholder={`Please explain why this is being ${actionModal.isReturn ? 'returned' : 'rejected'}...`}
-                                        className="w-full bg-rose-50/30 border border-rose-100 rounded-xl px-4 py-3 text-xs font-medium resize-none outline-none focus:ring-2 focus:ring-rose-500/10 transition-all"
-                                    />
-                                </div>
-                                <div className="flex gap-3">
-                                    <button onClick={() => setActionModal(null)} className="flex-1 py-2.5 rounded-xl border border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-all">
-                                        Cancel
-                                    </button>
-                                    <button
-                                        disabled={!remarks.trim()}
-                                        onClick={() => handleAction(actionModal.expenseId, actionModal.isReturn ? 'RETURNED' : 'REJECTED', { remarks })}
-                                        className="flex-1 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg shadow-rose-200"
-                                    >
-                                        Confirm {actionModal.isReturn ? 'Return' : 'Reject'}
-                                    </button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
+            {/* Detail Modal - Keep as is or optimize later if needed */}
 
             {/* Bill Preview */}
             {selectedExpense && (
