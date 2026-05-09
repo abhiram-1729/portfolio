@@ -150,62 +150,68 @@ export default function AdminExpenses() {
 
     if (isGlobalRole && !storeId) {
         return (
-            <div className="space-y-8 animate-in fade-in duration-700">
+            <div className="space-y-6 animate-in fade-in duration-700">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-3xl font-black text-gray-900 tracking-tight">Organization Expenses</h2>
                     <p className="text-sm font-medium text-gray-500 uppercase tracking-widest italic">Global Expenditure Monitoring & Approval Pipeline</p>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 max-w-5xl">
-                    {stores.map(store => {
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="bg-gray-50/50">
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Branch Details</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Total Expenditure</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Requests</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Pending Review</th>
+                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {stores.map(store => {
                         const stats = branchStats[store.id] || { count: 0, total: 0, pending: 0 };
                         return (
-                            <div 
-                                key={store.id}
-                                onClick={() => setSearchParams({ storeId: store.id })}
-                                className="group bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 hover:border-emerald-100 transition-all cursor-pointer relative overflow-hidden"
-                            >
-                                <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
-                                    <Receipt size={120} />
+                          <tr 
+                            key={store.id} 
+                            onClick={() => setSearchParams({ storeId: store.id })}
+                            className="hover:bg-emerald-50/30 transition-all cursor-pointer group"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-300">
+                                  <Building2 size={20} />
                                 </div>
-
-                                <div className="relative z-10 flex items-center justify-between gap-8">
-                                    <div className="flex items-center gap-6">
-                                        <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shrink-0">
-                                            <Building2 size={32} strokeWidth={2.5} />
-                                        </div>
-                                        <div className="flex flex-col">
-                                            <h3 className="text-xl font-black text-gray-900 tracking-tight group-hover:text-emerald-600 transition-colors">{store.name}</h3>
-                                            <div className="flex items-center gap-2 mt-1">
-                                                <span className="text-[10px] font-black px-2.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-md uppercase tracking-widest">
-                                                    {store.code || 'BRANCH'}
-                                                </span>
-                                                <span className="text-xs font-bold text-gray-400 uppercase tracking-tighter flex items-center gap-1.5">
-                                                    • {store.address || 'Location Unspecified'}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-12">
-                                        <div className="hidden lg:flex flex-col items-end">
-                                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Expenditure</span>
-                                            <span className="text-sm font-bold text-gray-900 mt-1">₹{stats.total.toLocaleString()} <span className="text-[10px] text-gray-400 ml-1">({stats.count} Requests)</span></span>
-                                        </div>
-                                        <div className="hidden md:flex flex-col items-end border-l border-gray-100 pl-12">
-                                            <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Pending Review</span>
-                                            <span className={`text-sm font-bold mt-1 ${stats.pending > 0 ? 'text-orange-500' : 'text-emerald-500'}`}>
-                                                {stats.pending} Required
-                                            </span>
-                                        </div>
-                                        <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
-                                            <ChevronRight size={24} strokeWidth={3} />
-                                        </div>
-                                    </div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-black text-gray-900 group-hover:text-emerald-600 transition-colors">{store.name}</span>
+                                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mt-1">{store.code || 'BRANCH'}</span>
                                 </div>
-                            </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-sm font-black text-gray-900">₹{stats.total.toLocaleString()}</span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-2.5 py-1 rounded-md">{stats.count} REQS</span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-full border ${
+                                stats.pending > 0 ? 'bg-orange-50 text-orange-600 border-orange-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+                              }`}>
+                                {stats.pending} Pending
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex justify-end">
+                                <div className="w-8 h-8 rounded-full bg-gray-50 text-gray-400 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                                  <ChevronRight size={14} strokeWidth={3} />
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
                         );
-                    })}
+                      })}
+                    </tbody>
+                  </table>
                 </div>
             </div>
         );
@@ -306,241 +312,157 @@ export default function AdminExpenses() {
                             </div>
                         ) : (
                             <>
-                                {/* Mobile Card View */}
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:hidden">
-                                    {expenses.map((exp) => (
-                                        <div key={exp.id} className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden hover:shadow-md transition-shadow group flex flex-col h-full">
-                                            <div className="p-5 flex-1 space-y-4">
-                                                <div className="flex items-start justify-between">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                                            exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600' : 
-                                                            exp.status === 'REJECTED' ? 'bg-rose-50 text-rose-600' : 'bg-orange-50 text-orange-600'
-                                                        }`}>
-                                                            <Receipt size={20} />
-                                                        </div>
-                                                        <div>
-                                                            <h4 className="text-sm font-black text-gray-900 tracking-tight">{exp.type}</h4>
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-[9px] font-black text-gray-400">{format(new Date(exp.createdAt), 'hh:mm a')}</span>
-                                                                <span className={`text-[8px] font-black uppercase px-1.5 py-0.5 rounded-md ${
-                                                                    exp.paymentMode === 'CASH' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'
-                                                                }`}>
-                                                                    {exp.paymentMode}
-                                                                </span>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <span className="text-base font-black text-gray-900">₹{exp.amount.toLocaleString()}</span>
-                                                </div>
-
-                                                <div className="bg-gray-50 p-3 rounded-2xl space-y-1.5 border border-gray-100">
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-tight">
-                                                        <User size={12} className="text-emerald-500" />
-                                                        <span>{exp.user?.name}</span>
-                                                    </div>
-                                                    <div className="flex items-center gap-2 text-[10px] font-black text-gray-500 uppercase tracking-tight">
-                                                        <Truck size={12} className="text-blue-500" />
-                                                        <span>{exp.vehicle?.vehicleNumber}</span>
-                                                    </div>
-                                                    {exp.description && (
-                                                        <p className="text-[10px] text-gray-500 font-bold italic mt-1 bg-white p-2 rounded-lg border border-gray-100">
-                                                            "{exp.description}"
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-
-                                            <div className="px-5 pb-5">
-                                              {exp.status === 'PENDING' ? (
-                                                  <div className="flex gap-2">
-                                                      {can('EXPENSES', 'UPDATE') ? (
-                                                        <>
-                                                          <button 
-                                                              onClick={() => handleAction(exp.id, 'APPROVED')}
-                                                              className="flex-1 bg-emerald-600 text-white py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20"
-                                                          >
-                                                              Approve
-                                                          </button>
-                                                          <button 
-                                                              onClick={() => handleAction(exp.id, 'REJECTED')}
-                                                              className="flex-1 bg-gray-100 text-gray-400 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest"
-                                                          >
-                                                              Reject
-                                                          </button>
-                                                        </>
-                                                      ) : (
-                                                        <span className="flex-1 text-center text-[8px] font-black text-orange-500 uppercase py-2 bg-orange-50 rounded-xl">Pending Action</span>
-                                                      )}
-                                                  </div>
-                                              ) : (
-                                                  <div className={`py-2 px-4 rounded-xl text-center font-black text-[10px] uppercase tracking-widest border ${
-                                                      exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-rose-50 text-rose-600 border-rose-100'
-                                                  }`}>
-                                                      {exp.status}
-                                                  </div>
-                                              )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-
-                                {/* Desktop Table View */}
-                                <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-                                  <table className="w-full text-left border-collapse">
-                                    <thead>
-                                      <tr className="bg-gray-50/50">
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Expense Detail</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Field Staff</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Amount</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                                      </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-50">
-                                      {expenses.map((exp) => (
-                                        <tr key={exp.id} className="hover:bg-gray-50/30 transition-colors group">
-                                          <td className="px-6 py-4 border-r border-gray-50 group-hover:border-transparent">
-                                            <div className="flex items-center gap-4">
-                                              <div 
-                                                className={`w-10 h-10 rounded-xl flex items-center justify-center cursor-pointer transition-transform hover:scale-105 shadow-sm ${exp.billImage ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-100 border border-gray-200'}`}
-                                                onClick={() => exp.billImage && setSelectedExpense(exp)}
+                        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mb-6">
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse min-w-[800px] md:min-w-full">
+                              <thead>
+                                <tr className="bg-gray-50/50">
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Preview</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Expense Type</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Reference ID</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Payment</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Time</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Field Staff</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Amount</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-gray-50">
+                                {expenses.map((exp) => (
+                                  <tr key={exp.id} className="hover:bg-gray-50/30 transition-colors group">
+                                    <td className="px-4 py-2 border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <div 
+                                        className={`w-8 h-8 rounded-lg flex items-center justify-center cursor-pointer transition-transform hover:scale-105 shadow-sm ${exp.billImage ? 'bg-emerald-50 border border-emerald-100' : 'bg-gray-100 border border-gray-200'}`}
+                                        onClick={() => exp.billImage && setSelectedExpense(exp)}
+                                      >
+                                        {exp.billImage ? <Eye size={14} className="text-emerald-600" /> : <Receipt size={14} className="text-gray-400" />}
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <span className="text-[11px] font-black text-gray-900 tracking-tight">{exp.type}</span>
+                                    </td>
+                                    <td className="px-4 py-2 text-center border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      {exp.displayId ? (
+                                        <span className="text-[8px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded-md border border-teal-100 tracking-wider">
+                                          {exp.displayId}
+                                        </span>
+                                      ) : (
+                                        <span className="text-[8px] font-bold text-gray-300">--</span>
+                                      )}
+                                    </td>
+                                    <td className="px-4 py-2 text-center border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <span className={`text-[7px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-md border ${exp.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
+                                        {exp.paymentMode}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2 text-center border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <span className="text-[9px] font-black text-gray-400 uppercase">{format(new Date(exp.createdAt), 'hh:mm a')}</span>
+                                    </td>
+                                    <td className="px-4 py-2 text-center border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <div className="flex items-center justify-center gap-2">
+                                        <span className="text-[10px] font-black text-gray-700">{exp.user?.name}</span>
+                                        <span className="text-[8px] font-black text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-100 uppercase">
+                                          {exp.vehicle?.vehicleNumber}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-4 py-2 text-center border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <span className="text-[11px] font-black text-gray-900">₹{exp.amount.toLocaleString()}</span>
+                                    </td>
+                                    <td className="px-4 py-2 text-center border-r border-gray-50 group-hover:border-transparent whitespace-nowrap">
+                                      <span className={`inline-flex px-2 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest border ${
+                                        exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
+                                        exp.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-orange-50 text-orange-600 border-orange-100'
+                                      }`}>
+                                        {exp.status}
+                                      </span>
+                                    </td>
+                                    <td className="px-4 py-2 text-right whitespace-nowrap">
+                                      {exp.status === 'PENDING' ? (
+                                        <div className="flex items-center justify-end gap-1.5">
+                                          {can('EXPENSES', 'UPDATE') ? (
+                                            <>
+                                              <button 
+                                                onClick={() => handleAction(exp.id, 'APPROVED')}
+                                                className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-600 hover:text-white transition-all border border-emerald-50"
                                               >
-                                                {exp.billImage ? <Eye size={18} className="text-emerald-600" /> : <Receipt size={18} className="text-gray-400" />}
-                                              </div>
-                                              <div className="flex flex-col min-w-0">
-                                                <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{exp.type}</span>
-                                                {exp.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded w-fit tracking-wider mb-1">{exp.displayId}</span>}
-                                                <div className="flex items-center gap-2">
-                                                  <span className={`text-[8px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded-lg border ${exp.paymentMode === 'CASH' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-blue-50 text-blue-600 border-blue-100'}`}>
-                                                    {exp.paymentMode}
-                                                  </span>
-                                                  <span className="text-[10px] font-bold text-gray-400">{format(new Date(exp.createdAt), 'hh:mm a')}</span>
-                                                </div>
-                                              </div>
-                                            </div>
-                                          </td>
-                                          <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                                            <div className="flex flex-col items-center gap-1">
-                                              <span className="text-xs font-black text-gray-700">{exp.user?.name}</span>
-                                              <div className="flex items-center gap-1 text-[9px] font-black text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
-                                                <Truck size={10} />
-                                                {exp.vehicle?.vehicleNumber}
-                                              </div>
-                                            </div>
-                                          </td>
-                                          <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                                            <span className="text-sm font-black text-gray-900">₹{exp.amount.toLocaleString()}</span>
-                                          </td>
-                                          <td className="px-6 py-4 text-center border-r border-gray-50 group-hover:border-transparent">
-                                            <span className={`inline-flex px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                                              exp.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 
-                                              exp.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-100' : 'bg-orange-50 text-orange-600 border-orange-100'
-                                            }`}>
-                                              {exp.status}
-                                            </span>
-                                          </td>
-                                          <td className="px-6 py-4 text-right">
-                                            {exp.status === 'PENDING' ? (
-                                              <div className="flex items-center justify-end gap-2">
-                                                {can('EXPENSES', 'UPDATE') ? (
-                                                  <>
-                                                    <button 
-                                                      onClick={() => handleAction(exp.id, 'APPROVED')}
-                                                      className="p-2 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-600 hover:text-white transition-all shadow-sm border border-emerald-100"
-                                                    >
-                                                      <Check size={16} strokeWidth={3} />
-                                                    </button>
-                                                    <button 
-                                                      onClick={() => handleAction(exp.id, 'REJECTED')}
-                                                      className="p-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-600 hover:text-white transition-all shadow-sm border border-rose-100"
-                                                    >
-                                                      <X size={16} strokeWidth={3} />
-                                                    </button>
-                                                  </>
-                                                ) : (
-                                                  <span className="text-[9px] font-black text-orange-400 uppercase tracking-widest bg-orange-50 px-2 py-1 rounded-lg">Awaiting Decision</span>
-                                                )}
-                                              </div>
-                                            ) : (
-                                              <div className="flex items-center justify-end text-[9px] font-black text-gray-300 uppercase tracking-widest">
-                                                Finalized
-                                              </div>
-                                            )}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                </div>
+                                                <Check size={12} strokeWidth={4} />
+                                              </button>
+                                              <button 
+                                                onClick={() => handleAction(exp.id, 'REJECTED')}
+                                                className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-600 hover:text-white transition-all border border-rose-50"
+                                              >
+                                                <X size={12} strokeWidth={4} />
+                                              </button>
+                                            </>
+                                          ) : (
+                                            <span className="text-[7px] font-black text-orange-400 uppercase tracking-widest px-1.5 py-0.5 bg-orange-50 rounded-md">Pending</span>
+                                          )}
+                                        </div>
+                                      ) : (
+                                        <div className="text-[7px] font-black text-gray-300 uppercase tracking-widest">
+                                          Done
+                                        </div>
+                                      )}
+                                    </td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
                             </>
                         )}
                     </div>
                 </>
             ) : (
                 <div className="space-y-6">
-                    {/* Desktop Categories Table */}
-                    <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                      <table className="w-full text-left border-collapse">
-                        <thead>
-                          <tr className="bg-gray-50/50">
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Category Name</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly Limit</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-50">
-                          {categories.map(cat => (
-                            <tr key={cat.id} className="hover:bg-emerald-50/10 transition-colors">
-                              <td className="px-6 py-4">
-                                <div className="flex items-center gap-3">
-                                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 border border-gray-100">
-                                    <Receipt size={20} />
-                                  </div>
-                                  <span className="text-sm font-black text-gray-900 tracking-tight">{cat.name}</span>
-                                </div>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className={`text-sm font-black ${cat.limit ? 'text-gray-900' : 'text-gray-300 italic'}`}>
-                                  {cat.limit ? `₹${cat.limit.toLocaleString()}` : 'No Limit Set'}
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-center">
-                                <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
-                                  <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                  Active
-                                </span>
-                              </td>
-                              <td className="px-6 py-4 text-right">
-                                {can('EXPENSES', 'UPDATE') && (
-                                  <button className="p-2 text-gray-300 hover:text-emerald-600 transition-colors">
-                                    <Settings size={16} />
-                                  </button>
-                                )}
-                              </td>
+                    <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left border-collapse min-w-[600px] md:min-w-full">
+                          <thead>
+                            <tr className="bg-gray-50/50">
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Category Name</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Monthly Limit</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                              <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-
-                    {/* Mobile Categories Grid */}
-                    <div className="md:hidden grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {categories.map(cat => (
-                            <div key={cat.id} className="bg-white p-6 rounded-[2rem] border border-slate-100 shadow-sm space-y-4 hover:border-emerald-200 transition-colors">
-                                <div className="flex items-center justify-between">
-                                  <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-slate-600">
+                          </thead>
+                          <tbody className="divide-y divide-gray-50">
+                            {categories.map(cat => (
+                              <tr key={cat.id} className="hover:bg-emerald-50/10 transition-colors">
+                                <td className="px-6 py-4">
+                                  <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 border border-gray-100">
                                       <Receipt size={20} />
+                                    </div>
+                                    <span className="text-sm font-black text-gray-900 tracking-tight">{cat.name}</span>
                                   </div>
-                                  <span className="text-[9px] font-black uppercase text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100">Active</span>
-                                </div>
-                                <div className="space-y-1">
-                                    <h4 className="text-sm font-black uppercase tracking-tight text-slate-900">{cat.name}</h4>
-                                    <p className="text-[10px] font-bold text-slate-400">Monthly Limit: {cat.limit ? `₹${cat.limit.toLocaleString()}` : 'No Limit'}</p>
-                                </div>
-                            </div>
-                        ))}
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  <span className={`text-sm font-black ${cat.limit ? 'text-gray-900' : 'text-gray-300 italic'}`}>
+                                    {cat.limit ? `₹${cat.limit.toLocaleString()}` : 'No Limit Set'}
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-center">
+                                  <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full text-[9px] font-black uppercase tracking-widest border border-emerald-100">
+                                    <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                    Active
+                                  </span>
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  {can('EXPENSES', 'UPDATE') && (
+                                    <button className="p-2 text-gray-300 hover:text-emerald-600 transition-colors">
+                                      <Settings size={16} />
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                 </div>
             )}

@@ -42,7 +42,7 @@ const StockLedgerSection = () => {
           {['', 'PURCHASE', 'SALE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'].map(t => (
             <button key={t} onClick={() => setTypeFilter(t)}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                typeFilter === t ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-200'
+                typeFilter === t ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-emerald-200'
               }`}>{t || 'All Types'}</button>
           ))}
         </div>
