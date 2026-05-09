@@ -194,6 +194,7 @@ export default function AdminInventory() {
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       setLoadingMaster(true);
       setLoadingInventory(true);
       setLoadingRefills(true);
@@ -213,50 +214,56 @@ export default function AdminInventory() {
       setIntakeItems([]);
       setVehicleInventory([]);
 
-      const [iRes, vRes, sRes, cRes, unitsRes, subRes, storeRes, aRes, stockRes, salesRes, usersRes] = await Promise.all([
-        adminAPI.getItems({
-          storeId: activeTab === 'main_master' ? undefined : storeFilterId,
-          all: activeTab === 'main_master' ? 'true' : undefined
-        }).finally(() => setLoadingMaster(false)),
-        adminAPI.getVehicles({ storeId: storeFilterId }).finally(() => setLoadingVehicles(false)),
-        adminAPI.getSettings(),
-        adminAPI.getCategories(),
-        adminAPI.getUnits(),
-        adminAPI.getSubCategories(),
+      // 1. Primary Mega-Fetch (Consolidated from newexpenses)
+      const { data: initData } = await adminAPI.getInventoryInit({ 
+        storeId: activeTab === 'main_master' ? undefined : storeFilterId 
+      });
+      
+      if (initData?.success) {
+        setItems(initData.items || []);
+        setVehicles(initData.vehicles || []);
+        setCategories(initData.categories || []);
+        setSubCategories(initData.subCategories || []);
+        setUnits(initData.units || []);
+        setRefillRequests(initData.refillRequests || []);
+        setAllVehiclesStock(initData.vehicleStock || {});
+
+        const settings = initData.settings?.find(s => s.storeId === storeFilterId) || initData.settings?.[0];
+        if (settings?.taxRates) {
+          setTaxRates(settings.taxRates.split(',').map(r => r.trim()));
+        } else {
+          setTaxRates(['0', '5', '12', '18']); // Default fallback
+        }
+      }
+
+      // 2. Secondary Fetches (Settled so one failure doesn't crash the page)
+      const results = await Promise.allSettled([
+        adminAPI.getAuditHistory({ storeId: storeFilterId }),
+        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }) : Promise.resolve({ data: [] }),
         adminAPI.getStores(),
-        adminAPI.getAuditHistory({ storeId: storeFilterId }).finally(() => setLoadingAudit(false)),
-        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }).finally(() => setLoadingInventory(false)) : Promise.resolve({ data: [] }),
         adminAPI.getSales().catch(() => ({ data: [] })),
         adminAPI.getUsers().catch(() => ({ data: [] }))
       ]);
 
-      // Handle refills separately if it exists in another call or similar
-      setLoadingRefills(false);
-
-      setItems(iRes.data);
-      setVehicles(vRes.data);
-      setAuditHistory(aRes.data || []);
-      setCategories(cRes.data || []);
-      setSubCategories(subRes.data || []);
-      setUnits(unitsRes.data || []);
-      setWarehouseStock(stockRes.data || []);
-      if (sRes.data?.success && sRes.data?.data?.taxRates) {
-        setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
-      }
-      if (storeRes.data?.success) {
-        const fetchedStores = storeRes.data.data;
+      // Process settled results
+      if (results[0].status === 'fulfilled') setAuditHistory(results[0].value.data || []);
+      if (results[1].status === 'fulfilled') setWarehouseStock(results[1].value.data || []);
+      if (results[2].status === 'fulfilled' && results[2].value.data?.success) {
+        const fetchedStores = results[2].value.data.data;
         setStores(fetchedStores);
-        // Auto-select if only one store exists
+        // Auto-select if only one store exists (HEAD logic)
         if (fetchedStores.length === 1 && !storeFilterId) {
           const params = new URLSearchParams(searchParams);
           params.set('storeId', fetchedStores[0].id);
           setSearchParams(params);
         }
       }
-      setSales(salesRes.data || []);
-      setUsers(usersRes.data || []);
+      if (results[3].status === 'fulfilled') setSales(results[3].value.data || []);
+      if (results[4].status === 'fulfilled') setUsers(results[4].value.data || []);
     } catch (error) {
-      toast.error('Failed to fetch inventory data');
+      console.error('❌ fetchData Error:', error);
+      const msg = error.response?.data?.message || 'Failed to fetch inventory data';
+      toast.error(msg);
     } finally {
       setLoading(false);
       setLoadingMaster(false);
@@ -490,21 +497,26 @@ export default function AdminInventory() {
     }
   };
 
-  const loadAllVehiclesStock = async () => {
+  const loadAllVehiclesStock = async (force = false) => {
     if (vehicles.length === 0) return;
-    setLoadingTracking(true);
+    
+    // Skip if we already have data from the Mega-Fetch (unless forced)
+    if (!force && Object.keys(allVehiclesStock).length > 0) return;
+
     try {
-      // Fetch sequentially to prevent connection pool exhaustion (500 errors)
-      // We update incrementally to improve UX
-      for (const v of vehicles) {
-        try {
-          const res = await adminAPI.getVehicleInventory(v.id);
-          setAllVehiclesStock(prev => ({ ...prev, [v.id]: res.data }));
-        } catch (innerErr) {
-          console.error(`Failed to load stock for vehicle ${v.id}:`, innerErr);
+      // Use Promise.allSettled for much faster parallel fetching than the previous sequential loop
+      const results = await Promise.allSettled(vehicles.map(v => adminAPI.getVehicleInventory(v.id)));
+      
+      const stockMap = {};
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          stockMap[vehicles[idx].id] = res.value.data;
         }
-      }
+      });
+      
+      setAllVehiclesStock(prev => ({ ...prev, ...stockMap }));
     } catch (err) {
+      console.error('❌ loadAllVehiclesStock Error:', err);
       toast.error('Failed to load tracking data for all vehicles');
     } finally {
       setLoadingTracking(false);
@@ -937,6 +949,7 @@ export default function AdminInventory() {
       setStockQuantities({});
       setShowLoadConfirmModal(false);
     } catch (error) {
+      console.error('❌ Load Error:', error);
       const msg = error.response?.data?.message || 'Failed to load stock';
       toast.error(msg);
     } finally {
@@ -977,7 +990,9 @@ export default function AdminInventory() {
       setStockQuantities({});
       if (type === 'RETURN') fetchVehicleInventory(selectedVehicleId);
     } catch (error) {
-      toast.error(`Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`);
+      console.error(`❌ ${type} Error:`, error);
+      const msg = error.response?.data?.message || `Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`;
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }

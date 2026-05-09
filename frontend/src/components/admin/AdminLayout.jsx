@@ -54,7 +54,7 @@ function cn(...inputs) {
 }
 
 export default function AdminLayout() {
-  const { clearUser, user } = useUserStore();
+  const { clearUser, user, refreshUserProfile } = useUserStore();
   const unreadCount = useNotificationStore(s => s.unreadCount);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
@@ -63,6 +63,10 @@ export default function AdminLayout() {
   const userDropdownRef = React.useRef(null);
   const [lastOpenedMenu, setLastOpenedMenu] = React.useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    refreshUserProfile();
+  }, []);
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const [openMenus, setOpenMenus] = React.useState({

@@ -10,6 +10,9 @@ export default function Sidebar({ isOpen, onClose }) {
   const location = useLocation();
 
   const handleLogout = () => {
+    import('../services/locationService').then(service => {
+      service.stopLiveTracking();
+    });
     clearUser();
     onClose();
   };

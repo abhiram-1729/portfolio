@@ -99,40 +99,19 @@ export const createPurchase = async (req, res) => {
           });
         }
 
-        // 1. Bulk Update Product Master (Prices, GST, Landing)
-        const masterUpdates = new Map();
-        items.forEach(i => {
-          masterUpdates.set(i.productId, i);
+        // A. Bulk Update Product Master Stock and Latest Purchase Price
+        const productValues = entries.map(([pId, qty]) => {
+          // Find the latest price for this product in the invoice items
+          const itemPrice = items.find(i => i.productId === pId)?.price || 0;
+          return Prisma.sql`(${pId}, ${qty}::int, ${parseFloat(itemPrice)}::float)`;
         });
 
-        const masterEntries = Array.from(masterUpdates.entries());
-        if (masterEntries.length > 0) {
-          const productValues = masterEntries.map(([pId, item]) => {
-            const itemPrice = parseFloat(item.price || item.unitCostBeforeTax || 0);
-            const sellPrice = parseFloat(item.unitSellingPrice || 0);
-            const netCost = parseFloat(item.netCost || itemPrice);
-            const gst = parseFloat(item.taxPercent || 0);
-            return Prisma.sql`(${pId}, ${itemPrice}::float, ${sellPrice}::float, ${netCost}::float, ${gst}::float)`;
-          });
-
-          await tx.$executeRaw`
-            UPDATE "Product"
-            SET 
-              "landingPrice" = CASE WHEN v.l_price > 0 THEN v.l_price ELSE "Product"."landingPrice" END,
-              "price" = CASE WHEN v.s_price > 0 THEN v.s_price ELSE "Product"."price" END,
-              "purchasePrice" = CASE WHEN v.p_price > 0 THEN v.p_price ELSE "Product"."purchasePrice" END,
-              "gst" = v.gst
-            FROM (VALUES ${Prisma.join(productValues)}) AS v(id, l_price, s_price, p_price, gst)
-            WHERE "Product".id = v.id
-          `;
-        }
-
-        // 2. Handle Stock Increments
-        const stockValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
         await tx.$executeRaw`
           UPDATE "Product"
-          SET stock = "Product".stock + v.qty
-          FROM (VALUES ${Prisma.join(stockValues)}) AS v(id, qty)
+          SET 
+            stock = "Product".stock + v.qty,
+            "landingPrice" = v.l_price
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty, l_price)
           WHERE "Product".id = v.id
         `;
 
@@ -319,49 +298,19 @@ export const updatePurchase = async (req, res) => {
           netChanges.set(i.productId, (netChanges.get(i.productId) || 0) + qty);
         });
 
-        // 1. Bulk Update Product Master (Prices, GST, Landing) - For all items in the request
-        const masterUpdates = new Map();
-        items.forEach(i => {
-          // Use the last occurrence of a product to define its master settings
-          masterUpdates.set(i.productId, i);
-        });
-
-        const masterEntries = Array.from(masterUpdates.entries());
-        if (masterEntries.length > 0) {
-          const productValues = masterEntries.map(([pId, item]) => {
-            const itemPrice = parseFloat(item.price || item.unitCostBeforeTax || 0);
-            const sellPrice = parseFloat(item.unitSellingPrice || 0);
-            const netCost = parseFloat(item.netCost || itemPrice);
-            const gst = parseFloat(item.taxPercent || 0);
-            return Prisma.sql`(${pId}, ${itemPrice}::float, ${sellPrice}::float, ${netCost}::float, ${gst}::float)`;
-          });
-
-          await tx.$executeRaw`
-            UPDATE "Product"
-            SET 
-              "landingPrice" = CASE WHEN v.l_price > 0 THEN v.l_price ELSE "Product"."landingPrice" END,
-              "price" = CASE WHEN v.s_price > 0 THEN v.s_price ELSE "Product"."price" END,
-              "purchasePrice" = CASE WHEN v.p_price > 0 THEN v.p_price ELSE "Product"."purchasePrice" END,
-              "gst" = v.gst
-            FROM (VALUES ${Prisma.join(productValues)}) AS v(id, l_price, s_price, p_price, gst)
-            WHERE "Product".id = v.id
-          `;
-        }
-
-        // 2. Handle Stock Adjustments - Only for non-zero deltas
-        const stockEntries = Array.from(netChanges.entries()).filter(([_, qty]) => qty !== 0);
-        if (stockEntries.length > 0) {
-          const stockValues = stockEntries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
-          
+        const entries = Array.from(netChanges.entries()).filter(([_, qty]) => qty !== 0);
+        if (entries.length > 0) {
+          // A. Bulk Update Product Master Stock
+          const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
           await tx.$executeRaw`
             UPDATE "Product"
             SET stock = "Product".stock + v.qty
-            FROM (VALUES ${Prisma.join(stockValues)}) AS v(id, qty)
+            FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
             WHERE "Product".id = v.id
           `;
 
           // B. Bulk Upsert Warehouse Inventory
-          const wiValues = stockEntries.map(([pId, qty]) => {
+          const wiValues = entries.map(([pId, qty]) => {
             const tempId = `pwi_upd_${Math.random().toString(36).substring(2, 11)}`;
             return Prisma.sql`(${tempId}, ${existing.tenantId}, ${warehouse.id}, ${pId}, ${qty}::int)`;
           });
@@ -375,12 +324,12 @@ export const updatePurchase = async (req, res) => {
 
           // C. Record in Procurement Stock Ledger
           const currentWIs = await tx.warehouseInventory.findMany({
-            where: { warehouseId: warehouse.id, productId: { in: stockEntries.map(e => e[0]) } }
+            where: { warehouseId: warehouse.id, productId: { in: entries.map(e => e[0]) } }
           });
           const currentWIMap = new Map(currentWIs.map(wi => [wi.productId, wi.quantity]));
 
           await tx.procurementStockLedger.createMany({
-            data: stockEntries.map(([pId, qty]) => ({
+            data: entries.map(([pId, qty]) => ({
               tenantId: existing.tenantId,
               storeId: existing.storeId,
               productId: pId,
@@ -402,18 +351,7 @@ export const updatePurchase = async (req, res) => {
             productId: item.productId,
             quantity: parseInt(item.quantity) || 0,
             price: parseFloat(item.price) || 0,
-            unitCostBeforeDiscount: parseFloat(item.unitCostBeforeDiscount) || 0,
-            discountPercent: parseFloat(item.discountPercent) || 0,
-            unitCostBeforeTax: parseFloat(item.unitCostBeforeTax) || 0,
-            subtotalBeforeTax: parseFloat(item.subtotalBeforeTax) || 0,
-            taxType: item.taxType || 'NONE',
-            taxPercent: parseFloat(item.taxPercent) || 0,
-            netCost: parseFloat(item.netCost) || 0,
-            profitMargin: parseFloat(item.profitMargin) || 0,
-            unitSellingPrice: parseFloat(item.unitSellingPrice) || 0,
-            mfgDate: item.mfgDate ? new Date(item.mfgDate) : null,
-            expDate: item.expDate ? new Date(item.expDate) : null,
-            total: parseFloat(item.total) || ((parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0))
+            total: (parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0)
           }))
         });
       }

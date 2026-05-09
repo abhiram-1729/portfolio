@@ -149,6 +149,12 @@ export const markCoverage = async (req, res, next) => {
         const activeShift = shifts.find(s => s.id === shiftId || s.name === shiftName || s.name.toUpperCase() === slot);
 
         const effectiveShiftName = activeShift ? activeShift.name : slot;
+        
+        if (!effectiveShiftName || typeof effectiveShiftName !== 'string') {
+            console.error('[MarkCoverage] Invalid Shift Name:', { effectiveShiftName, slot, shiftId, shiftName });
+            res.status(400);
+            throw new Error('Valid shift name or slot is required');
+        }
 
         // Upsert DailyCoverage record
         const existing = await prisma.dailyCoverage.findUnique({
@@ -166,7 +172,7 @@ export const markCoverage = async (req, res, next) => {
         const eveningDone = effectiveShiftName.toUpperCase() === 'EVENING' || !!shiftStatus['Evening'];
 
         // Calculate overall status
-        const allDone = shifts.every(s => shiftStatus[s.name]);
+        const allDone = shifts && shifts.length > 0 ? shifts.every(s => shiftStatus[s.name]) : true;
         const coverageStatus = allDone ? 'BOTH_DONE' : (Object.keys(shiftStatus).length > 0 ? 'PARTIAL' : 'PENDING');
 
         const coverage = await prisma.dailyCoverage.upsert({

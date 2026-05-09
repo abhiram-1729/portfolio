@@ -750,24 +750,33 @@ model StoreDeposit {
 }
 
 model Expense {
-  id          String             @id @default(cuid())
-  userId      String
-  vehicleId   String?
-  type        String
-  amount      Float
-  paymentMode ExpensePaymentMode
-  description String?
-  billImage   String?
-  status      ExpenseStatus      @default(PENDING)
-  date        String
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-  tenantId    String             @default("VK001")
-  storeId     String?
-  displayId   String?            @unique
-  user        User               @relation(fields: [userId], references: [id])
-  vehicle     Vehicle?           @relation(fields: [vehicleId], references: [id])
-  store       Store?             @relation(fields: [storeId], references: [id])
+  id                   String             @id @default(cuid())
+  userId               String
+  vehicleId            String?
+  type                 String
+  // expenseSubCategoryId String?
+  amount               Float
+  // taxableAmount        Float?             @default(0)
+  // gstAmount            Float?             @default(0)
+  // gstNumber            String?
+  // vendorBillNumber     String?
+  paymentMode          ExpensePaymentMode
+  description          String?
+  billImage            String?
+  status               ExpenseStatus      @default(PENDING)
+  date                 String
+  paidTo               String?
+  paidDate             String?
+  billDate             String?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+  tenantId             String             @default("VK001")
+  storeId              String?
+  displayId            String?            @unique
+  user                 User               @relation(fields: [userId], references: [id])
+  vehicle              Vehicle?           @relation(fields: [vehicleId], references: [id])
+  store                Store?             @relation(fields: [storeId], references: [id])
+  // subCategory          ExpenseSubCategory? @relation(fields: [expenseSubCategoryId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
@@ -775,6 +784,7 @@ model Expense {
   @@index([date])
   @@index([status])
   @@index([storeId])
+  // @@index([expenseSubCategoryId])
 }
 
 model CashTransfer {
@@ -800,17 +810,34 @@ model CashTransfer {
 }
 
 model ExpenseCategory {
-  id        String   @id @default(cuid())
-  name      String
-  limit     Float?
-  status    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tenantId  String   @default("VK001")
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  id           String               @id @default(cuid())
+  name         String
+  limit        Float?
+  status       Boolean              @default(true)
+  createdAt    DateTime             @default(now())
+  updatedAt    DateTime             @updatedAt
+  tenantId     String               @default("VK001")
+  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  subCategories ExpenseSubCategory[]
 
   @@unique([tenantId, name])
   @@index([tenantId])
+}
+
+model ExpenseSubCategory {
+  id                String          @id @default(cuid())
+  tenantId          String          @default("VK001")
+  expenseCategoryId String
+  name              String
+  status            Boolean         @default(true)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  category          ExpenseCategory @relation(fields: [expenseCategoryId], references: [id], onDelete: Cascade)
+  // expenses          Expense[]
+
+  @@unique([tenantId, expenseCategoryId, name])
+  @@index([tenantId])
+  @@index([expenseCategoryId])
 }
 
 model DailyCoverage {
@@ -1762,6 +1789,9 @@ model SessionSales {
 enum ExpensePaymentMode {
   CASH
   UPI
+  CARD
+  CHEQUE
+  BANK_TRANSFER
 }
 
 enum ExpenseStatus {

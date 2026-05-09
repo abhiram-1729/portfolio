@@ -32,6 +32,7 @@ export const adminAPI = {
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
 
   // Inventory
+  getInventoryInit: (params) => api.get('/admin/inventory/init', { params }),
   getItems: (params) => api.get('/admin/inventory/items', { params }),
   createItem: (data) => api.post('/admin/inventory/items', data, {
     headers: { 'Content-Type': 'multipart/form-data' }

@@ -42,7 +42,22 @@ export const protect = async (req, res, next) => {
             });
             return; 
         } catch (error) {
-            console.error('[AuthMiddleware JWT Error]', error.message);
+            console.error('[AuthMiddleware Error]', error.message);
+            
+            // If it's a database connection error, return 503 instead of 401
+            // This prevents the frontend from logging out the user when the DB is just busy
+            const isDbError = error.message.includes('Prisma') || 
+                              error.message.includes('connection') || 
+                              error.message.includes('Pool') ||
+                              error.message.includes('terminated');
+
+            if (isDbError) {
+              return res.status(503).json({ 
+                message: 'Database is busy, please wait...',
+                error: error.message 
+              });
+            }
+
             res.status(401);
             return next(new Error('Not authorized, token failed'));
         }

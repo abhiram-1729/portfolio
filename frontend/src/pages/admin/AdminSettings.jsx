@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt } from 'lucide-react';
 import adminAPI from '../../services/adminService';
+import { getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '../../services/expenseService';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
 import AdminLateEntryConfig from './AdminLateEntryConfig';
@@ -51,11 +52,23 @@ export default function AdminSettings() {
   const [newSubCategory, setNewSubCategory] = useState({ name: '', categoryId: '' });
   const [editingSubCategoryId, setEditingSubCategoryId] = useState(null);
   
+  // Expense Categories State
+  const [expenseCategories, setExpenseCategories] = useState([]);
+  const [expenseCategoriesLoading, setExpenseCategoriesLoading] = useState(false);
+  const [newExpenseCategory, setNewExpenseCategory] = useState({ name: '' });
+  const [editingExpenseCategoryId, setEditingExpenseCategoryId] = useState(null);
+
+  // Expense Sub-Categories State (Virtual)
+  const [editingExpenseSubCategoryId, setEditingExpenseSubCategoryId] = useState(null);
+  const [newExpenseSubCategory, setNewExpenseSubCategory] = useState({ name: '', parentName: '', limit: '' });
+  const [expenseSubCategorySearch, setExpenseSubCategorySearch] = useState('');
+  
   // Search States
   const [unitSearch, setUnitSearch] = useState('');
   const [categorySearch, setCategorySearch] = useState('');
   const [subCategorySearch, setSubCategorySearch] = useState('');
   const [assetCategorySearch, setAssetCategorySearch] = useState('');
+  const [expenseCategorySearch, setExpenseCategorySearch] = useState('');
 
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -66,6 +79,7 @@ export default function AdminSettings() {
     fetchCategories();
     fetchSubCategories();
     fetchAssetCategories();
+    fetchExpenseCategories();
   }, [currentUser?.storeId]);
 
   const fetchUnits = async () => {
@@ -113,6 +127,18 @@ export default function AdminSettings() {
       toast.error('Failed to load asset categories');
     } finally {
       setAssetCategoriesLoading(false);
+    }
+  };
+
+  const fetchExpenseCategories = async () => {
+    setExpenseCategoriesLoading(true);
+    try {
+      const data = await getExpenseCategories();
+      setExpenseCategories(data);
+    } catch (error) {
+      toast.error('Failed to load expense categories');
+    } finally {
+      setExpenseCategoriesLoading(false);
     }
   };
 
@@ -240,7 +266,7 @@ export default function AdminSettings() {
         setSubCategories(subCategories.map(s => s.id === editingSubCategoryId ? data : s));
         toast.success('Sub-category updated');
       } else {
-        const { data } = await adminAPI.createSubCategory(newSubCategory);
+        const { data } = await adminAPI.createSubCategory({ ...newSubCategory, storeId: currentUser?.storeId });
         setSubCategories([data, ...subCategories]);
         toast.success('Sub-category created');
       }
@@ -248,6 +274,102 @@ export default function AdminSettings() {
       setEditingSubCategoryId(null);
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save sub-category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleSaveExpenseCategory = async (e) => {
+    e.preventDefault();
+    if (!newExpenseCategory.name) return toast.error('Please enter category name');
+    setSaving(true);
+    try {
+        if (editingExpenseCategoryId) {
+            await updateExpenseCategory(editingExpenseCategoryId, { name: newExpenseCategory.name });
+            toast.success('Expense category updated');
+        } else {
+            await createExpenseCategory({ name: newExpenseCategory.name });
+            toast.success('Expense category created');
+        }
+        setNewExpenseCategory({ name: '' });
+        setEditingExpenseCategoryId(null);
+        fetchExpenseCategories();
+    } catch (error) {
+        toast.error(error.response?.data?.message || 'Failed to save expense category');
+    } finally {
+        setSaving(false);
+    }
+  };
+
+  const handleSaveExpenseSubCategory = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const fullName = `${newExpenseSubCategory.parentName} | ${newExpenseSubCategory.name}`;
+      const payload = { name: fullName, limit: newExpenseSubCategory.limit };
+      if (editingExpenseSubCategoryId) {
+        await updateExpenseCategory(editingExpenseSubCategoryId, payload);
+        toast.success('Sub-category updated');
+      } else {
+        await createExpenseCategory(payload);
+        toast.success('Sub-category created');
+      }
+      setEditingExpenseSubCategoryId(null);
+      setNewExpenseSubCategory({ name: '', parentName: '', limit: '' });
+      fetchExpenseCategories();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save sub-category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDeleteExpenseCategory = async (id) => {
+    if (!confirm('Are you sure you want to delete this expense category?')) return;
+    try {
+        await deleteExpenseCategory(id);
+        toast.success('Expense category deleted');
+        fetchExpenseCategories();
+    } catch (error) {
+        toast.error('Failed to delete expense category');
+    }
+  };
+
+  const handleApplyDefaultHierarchy = async () => {
+    if (!confirm('This will establish 30+ professional categories and sub-categories. Existing ones will be skipped. Continue?')) return;
+    setSaving(true);
+    const defaults = {
+      "Vehicle": ["Fuel (Diesel/Petrol)", "Repairs & Maintenance", "Insurance & Road Tax", "Tolls & Parking", "Tires & Tubes"],
+      "Staff": ["Monthly Salaries", "Sales Incentives", "Advance/Loan Payment", "Food & Refreshments", "Training & Uniforms"],
+      "Operations": ["Warehouse Rent", "Electricity Bill", "Internet & Mobile Recharge", "Cleaning & Sanitation", "Water Charges"],
+      "Marketing": ["Banners & Flex Printing", "Customer Samples", "Agent Commissions", "Promotional Events"],
+      "Assets": ["Computing (Laptops/Tabs)", "Furniture & Fixtures"],
+      "Inventory": ["Loading & Unloading Labor", "Damage Write-offs"],
+      "Admin": ["Stationery & Printing", "Audit & Legal Fees", "Software Subscriptions", "Courier & Post"],
+      "Misc": ["Bank Charges", "Donations/Charity", "Unexpected Emergencies"]
+    };
+
+    try {
+      let count = 0;
+      for (const [master, subs] of Object.entries(defaults)) {
+        // Create Master
+        if (!expenseCategories.find(c => c.name === master)) {
+          await createExpenseCategory({ name: master });
+          count++;
+        }
+        // Create Subs
+        for (const sub of subs) {
+          const fullName = `${master} | ${sub}`;
+          if (!expenseCategories.find(c => c.name === fullName)) {
+            await createExpenseCategory({ name: fullName });
+            count++;
+          }
+        }
+      }
+      toast.success(`Successfully initialized ${count} categories/sub-categories`);
+      fetchExpenseCategories();
+    } catch (error) {
+      toast.error('Partial success. Some categories might have failed.');
     } finally {
       setSaving(false);
     }
@@ -313,6 +435,14 @@ export default function AdminSettings() {
         { label: 'Product Categories', action: () => setActiveModal('CATEGORIES') },
         { label: 'Sub-Category Management', action: () => setActiveModal('SUB_CATEGORIES') },
         { label: 'Asset Type Management', action: () => setActiveModal('ASSET_CATEGORIES') }
+      ]
+    },
+    {
+      title: 'Expense Management',
+      icon: Receipt,
+      items: [
+        { label: 'Categories', action: () => setActiveModal('EXPENSES') },
+        { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES') }
       ]
     },
     { 
@@ -1173,6 +1303,216 @@ export default function AdminSettings() {
                <p className="text-sm font-bold text-gray-400 uppercase tracking-widest italic">No shifts configured yet</p>
             </div>
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'EXPENSES') {
+    return (
+      <div className="space-y-6 pb-20 max-w-7xl mx-auto">
+        {renderHeader('Categories', 'Spending Thresholds & Classification', Receipt, 'text-emerald-600 bg-emerald-100')}
+        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
+          <div className="bg-white rounded-[2rem] p-8 border border-gray-50 shadow-xl h-fit">
+            <h4 className="text-[10px] font-black text-emerald-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              {editingExpenseCategoryId ? 'Amend Category' : 'Create Expense Type'}
+            </h4>
+            <form onSubmit={handleSaveExpenseCategory} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Expense Type Name</label>
+                <input type="text" required placeholder="e.g. Vehicle Fuel" value={newExpenseCategory.name} onChange={e => setNewExpenseCategory({...newExpenseCategory, name: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
+              </div>
+              <div className="pt-4 flex flex-col gap-2">
+                <button type="submit" disabled={saving} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98]">
+                  {saving ? <Loader2 size={20} className="animate-spin" /> : (editingExpenseCategoryId ? <Save size={20} /> : <Plus size={20} />)}
+                  {saving ? 'Synchronizing...' : (editingExpenseCategoryId ? 'Commit Update' : 'Initialize Expense Type')}
+                </button>
+                {editingExpenseCategoryId && (
+                  <button type="button" onClick={() => { setEditingExpenseCategoryId(null); setNewExpenseCategory({name:'', limit:''}) }}
+                    className="w-full py-4 rounded-2xl text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 transition-colors">
+                    Discard Selection
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
+             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Hash size={18} className="text-emerald-400 opacity-60" />
+                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Master Category Index</h4>
+              </div>
+              <div className="flex items-center gap-4">
+                <button onClick={handleApplyDefaultHierarchy} disabled={saving}
+                  className="px-4 py-2 bg-emerald-600/10 hover:bg-emerald-600 text-emerald-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-emerald-500/20 transition-all flex items-center gap-2">
+                  <CheckCircle2 size={12}/> Apply Defaults
+                </button>
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Expenses..." 
+                    value={expenseCategorySearch}
+                    onChange={(e) => setExpenseCategorySearch(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-slate-500 focus:bg-slate-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700 min-w-fit">{expenseCategories.filter(c => !c.name.includes(' | ')).length} TYPES</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-gray-100">
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Expense Nature</th>
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {expenseCategories
+                    .filter(c => !c.name.includes(' | '))
+                    .filter(c => c.name.toLowerCase().includes(expenseCategorySearch.toLowerCase()))
+                    .map(category => (
+                    <tr key={category.id} className="hover:bg-emerald-50/30 transition-all group">
+                      <td className="py-5 px-8">
+                        <span className="text-sm font-black text-slate-700">{category.name}</span>
+                      </td>
+                      <td className="py-5 px-8 text-right">
+                        <div className="flex items-center justify-end gap-2 pr-2">
+                          <button onClick={() => { setEditingExpenseCategoryId(category.id); setNewExpenseCategory({ name: category.name, limit: category.limit || '' }) }}
+                            className="p-2 text-emerald-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Edit size={16} /></button>
+                          <button onClick={() => handleDeleteExpenseCategory(category.id)}
+                            className="p-2 text-rose-400 hover:bg-white hover:shadow-md hover:text-rose-600 rounded-xl transition-all"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {expenseCategories.length === 0 && !expenseCategoriesLoading && <div className="py-20 text-center text-gray-400 text-xs font-bold font-black uppercase tracking-widest italic opacity-40">Empty Classification Registry</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'SUB_EXPENSES') {
+    const masterCategories = expenseCategories.filter(c => !c.name.includes(' | '));
+    const subCategoriesList = expenseCategories.filter(c => c.name.includes(' | ')).map(c => {
+      const [parent, child] = c.name.split(' | ');
+      return { ...c, parentName: parent, childName: child };
+    });
+
+    return (
+      <div className="space-y-6 pb-20 max-w-7xl mx-auto">
+        {renderHeader('Sub Categories', 'Nested Classification & Mapping', Hash, 'text-emerald-600 bg-emerald-100')}
+        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
+          <div className="bg-white rounded-[2rem] p-8 border border-gray-50 shadow-xl h-fit">
+            <h4 className="text-[10px] font-black text-emerald-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></span>
+              {editingExpenseSubCategoryId ? 'Modify Sub-Type' : 'Establish New Sub-Type'}
+            </h4>
+            <form onSubmit={handleSaveExpenseSubCategory} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Parent Category</label>
+                <select required value={newExpenseSubCategory.parentName} onChange={e => setNewExpenseSubCategory({...newExpenseSubCategory, parentName: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-black text-emerald-800 appearance-none outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 focus:bg-white transition-all cursor-pointer">
+                  <option value="">Select Master Category</option>
+                  {masterCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sub-Category Name</label>
+                <input type="text" required placeholder="e.g. Repair & Maintenance" value={newExpenseSubCategory.name} onChange={e => setNewExpenseSubCategory({...newExpenseSubCategory, name: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Single Transaction Limit (₹)</label>
+                <input type="number" placeholder="Optional: No limit" value={newExpenseSubCategory.limit} onChange={e => setNewExpenseSubCategory({...newExpenseSubCategory, limit: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all" />
+              </div>
+              <div className="pt-4 flex flex-col gap-2">
+                <button type="submit" disabled={saving} className="w-full bg-emerald-600 text-white font-black py-5 rounded-2xl shadow-2xl shadow-emerald-500/20 hover:bg-emerald-700 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98]">
+                  {saving ? <Loader2 size={20} className="animate-spin" /> : (editingExpenseSubCategoryId ? <Save size={20} /> : <Plus size={20} />)}
+                  {saving ? 'Synchronizing...' : (editingExpenseSubCategoryId ? 'Commit Update' : 'Initialize Sub-Type')}
+                </button>
+                {editingExpenseSubCategoryId && (
+                  <button type="button" onClick={() => { setEditingExpenseSubCategoryId(null); setNewExpenseSubCategory({name:'', parentName:''}) }}
+                    className="w-full py-4 rounded-2xl text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 transition-colors">
+                    Discard Selection
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
+             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Hash size={18} className="text-emerald-400 opacity-60" />
+                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Sub Category Index</h4>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-emerald-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Sub-Cats..." 
+                    value={expenseSubCategorySearch}
+                    onChange={(e) => setExpenseSubCategorySearch(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-slate-500 focus:bg-slate-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700 min-w-fit">{subCategoriesList.length} ITEMS</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-gray-100">
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sub-Category</th>
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Parent Type</th>
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Txn Limit</th>
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {subCategoriesList
+                    .filter(s => s.childName.toLowerCase().includes(expenseSubCategorySearch.toLowerCase()) || s.parentName.toLowerCase().includes(expenseSubCategorySearch.toLowerCase()))
+                    .map(sub => (
+                    <tr key={sub.id} className="hover:bg-emerald-50/30 transition-all group">
+                      <td className="py-5 px-8">
+                        <span className="text-sm font-black text-slate-700">{sub.childName}</span>
+                      </td>
+                      <td className="py-5 px-8 text-center">
+                        <span className="inline-block px-3 py-1.5 bg-gray-100 text-gray-500 text-[10px] font-black rounded-lg border border-gray-200 uppercase tracking-tighter">{sub.parentName}</span>
+                      </td>
+                      <td className="py-5 px-8 text-center">
+                        {sub.limit ? (
+                          <span className="inline-block px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-black rounded-lg border border-emerald-100">₹{sub.limit.toLocaleString()}</span>
+                        ) : (
+                          <span className="text-xs font-bold text-gray-300 italic">No limit</span>
+                        )}
+                      </td>
+                      <td className="py-5 px-8 text-right">
+                        <div className="flex items-center justify-end gap-2 pr-2">
+                          <button onClick={() => { setEditingExpenseSubCategoryId(sub.id); setNewExpenseSubCategory({ name: sub.childName, parentName: sub.parentName, limit: sub.limit || '' }) }}
+                            className="p-2 text-emerald-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Edit size={16} /></button>
+                          <button onClick={() => handleDeleteExpenseCategory(sub.id)}
+                            className="p-2 text-rose-400 hover:bg-white hover:shadow-md hover:text-rose-600 rounded-xl transition-all"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {subCategoriesList.length === 0 && !expenseCategoriesLoading && <div className="py-20 text-center text-gray-400 text-xs font-bold font-black uppercase tracking-widest italic opacity-40">No Sub-Hierarchies Established</div>}
+            </div>
+          </div>
         </div>
       </div>
     );

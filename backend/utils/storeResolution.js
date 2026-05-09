@@ -1,29 +1,34 @@
+/**
+ * Utility to resolve the effective store ID for a request.
+ * Handles global roles (TENANT_OWNER, SUPER_ADMIN, ADMIN) vs restricted roles.
+ * Priority: req.query.storeId (for global) > req.user.storeId
+ */
 export const getEffectiveStoreId = (req) => {
+    if (!req.user) return null;
+
     const queryStoreId = req.query?.storeId;
     const bodyStoreId = req.body?.storeId;
-    const userStoreId = req.user?.storeId;
+    const user = req.user;
+
+    // Normalize input storeId
+    const targetStoreId = queryStoreId || bodyStoreId;
 
     const isGlobal = 
-        req.user?.role === 'TENANT_OWNER' || 
-        req.user?.role === 'SUPER_ADMIN' || 
-        req.user?.role === 'ADMIN' ||
-        req.user?.portalType === 'ADMIN';
-
-    let requestedId = null;
-    if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') requestedId = queryStoreId;
-    else if (bodyStoreId && bodyStoreId !== 'undefined' && bodyStoreId !== 'null' && bodyStoreId !== '') requestedId = bodyStoreId;
+        user.role === 'TENANT_OWNER' || 
+        user.role === 'SUPER_ADMIN' || 
+        (user.role === 'ADMIN' && !user.customRoleId) ||
+        user.portalType === 'ADMIN';
 
     // Restricted roles (Agents, Mechanics, etc.) are ALWAYS locked to their profile's storeId
-    if (req.user?.role === 'SALES_AGENT' || req.user?.role === 'MECHANIC') {
-        return userStoreId;
+    if (user.role === 'SALES_AGENT' || user.role === 'MECHANIC') {
+        return user.storeId || null;
     }
 
-    // Global Roles can see everything if requested, otherwise fallback to their own branch
     if (isGlobal) {
-        const finalId = requestedId || userStoreId;
-        // console.log(`[RESOLVE-DEBUG] Store Resolution - URL: ${req.originalUrl}, User: ${req.user?.name}, isGlobal: true, Final: ${finalId}`);
-        return finalId;
+        // Global roles can use the provided storeId or null (for all stores)
+        return (targetStoreId && targetStoreId !== 'undefined' && targetStoreId !== 'null' && targetStoreId !== '') ? targetStoreId : null;
     }
 
-    return userStoreId;
+    // Default for others (Restricted Admins, Branch Managers)
+    return user.storeId || null;
 };
