@@ -2,7 +2,7 @@ import prisma from '../utils/prisma.js';
 import { uploadToSupabase } from '../utils/supabaseService.js';
 import lateEntryEngine from '../services/lateEntryEngine.js';
 
-// Helper: get today's date string in YYYY-MM-DD format (IST)
+// Helpdshfgjkdfhkgjber: get today's date string in YYYY-MM-DD format (IST)
 const getTodayIST = () => {
   const now = new Date();
   // Offset for IST (+5:30)
@@ -236,14 +236,14 @@ export const getAllAttendance = async (req, res, next) => {
 
     // Build where clause
     const where = { tenantId };
-    
+
     // Store filter logic
     if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
       where.storeId = queryStoreId;
     } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
       where.storeId = req.user.storeId;
     }
-    
+
     if (filterUserId) where.userId = filterUserId;
 
     if (startDate && endDate) {
