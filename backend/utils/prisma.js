@@ -3,6 +3,7 @@ import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 import dotenv from 'dotenv';
 import { getTenantId } from './tenantContext.js';
+import fs from 'fs';
 
 dotenv.config();
 
@@ -44,12 +45,13 @@ const prisma = basePrisma.$extends({
 
             // Injection for Write operations
             if (operation === 'create' || operation === 'upsert') {
-              const relationalMandatory = ['Order', 'User', 'Store', 'Tenant', 'OrderItem', 'Payment']; // Models where scalars are hidden in CreateInput (mostly Order)
+              const relationalMandatory = ['Order', 'User', 'Store', 'Tenant']; // Models where scalars are hidden in CreateInput (mostly Order)
 
               const h_clean = (modelName, obj) => {
                 if (!obj || typeof obj !== 'object') return obj;
                 const data = { ...obj };
                 const isRelationalMandatory = relationalMandatory.includes(modelName);
+                fs.appendFileSync('prisma_debug.log', `[${new Date().toISOString()}] Model: ${modelName} | Mandatory: ${isRelationalMandatory} | Keys: ${Object.keys(data).join(', ')}\n`);
 
                 // Handle Tenant Isolation
                 const tId = data.tenantId || tenantId;

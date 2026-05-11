@@ -138,6 +138,7 @@ router.get('/reports/category-wise', reportCtr.getCategoryWiseReport);
 router.get('/reports/returns', reportCtr.getReturnReport);
 router.get('/reports/sessions', reportCtr.getSessionReport);
 router.get('/reports/vehicle-all', reportCtr.getAllVehiclePerformance);
+router.get('/reports/day-detailed', reportCtr.getDayDetailedSales);
 
 // Activity Logs
 router.get('/activities', activityCtr.getActivityLogs);

@@ -57,7 +57,11 @@ export const getInventoryInitData = async (req, res) => {
       }),
       prisma.refillRequest.findMany({
         where: { tenantId, status: 'PENDING', ...(storeId && storeId !== 'null' ? { storeId } : {}) },
-        include: { items: true }
+        include: { 
+          items: true,
+          user: { select: { id: true, name: true } },
+          vehicle: { select: { id: true, vehicleNumber: true, vehicleName: true } }
+        }
       })
     ]);
 
@@ -1631,7 +1635,7 @@ export const getRefillRequests = async (req, res) => {
       where,
       orderBy: { createdAt: 'desc' },
       include: {
-        vehicle: { select: { vehicleNumber: true, vehicleName: true } },
+        vehicle: { select: { id: true, vehicleNumber: true, vehicleName: true } },
         user: { select: { id: true, name: true } },
         items: {
           include: {

@@ -70,6 +70,7 @@ export default function AdminVehicles() {
   const [items, setItems] = useState([]);
   const [stockQuantities, setStockQuantities] = useState({});
   const [opsSearch, setOpsSearch] = useState('');
+  const [refillSearch, setRefillSearch] = useState('');
   const [opsCategory, setOpsCategory] = useState('ALL');
   const [opsSubCategory, setOpsSubCategory] = useState('ALL');
   const [itemsPerPage] = useState(25);
@@ -81,6 +82,10 @@ export default function AdminVehicles() {
   const [vehicleInventoryMap, setVehicleInventoryMap] = useState({});
   const [refillRequests, setRefillRequests] = useState([]);
   const [viewingAgentId, setViewingAgentId] = useState(null);
+
+  useEffect(() => {
+    setViewingAgentId(null);
+  }, [activeSub]);
   const [unselectedRefillItems, setUnselectedRefillItems] = useState([]);
   const [editedQuantities, setEditedQuantities] = useState({});
   const [processingItems, setProcessingItems] = useState(new Set());
@@ -285,20 +290,29 @@ export default function AdminVehicles() {
   const groupedRefills = useMemo(() => {
     const groups = {};
     (refillRequests || []).forEach(req => {
-      const userId = req.user?.id || req.user?.name || 'unknown';
-      if (!groups[userId]) {
-        groups[userId] = { user: req.user, vehicle: req.vehicle, requests: [], latestDate: new Date(req.createdAt) };
+      const uId = req.user?.id || req.user?.name || 'unknown';
+      const vId = req.vehicleId || req.vehicle?.id || 'unknown';
+      const groupKey = `${uId}_${vId}`;
+      
+      if (!groups[groupKey]) {
+        groups[groupKey] = { 
+          id: groupKey,
+          user: req.user, 
+          vehicle: req.vehicle, 
+          requests: [], 
+          latestDate: new Date(req.createdAt) 
+        };
       }
-      groups[userId].requests.push(req);
+      groups[groupKey].requests.push(req);
       const reqDate = new Date(req.createdAt);
-      if (reqDate > groups[userId].latestDate) groups[userId].latestDate = reqDate;
+      if (reqDate > groups[groupKey].latestDate) groups[groupKey].latestDate = reqDate;
     });
     return Object.values(groups).sort((a, b) => b.latestDate - a.latestDate);
   }, [refillRequests]);
 
   const activeRefillGroup = useMemo(() => {
     if (!viewingAgentId) return null;
-    return groupedRefills.find(g => (g.user?.id || g.user?.name || 'unknown') === viewingAgentId);
+    return groupedRefills.find(g => g.id === viewingAgentId);
   }, [groupedRefills, viewingAgentId]);
 
   const toggleRefillItemSelection = (itemId) => {
@@ -567,7 +581,8 @@ export default function AdminVehicles() {
             setViewingAgentId={setViewingAgentId}
             loadingRefills={loadingRefills}
             groupedRefills={groupedRefills}
-            auditSearch={opsSearch}
+            refillSearch={refillSearch}
+            setRefillSearch={setRefillSearch}
             unselectedRefillItems={unselectedRefillItems}
             toggleRefillItemSelection={toggleRefillItemSelection}
             items={items}

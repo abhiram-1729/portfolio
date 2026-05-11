@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Truck, ArrowUpCircle, Square, CheckSquare, Package, Minus, Plus, Loader2, Check, History, Clock, ArrowLeft, Printer, FileDown, FileText, RefreshCw } from 'lucide-react';
+import { X, Truck, ArrowUpCircle, Square, CheckSquare, Package, Minus, Plus, Loader2, Check, History, Clock, ArrowLeft, Printer, FileDown, FileText, RefreshCw, Search } from 'lucide-react';
 import adminAPI from '../../../services/adminService';
 import * as XLSX from 'xlsx';
 
@@ -8,7 +8,8 @@ const RefillsSection = ({
   setViewingAgentId,
   loadingRefills,
   groupedRefills,
-  auditSearch,
+  refillSearch,
+  setRefillSearch,
   unselectedRefillItems,
   toggleRefillItemSelection,
   items,
@@ -390,6 +391,16 @@ const RefillsSection = ({
         <button onClick={() => setActiveTab('history')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
           <History size={14} className="inline mr-2 mb-0.5" /> Refill History
         </button>
+        <div className="ml-auto relative w-full sm:w-64">
+          <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search agents or vehicles..."
+            className="w-full bg-white border border-gray-100 rounded-xl pl-10 pr-4 py-2 text-[10px] font-black uppercase tracking-widest outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm"
+            value={refillSearch}
+            onChange={(e) => setRefillSearch(e.target.value)}
+          />
+        </div>
       </div>
 
       {activeTab === 'active' ? (
@@ -425,15 +436,15 @@ const RefillsSection = ({
                   <tbody className="divide-y divide-gray-50">
                     {groupedRefills
                       .filter(g =>
-                        g.user?.name?.toLowerCase().includes(auditSearch.toLowerCase()) ||
-                        g.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase())
+                        g.user?.name?.toLowerCase().includes(refillSearch.toLowerCase()) ||
+                        g.vehicle?.vehicleNumber?.toLowerCase().includes(refillSearch.toLowerCase())
                       )
                       .map(group => {
                         const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
                         return (
                           <tr
-                            key={group.user?.id || 'unknown'}
-                            onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                            key={group.id || 'unknown'}
+                            onClick={() => setViewingAgentId(group.id || 'unknown')}
                             className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
                           >
                             <td className="px-6 py-4">
@@ -470,13 +481,18 @@ const RefillsSection = ({
 
               {/* Mobile Card View */}
               <div className="md:hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {groupedRefills.map(group => {
+                {groupedRefills
+                  .filter(g =>
+                    g.user?.name?.toLowerCase().includes(refillSearch.toLowerCase()) ||
+                    g.vehicle?.vehicleNumber?.toLowerCase().includes(refillSearch.toLowerCase())
+                  )
+                  .map(group => {
                   const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
 
                   return (
                     <div
-                      key={group.user?.id || 'unknown'}
-                      onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                      key={group.id || 'unknown'}
+                      onClick={() => setViewingAgentId(group.id || 'unknown')}
                       className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
                     >
                       <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
