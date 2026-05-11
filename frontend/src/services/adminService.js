@@ -30,6 +30,19 @@ export const adminAPI = {
   deleteVehicle: (id) => api.delete(`/admin/vehicles/${id}`),
   assignDriver: (id, userId) => api.put(`/admin/vehicles/${id}/assign`, { userId }),
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
+  
+  // Vehicle Operations
+  getVehicleOpsTrips: (params) => api.get('/admin/vehicles/ops/trips', { params }),
+  startVehicleTrip: (data) => api.post('/admin/vehicles/ops/trips/start', data),
+  endVehicleTrip: (id, data) => api.put(`/admin/vehicles/ops/trips/${id}/end`, data),
+  getFuelLogs: (params) => api.get('/admin/vehicles/ops/fuel', { params }),
+  addFuelLog: (data) => api.post('/admin/vehicles/ops/fuel', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getMaintenanceLogs: (params) => api.get('/admin/vehicles/ops/maintenance', { params }),
+  addMaintenanceLog: (data) => api.post('/admin/vehicles/ops/maintenance', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 
   // Inventory
   getInventoryInit: (params) => api.get('/admin/inventory/init', { params }),
@@ -83,6 +96,7 @@ export const adminAPI = {
   getVehicleAllPerformance: (params) => api.get('/admin/reports/vehicle-all', { params }),
   getPaymentReport: (params) => api.get('/admin/reports/daily', { params }),
   getDamageReports: (params) => api.get('/damage/reports', { params }),
+  getDamageEntries: (params) => api.get('/damage/entries', { params }),
   getInvoiceReport: (params) => api.get('/admin/sales', { params }),
   getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
   getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),

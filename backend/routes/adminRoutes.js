@@ -17,6 +17,9 @@ import * as assetCtr from '../controllers/admin/assetController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
 import * as adminStoreCtr from '../controllers/admin/storeController.js';
 import * as mediaCtr from '../controllers/admin/mediaController.js';
+import * as vehicleTripCtr from '../controllers/admin/vehicleTripController.js';
+import * as fuelCtr from '../controllers/admin/fuelController.js';
+import * as maintenanceCtr from '../controllers/admin/maintenanceController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
@@ -74,6 +77,17 @@ router.route('/vehicles/:id')
   .delete(vehicleCtr.deleteVehicle);
 router.put('/vehicles/:id/assign', vehicleCtr.assignDriver);
 router.get('/vehicles/:id/sales', vehicleCtr.getVehicleSales);
+
+// Vehicle Operations
+router.get('/vehicles/ops/trips', vehicleTripCtr.getTrips);
+router.post('/vehicles/ops/trips/start', vehicleTripCtr.startTrip);
+router.put('/vehicles/ops/trips/:id/end', vehicleTripCtr.endTrip);
+
+router.get('/vehicles/ops/fuel', fuelCtr.getFuelLogs);
+router.post('/vehicles/ops/fuel', uploadMiddleware.single('billImage'), fuelCtr.addFuelLog);
+
+router.get('/vehicles/ops/maintenance', maintenanceCtr.getMaintenanceLogs);
+router.post('/vehicles/ops/maintenance', uploadMiddleware.single('billImage'), maintenanceCtr.addMaintenanceLog);
 
 // Inventory (Item Master & Stocking)
 router.get('/inventory/init', inventoryCtr.getInventoryInitData);

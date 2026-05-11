@@ -149,6 +149,7 @@ model User {
   approvedExceptions LateEntryException[]  @relation("ApprovedBy")
   leaveBalances      LeaveBalance[]
   createdStores      Store[]               @relation("StoreCreator")
+  vehicleTrips       VehicleTrip[]
 
   documents          UserDocument[]
   kycStatus          KYCStatus             @default(PENDING)
@@ -477,6 +478,9 @@ model Vehicle {
   cashTransfers     CashTransfer[]
   stockAudits       StockAudit[]
   damageEntries     DamageEntry[]
+  trips             VehicleTrip[]
+  fuelLogs          FuelLog[]
+  maintenanceLogs   MaintenanceLog[]
 
   @@unique([tenantId, vehicleNumber])
   @@index([tenantId])
@@ -497,6 +501,93 @@ model VehicleStock {
   @@unique([vehicleId, productId])
   @@index([tenantId])
   @@index([storeId])
+}
+
+model VehicleTrip {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  userId           String
+  date             String
+  shift            Int      @default(1)
+  status           TripStatus @default(OPEN)
+  
+  startOdometer    Float?
+  endOdometer      Float?
+  
+  openingCash      Float?   @default(0)
+  closingCash      Float?   @default(0)
+  
+  // Stats
+  totalSales       Float?   @default(0)
+  totalExpenses    Float?   @default(0)
+  
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  tenantId         String   @default("VK001")
+  storeId          String?
+  
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  user             User     @relation(fields: [userId], references: [id])
+  
+  fuelLogs         FuelLog[]
+  maintenanceLogs  MaintenanceLog[]
+
+  @@unique([vehicleId, date, shift])
+  @@index([tenantId])
+  @@index([storeId])
+}
+
+enum TripStatus {
+  OPEN
+  CLOSED
+}
+
+model FuelLog {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  tripId           String?
+  date             String
+  odometer         Float
+  liters           Float
+  rate             Float
+  totalAmount      Float
+  paymentMode      ExpensePaymentMode
+  billImage        String?
+  
+  createdAt        DateTime @default(now())
+  tenantId         String   @default("VK001")
+  storeId          String?
+  
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  trip             VehicleTrip? @relation(fields: [tripId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([tripId])
+}
+
+model MaintenanceLog {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  tripId           String?
+  date             String
+  odometer         Float
+  serviceType      String   // General, Repair, Tire, Oil Change, etc.
+  details          String?
+  amount           Float
+  mechanicName     String?
+  billImage        String?
+  
+  createdAt        DateTime @default(now())
+  tenantId         String   @default("VK001")
+  storeId          String?
+  
+  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
+  trip             VehicleTrip? @relation(fields: [tripId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([tripId])
 }
 
 model StockTransaction {

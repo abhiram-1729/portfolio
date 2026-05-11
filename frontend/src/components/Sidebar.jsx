@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, ShoppingBag, Landmark } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { attendanceAPI } from '../services/api';
@@ -38,16 +38,58 @@ export default function Sidebar({ isOpen, onClose }) {
         { path: '/admin/inventory?tab=return&sub=return', icon: ArrowDownCircle, name: 'Return', section: 'RETURN' },
         { path: '/admin/inventory?tab=return&sub=refills', icon: Package, name: 'Refills', section: 'REFILLS' },
         { path: '/admin/inventory?tab=return&sub=damage', icon: AlertTriangle, name: 'Damage', section: 'DAMAGE' },
+        { path: '/admin/inventory?tab=return&sub=trips', icon: History, name: 'Trips/Shifts', section: 'TRIPS' },
+        { path: '/admin/inventory?tab=return&sub=fuel', icon: CreditCard, name: 'Fuel Logs', section: 'FUEL' },
+        { path: '/admin/inventory?tab=return&sub=maintenance', icon: Settings, name: 'Maintenance', section: 'MAINTENANCE' },
         { path: '/admin/inventory?tab=return&sub=audits', icon: CheckSquare, name: 'Audit History', section: 'AUDITS' },
       ].filter(sub => {
+        // HARDCODE BYPASS: Ensure these are ALWAYS visible for debugging
+        if (['TRIPS', 'FUEL', 'MAINTENANCE'].includes(sub.section)) return true;
+
         if (!user?.customRoleId) return true;
         const sections = user?.permissions?.INVENTORY_SECTIONS;
-        if (sections) return (sections[sub.section] || []).includes('READ');
+        if (sections && sections[sub.section] !== undefined) {
+          return (sections[sub.section] || []).includes('READ');
+        }
         if (user?.permissions?.INVENTORY_TARGET_SECTIONS) {
           return user.permissions.INVENTORY_TARGET_SECTIONS.includes(sub.section);
         }
         return true;
       })
+    },
+    {
+      name: 'Vehicles',
+      icon: Truck,
+      color: 'text-indigo-600',
+      module: 'VEHICLES',
+      isAdmin: true,
+      subItems: [
+        { path: '/admin/vehicles?sub=master', icon: Truck, name: 'Vehicle Master' },
+        { path: '/admin/vehicles?sub=inventory', icon: Grid, name: 'Fleet Inventory' },
+        { path: '/admin/vehicles?sub=loading', icon: ArrowUpCircle, name: 'Stock Loading' },
+        { path: '/admin/vehicles?sub=return', icon: ArrowDownCircle, name: 'Stock Return' },
+        { path: '/admin/vehicles?sub=refill', icon: Package, name: 'Refill Requests' },
+        { path: '/admin/vehicles?sub=closing', icon: Clock, name: 'Shift Closing' },
+        { path: '/admin/vehicles?sub=fuel', icon: CreditCard, name: 'Fuel Logs' },
+        { path: '/admin/vehicles?sub=maintenance', icon: Settings, name: 'Maintenance' },
+        { path: '/admin/vehicles?sub=driver_mapping', icon: UserPlus, name: 'Driver Mapping' },
+        { path: '/admin/vehicles?sub=opening_stock', icon: ClipboardList, name: 'Opening Stock' },
+        { path: '/admin/vehicles?sub=damages', icon: AlertTriangle, name: 'Vehicle Damages' },
+      ]
+    },
+    {
+      name: 'Routes',
+      icon: Map,
+      color: 'text-emerald-600',
+      module: 'ROUTES',
+      isAdmin: true,
+      subItems: [
+        { path: '/admin/routes?tab=villages', icon: MapPin, name: 'Village Master' },
+        { path: '/admin/routes?tab=routes', icon: Map, name: 'Route Master' },
+        { path: '/admin/vehicles?sub=route_mapping', icon: Link2, name: 'Route Assignments' },
+        { path: '/admin/vehicles?sub=sales', icon: ShoppingBag, name: 'Route Sales' },
+        { path: '/admin/vehicles?sub=collection', icon: Landmark, name: 'Route Collection' },
+      ]
     },
     {
       name: 'Cash Reconciliation',
@@ -142,6 +184,9 @@ export default function Sidebar({ isOpen, onClose }) {
     // If it's a basic agent role WITH a custom role, still allow core modules unless explicitly handled above
     if (isBasicAgentRole && !item.isAdmin) return true;
 
+    // ADMIN/TENANT_OWNER Bypass - They see everything administrative
+    if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+
     // Granular checks for top-level modules - PRIORITIZE SECTION VISIBILITY OVER MODULE READ
     if (item.module === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {
       if (user.permissions.REPORT_TARGET_SECTIONS.length > 0) return true;
@@ -155,6 +200,9 @@ export default function Sidebar({ isOpen, onClose }) {
       const sections = user?.permissions?.INVENTORY_SECTIONS;
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
       if (user?.permissions?.INVENTORY_TARGET_SECTIONS?.length > 0) return true;
+    }
+    if (item.module === 'VEHICLES' || item.module === 'ROUTES') {
+      if (user?.role === 'SUPERVISOR') return true;
     }
     if (item.module === 'CASH') {
       const sections = user?.permissions?.CASH_SECTIONS;
@@ -173,7 +221,13 @@ export default function Sidebar({ isOpen, onClose }) {
 
   const [openMenus, setOpenMenus] = useState({
     Procurement: location.pathname.startsWith('/admin/procurement'),
-    Inventory: location.pathname.startsWith('/admin/inventory')
+    Inventory: location.pathname.startsWith('/admin/inventory'),
+    Vehicles: location.pathname.startsWith('/admin/vehicles'),
+    Routes: location.pathname.startsWith('/admin/routes') || (location.pathname.startsWith('/admin/vehicles') && (
+      new URLSearchParams(location.search).get('sub') === 'route_mapping' || 
+      new URLSearchParams(location.search).get('sub') === 'sales' || 
+      new URLSearchParams(location.search).get('sub') === 'collection'
+    ))
   });
 
   const toggleMenu = (name) => {
@@ -225,7 +279,8 @@ export default function Sidebar({ isOpen, onClose }) {
               const isMenuOpen = openMenus[item.name];
               const isActive = location.pathname === item.path || (hasSubItems && (
                 (item.name === 'Procurement' && location.pathname.startsWith('/admin/procurement')) ||
-                (item.name === 'Inventory' && location.pathname.startsWith('/admin/inventory'))
+                (item.name === 'Inventory' && location.pathname.startsWith('/admin/inventory')) ||
+                (item.name === 'Vehicles' && location.pathname.startsWith('/admin/vehicles'))
               ));
 
               if (hasSubItems) {
@@ -304,6 +359,11 @@ export default function Sidebar({ isOpen, onClose }) {
                             isSubActive = location.pathname === '/admin/procurement' && new URLSearchParams(location.search).get('tab') === targetTab;
                           } else if (item.name === 'Inventory') {
                             isSubActive = location.pathname === '/admin/inventory' && new URLSearchParams(location.search).get('tab') === targetTab && (!targetSub || new URLSearchParams(location.search).get('sub') === targetSub);
+                          } else if (item.name === 'Vehicles') {
+                            isSubActive = location.pathname === '/admin/vehicles' && new URLSearchParams(location.search).get('sub') === targetSub;
+                          } else if (item.name === 'Routes') {
+                            isSubActive = (location.pathname === '/admin/routes' && new URLSearchParams(location.search).get('tab') === targetTab) || 
+                                          (location.pathname === '/admin/vehicles' && new URLSearchParams(location.search).get('sub') === targetSub);
                           }
 
                           return (

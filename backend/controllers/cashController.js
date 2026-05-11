@@ -1094,14 +1094,29 @@ export const getFinanceReports = async (req, res, next) => {
         }
 
         // 1. Daily Summary (Daily Cash Sheet)
-        const dailySummaries = await prisma.dailyCashSummary.findMany({
+        const summaries = await prisma.dailyCashSummary.findMany({
             where: baseFilter,
             include: {
                 vehicle: {
-                    select: { vehicleNumber: true }
+                    select: { id: true, vehicleNumber: true }
+                },
+                user: {
+                    select: { name: true }
                 }
             }
         });
+
+        // Enrich with route info (similar to getAdminCashSummary)
+        const dayName = format(new Date(targetDate), 'EEEE').toUpperCase();
+        const dailySummaries = await Promise.all(summaries.map(async (s) => {
+            const ra = await prisma.routeAssignment.findFirst({
+                where: { vehicleId: s.vehicleId, status: true },
+                include: { route: { include: { cycles: true } } }
+            });
+            const todayCycle = ra?.route?.cycles?.find(c => c.dayOfWeek === dayName);
+            const villageName = todayCycle?.villageName || ra?.route?.routeName || 'Unspecified';
+            return { ...s, villageName };
+        }));
 
         // 2. Expense Category Breakdown
         const expenseFilter = {

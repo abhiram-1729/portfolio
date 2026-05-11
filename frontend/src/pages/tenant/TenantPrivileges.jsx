@@ -40,6 +40,9 @@ const INVENTORY_SECTIONS = [
   { key: 'RETURN', label: 'Return Ops', desc: 'Stock returns from vehicles' },
   { key: 'REFILLS', label: 'Stock Refills', desc: 'Refilling vehicle substores' },
   { key: 'DAMAGE', label: 'Damage/Loss', desc: 'Damage reporting & audits' },
+  { key: 'TRIPS', label: 'Trip Management', desc: 'Shift & Odometer tracking' },
+  { key: 'FUEL', label: 'Fuel Logs', desc: 'Refueling & Expense sync' },
+  { key: 'MAINTENANCE', label: 'Maintenance', desc: 'Repairs & Service records' },
   { key: 'AUDITS', label: 'Audit History', desc: 'Stock audit logs' }
 ];
 

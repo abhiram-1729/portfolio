@@ -30,6 +30,7 @@ export const getSalesHistory = async (req, res) => {
       include: {
         user: { select: { id: true, name: true, mobile: true, role: true } },
         vehicle: { select: { id: true, vehicleNumber: true, vehicleName: true, assignedUsers: { select: { id: true, name: true, mobile: true } } } },
+        route: { select: { id: true, routeName: true } },
         items: {
           include: {
             product: { select: { id: true, name: true } }

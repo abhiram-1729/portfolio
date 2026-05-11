@@ -79,6 +79,7 @@ export const getInventoryInitData = async (req, res) => {
           select: {
             name: true,
             skuCode: true,
+            price: true,
             unit: { select: { name: true } }
           }
         }
@@ -1712,12 +1713,11 @@ export const approveRefillRequest = async (req, res) => {
     }));
 
     // 3. Run stock updates in a highly-resilient atomic transaction
-    // Explicitly override Prisma's default 5000ms timeout with massive limits
     await prisma.$transaction(async (tx) => {
-      for (const item of finalItemsToProcess) {
-        // Log transaction
-        await tx.stockTransaction.create({
-          data: {
+      // 1. Bulk Log Transactions
+      if (finalItemsToProcess.length > 0) {
+        await tx.stockTransaction.createMany({
+          data: finalItemsToProcess.map(item => ({
             tenantId: request.tenantId,
             storeId: request.storeId,
             userId: req.user.id,
@@ -1726,26 +1726,39 @@ export const approveRefillRequest = async (req, res) => {
             vehicleId: request.vehicleId,
             productId: item.productId,
             quantity: item.quantity
-          }
+          }))
         });
+      }
 
-        // Update vehicle stock
-        await tx.vehicleStock.upsert({
-          where: { vehicleId_productId: { vehicleId: request.vehicleId, productId: item.productId } },
-          update: { 
-            quantity: { increment: item.quantity }
-          },
-          create: { 
-            tenantId: request.tenantId,
-            storeId: request.storeId,
-            vehicleId: request.vehicleId, 
-            productId: item.productId, 
-            quantity: item.quantity,
-            openingQuantity: item.quantity
-          }
-        });
- 
-        // 🆕 DECREMENT main product stock
+      // 2. Fetch existing vehicle stocks to decide between update and create
+      const existingStocks = await tx.vehicleStock.findMany({
+        where: { 
+          vehicleId: request.vehicleId,
+          productId: { in: finalItemsToProcess.map(i => i.productId) }
+        }
+      });
+      const existingProductIds = new Set(existingStocks.map(s => s.productId));
+
+      // 3. Update Stocks
+      for (const item of finalItemsToProcess) {
+        if (existingProductIds.has(item.productId)) {
+          await tx.vehicleStock.update({
+            where: { vehicleId_productId: { vehicleId: request.vehicleId, productId: item.productId } },
+            data: { quantity: { increment: item.quantity } }
+          });
+        } else {
+          await tx.vehicleStock.create({
+            data: {
+              tenantId: request.tenantId,
+              storeId: request.storeId,
+              vehicleId: request.vehicleId,
+              productId: item.productId,
+              quantity: item.quantity,
+              openingQuantity: item.quantity
+            }
+          });
+        }
+
         await tx.product.update({
           where: { id: item.productId },
           data: { stock: { decrement: Math.floor(item.quantity) } }

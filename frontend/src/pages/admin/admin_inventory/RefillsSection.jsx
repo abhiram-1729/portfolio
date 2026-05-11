@@ -21,8 +21,12 @@ const RefillsSection = ({
   isSubmitting,
   handleRejectRefill,
   handleApproveRefill,
-  can
+  can,
+  currentUser
 }) => {
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+  const hasUpdatePerm = can && can('INVENTORY', 'UPDATE');
+  const canApprove = isAdmin || hasUpdatePerm;
   const [activeTab, setActiveTab] = useState('active');
   const [historyData, setHistoryData] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -129,19 +133,78 @@ const RefillsSection = ({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
-            <div className="flex flex-col">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end px-4 py-2 bg-emerald-50 rounded-2xl border border-emerald-100">
               <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Sessions</span>
               <span className="text-lg font-black text-emerald-950">{group.requests.length}</span>
             </div>
             {pendingCount > 0 && (
-              <div className="ml-4 flex flex-col items-end">
+              <div className="flex flex-col items-end px-4 py-2 bg-amber-50 rounded-2xl border border-amber-100">
                 <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Action Required</span>
                 <span className="text-lg font-black text-amber-500">{pendingCount} Pending</span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Bulk Action Controls */}
+        {pendingCount >= 1 && canApprove && (
+           <div className="flex flex-col md:flex-row items-center gap-4 p-5 bg-indigo-50/80 rounded-[2rem] border border-indigo-100 shadow-lg shadow-indigo-500/5 animate-in slide-in-from-top-4 duration-500">
+             <div className="flex-1 flex items-center gap-4">
+                <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
+                  <CheckSquare size={24} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-black text-indigo-950 uppercase tracking-wider leading-none mb-1">Administrative Quick Actions</h4>
+                  <p className="text-[10px] font-bold text-indigo-400 uppercase tracking-[0.1em]">Process all {pendingCount} pending sessions for this agent</p>
+                </div>
+             </div>
+             <div className="flex items-center gap-3 w-full md:w-auto">
+                <button
+                  onClick={async () => {
+                    const ids = group.requests.filter(r => r.status === 'PENDING').map(r => r.id);
+                    setIsSubmitting(true);
+                    try {
+                      for (const id of ids) {
+                        await handleRejectRefill(id, true);
+                      }
+                      toast.success(`Rejected ${ids.length} sessions`);
+                      loadRefillRequests();
+                    } catch (error) {
+                      toast.error('Failed to reject some sessions');
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-white border border-rose-200 text-rose-600 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 active:scale-95 transition-all disabled:opacity-50 shadow-sm"
+                >
+                  Reject All Sessions
+                </button>
+                <button
+                  onClick={async () => {
+                    const pending = group.requests.filter(r => r.status === 'PENDING');
+                    setIsSubmitting(true);
+                    try {
+                      for (const r of pending) {
+                        await handleApproveRefill(r.id, r.items, true);
+                      }
+                      toast.success(`Approved ${pending.length} sessions`);
+                      loadRefillRequests();
+                    } catch (error) {
+                      toast.error('Failed to approve some sessions');
+                    } finally {
+                      setIsSubmitting(false);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                  className="flex-1 md:flex-none px-8 py-3 rounded-2xl bg-indigo-600 text-white text-[10px] font-black uppercase tracking-widest shadow-xl shadow-indigo-600/20 hover:bg-indigo-700 active:scale-95 transition-all disabled:opacity-50"
+                >
+                  Approve All Sessions
+                </button>
+             </div>
+           </div>
+        )}
 
         {/* Refill Timeline */}
         <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
@@ -177,6 +240,30 @@ const RefillsSection = ({
                         {req.status}
                       </div>
                     </div>
+                    {req.status === 'PENDING' && (
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => {
+                            const allItemIds = req.items.map(i => i.id);
+                            const currentlySelected = allItemIds.filter(id => !unselectedRefillItems.includes(id));
+                            if (currentlySelected.length === allItemIds.length) {
+                              // Deselect all
+                              allItemIds.forEach(id => {
+                                if (!unselectedRefillItems.includes(id)) toggleRefillItemSelection(id);
+                              });
+                            } else {
+                              // Select all
+                              allItemIds.forEach(id => {
+                                if (unselectedRefillItems.includes(id)) toggleRefillItemSelection(id);
+                              });
+                            }
+                          }}
+                          className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                        >
+                          {req.items.every(i => !unselectedRefillItems.includes(i.id)) ? 'Select None' : 'Select All'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Items List */}
@@ -208,7 +295,7 @@ const RefillsSection = ({
                         <div key={item.id} className={`bg-white p-3.5 rounded-[1.5rem] border transition-all duration-300 ${!isSelected ? 'border-gray-100 opacity-40 grayscale' : 'border-indigo-100 shadow-sm'}`}>
                           {/* Integrated Top: Info + Toggle */}
                           <div className="flex items-center gap-3 mb-2.5">
-                            {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE', 'REFILLS') && (
+                            {req.status === 'PENDING' && canApprove && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
                                 className={`shrink-0 transition-all ${isSelected ? 'text-indigo-600' : 'text-gray-300'}`}
@@ -225,14 +312,34 @@ const RefillsSection = ({
                             </div>
                             <div className="flex-1 min-w-0">
                               <span className="text-[13px] font-black text-gray-900 leading-none truncate block">{item.product?.name}</span>
-                              {req.status === 'PENDING' && (
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Store:</span>
-                                  <span className={`text-[10px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Store:</span>
+                                  <span className={`text-[9px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
                                     {prod?.stock || 0}
                                   </span>
                                 </div>
-                              )}
+                                {req.status === 'PENDING' && (
+                                  <>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Vehicle:</span>
+                                      <span className="text-[9px] font-black text-indigo-600">{(allVehiclesStock[req.vehicleId]?.find(v => v.productId === item.productId)?.quantity || 0)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Shortfall:</span>
+                                      <span className="text-[9px] font-black text-amber-600">
+                                        {(() => {
+                                          const vInv = allVehiclesStock[req.vehicleId] || [];
+                                          const si = vInv.find(v => v.productId === item.productId);
+                                          const tc = si ? Math.max(si.openingQuantity || 0, si.quantity) : 0;
+                                          const cq = si ? si.quantity : 0;
+                                          return Math.max(0, tc - cq);
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -241,7 +348,7 @@ const RefillsSection = ({
                             <div className="flex items-center gap-2">
                               {/* Qty Adj */}
                               <div className="flex-1 flex items-center justify-between bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
-                                {can && can('INVENTORY', 'UPDATE', 'REFILLS') ? (
+                                {canApprove ? (
                                   <>
                                     <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1) }))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
                                     <input
@@ -260,7 +367,7 @@ const RefillsSection = ({
                               </div>
 
                               {/* Quick Actions */}
-                              {can && can('INVENTORY', 'UPDATE', 'REFILLS') && (
+                              {canApprove && (
                                 <div className="flex gap-1.5 shrink-0">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
@@ -291,7 +398,7 @@ const RefillsSection = ({
                   </div>
 
                   {/* Action Controls */}
-                  {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE') && (
+                  {req.status === 'PENDING' && canApprove && (
                     <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 mt-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }}
@@ -358,6 +465,67 @@ const RefillsSection = ({
         </div>
       ) : (
         <>
+          {/* Global Bulk Actions */}
+          {groupedRefills.some(g => g.requests.some(r => r.status === 'PENDING')) && canApprove && (
+            <div className="mb-6 flex flex-col md:flex-row items-center justify-between gap-4 p-5 bg-emerald-950 rounded-[2.5rem] border border-emerald-900 shadow-2xl shadow-emerald-950/20 animate-in slide-in-from-top-4 duration-500">
+               <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 bg-emerald-900/50 rounded-2xl flex items-center justify-center text-emerald-400">
+                    <CheckSquare size={24} />
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-black text-white uppercase tracking-wider leading-none mb-1">Global Refill Queue</h4>
+                    <p className="text-[10px] font-bold text-emerald-500/80 uppercase tracking-widest">Process all pending requests across all agents</p>
+                  </div>
+               </div>
+               <div className="flex items-center gap-3 w-full md:w-auto">
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const allPending = groupedRefills.flatMap(g => g.requests.filter(r => r.status === 'PENDING'));
+                      setIsSubmitting(true);
+                      try {
+                        for (const r of allPending) {
+                          await handleRejectRefill(r.id, true);
+                        }
+                        toast.success(`Rejected ${allPending.length} pending requests`);
+                        loadRefillRequests();
+                      } catch (error) {
+                        toast.error('Failed to reject some requests');
+                      } finally {
+                        setIsSubmitting(false);
+                      }
+                    }}
+                    disabled={isSubmitting}
+                    className="flex-1 md:flex-none px-6 py-3 rounded-2xl bg-emerald-900/30 border border-emerald-800 text-emerald-400 text-[10px] font-black uppercase tracking-widest hover:bg-emerald-900/50 transition-all disabled:opacity-50"
+                  >
+                    Reject All Pending
+                  </button>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      const allPending = groupedRefills.flatMap(g => g.requests.filter(r => r.status === 'PENDING'));
+                      setIsSubmitting(true);
+                      try {
+                        for (const r of allPending) {
+                          await handleApproveRefill(r.id, r.items, true);
+                        }
+                        toast.success(`Approved ${allPending.length} pending requests`);
+                        loadRefillRequests();
+                      } catch (error) {
+                        toast.error('Failed to approve some requests');
+                      } finally {
+                        setIsSubmitting(false);
+                      }
+                    }}
+                    disabled={isSubmitting}
+                    className="flex-1 md:flex-none px-8 py-3 rounded-2xl bg-emerald-500 text-emerald-950 text-[10px] font-black uppercase tracking-widest shadow-lg shadow-emerald-500/20 hover:bg-emerald-400 active:scale-95 transition-all disabled:opacity-50"
+                  >
+                    Approve All Pending
+                  </button>
+               </div>
+            </div>
+          )}
+
           {/* Desktop Table View */}
           <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
             <table className="w-full text-left border-collapse">
