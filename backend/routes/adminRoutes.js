@@ -121,6 +121,7 @@ router.put('/inventory/refills/:id/reject', inventoryCtr.rejectRefillRequest);
 
 // Sales History
 router.get('/sales', salesCtr.getSalesHistory);
+router.post('/sales', salesCtr.createManualSale);
 
 // Reports
 router.get('/reports/daily', reportCtr.getDailyReport);

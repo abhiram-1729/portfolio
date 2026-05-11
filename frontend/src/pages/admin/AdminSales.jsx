@@ -15,7 +15,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import { generateReportPDF } from './adminreports/ReportUtils';
-
+import ManualSaleDrawer from './ManualSaleDrawer';
 export default function AdminSales() {
   // Add Print Styles
   useEffect(() => {
@@ -70,6 +70,7 @@ export default function AdminSales() {
   const [saleType, setSaleType] = useState('ALL'); // ALL, POS, AGENT
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingOrder, setViewingOrder] = useState(null);
+  const [showCreateSale, setShowCreateSale] = useState(false);
   const ITEMS_PER_PAGE = 10;
 
   // ── Order Edit / Return / Cancel States ──
@@ -749,8 +750,15 @@ export default function AdminSales() {
           </div>
         </div>
 
-        {can('SALES', 'CREATE') && !viewingOrder && (
+        {can('SALES', 'CREATE') && !viewingOrder && !showCreateSale && (
           <div className="flex items-center gap-2 no-print">
+            <button
+              onClick={() => setShowCreateSale(true)}
+              className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all flex items-center gap-2 group"
+            >
+              <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+              Create Sale
+            </button>
             <button
               onClick={exportHistoryToExcel}
               className="bg-emerald-50 text-emerald-600 border border-emerald-100 p-3 rounded-xl hover:bg-emerald-100 transition-all shadow-sm group"
@@ -777,7 +785,7 @@ export default function AdminSales() {
       </div>
 
       {/* Tab Navigation */}
-      {!viewingOrder && (
+      {!viewingOrder && !showCreateSale && (
         <div className="flex items-center gap-2 bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 w-fit no-print">
           <button
             onClick={() => setActiveTab('sales')}
@@ -815,7 +823,13 @@ export default function AdminSales() {
         </div>
       )}
 
-      {viewingOrder ? (
+      {showCreateSale ? (
+        <ManualSaleDrawer 
+          isOpen={showCreateSale} 
+          onClose={() => setShowCreateSale(false)} 
+          onSuccess={() => { setShowCreateSale(false); fetchSales(); }}
+        />
+      ) : viewingOrder ? (
         /* ========== SALES DETAIL FULL PAGE VIEW ========== */
         <>
           <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-500 pb-12">

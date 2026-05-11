@@ -76,6 +76,7 @@ export const adminAPI = {
 
   // Sales
   getSales: (params) => api.get('/admin/sales', { params }),
+  createManualSale: (data) => api.post('/admin/sales', data),
 
   // Activity Logs
   getActivityLogs: (params) => api.get('/admin/activities', { params }),
