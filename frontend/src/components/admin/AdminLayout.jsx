@@ -580,7 +580,7 @@ export default function AdminLayout() {
                           isSidebarCollapsed ? "justify-center px-0" : "justify-between",
                           (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
                             ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
-                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Operation') ||
+                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Oppoeration') ||
                             ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
                             ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
                             ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
