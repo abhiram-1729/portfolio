@@ -37,6 +37,10 @@ export default function TodayPlan() {
   const [statusData, setStatusData] = useState(null);
   const [markingSlot, setMarkingSlot] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [closureSummary, setClosureSummary] = useState(null);
+  const [showClosureModal, setShowClosureModal] = useState(false);
+  const [closureRemarks, setClosureRemarks] = useState('');
+  const [distanceToVillage, setDistanceToVillage] = useState(null);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -114,6 +118,43 @@ export default function TodayPlan() {
     }
   };
 
+  // ─── Proximity Logic ───────────────────────────────
+  useEffect(() => {
+    let interval;
+    if (activeShift && statusData?.today?.villageChecklist?.length > 0) {
+      interval = setInterval(() => {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          const { latitude, longitude } = pos.coords;
+          
+          // Find the nearest unvisited village
+          const unvisited = statusData.today.villageChecklist.filter(v => !v.visited && v.lat && v.lon);
+          if (unvisited.length === 0) {
+            setDistanceToVillage(null);
+            return;
+          }
+
+          let minD = 999999;
+          unvisited.forEach(target => {
+            const R = 6371e3; // metres
+            const φ1 = latitude * Math.PI / 180;
+            const φ2 = target.lat * Math.PI / 180;
+            const Δφ = (target.lat - latitude) * Math.PI / 180;
+            const Δλ = (target.lon - longitude) * Math.PI / 180;
+            const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                      Math.cos(φ1) * Math.cos(φ2) *
+                      Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const d = R * c;
+            if (d < minD) minD = d;
+          });
+
+          setDistanceToVillage(minD);
+        });
+      }, 10000);
+    }
+    return () => clearInterval(interval);
+  }, [activeShift, statusData]);
+
   const formatTime12h = (time24) => {
     if (!time24) return 'N/A';
     const [hours, minutes] = time24.split(':');
@@ -157,9 +198,29 @@ export default function TodayPlan() {
 
   const handleEndShift = async () => {
     if (!activeShift) return;
+    
+    // Fetch closure summary before showing modal
     setActionLoading(true);
     try {
-      // 1. Immediately stop local tracking (Privacy first)
+      const summary = await routeService.getAgentClosureSummary();
+      setClosureSummary(summary);
+      setShowClosureModal(true);
+    } catch (err) {
+      toast.error('Failed to load daily summary');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const confirmEndShift = async () => {
+    // Validate justification if villages missed
+    if (closureSummary?.missedVillages?.length > 0 && !closureRemarks.trim()) {
+      toast.error('Please provide a reason for missed villages.');
+      return;
+    }
+
+    setActionLoading(true);
+    try {
       locationService.stopLiveTracking();
       setIsTracking(false);
 
@@ -172,15 +233,15 @@ export default function TodayPlan() {
         shiftLogId: activeShift.id,
         lat: coords.latitude,
         lon: coords.longitude,
-        accuracy: coords.accuracy
+        accuracy: coords.accuracy,
+        remarks: closureRemarks
       });
 
-      // 2. Cleanup any hanging village visits locally
-      if (activeVillageVisit) {
-        setActiveVillageVisit(null);
-      }
+      if (activeVillageVisit) setActiveVillageVisit(null);
 
-      toast.success('Shift Ended ✅. Location OFF.');
+      toast.success('Shift Ended ✅. Day Summary Submitted.');
+      setShowClosureModal(false);
+      setClosureRemarks('');
       setActiveShift(null);
       fetchActiveShift();
       fetchStatus();
@@ -397,6 +458,69 @@ export default function TodayPlan() {
             >
               {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <Square size={16} />}
             </button>
+          </div>
+        )}
+
+        {/* ── Route Progress & Checklist (NEW) ─────────── */}
+        {hasPlan && (
+          <div className="bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm space-y-4">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-black text-gray-900 uppercase tracking-tight">Route Progress</h4>
+              <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg">
+                {Math.round(((today.villageChecklist?.filter(v => v.visited).length || 0) / (today.villageChecklist?.length || 1)) * 100)}% Complete
+              </span>
+            </div>
+            
+            {/* Progress Bar */}
+            <div className="h-3 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-emerald-500 transition-all duration-1000 ease-out"
+                style={{ width: `${((today.villageChecklist?.filter(v => v.visited).length || 0) / (today.villageChecklist?.length || 1)) * 100}%` }}
+              />
+            </div>
+
+            {/* Checklist */}
+            <div className="grid grid-cols-1 gap-2 mt-4">
+              {today.villageChecklist?.map((v, i) => (
+                <div key={i} className={`flex items-center justify-between p-3 rounded-2xl border ${v.visited ? 'bg-emerald-50 border-emerald-100' : 'bg-gray-50 border-gray-100 opacity-60'}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center ${v.visited ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-200 text-gray-400'}`}>
+                      {v.visited ? <CheckCircle2 size={16} strokeWidth={3} /> : <div className="w-2 h-2 rounded-full bg-current" />}
+                    </div>
+                    <div>
+                      <p className="text-xs font-bold text-gray-900">{v.name}</p>
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{v.session}</p>
+                    </div>
+                  </div>
+                  {v.visited ? (
+                    <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest">Visited</span>
+                  ) : (
+                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Pending</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            
+            {/* Proximity Alert */}
+            {distanceToVillage !== null && distanceToVillage < 10000 && !activeVillageVisit && (
+              <div className="mt-4 p-4 bg-blue-50 border border-blue-100 rounded-2xl flex items-center gap-4 animate-in fade-in slide-in-from-bottom-2">
+                <div className="w-10 h-10 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center">
+                  <MapPin size={20} className="animate-bounce" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-[10px] font-black text-blue-400 uppercase tracking-widest mb-0.5">Village Proximity</p>
+                  <p className="text-xs font-bold text-blue-900">
+                    You are {distanceToVillage < 1000 ? `${Math.round(distanceToVillage)}m` : `${(distanceToVillage / 1000).toFixed(1)}km`} away
+                  </p>
+                </div>
+                <button 
+                  onClick={() => handleVillageVisit('start')}
+                  className="bg-blue-600 text-white px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest"
+                >
+                  Start Visit
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -648,6 +772,87 @@ export default function TodayPlan() {
           )}
         </div>
       </div>
+
+      {/* ── Closure Modal (NEW) ───────────────────────── */}
+      {showClosureModal && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-5">
+          <div className="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onClick={() => !actionLoading && setShowClosureModal(false)} />
+          <div className="relative bg-white w-full max-w-sm rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-gray-900 p-8 text-center text-white relative">
+              <div className="w-20 h-20 bg-white/10 rounded-[2rem] flex items-center justify-center mx-auto mb-4 border border-white/10">
+                <CheckCircle2 size={40} className="text-emerald-400" />
+              </div>
+              <h3 className="text-xl font-black tracking-tight">Daily Performance</h3>
+              <p className="text-xs text-gray-400 font-bold uppercase tracking-widest mt-1">{closureSummary?.date}</p>
+            </div>
+
+            <div className="p-8 space-y-6">
+              {/* Stats Grid */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Coverage</p>
+                  <p className="text-lg font-black text-gray-900">{closureSummary?.visitedCount}/{closureSummary?.totalVillages}</p>
+                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tight">Villages Visited</p>
+                </div>
+                <div className="bg-gray-50 p-4 rounded-2xl border border-gray-100">
+                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Sales</p>
+                  <p className="text-lg font-black text-gray-900">₹{closureSummary?.totalSales?.toLocaleString()}</p>
+                  <p className="text-[8px] font-bold text-gray-500 uppercase tracking-tight">{closureSummary?.totalOrders} Orders</p>
+                </div>
+              </div>
+
+              {/* Incentive Highlight */}
+              <div className="bg-emerald-50 p-5 rounded-3xl border border-emerald-100 flex items-center justify-between">
+                <div>
+                  <p className="text-[9px] font-black text-emerald-600 uppercase tracking-widest mb-0.5">Today's Earnings</p>
+                  <p className="text-xl font-black text-emerald-900">₹{closureSummary?.totalIncentive}</p>
+                </div>
+                <div className="bg-emerald-600 text-white px-3 py-1.5 rounded-xl text-[10px] font-black">
+                  {closureSummary?.level}
+                </div>
+              </div>
+
+              {/* Justification Box */}
+              {closureSummary?.missedVillages?.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2 text-rose-500">
+                    <AlertTriangle size={14} />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Missed Villages Justification</span>
+                  </div>
+                  <div className="bg-rose-50/50 p-3 rounded-xl border border-rose-100 mb-2">
+                    <p className="text-[10px] font-bold text-rose-700">Missing: {closureSummary.missedVillages.join(', ')}</p>
+                  </div>
+                  <textarea
+                    value={closureRemarks}
+                    onChange={(e) => setClosureRemarks(e.target.value)}
+                    placeholder="Provide a reason for missed villages..."
+                    className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all resize-none min-h-[100px]"
+                  />
+                </div>
+              )}
+
+              {/* Actions */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  onClick={() => setShowClosureModal(false)}
+                  disabled={actionLoading}
+                  className="flex-1 bg-gray-100 text-gray-500 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest active:scale-95 transition-all disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmEndShift}
+                  disabled={actionLoading}
+                  className="flex-[2] bg-gray-900 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-xl shadow-gray-900/20 active:scale-95 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+                >
+                  {actionLoading ? <Loader2 size={14} className="animate-spin" /> : <CheckCircle2 size={14} />}
+                  Submit & End Shift
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

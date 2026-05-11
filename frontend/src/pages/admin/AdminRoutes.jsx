@@ -28,6 +28,7 @@ import {
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, CircleF, InfoWindow } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
 import * as routeService from '../../services/routeService';
+import RoutePerformanceDashboard from './components/RoutePerformanceDashboard';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
@@ -56,7 +57,7 @@ export default function AdminRoutes() {
     return 'villages';
   };
 
-  const [activeTab, setActiveTab] = useState(getInitialTab());
+    const [activeTab, setActiveTab] = useState('performance');
   const [villagePage, setVillagePage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
@@ -105,13 +106,15 @@ export default function AdminRoutes() {
     setIsVillagesLoading(true);
     setIsRoutesLoading(true);
     setIsAssignmentsLoading(true);
+    const normalizedStoreId = (storeId && storeId !== 'null' && storeId !== 'undefined' && storeId !== '') ? storeId : null;
+
     try {
       const [vRes, rRes, aRes, vehRes, uRes, sRes] = await Promise.all([
-        routeService.getVillages({ storeId }),
-        routeService.getAdminRoutes({ storeId }),
-        routeService.getRouteAssignments({ storeId }),
-        adminAPI.getVehicles({ storeId }),
-        adminAPI.getUsers({ storeId }),
+        routeService.getVillages({ storeId: normalizedStoreId }),
+        routeService.getAdminRoutes({ storeId: normalizedStoreId }),
+        routeService.getRouteAssignments({ storeId: normalizedStoreId }),
+        adminAPI.getVehicles({ storeId: normalizedStoreId }),
+        adminAPI.getUsers({ storeId: normalizedStoreId }),
         adminAPI.getStores()
       ]);
       setVillages(vRes);
@@ -509,6 +512,12 @@ export default function AdminRoutes() {
           </div>
 
         <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('performance')}
+            className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'performance' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+          >
+            Performance
+          </button>
           {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
             <button
               onClick={() => setActiveTab('villages')}
@@ -552,6 +561,26 @@ export default function AdminRoutes() {
           </button>
         </div>
       </div>
+
+      {/* --- PERFORMANCE TAB --- */}
+      {/* Performance Tab Warning */}
+      {activeTab === 'performance' && !import.meta.env.VITE_GOOGLE_MAPS_API_KEY && (
+        <div className="max-w-7xl mx-auto px-6 mb-6">
+          <div className="bg-rose-50 border border-rose-100 rounded-3xl p-6 flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0">
+              <AlertCircle size={24} />
+            </div>
+            <div>
+              <h4 className="text-sm font-black text-rose-900 uppercase tracking-widest">Google Maps Key Missing</h4>
+              <p className="text-xs text-rose-700 font-medium mt-1">Real-time tracking and village mapping will not work. Please add <code className="bg-rose-200/50 px-1.5 py-0.5 rounded">VITE_GOOGLE_MAPS_API_KEY</code> to your environment.</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'performance' && (
+        <RoutePerformanceDashboard storeId={storeId} isLoaded={isLoaded} />
+      )}
 
       {/* --- VILLAGES TAB --- */}
       {activeTab === 'villages' && (

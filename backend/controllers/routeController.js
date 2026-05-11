@@ -53,17 +53,27 @@ export const fetchPlanForVehicle = async (vehicleId, targetDate = new Date()) =>
         }
     }
 
-    const villageName = morning === evening ? morning : (morning && evening ? `${morning} / ${evening}` : (morning || evening));
+    // 4. Resolve village names to objects with IDs for the agent app
+    const villageNames = [morning, evening].filter(v => v && v !== 'No Task');
+    const villageObjects = await prisma.village.findMany({
+        where: {
+            name: { in: villageNames },
+            tenantId: assignment.tenantId
+        },
+        select: { id: true, name: true }
+    });
 
-    if (!morning && !evening) return { routeId: assignment.routeId, routeName: assignment.route.routeName, noVillage: true };
+    const villageNameStr = morning === evening ? morning : (morning && evening ? `${morning} / ${evening}` : (morning || evening));
 
-    // 4. Return formatted plan
     return {
         routeId: assignment.routeId,
-        villageName: villageName,
+        villageId: villageObjects.find(v => v.name === (morning || evening))?.id, // Primary village ID
+        villageName: villageNameStr,
         routeName: assignment.route.routeName,
         morning: morning || "No Task",
-        evening: evening || "No Task"
+        morningId: villageObjects.find(v => v.name === morning)?.id,
+        evening: evening || "No Task",
+        eveningId: villageObjects.find(v => v.name === evening)?.id
     };
 };
 
@@ -149,7 +159,7 @@ export const markCoverage = async (req, res, next) => {
         const activeShift = shifts.find(s => s.id === shiftId || s.name === shiftName || s.name.toUpperCase() === slot);
 
         const effectiveShiftName = activeShift ? activeShift.name : slot;
-        
+
         if (!effectiveShiftName || typeof effectiveShiftName !== 'string') {
             console.error('[MarkCoverage] Invalid Shift Name:', { effectiveShiftName, slot, shiftId, shiftName });
             res.status(400);
@@ -363,11 +373,21 @@ export const locationCheckIn = async (req, res, next) => {
             status = (hour >= 6 && hour <= 9) ? "ON_TIME" : "LATE";
         }
 
-        // Validate location match
+        // Validate location match (Fuzzy)
         let isLocationMatched = true;
-        const village = await prisma.village.findFirst({
+        let village = await prisma.village.findFirst({
             where: { name: villageName, tenantId }
         });
+
+        if (!village) {
+            // Fallback: Try a slightly looser match
+            village = await prisma.village.findFirst({
+                where: {
+                    name: { contains: (villageName || '').split(/[\s&/]+/)[0], mode: 'insensitive' },
+                    tenantId
+                }
+            });
+        }
 
         if (village && village.latitude && village.longitude) {
             const distance = getDistance(latitude, longitude, village.latitude, village.longitude);

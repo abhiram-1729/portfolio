@@ -69,6 +69,21 @@ export const assignRoute = async (data) => {
     return response.data;
 };
 
+export const getRoutePerformance = async (params) => {
+    const response = await api.get('/admin/routes/performance', { params });
+    return response.data;
+};
+
+export const getAssignmentPerformanceDetail = async (id, params) => {
+    const response = await api.get(`/admin/routes/performance/${id}`, { params });
+    return response.data;
+};
+
+export const getRouteClosureSummary = async (id, params) => {
+    const response = await api.get(`/admin/routes/performance/${id}/closure`, { params });
+    return response.data;
+};
+
 export const getRouteAssignments = async (params) => {
     const response = await api.get('/admin/routes/assignments', { params });
     return response.data;

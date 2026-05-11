@@ -4,13 +4,20 @@ import { format } from 'date-fns';
 import { sendNotification } from '../services/notificationService.js';
 
 export const getShiftsConfig = async (tenantId, storeId) => {
-  let settings = await prisma.businessSettings.findUnique({
-    where: { tenantId_storeId: { tenantId, storeId } }
+  // Use findFirst instead of findUnique to handle null/undefined storeId more gracefully
+  let settings = await prisma.businessSettings.findFirst({
+    where: {
+      tenantId: tenantId || "VK001",
+      storeId: storeId || null
+    }
   });
 
   if (!settings && storeId) {
-    settings = await prisma.businessSettings.findUnique({
-      where: { tenantId_storeId: { tenantId, storeId: null } }
+    settings = await prisma.businessSettings.findFirst({
+      where: {
+        tenantId: tenantId || "VK001",
+        storeId: null
+      }
     });
   }
 
@@ -38,9 +45,9 @@ export const startShift = async (req, res, next) => {
 
     // 1. GPS Accuracy Check
     if (accuracy > 2000) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'GPS accuracy too low (>50m). Please wait for a better signal.',
-        accuracy 
+        accuracy
       });
     }
 
@@ -69,7 +76,7 @@ export const startShift = async (req, res, next) => {
 
     const nearHub = isWithinRadius(lat, lon, store.latitude, store.longitude, 500000); // Relaxed to 500km for development testing
     if (!nearHub) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'Shift must be started near the HUB (within 200m).',
         distanceError: true,
         currentLocation: { lat, lon },
@@ -96,15 +103,15 @@ export const startShift = async (req, res, next) => {
 
     // 5. Late Start Notification Check
     const shifts = await getShiftsConfig(req.user.tenantId, req.user.storeId);
-    
+
     // Find config by ID (string) or by 1-based index (Int)
-    const activeShiftConfig = shifts.find((s, idx) => 
-        s.id === shiftType || 
-        s.id === `shift_${shiftType}` || 
-        (idx + 1) === shiftType ||
-        s.name.toUpperCase() === (shiftType === 1 ? 'MORNING' : 'EVENING')
+    const activeShiftConfig = shifts.find((s, idx) =>
+      s.id === shiftType ||
+      s.id === `shift_${shiftType}` ||
+      (idx + 1) === shiftType ||
+      s.name.toUpperCase() === (shiftType === 1 ? 'MORNING' : 'EVENING')
     );
-    
+
     const shiftTime = new Date();
     const currentTimeStr = format(shiftTime, 'HH:mm');
     let isLate = false;
@@ -112,31 +119,31 @@ export const startShift = async (req, res, next) => {
     const shiftName = activeShiftConfig ? activeShiftConfig.name : (shiftType === 1 ? 'MORNING' : 'EVENING');
 
     if (activeShiftConfig && activeShiftConfig.startTime) {
-        if (currentTimeStr > activeShiftConfig.startTime) {
-            isLate = true;
-            expectedTime = activeShiftConfig.startTime;
-        }
+      if (currentTimeStr > activeShiftConfig.startTime) {
+        isLate = true;
+        expectedTime = activeShiftConfig.startTime;
+      }
     } else {
-        // Fallback to legacy hardcoded times
-        const hours = shiftTime.getHours();
-        const minutes = shiftTime.getMinutes();
-        if (shiftType === 1 && (hours > 5 || (hours === 5 && minutes > 45))) {
-            isLate = true;
-            expectedTime = '05:45 AM';
-        } else if (shiftType === 2 && (hours > 15 || (hours === 15 && minutes > 30))) {
-            isLate = true;
-            expectedTime = '03:30 PM';
-        }
+      // Fallback to legacy hardcoded times
+      const hours = shiftTime.getHours();
+      const minutes = shiftTime.getMinutes();
+      if (shiftType === 1 && (hours > 5 || (hours === 5 && minutes > 45))) {
+        isLate = true;
+        expectedTime = '05:45 AM';
+      } else if (shiftType === 2 && (hours > 15 || (hours === 15 && minutes > 30))) {
+        isLate = true;
+        expectedTime = '03:30 PM';
+      }
     }
 
     if (isLate) {
-        await sendNotification({
-            userIds: [userId],
-            title: 'Late Shift Start',
-            message: `You started your ${shiftName} shift at ${format(shiftTime, 'hh:mm a')}. Expected start was ${expectedTime}.`,
-            type: 'alert',
-            priority: 'high'
-        });
+      await sendNotification({
+        userIds: [userId],
+        title: 'Late Shift Start',
+        message: `You started your ${shiftName} shift at ${format(shiftTime, 'hh:mm a')}. Expected start was ${expectedTime}.`,
+        type: 'alert',
+        priority: 'high'
+      });
     }
 
     res.status(201).json({ message: 'Shift Started ✅', shiftLog });
@@ -157,9 +164,9 @@ export const endShift = async (req, res, next) => {
 
     // 1. GPS Accuracy Check
     if (accuracy > 2000) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         message: 'GPS accuracy too low (>50m). Please wait for a better signal.',
-        accuracy 
+        accuracy
       });
     }
 
@@ -186,15 +193,53 @@ export const endShift = async (req, res, next) => {
       return res.status(400).json({ message: 'Shift must be ended near the HUB (within 200m).' });
     }
 
-    // 4. Update Shift Log
-    const updatedShift = await prisma.shiftLog.update({
-      where: { id: shiftLogId },
-      data: {
-        endTime: new Date(),
-        endLat: lat,
-        endLong: lon,
-        status: 'COMPLETED'
-      }
+    // 4. Update Shift Log and DailyCoverage
+    const updatedShift = await prisma.$transaction(async (tx) => {
+        const updated = await tx.shiftLog.update({
+            where: { id: shiftLogId },
+            data: {
+                endTime: new Date(),
+                endLat: lat,
+                endLong: lon,
+                status: 'COMPLETED'
+            }
+        });
+
+        // Store remarks/justification in shiftStatus JSON if provided
+        if (remarks && req.user.assignedVehicleId) {
+            const existingCoverage = await tx.dailyCoverage.findUnique({
+                where: { 
+                    vehicleId_date: { 
+                        vehicleId: req.user.assignedVehicleId, 
+                        date: dateStr 
+                    } 
+                }
+            });
+
+            const currentStatus = existingCoverage?.shiftStatus || {};
+            const updatedStatus = { 
+                ... (typeof currentStatus === 'object' ? currentStatus : {}), 
+                closureRemarks: remarks 
+            };
+
+            await tx.dailyCoverage.upsert({
+                where: { 
+                    vehicleId_date: { 
+                        vehicleId: req.user.assignedVehicleId, 
+                        date: dateStr 
+                    } 
+                },
+                update: { shiftStatus: updatedStatus },
+                create: {
+                    vehicleId: req.user.assignedVehicleId,
+                    date: dateStr,
+                    villageName: 'N/A',
+                    shiftStatus: updatedStatus
+                }
+            });
+        }
+
+        return updated;
     });
 
     res.json({ message: 'Shift Ended ✅', updatedShift });
@@ -234,14 +279,14 @@ export const getShiftStatus = async (req, res, next) => {
       getShiftsConfig(req.user.tenantId, req.user.storeId)
     ]);
 
-    res.json({ 
-      activeShift, 
+    res.json({
+      activeShift,
       attendance: attendance ? {
         isLate: attendance.isLate,
         lateMinutes: attendance.lateMinutes,
         punchInTime: attendance.punchInTime
       } : null,
-      shifts 
+      shifts
     });
   } catch (error) {
     console.error('getShiftStatus error:', error);

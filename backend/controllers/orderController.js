@@ -123,14 +123,14 @@ export const createOrderFromCart = async (req, res, next) => {
         if (vehicleId) {
             for (const item of orderItemsData) {
                 const stock = await prisma.vehicleStock.findUnique({
-                    where: { 
+                    where: {
                         vehicleId_productId: { vehicleId, productId: item.productId }
                     }
                 });
-                
+
                 if (!stock || stock.quantity < item.quantity) {
                     const product = await prisma.product.findUnique({ where: { id: item.productId } });
-                    
+
                     sendNotification({
                         roles: ['ADMIN'],
                         title: 'Inventory Alert: Stock Mismatch',
@@ -139,7 +139,7 @@ export const createOrderFromCart = async (req, res, next) => {
                         priority: 'high',
                         metadata: { productId: item.productId, vehicleId, requested: item.quantity, available: stock?.quantity || 0 }
                     });
-                    
+
                     res.status(400);
                     throw new Error(`Insufficient stock for ${product.name} (Available: ${stock?.quantity || 0})`);
                 }
@@ -163,9 +163,9 @@ export const createOrderFromCart = async (req, res, next) => {
         // 3. Create Order + OrderItems in a transaction
         const order = await prisma.$transaction(async (tx) => {
             const orderDisplayId = await generateId({
-              entity: 'ORD',
-              tenantId: req.user.tenantId,
-              storeId: req.user.storeId
+                entity: 'ORD',
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId
             });
 
             const newOrder = await tx.order.create({
@@ -184,8 +184,8 @@ export const createOrderFromCart = async (req, res, next) => {
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
                     items: {
-                        create: orderItemsData.map(item => ({ 
-                            ...item, 
+                        create: orderItemsData.map(item => ({
+                            ...item,
                             tenantId: req.user.tenantId,
                             storeId: req.user.storeId
                         })),
@@ -305,8 +305,8 @@ export const completePayment = async (req, res, next) => {
                     // 2. Sync with WarehouseInventory if it exists
                     // We target the same tenant and optionally storeId if available
                     const wi = await tx.warehouseInventory.findFirst({
-                        where: { 
-                            productId: item.productId, 
+                        where: {
+                            productId: item.productId,
                             tenantId: order.tenantId
                         }
                     });
@@ -339,8 +339,8 @@ export const completePayment = async (req, res, next) => {
             storeId: req.user.storeId,
             action: 'SALE_COMPLETED',
             details: `Completed sale #${updatedOrder.orderNumber} for ₹${updatedOrder.totalAmount}`,
-            metadata: { 
-                orderId: updatedOrder.id, 
+            metadata: {
+                orderId: updatedOrder.id,
                 orderNumber: updatedOrder.orderNumber,
                 amount: updatedOrder.totalAmount,
                 paymentMode: updatedOrder.paymentMode,
@@ -354,7 +354,7 @@ export const completePayment = async (req, res, next) => {
         // Notify for low stock (Consolidated)
         if (lowStockItems.length > 0) {
             const lowStockCount = lowStockItems.length;
-            const msg = lowStockCount === 1 
+            const msg = lowStockCount === 1
                 ? `Vehicle is low on ${lowStockItems[0].name} (Only ${lowStockItems[0].quantity} left).`
                 : `Vehicle is low on ${lowStockCount} items including ${lowStockItems[0].name}. Please check inventory.`;
 
@@ -377,19 +377,19 @@ export const completePayment = async (req, res, next) => {
             message: `Order #${updatedOrder.orderNumber} for ₹${updatedOrder.totalAmount} has been completed by ${req.user.name}.`,
             type: 'sales',
             priority: updatedOrder.totalAmount >= 2000 ? 'high' : 'medium',
-            metadata: { 
-              orderId: updatedOrder.id, 
-              amount: updatedOrder.totalAmount, 
-              vehicleId: updatedOrder.vehicleId,
-              orderNumber: updatedOrder.orderNumber 
+            metadata: {
+                orderId: updatedOrder.id,
+                amount: updatedOrder.totalAmount,
+                vehicleId: updatedOrder.vehicleId,
+                orderNumber: updatedOrder.orderNumber
             }
         });
 
         // 5. Trigger VGE performance recalculation (fire-and-forget)
         if (updatedOrder.agentId) {
-          updateDailyPerformance(updatedOrder.agentId).catch(err => {
-            console.warn('[VGE] Background recalculation failed:', err.message);
-          });
+            updateDailyPerformance(updatedOrder.agentId).catch(err => {
+                console.warn('[VGE] Background recalculation failed:', err.message);
+            });
         }
 
         // 6. Recalculate Daily Cash Summary if CASH or CASH_UPI payment
@@ -466,7 +466,7 @@ export const getMyOrders = async (req, res, next) => {
         const { limit = 100, page = 1 } = req.query;
 
         const orders = await prisma.order.findMany({
-            where: { 
+            where: {
                 tenantId: tenantId,
                 OR: [
                     { agentId: userId },
