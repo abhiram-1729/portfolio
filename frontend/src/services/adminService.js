@@ -14,6 +14,12 @@ export const adminAPI = {
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   deactivateUser: (id) => api.delete(`/admin/users/${id}`),
+  uploadUserDocument: (userId, data) => api.post(`/admin/users/${userId}/documents`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  updateUserDocumentStatus: (documentId, status) => api.put(`/admin/users/documents/${documentId}`, { status }),
+  getShifts: () => api.get('/admin/users/shifts'),
+  createShift: (data) => api.post('/admin/users/shifts', data),
 
   // Vehicles
   getVehicles: (params) => api.get('/admin/vehicles', { params }),
@@ -24,8 +30,22 @@ export const adminAPI = {
   deleteVehicle: (id) => api.delete(`/admin/vehicles/${id}`),
   assignDriver: (id, userId) => api.put(`/admin/vehicles/${id}/assign`, { userId }),
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
+  
+  // Vehicle Operations
+  getVehicleOpsTrips: (params) => api.get('/admin/vehicles/ops/trips', { params }),
+  startVehicleTrip: (data) => api.post('/admin/vehicles/ops/trips/start', data),
+  endVehicleTrip: (id, data) => api.put(`/admin/vehicles/ops/trips/${id}/end`, data),
+  getFuelLogs: (params) => api.get('/admin/vehicles/ops/fuel', { params }),
+  addFuelLog: (data) => api.post('/admin/vehicles/ops/fuel', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getMaintenanceLogs: (params) => api.get('/admin/vehicles/ops/maintenance', { params }),
+  addMaintenanceLog: (data) => api.post('/admin/vehicles/ops/maintenance', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 
   // Inventory
+  getInventoryInit: (params) => api.get('/admin/inventory/init', { params }),
   getItems: (params) => api.get('/admin/inventory/items', { params }),
   createItem: (data) => api.post('/admin/inventory/items', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -49,6 +69,7 @@ export const adminAPI = {
   approveRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/approve`, data),
   rejectRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/reject`, data),
   updateProductStock: (data) => api.post('/admin/inventory/stock', data),
+  updateInventory: (data) => api.post('/admin/inventory/stock', data),
   importZipInventory: (data) => api.post('/admin/inventory/items/zip-import', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -76,6 +97,13 @@ export const adminAPI = {
   getVehicleAllPerformance: (params) => api.get('/admin/reports/vehicle-all', { params }),
   getPaymentReport: (params) => api.get('/admin/reports/daily', { params }),
   getDamageReports: (params) => api.get('/damage/reports', { params }),
+  getDamageEntries: (params) => api.get('/damage/entries', { params }),
+
+  // Vehicle Damage CRUD (Separate)
+  getVehicleDamages: (params) => api.get('/admin/vehicle-damages', { params }),
+  createVehicleDamage: (data) => api.post('/admin/vehicle-damages', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateVehicleDamage: (id, data) => api.put(`/admin/vehicle-damages/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteVehicleDamage: (id) => api.delete(`/admin/vehicle-damages/${id}`),
   getInvoiceReport: (params) => api.get('/admin/sales', { params }),
   getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
   getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),

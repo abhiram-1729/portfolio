@@ -1,13 +1,13 @@
 import React from 'react';
-import { 
-  Loader2, BookOpen, Building2, Vault, Coins, ArrowUpRight, ArrowDownLeft, 
-  ShoppingCart, Lock, ExternalLink, Shield 
+import {
+  Loader2, BookOpen, Building2, Vault, Coins, ArrowUpRight, ArrowDownLeft,
+  ShoppingCart, Lock, ExternalLink, Shield, Package
 } from 'lucide-react';
 import { format } from 'date-fns';
 
-const AuditLedgerTab = ({ 
-  ledgerLoading, ledgerData, ledgerFilter, setLedgerFilter, 
-  date, setViewingOrder, setPreviewImage 
+const AuditLedgerTab = ({
+  ledgerLoading, ledgerData, ledgerFilter, setLedgerFilter,
+  date, setViewingOrder, setPreviewImage
 }) => {
   if (ledgerLoading) {
     return (
@@ -90,6 +90,7 @@ const AuditLedgerTab = ({
                   'BANK_TRANSFER': { icon: Building2, bg: 'bg-rose-50', text: 'text-rose-600', badge: 'BANK' },
                   'SAFE_MOVEMENT': { icon: Vault, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'INTERNAL' },
                   'STORE_SALE': { icon: ShoppingCart, bg: 'bg-sky-50', text: 'text-sky-600', badge: 'POS' },
+                  'EXPENSE_OUTFLOW': { icon: Package, bg: 'bg-rose-50', text: 'text-rose-600', badge: 'EXPENSE' },
                   'CLOSING': { icon: Lock, bg: 'bg-slate-100', text: 'text-slate-600', badge: 'CLOSE' },
                 };
                 const cfg = typeConfig[entry.type] || typeConfig['OPENING'];

@@ -54,7 +54,11 @@ const StoreSafeHeader = ({
                     <div className="flex flex-col gap-2">
                       <span className="flex items-center gap-2">
                         <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active • Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                          Active • Balance: ₹{storeRegisterData?.liveMetrics?.availableCash?.toLocaleString()} 
+                          <span className="text-white/20 mx-2">|</span>
+                          Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}
+                        </span>
                       </span>
 
                       {storeRegisterData.previousRegister && Math.abs(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash) > 0.01 && (
@@ -285,10 +289,6 @@ const StoreSafeHeader = ({
                   <p className="text-xl font-black text-white tabular-nums">
                     ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
                   </p>
-                  <div className="mt-2 pt-2 border-t border-emerald-800/50 flex items-center justify-between">
-                    <span className="text-[8px] font-bold text-emerald-500 uppercase">Total Cash</span>
-                    <span className="text-[10px] font-black text-emerald-300">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</span>
-                  </div>
                 </div>
               </div>
             )}

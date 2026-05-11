@@ -70,6 +70,7 @@ export const OpenStoreModal = ({
                     className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200"
                     value={storeDenomData.denominations[denom] || ''}
                     onChange={(e) => handleDenominationChange(e.target.value, denom, 'store')}
+                    onWheel={(e) => e.target.blur()}
                   />
                 </div>
               ))}
@@ -140,6 +141,7 @@ export const CloseStoreModal = ({
                     className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200 text-center"
                     value={storeDenomData.denominations[denom] || ''}
                     onChange={(e) => handleDenominationChange(e.target.value, denom, 'store')}
+                    onWheel={(e) => e.target.blur()}
                   />
                 </div>
               </div>
@@ -230,6 +232,7 @@ export const EditStoreModal = ({
                   className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 placeholder:text-gray-200"
                   value={storeDenomData.denominations[denom] || ''}
                   onChange={(e) => handleDenominationChange(e.target.value, denom, 'store')}
+                  onWheel={(e) => e.target.blur()}
                 />
               </div>
             ))}
@@ -301,6 +304,7 @@ export const SafeMovementModal = ({
                   className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0"
                   value={safeMovementData.denominations[denom] || ''}
                   onChange={(e) => handleDenominationChange(e.target.value, denom, 'safe')}
+                  onWheel={(e) => e.target.blur()}
                   placeholder="0"
                 />
               </div>
@@ -334,10 +338,34 @@ export const SafeMovementModal = ({
             </div>
           </div>
 
+          {(() => {
+            const available = safeMovementData.type === 'DEPOSIT' 
+              ? (storeRegisterData?.liveMetrics?.availableCash || 0)
+              : (storeRegisterData?.liveMetrics?.safeBalance || 0);
+            
+            if (safeMovementData.amount > available) {
+              return (
+                <div className="flex items-center gap-2 px-3 py-2 bg-rose-500/10 border border-rose-500/20 rounded-xl animate-in shake duration-300">
+                  <AlertTriangle size={12} className="text-rose-500 shrink-0" />
+                  <p className="text-[9px] font-bold text-rose-500 uppercase tracking-tight">
+                    Amount exceeds available {safeMovementData.type === 'DEPOSIT' ? 'counter cash' : 'safe balance'}
+                  </p>
+                </div>
+              );
+            }
+            return null;
+          })()}
+
           <button
             onClick={handleSafeMovement}
-            disabled={isSubmitting || safeMovementData.amount <= 0}
-            className="w-full bg-sky-600 text-white font-black py-3.5 rounded-xl hover:bg-sky-700 transition-all shadow-lg shadow-sky-600/20"
+            disabled={
+              isSubmitting || 
+              safeMovementData.amount <= 0 || 
+              safeMovementData.amount > (safeMovementData.type === 'DEPOSIT' 
+                ? (storeRegisterData?.liveMetrics?.availableCash || 0)
+                : (storeRegisterData?.liveMetrics?.safeBalance || 0))
+            }
+            className="w-full bg-sky-600 text-white font-black py-3.5 rounded-xl hover:bg-sky-700 transition-all shadow-lg shadow-sky-600/20 disabled:opacity-40"
           >
             {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Confirm Movement'}
           </button>
@@ -379,6 +407,7 @@ export const BankDepositModal = ({
                 placeholder="0.00"
                 value={bankData.amount || ''}
                 onChange={(e) => setBankData({ ...bankData, amount: parseFloat(e.target.value) || 0 })}
+                onWheel={(e) => e.target.blur()}
               />
               <div className="flex flex-col gap-1.5">
                 <p className="text-[9px] font-bold text-gray-400 uppercase pl-1">Available in Safe: ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}</p>

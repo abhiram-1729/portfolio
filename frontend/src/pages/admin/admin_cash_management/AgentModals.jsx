@@ -109,6 +109,7 @@ export const AssignFloatModal = ({
                               className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
                               value={assignmentData.denominations[denom] || ''}
                               onChange={(e) => handleDenominationChange(e.target.value, denom, 'assign')}
+                              onWheel={(e) => e.target.blur()}
                             />
                           </div>
                         ))}
@@ -175,6 +176,7 @@ export const EditReconciliationModal = ({
                     className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
                     value={editData.denominations[denom] || ''}
                     onChange={(e) => handleDenominationChange(e.target.value, denom, 'edit')}
+                    onWheel={(e) => e.target.blur()}
                   />
                 </div>
               ))}
@@ -328,6 +330,7 @@ export const EditDepositModal = ({ show, setShow, depositData, setDepositData, h
                   className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
                   value={depositData.denominations[denom] || ''}
                   onChange={(e) => handleDenominationChange(e.target.value, denom, 'deposit')}
+                  onWheel={(e) => e.target.blur()}
                 />
               </div>
             ))}

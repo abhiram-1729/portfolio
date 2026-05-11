@@ -1,15 +1,30 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, Package } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Truck, User, ArrowRight, CheckCircle2, XCircle, X, Loader2, Pencil, Trash2, FileText, Search, Store, ArrowLeft, ChevronLeft, ChevronRight, Package, Download, MapPin, Users, Fuel, IndianRupee, Wrench, Zap, Settings, ClipboardCheck, Activity, BarChart3, RotateCcw, ShoppingBag, History, Grid, PlusCircle, AlertCircle, ScanBarcode, Building2 } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
-import { useSearchParams, useLocation } from 'react-router-dom';
+import { useSearchParams, useLocation, useNavigate } from 'react-router-dom';
 import { useUserStore } from '../../store/userStore';
 import * as XLSX from 'xlsx';
 import { generateReportPDF } from './adminreports/ReportUtils';
-import { Download } from 'lucide-react';
+
+// Modular Components Integration
+import FuelLogsSection from './admin_inventory/FuelLogsSection';
+import MaintenanceSection from './admin_inventory/MaintenanceSection';
+import TripManagementSection from './admin_inventory/TripManagementSection';
+import VehicleStockSection from './admin_inventory/VehicleStockSection';
+import LoadingSection from './admin_inventory/LoadingSection';
+import ReturnSection from './admin_inventory/ReturnSection';
+import RefillsSection from './admin_inventory/RefillsSection';
+import OpeningStockSection from './admin_inventory/OpeningStockSection';
+import RouteMappingSection from './admin_vehicles/RouteMappingSection';
+import VehicleSalesSection from './admin_vehicles/VehicleSalesSection';
+import RouteCollectionSection from './admin_vehicles/RouteCollectionSection';
+import VehicleDamagesSection from './admin_vehicles/VehicleDamagesSection';
 
 export default function AdminVehicles() {
   const [searchParams, setSearchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const activeSub = searchParams.get('sub') || 'master';
   const storeFilterId = searchParams.get('storeId');
   const location = useLocation();
   const isTenantRoute = location.pathname.startsWith('/tenant');
@@ -20,13 +35,24 @@ export default function AdminVehicles() {
   const [users, setUsers] = useState([]);
   const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [allVehiclesStock, setAllVehiclesStock] = useState({});
+  const [loadingTracking, setLoadingTracking] = useState(false);
+  const [auditHistory, setAuditHistory] = useState([]);
+  const [isAuditMode, setIsAuditMode] = useState(false);
+  const [auditQuantities, setAuditQuantities] = useState({});
+  const [auditRemark, setAuditRemark] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [viewingVehicleId, setViewingVehicleId] = useState(null);
+  const [vehicleSearch, setVehicleSearch] = useState('');
+  const [showScanner, setShowScanner] = useState(false);
+  const [scannerTarget, setScannerTarget] = useState('tracking');
+  const [loadingVehicles, setLoadingVehicles] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedVehicle, setSelectedVehicle] = useState(null);
   const [editingVehicle, setEditingVehicle] = useState(null);
   const [editDocuments, setEditDocuments] = useState({ rcDocument: null, insuranceDocument: null, permitDocument: null });
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -36,7 +62,30 @@ export default function AdminVehicles() {
   const [auditTargetUser, setAuditTargetUser] = useState(null);
   const [vehicleInventory, setVehicleInventory] = useState([]);
   const [isAuditing, setIsAuditing] = useState(false);
-  const [auditRemark, setAuditRemark] = useState('');
+  const [auditSearch, setAuditSearch] = useState('');
+  const [agentSearch, setAgentSearch] = useState('');
+  const [mappingSearch, setMappingSearch] = useState('');
+  
+  // Inventory Operation States
+  const [items, setItems] = useState([]);
+  const [stockQuantities, setStockQuantities] = useState({});
+  const [opsSearch, setOpsSearch] = useState('');
+  const [opsCategory, setOpsCategory] = useState('ALL');
+  const [opsSubCategory, setOpsSubCategory] = useState('ALL');
+  const [itemsPerPage] = useState(25);
+  const [selectedVehicleId, setSelectedVehicleId] = useState('');
+  const [showLoadConfirmModal, setShowLoadConfirmModal] = useState(false);
+  const [pendingLoadItems, setPendingLoadItems] = useState([]);
+  const [returnSearch, setReturnSearch] = useState('');
+  const [openingSearch, setOpeningSearch] = useState('');
+  const [vehicleInventoryMap, setVehicleInventoryMap] = useState({});
+  const [refillRequests, setRefillRequests] = useState([]);
+  const [viewingAgentId, setViewingAgentId] = useState(null);
+  const [unselectedRefillItems, setUnselectedRefillItems] = useState([]);
+  const [editedQuantities, setEditedQuantities] = useState({});
+  const [processingItems, setProcessingItems] = useState(new Set());
+  const [stockInputs, setStockInputs] = useState({});
+  const [loadingRefills, setLoadingRefills] = useState(false);
 
   const ITEMS_PER_PAGE = 10;
 
@@ -51,16 +100,27 @@ export default function AdminVehicles() {
 
   const fetchData = async () => {
     try {
-      const [vRes, uRes, sRes] = await Promise.all([
-        adminAPI.getVehicles(), 
-        adminAPI.getUsers(), 
-        adminAPI.getStores()
+      setLoading(true);
+      const [vRes, uRes, sRes, stockRes, auditRes] = await Promise.all([
+        adminAPI.getVehicles({ storeId: storeFilterId }), 
+        adminAPI.getUsers({ storeId: storeFilterId }), 
+        adminAPI.getStores(),
+        adminAPI.getInventoryInit({ storeId: storeFilterId }),
+        adminAPI.getAuditHistory({ storeId: storeFilterId })
       ]);
       setVehicles(vRes.data);
       const fetchedStores = sRes.data?.success ? sRes.data.data : (sRes.data || []);
       setStores(fetchedStores);
       // Filter out Consumers AND Admins - only show agents/staff for vehicles
       setUsers(uRes.data.filter(u => u.role !== 'CONSUMER' && u.role !== 'ADMIN'));
+      
+      if (stockRes.data?.items) {
+          setItems(stockRes.data.items);
+      }
+      if (stockRes.data?.vehicleStock) {
+        setAllVehiclesStock(stockRes.data.vehicleStock);
+      }
+      setAuditHistory(auditRes.data || []);
 
       // Auto-select if only one store exists
       if (fetchedStores.length === 1 && !storeFilterId) {
@@ -73,7 +133,481 @@ export default function AdminVehicles() {
     }
   };
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [storeFilterId]);
+
+  // --- Inventory Memos & Logic ---
+  const loadingFilteredItems = useMemo(() => {
+    const q = opsSearch.toLowerCase();
+    return items.filter(i => {
+      const matchesSearch = i.name.toLowerCase().includes(q) ||
+        (i.barcode && i.barcode.toLowerCase().includes(q)) ||
+        (i.displayId && i.displayId.toLowerCase().includes(q));
+      const hasStock = (i.stock || 0) > 0;
+      return matchesSearch && hasStock;
+    });
+  }, [items, opsSearch]);
+
+  const groupedLoadingItems = useMemo(() => {
+    const regular = [];
+    const free = [];
+    loadingFilteredItems.forEach(i => {
+      if (i.isFree) free.push(i);
+      else regular.push(i);
+    });
+    return { regular, free };
+  }, [loadingFilteredItems]);
+
+  const totalLoadingValue = useMemo(() => {
+    return Object.entries(stockQuantities).reduce((acc, [pid, qty]) => {
+      const item = items.find(i => i.id === pid);
+      return acc + ((item?.price || 0) * (qty || 0));
+    }, 0);
+  }, [stockQuantities, items]);
+
+  const hasInvalidQuantities = useMemo(() => {
+    return Object.entries(stockQuantities).some(([pid, qty]) => {
+      const prod = items.find(p => p.id === pid);
+      return prod && (parseInt(qty) || 0) > (prod.stock || 0);
+    });
+  }, [stockQuantities, items]);
+
+  const handleQuantityChange = (productId, qty) => {
+    setStockQuantities(prev => ({ ...prev, [productId]: qty }));
+  };
+
+  const handleInitiateLoad = () => {
+    if (!selectedVehicleId) return toast.error('Please select a vehicle');
+    const actionItems = Object.entries(stockQuantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([productId, quantity]) => {
+        const itemDetails = items.find(i => i.id === productId);
+        return {
+          productId,
+          quantity: parseInt(quantity),
+          name: itemDetails?.name,
+          price: itemDetails?.price
+        };
+      });
+    if (actionItems.length === 0) return toast.error('Please enter quantities');
+    setPendingLoadItems(actionItems);
+    handleConfirmLoad(actionItems); // Directly confirm for now to match simplicity or add modal if requested
+  };
+
+  const handleConfirmLoad = async (itemsToLoadOverride) => {
+    setIsSubmitting(true);
+    try {
+      const itemsToLoad = (itemsToLoadOverride || pendingLoadItems).map(i => ({ productId: i.productId, quantity: i.quantity }));
+      await adminAPI.loadStock({ vehicleId: selectedVehicleId, items: itemsToLoad });
+      toast.success('Stock loaded successfully');
+      setStockQuantities({});
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to load stock');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // --- Return Logic ---
+  const returnFilteredItems = useMemo(() => {
+    const q = returnSearch.toLowerCase();
+    return items.filter(i => {
+      const matchesSearch = i.name.toLowerCase().includes(q) ||
+        (i.barcode && i.barcode.toLowerCase().includes(q)) ||
+        (i.displayId && i.displayId.toLowerCase().includes(q));
+      return matchesSearch;
+    });
+  }, [items, returnSearch]);
+
+  const groupedReturnItems = useMemo(() => {
+    const regular = [];
+    const free = [];
+    returnFilteredItems.forEach(i => {
+      if (i.isFree) free.push(i);
+      else regular.push(i);
+    });
+    return { regular, free };
+  }, [returnFilteredItems]);
+
+  const totalReturnInventoryValue = useMemo(() => {
+    return Object.entries(stockQuantities).reduce((acc, [pid, qty]) => {
+      const item = items.find(i => i.id === pid);
+      return acc + ((item?.price || 0) * (qty || 0));
+    }, 0);
+  }, [stockQuantities, items]);
+
+  const hasInvalidReturnQuantities = useMemo(() => {
+    return Object.entries(stockQuantities).some(([pid, qty]) => {
+      const currentVehicleStock = vehicleInventoryMap[pid] || 0;
+      return (parseInt(qty) || 0) > currentVehicleStock;
+    });
+  }, [stockQuantities, vehicleInventoryMap]);
+
+  const handleStockAction = async (type) => {
+    if (!selectedVehicleId) return toast.error('Please select a vehicle');
+    const actionItems = Object.entries(stockQuantities)
+      .filter(([_, qty]) => qty > 0)
+      .map(([productId, quantity]) => ({ productId, quantity: parseInt(quantity) }));
+    if (actionItems.length === 0) return toast.error('Please enter quantities');
+
+    setIsSubmitting(true);
+    try {
+      if (type === 'RETURN') {
+        await adminAPI.returnStock({ vehicleId: selectedVehicleId, items: actionItems });
+        toast.success('Stock returned successfully');
+      }
+      setStockQuantities({});
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.message || `Failed to ${type.toLowerCase()} stock`);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // --- Refill Logic ---
+  const loadRefillRequests = async (silent = false) => {
+    if (!silent) setLoadingRefills(true);
+    try {
+      const { data } = await adminAPI.getRefillRequests({ storeId: storeFilterId });
+      setRefillRequests(data);
+    } catch (error) {
+      if (!silent) toast.error('Failed to load refill requests');
+    } finally {
+      if (!silent) setLoadingRefills(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSub === 'refill') loadRefillRequests();
+  }, [activeSub, storeFilterId]);
+
+  const groupedRefills = useMemo(() => {
+    const groups = {};
+    (refillRequests || []).forEach(req => {
+      const userId = req.user?.id || req.user?.name || 'unknown';
+      if (!groups[userId]) {
+        groups[userId] = { user: req.user, vehicle: req.vehicle, requests: [], latestDate: new Date(req.createdAt) };
+      }
+      groups[userId].requests.push(req);
+      const reqDate = new Date(req.createdAt);
+      if (reqDate > groups[userId].latestDate) groups[userId].latestDate = reqDate;
+    });
+    return Object.values(groups).sort((a, b) => b.latestDate - a.latestDate);
+  }, [refillRequests]);
+
+  const activeRefillGroup = useMemo(() => {
+    if (!viewingAgentId) return null;
+    return groupedRefills.find(g => (g.user?.id || g.user?.name || 'unknown') === viewingAgentId);
+  }, [groupedRefills, viewingAgentId]);
+
+  const toggleRefillItemSelection = (itemId) => {
+    setUnselectedRefillItems(prev => prev.includes(itemId) ? prev.filter(id => id !== itemId) : [...prev, itemId]);
+  };
+
+  const handleApproveRefill = async (refillId, items, skipReload = false) => {
+    if (!skipReload) setIsSubmitting(true);
+    try {
+      const approvedItemIds = items.filter(i => !unselectedRefillItems.includes(i.id)).map(i => i.id);
+      const qtys = {};
+      items.forEach(i => {
+        qtys[i.id] = editedQuantities[i.id] ?? i.quantity;
+      });
+      await adminAPI.approveRefillRequest(refillId, { approvedItemIds, quantities: qtys });
+      if (!skipReload) {
+        toast.success('Refill approved');
+        loadRefillRequests();
+      }
+    } catch (error) {
+      if (!skipReload) toast.error('Failed to approve refill');
+      throw error; // Rethrow for bulk handling
+    } finally {
+      if (!skipReload) setIsSubmitting(false);
+    }
+  };
+
+  const handleRejectRefill = async (refillId, skipReload = false) => {
+    if (!skipReload) setIsSubmitting(true);
+    try {
+      await adminAPI.rejectRefillRequest(refillId);
+      if (!skipReload) {
+        toast.success('Refill rejected');
+        loadRefillRequests();
+      }
+    } catch (error) {
+      if (!skipReload) toast.error('Failed to reject refill');
+      throw error;
+    } finally {
+      if (!skipReload) setIsSubmitting(false);
+    }
+  };
+
+  const handleApproveSingleItem = async (refillId, itemId) => {
+    setProcessingItems(prev => new Set(prev).add(itemId));
+    try {
+      const qty = editedQuantities[itemId];
+      await adminAPI.approveRefillItem(refillId, itemId, { quantity: qty });
+      toast.success('Item approved');
+      loadRefillRequests();
+    } catch (error) {
+      toast.error('Failed to approve item');
+    } finally {
+      setProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  };
+
+  const handleRejectSingleItem = async (refillId, itemId) => {
+    setProcessingItems(prev => new Set(prev).add(itemId));
+    try {
+      await adminAPI.rejectRefillItem(refillId, itemId);
+      toast.success('Item rejected');
+      loadRefillRequests();
+    } catch (error) {
+      toast.error('Failed to reject item');
+    } finally {
+      setProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(itemId);
+        return next;
+      });
+    }
+  };
+
+  // --- Opening Stock Logic ---
+  const handleUpdateStock = async (productId, quantity, type) => {
+    setProcessingItems(prev => new Set(prev).add(productId));
+    try {
+      await adminAPI.updateInventory({ productId, quantity, mode: type });
+      toast.success('Stock updated');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to update stock');
+    } finally {
+      setProcessingItems(prev => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
+      });
+    }
+  };
+
+  const handleAuditSave = async (vehicleId, quantities, remark) => {
+    setIsSubmitting(true);
+    try {
+      const items = Object.entries(quantities).map(([productId, quantity]) => ({
+        productId,
+        quantity: parseInt(quantity)
+      }));
+      await adminAPI.saveVehicleAudit(vehicleId, { items, remark });
+      toast.success('Audit saved successfully');
+      setIsAuditMode(false);
+      setAuditQuantities({});
+      setAuditRemark('');
+      fetchData();
+    } catch (error) {
+      toast.error('Failed to save audit');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedVehicleId && activeSub === 'return') {
+      adminAPI.getVehicleInventory(selectedVehicleId).then(res => {
+        const map = {};
+        res.data.forEach(i => map[i.productId] = i.quantity);
+        setVehicleInventoryMap(map);
+      });
+    }
+  }, [selectedVehicleId, activeSub]);
+
+  const renderSubTabContent = () => {
+    switch(activeSub) {
+      case 'inventory':
+        return (
+          <VehicleStockSection 
+            loadingVehicles={loading}
+            vehicles={vehicles}
+            allVehiclesStock={allVehiclesStock}
+            vehicleSearch={vehicleSearch}
+            setVehicleSearch={setVehicleSearch}
+            viewingVehicleId={viewingVehicleId}
+            setViewingVehicleId={setViewingVehicleId}
+            auditHistory={auditHistory}
+            isAuditMode={isAuditMode}
+            setIsAuditMode={setIsAuditMode}
+            auditQuantities={auditQuantities}
+            setAuditQuantities={setAuditQuantities}
+            auditRemark={auditRemark}
+            setAuditRemark={setAuditRemark}
+            handleAuditSave={handleAuditSave}
+            isSubmitting={isSubmitting}
+            setShowScanner={setShowScanner}
+            setScannerTarget={setScannerTarget}
+            can={can}
+            currentUser={currentUser}
+          />
+        );
+      case 'fuel':
+        return <FuelLogsSection storeId={storeFilterId} vehicles={vehicles} />;
+      case 'maintenance':
+        return <MaintenanceSection storeId={storeFilterId} vehicles={vehicles} />;
+      case 'route_mapping':
+        return (
+          <RouteMappingSection 
+            storeId={storeFilterId}
+            can={can}
+            currentUser={currentUser}
+            vehicles={vehicles}
+            users={users}
+          />
+        );
+      case 'driver_mapping':
+        return (
+            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+                <h3 className="text-xl font-black text-gray-900 tracking-tight">Driver Mapping Status</h3>
+                <div className="relative group w-full md:w-72">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search vehicle or driver..." 
+                    value={mappingSearch}
+                    onChange={(e) => setMappingSearch(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                 {vehicles
+                   .filter(v => v.assignedUsers?.length > 0)
+                   .filter(v => 
+                     v.vehicleNumber?.toLowerCase().includes(mappingSearch.toLowerCase()) || 
+                     v.assignedUsers[0].name.toLowerCase().includes(mappingSearch.toLowerCase())
+                   )
+                   .map(v => (
+                   <div key={v.id} className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col gap-4">
+                      <div className="flex items-center gap-4">
+                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
+                            <User size={24} />
+                         </div>
+                         <div className="flex flex-col">
+                            <span className="text-sm font-black text-gray-900">{v.assignedUsers[0].name}</span>
+                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{v.vehicleNumber}</span>
+                         </div>
+                      </div>
+                   </div>
+                 ))}
+              </div>
+            </div>
+        );
+      case 'loading':
+        return (
+          <LoadingSection 
+            groupedLoadingItems={groupedLoadingItems}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            stockQuantities={stockQuantities}
+            handleQuantityChange={handleQuantityChange}
+            selectedVehicleId={selectedVehicleId}
+            setSelectedVehicleId={setSelectedVehicleId}
+            vehicles={vehicles}
+            opsSearch={opsSearch}
+            setOpsSearch={setOpsSearch}
+            setScannerTarget={setScannerTarget}
+            setShowScanner={setShowScanner}
+            totalLoadingValue={totalLoadingValue}
+            handleInitiateLoad={handleInitiateLoad}
+            isSubmitting={isSubmitting}
+            hasInvalidQuantities={hasInvalidQuantities}
+            can={can}
+            currentUser={currentUser}
+          />
+        );
+      case 'sales':
+        return <VehicleSalesSection storeId={storeFilterId} />;
+      case 'collection':
+        return <RouteCollectionSection storeId={storeFilterId} />;
+      case 'damages':
+        return <VehicleDamagesSection storeId={storeFilterId} />;
+      case 'return':
+        return (
+          <ReturnSection 
+            groupedReturnItems={groupedReturnItems}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            setCurrentPage={setCurrentPage}
+            stockQuantities={stockQuantities}
+            handleQuantityChange={handleQuantityChange}
+            selectedVehicleId={selectedVehicleId}
+            setSelectedVehicleId={setSelectedVehicleId}
+            vehicles={vehicles}
+            returnSearch={returnSearch}
+            setReturnSearch={setReturnSearch}
+            setScannerTarget={setScannerTarget}
+            setShowScanner={setShowScanner}
+            totalReturnInventoryValue={totalReturnInventoryValue}
+            handleStockAction={handleStockAction}
+            isSubmitting={isSubmitting}
+            hasInvalidReturnQuantities={hasInvalidReturnQuantities}
+            vehicleInventoryMap={vehicleInventoryMap}
+            can={can}
+            currentUser={currentUser}
+          />
+        );
+      case 'refill':
+        return (
+          <RefillsSection 
+            activeRefillGroup={activeRefillGroup}
+            setViewingAgentId={setViewingAgentId}
+            loadingRefills={loadingRefills}
+            groupedRefills={groupedRefills}
+            auditSearch={opsSearch}
+            unselectedRefillItems={unselectedRefillItems}
+            toggleRefillItemSelection={toggleRefillItemSelection}
+            items={items}
+            allVehiclesStock={allVehiclesStock}
+            editedQuantities={editedQuantities}
+            setEditedQuantities={setEditedQuantities}
+            handleRejectSingleItem={handleRejectSingleItem}
+            handleApproveSingleItem={handleApproveSingleItem}
+            processingItems={processingItems}
+            isSubmitting={isSubmitting}
+            handleRejectRefill={handleRejectRefill}
+            handleApproveRefill={handleApproveRefill}
+            can={can}
+            currentUser={currentUser}
+          />
+        );
+      case 'opening_stock':
+        return (
+          <OpeningStockSection 
+            items={items}
+            openingSearch={openingSearch}
+            setOpeningSearch={setOpeningSearch}
+            setCurrentPage={setCurrentPage}
+            setShowScanner={setShowScanner}
+            setScannerTarget={setScannerTarget}
+            itemsPerPage={itemsPerPage}
+            currentPage={currentPage}
+            stockInputs={stockInputs}
+            setStockInputs={setStockInputs}
+            handleUpdateStock={handleUpdateStock}
+            processingItems={processingItems}
+            can={can}
+          />
+        );
+      case 'closing':
+        return <TripManagementSection storeId={storeFilterId} vehicles={vehicles} />;
+      default:
+        return null;
+    }
+  };
 
   useEffect(() => {
     setCurrentPage(1);
@@ -838,126 +1372,106 @@ export default function AdminVehicles() {
         </div>
       ) : (
         <>
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-12">
+          {/* Navigation and Context Header */}
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-4">
-                {storeFilterId && (
+                {activeSub !== 'master' && (
                   <button
-                    onClick={() => setSearchParams({})}
+                    onClick={() => setSearchParams({ sub: 'master', storeId: storeFilterId })}
                     className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                    title="Back to All Branches"
+                    title="Back to Master"
                   >
                     <ArrowLeft size={18} />
                   </button>
                 )}
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight">Fleet Management</h2>
+                <h2 className="text-3xl font-black text-gray-900 tracking-tight capitalize">
+                  {activeSub === 'master' ? 'Fleet Management' : activeSub.replace('_', ' ')}
+                </h2>
               </div>
               <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-500">Monitor and assign your transport assets</p>
-                <span className="text-gray-300">•</span>
-                <select
-                  value={storeFilterId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSearchParams({ storeId: e.target.value });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
-                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.25rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
-                >
-                  <option value="">All Branches</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+                <p className="text-sm font-medium text-gray-500">
+                  {activeSub === 'master' ? 'Monitor and assign your transport assets' : `Manage ${activeSub.replace('_', ' ')} for ${stores.find(s => s.id === storeFilterId)?.name || 'All Branches'}`}
+                </p>
+                {activeSub === 'master' && (
+                  <>
+                    <span className="text-gray-300">•</span>
+                    <select
+                      value={storeFilterId || ''}
+                      onChange={(e) => setSearchParams({ storeId: e.target.value })}
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.25rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1rem'
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  </>
+                )}
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative group hidden sm:block">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-emerald-500 transition-colors" size={16} />
-                <input
-                  type="text"
-                  placeholder="Search by number or driver..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
-                />
-              </div>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={handleExportPDF}
-                  className="p-3 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm active:scale-95"
-                  title="Export PDF"
-                >
-                  <FileText size={20} />
-                </button>
-                <button
-                  onClick={handleExportExcel}
-                  className="p-3 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm active:scale-95"
-                  title="Export Excel"
-                >
-                  <Download size={20} />
-                </button>
-              </div>
-              {can('VEHICLES', 'CREATE') && storeFilterId && (
-                <button onClick={() => {
-                  setNewVehicle({
-                    vehicleNumber: '',
-                    vehicleName: '',
-                    assignedUserId: '',
-                    status: true,
-                    storeId: storeFilterId || currentUser?.storeId || ''
-                  });
-                  setDocuments({ rcDocument: null, insuranceDocument: null, permitDocument: null });
-                  setShowAddModal(true);
-                }}
-                  className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3.5 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
-                >
-                  <Plus size={20} />
-                  <span className="hidden md:inline">Register Vehicle</span>
-                  <span className="md:hidden">Add</span>
-                </button>
-              )}
-            </div>
-          </div>
 
-
-          {/* Mobile Search - Only visible on small screens */}
-          <div className="sm:hidden relative group px-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-            <input
-              type="text"
-              placeholder="Search fleet..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
-            />
-          </div>
-
-          {/* Vehicle Data Representation */}
-          <div className="space-y-4">
-            {filteredVehicles.length === 0 ? (
-              <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
-                <Truck size={48} className="mx-auto text-gray-300 mb-2" />
-                <p className="text-gray-500">No vehicles found</p>
+            {activeSub === 'master' && (
+              <div className="flex items-center gap-3">
+                <div className="relative group hidden sm:block">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-emerald-500 transition-colors" size={16} />
+                  <input
+                    type="text"
+                    placeholder="Search by number or driver..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 pr-4 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
+                  />
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportPDF}
+                    className="p-3 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm active:scale-95"
+                    title="Export PDF"
+                  >
+                    <FileText size={20} />
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="p-3 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm active:scale-95"
+                    title="Export Excel"
+                  >
+                    <Download size={20} />
+                  </button>
+                  {can('VEHICLES', 'CREATE') && (
+                    <button
+                      onClick={() => setShowAddModal(true)}
+                      className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"
+                    >
+                      <Plus size={18} />
+                      Add Vehicle
+                    </button>
+                  )}
+                </div>
               </div>
-            ) : (
-              renderClassifiedVehicles()
             )}
           </div>
 
-
-
-
-
+          {activeSub === 'master' ? (
+             <div className="space-y-4">
+                {filteredVehicles.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
+                    <Truck size={48} className="mx-auto text-gray-300 mb-2" />
+                    <p className="text-gray-500">No vehicles found</p>
+                  </div>
+                ) : (
+                  renderClassifiedVehicles()
+                )}
+              </div>
+          ) : (
+             renderSubTabContent()
+          )}
         </>
       )}
 
@@ -973,9 +1487,23 @@ export default function AdminVehicles() {
               <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
             </div>
 
+            <div className="mb-4 relative group shrink-0">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+              <input 
+                type="text" 
+                placeholder="Search drivers..." 
+                value={agentSearch}
+                onChange={(e) => setAgentSearch(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {users.filter(u => !u.assignedVehicleId && u.storeId === selectedVehicle?.storeId).map(user => (
-                <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
+              {users
+                .filter(u => !u.assignedVehicleId && u.storeId === selectedVehicle?.storeId)
+                .filter(u => u.name.toLowerCase().includes(agentSearch.toLowerCase()))
+                .map(user => (
+                  <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
                   className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
@@ -983,7 +1511,9 @@ export default function AdminVehicles() {
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="font-bold text-gray-900 text-sm">{user.name}</span>
-                      <span className="text-[10px] text-gray-400 font-bold uppercase tracking-wider">{user.role}</span>
+                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border tracking-tighter mt-0.5 ${user.role === 'SALES_AGENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                        {user.role === 'SALES_AGENT' ? 'Field Agent' : user.role === 'HELPER' ? 'Helper' : user.role}
+                      </span>
                     </div>
                   </div>
                   {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
@@ -1016,6 +1546,19 @@ export default function AdminVehicles() {
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+              {vehicleInventory.length > 0 && (
+                <div className="relative group shrink-0">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search items in vehicle..." 
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  />
+                </div>
+              )}
+
               {vehicleInventory.length === 0 ? (
                 <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                   <Package size={32} className="mx-auto text-gray-300 mb-3" />
@@ -1033,8 +1576,16 @@ export default function AdminVehicles() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {vehicleInventory.map((item, idx) => (
-                        <tr key={idx} className={item.oldQuantity !== item.newQuantity ? 'bg-orange-50/30' : ''}>
+                      {vehicleInventory
+                        .filter(item => 
+                          item.name.toLowerCase().includes(auditSearch.toLowerCase()) || 
+                          item.sku.toLowerCase().includes(auditSearch.toLowerCase())
+                        )
+                        .map((item, idx) => {
+                          // Find original index in vehicleInventory for update logic
+                          const originalIdx = vehicleInventory.findIndex(orig => orig.productId === item.productId);
+                          return (
+                            <tr key={item.productId} className={item.oldQuantity !== item.newQuantity ? 'bg-orange-50/30' : ''}>
                           <td className="px-4 py-3">
                             <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.name}</p>
                             <p className="text-[10px] text-gray-400 tracking-wider font-mono mt-0.5">{item.sku}</p>
@@ -1053,7 +1604,7 @@ export default function AdminVehicles() {
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value) || 0;
                                   const newInv = [...vehicleInventory];
-                                  newInv[idx].newQuantity = Math.max(0, val);
+                                  newInv[originalIdx].newQuantity = Math.max(0, val);
                                   setVehicleInventory(newInv);
                                 }}
                                 className={cn(
@@ -1066,7 +1617,7 @@ export default function AdminVehicles() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>

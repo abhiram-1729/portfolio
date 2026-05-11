@@ -463,15 +463,23 @@ export default function LocationTrackingReport() {
                                             return acc;
                                         }, {});
 
-                                        const sortedGroups = Object.entries(grouped).sort((a, b) => {
+                                        // Sort logs within each group DESCENDING and then sort groups by latest log
+                                        const processedGroups = Object.entries(grouped).map(([userId, logs]) => {
+                                            const sortedLogs = [...logs].sort((a, b) => {
+                                                const timeA = new Date(a.time || a.createdAt || a.timestamp);
+                                                const timeB = new Date(b.time || b.createdAt || b.timestamp);
+                                                return timeB - timeA;
+                                            });
+                                            return [userId, sortedLogs];
+                                        }).sort((a, b) => {
                                             const latestA = new Date(a[1][0].time || a[1][0].createdAt || a[1][0].timestamp);
                                             const latestB = new Date(b[1][0].time || b[1][0].createdAt || b[1][0].timestamp);
                                             return latestB - latestA;
                                         });
 
-                                        return sortedGroups.map(([userId, logs]) => {
+                                        return processedGroups.map(([userId, sortedLogs]) => {
                                             const isExpanded = expandedAgents[userId];
-                                            const latestLog = logs[0];
+                                            const latestLog = sortedLogs[0];
                                             
                                             return (
                                                 <div key={userId} className="group transition-all">
@@ -488,7 +496,7 @@ export default function LocationTrackingReport() {
                                                                 <div className="flex items-center gap-2 mt-0.5">
                                                                     <div className="flex items-center gap-1.5 px-2 py-0.5 bg-gray-100 rounded-full">
                                                                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                                                                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{logs.length} Recent Logs</span>
+                                                                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">{sortedLogs.length} Recent Logs</span>
                                                                     </div>
                                                                     <span className="text-[9px] font-bold text-gray-300">•</span>
                                                                     <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest italic">
@@ -505,38 +513,40 @@ export default function LocationTrackingReport() {
                                                     {isExpanded && (
                                                         <div className="px-5 pb-5 animate-in slide-in-from-top-2 duration-300">
                                                             <div className="rounded-2xl border border-gray-100 bg-gray-50/30 overflow-hidden">
-                                                                <table className="w-full text-left border-collapse">
-                                                                    <thead>
-                                                                        <tr className="bg-gray-100/50">
-                                                                            <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Village</th>
-                                                                            <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Landmark / Sub-Location</th>
-                                                                            <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Time</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody className="divide-y divide-gray-100">
-                                                                        {logs.slice(0, 5).map((log, idx) => (
-                                                                            <tr key={idx} className="hover:bg-white transition-colors">
-                                                                                <td className="px-4 py-3">
-                                                                                    <div className="flex items-center gap-2">
-                                                                                        <div className="w-6 h-6 rounded-lg bg-rose-50 flex items-center justify-center">
-                                                                                            <MapPin size={12} className="text-rose-500" />
-                                                                                        </div>
-                                                                                        <span className="text-xs font-black text-gray-700">{log.villageName || 'In-Transit'}</span>
-                                                                                    </div>
-                                                                                </td>
-                                                                                <td className="px-4 py-3 text-[10px] font-bold text-gray-500 italic truncate max-w-[200px]">
-                                                                                    {log.subLocation || '---'}
-                                                                                </td>
-                                                                                <td className="px-4 py-3 text-[10px] font-black text-gray-400">
-                                                                                    {format(new Date(log.time || log.createdAt || log.timestamp), 'hh:mm:ss a')}
-                                                                                </td>
+                                                                <div className="overflow-x-auto">
+                                                                    <table className="w-full text-left border-collapse">
+                                                                        <thead>
+                                                                            <tr className="bg-gray-100/50">
+                                                                                <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Village</th>
+                                                                                <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Landmark / Sub-Location</th>
+                                                                                <th className="px-4 py-3 text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">Time</th>
                                                                             </tr>
-                                                                        ))}
-                                                                    </tbody>
-                                                                </table>
-                                                                {logs.length > 5 && (
+                                                                        </thead>
+                                                                        <tbody className="divide-y divide-gray-100">
+                                                                            {sortedLogs.slice(0, 4).map((log, idx) => (
+                                                                                <tr key={idx} className="hover:bg-white transition-colors">
+                                                                                    <td className="px-4 py-3">
+                                                                                        <div className="flex items-center gap-2">
+                                                                                            <div className="w-6 h-6 rounded-lg bg-rose-50 flex items-center justify-center">
+                                                                                                <MapPin size={12} className="text-rose-500" />
+                                                                                            </div>
+                                                                                            <span className="text-xs font-black text-gray-700">{log.villageName || 'In-Transit'}</span>
+                                                                                        </div>
+                                                                                    </td>
+                                                                                    <td className="px-4 py-3 text-[10px] font-bold text-gray-500 italic truncate max-w-[200px]">
+                                                                                        {log.subLocation || '---'}
+                                                                                    </td>
+                                                                                    <td className="px-4 py-3 text-[10px] font-black text-gray-400">
+                                                                                        {format(new Date(log.time || log.createdAt || log.timestamp), 'hh:mm:ss a')}
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+                                                                {sortedLogs.length > 4 && (
                                                                     <div className="px-4 py-2 bg-gray-100/50 text-center">
-                                                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest italic">Showing latest 5 of {logs.length} logs</span>
+                                                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest italic">Showing latest 4 of {sortedLogs.length} logs</span>
                                                                     </div>
                                                                 )}
                                                             </div>

@@ -9,6 +9,11 @@ const PENDING_LOGS_KEY = 'vk_pending_location_logs';
 export const logLocation = async (data) => {
   try {
     const token = localStorage.getItem('token');
+    if (!token) {
+        console.warn('[Location] No token found, skipping log.');
+        return { status: 'unauthorized' };
+    }
+
     if (!navigator.onLine) {
       queueLog(data);
       return { status: 'queued' };

@@ -1,4 +1,5 @@
 import prisma from '../../utils/prisma.js';
+import { format } from 'date-fns';
 
 export const getDashboardStats = async (req, res) => {
   try {
@@ -42,13 +43,19 @@ export const getDashboardStats = async (req, res) => {
       stockValueData,
       assetStats,
       expenseStats,
+      pendingRefills,
+      activeAttendance,
+      damageStats,
+      pendingOrders,
+      vendorPayments,
+      orderItemStats,
     ] = await Promise.all([
       prisma.vehicle.count({ where: vehicleFilter }),
       prisma.user.count({ where: userFilter }),
       prisma.order.count({ where: orderFilter }),
       prisma.order.findMany({
         where: orderFilter,
-        select: { totalAmount: true, paymentMode: true, id: true, customerName: true, createdAt: true, displayId: true }
+        select: { totalAmount: true, paymentMode: true, id: true, customerName: true, createdAt: true, displayId: true, vehicleId: true }
       }),
       prisma.product.count({ where: { tenantId, status: 'ACTIVE' } }),
       prisma.village.count({ where: { tenantId } }),
@@ -69,11 +76,60 @@ export const getDashboardStats = async (req, res) => {
           createdAt: { gte: today },
           status: 'APPROVED'
         }
+      }),
+      prisma.refillRequest.count({
+        where: { tenantId, status: 'PENDING', ...(storeId && { storeId }) }
+      }),
+      prisma.attendance.count({
+        where: { 
+          tenantId, 
+          date: format(new Date(), 'yyyy-MM-dd'),
+          punchOutTime: null,
+          ...(storeId && { storeId })
+        }
+      }),
+      prisma.damageEntry.aggregate({
+        _sum: { quantity: true },
+        where: { 
+          tenantId, 
+          createdAt: { gte: today },
+          ...(storeId && { storeId })
+        }
+      }),
+      prisma.order.count({
+        where: { 
+          tenantId, 
+          status: 'PENDING',
+          ...(storeId && { storeId })
+        }
+      }),
+      prisma.vendor.aggregate({
+        _sum: { currentBalance: true },
+        where: { tenantId }
+      }),
+      prisma.orderItem.aggregate({
+        _sum: { quantity: true, price: true, landingPrice: true },
+        where: {
+          order: {
+            ...orderFilter
+          }
+        }
       })
     ]);
 
+    // Inventory Alerts (Products with stock <= minStockAlert)
+    const inventoryAlerts = await prisma.product.count({
+      where: {
+        tenantId,
+        status: 'ACTIVE',
+        OR: [
+          { stock: { lte: 5 } }, // Default alert threshold
+          { stock: { lte: 0 } }
+        ]
+      }
+    });
+
     // For Fast/Slow moving products (last 30 days)
-    // Fetch items and group manually to avoid Prisma groupBy limitations with relations
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const recentItems = await prisma.orderItem.findMany({
       where: {
@@ -116,13 +172,25 @@ export const getDashboardStats = async (req, res) => {
 
     let totalSales = 0;
     const paymentSplits = { CASH: 0, UPI: 0, CARD: 0 };
+    const orderSources = { COUNTER: 0, FIELD: 0 };
 
     todayOrders.forEach(order => {
       totalSales += order.totalAmount;
       if (order.paymentMode) {
         paymentSplits[order.paymentMode] = (paymentSplits[order.paymentMode] || 0) + order.totalAmount;
       }
+      if (order.vehicleId) {
+        orderSources.FIELD += 1;
+      } else {
+        orderSources.COUNTER += 1;
+      }
     });
+
+    // Gross Margin Calculation
+    const totalRevenue = orderItemStats._sum.price || 0;
+    const totalCost = orderItemStats._sum.landingPrice || 0;
+    const grossMargin = totalRevenue > 0 ? ((totalRevenue - totalCost) / totalRevenue) * 100 : 0;
+    const grossProfit = totalRevenue - totalCost;
 
     // Resolve Fast/Slow moving products
     const sortedProducts = salesVolumeData.sort((a, b) => b.quantity - a.quantity);
@@ -144,6 +212,15 @@ export const getDashboardStats = async (req, res) => {
       ordersToday,
       totalSales,
       paymentSplits,
+      orderSources,
+      grossMargin: Math.round(grossMargin * 100) / 100,
+      grossProfit,
+      inventoryAlerts,
+      pendingRefills,
+      activeAttendance,
+      todayDamages: damageStats._sum.quantity || 0,
+      pendingOrders,
+      outstandingPayments: vendorPayments._sum.currentBalance || 0,
       recentOrders: todayOrders.slice(0, 5),
       metrics: {
         totalProducts,

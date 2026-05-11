@@ -47,8 +47,16 @@ export default function AdminRoutes() {
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
 
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'TENANT_OWNER';
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const storeId = searchParams.get('storeId');
+  const location = useLocation();
+
   const getInitialTab = () => {
-    if (!currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
+    if (urlTab && ['villages', 'routes', 'assignments'].includes(urlTab)) return urlTab;
+    if (isAdmin || !currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
     const sections = currentUser.permissions.ROUTE_TARGET_SECTIONS;
     if (sections.includes('VILLAGES')) return 'villages';
     if (sections.includes('ROUTES')) return 'routes';
@@ -57,6 +65,21 @@ export default function AdminRoutes() {
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab());
+
+  useEffect(() => {
+    if (urlTab && ['villages', 'routes', 'assignments'].includes(urlTab) && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams(prev => {
+      prev.set('tab', tab);
+      return prev;
+    });
+  };
+  
   const [villagePage, setVillagePage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
@@ -97,9 +120,6 @@ export default function AdminRoutes() {
   const [routeForm, setRouteForm] = useState({ id: '', routeName: '', selectedVillages: [] });
   const [assignmentForm, setAssignmentForm] = useState({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' });
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const storeId = searchParams.get('storeId');
-  const location = useLocation();
 
   const fetchData = async () => {
     setIsVillagesLoading(true);
@@ -509,25 +529,25 @@ export default function AdminRoutes() {
           </div>
 
         <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
-          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
+          {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
             <button
-              onClick={() => setActiveTab('villages')}
+              onClick={() => handleTabChange('villages')}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'villages' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Villages
             </button>
           )}
-          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
+          {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
             <button
-              onClick={() => setActiveTab('routes')}
+              onClick={() => handleTabChange('routes')}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'routes' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Routes
             </button>
           )}
-          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
+          {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
             <button
-              onClick={() => setActiveTab('assignments')}
+              onClick={() => handleTabChange('assignments')}
               className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'assignments' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
             >
               Assignments
@@ -802,14 +822,14 @@ export default function AdminRoutes() {
                         />
                       </div>
                     ) : (
-                      <div className="p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100/50 space-y-3">
-                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block">Polygon Points</label>
+                      <div className="p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-3">
+                        <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">Polygon Points</label>
                         <div className="max-h-[150px] overflow-y-auto space-y-2 custom-scrollbar pr-2">
                           {polygonPoints.length === 0 ? (
                             <p className="text-[10px] text-gray-400 italic">No points added yet. Click the map to draw your boundary.</p>
                           ) : (
                             polygonPoints.map((p, i) => (
-                              <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-indigo-50 shadow-sm">
+                              <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-emerald-50 shadow-sm">
                                 <span className="text-[10px] font-bold text-gray-600">Point {i + 1}: {p.lat.toFixed(4)}, {p.lng.toFixed(4)}</span>
                                 <button
                                   type="button"
@@ -1307,7 +1327,7 @@ export default function AdminRoutes() {
             {can('ROUTES', 'CREATE') && (
               <button
                 onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
               >
                 <Plus size={16} strokeWidth={3} /> New Assignment
               </button>
@@ -1316,7 +1336,7 @@ export default function AdminRoutes() {
 
           {isAssignmentsLoading ? (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm py-20 flex flex-col items-center justify-center gap-4">
-              <Loader2 className="animate-spin text-indigo-600" size={32} />
+              <Loader2 className="animate-spin text-emerald-600" size={32} />
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Compiling Assignments...</p>
             </div>
           ) : (
@@ -1342,7 +1362,7 @@ export default function AdminRoutes() {
                                 schedule: a.schedule || null
                               });
                               setShowAssignModal(true);
-                            }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15} /></button>
+                            }} className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><Pencil size={15} /></button>
                           )}
                           {can('ROUTES', 'DELETE') && (
                             <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15} /></button>
@@ -1359,7 +1379,7 @@ export default function AdminRoutes() {
                           <span className="text-sm font-black text-gray-800 leading-none">{a.user?.name}</span>
                         </div>
                       </div>
-                      <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 space-y-2">
+                      <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100/50 space-y-2">
                         {(() => {
                           const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                           const today = days[new Date().getDay()];
@@ -1367,12 +1387,12 @@ export default function AdminRoutes() {
                           return (
                             <>
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Morning ({today})</span>
-                                <span className="text-xs font-black text-indigo-700">{todaySchedule.morning || 'OFF'}</span>
+                                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Today Morning ({today})</span>
+                                <span className="text-xs font-black text-emerald-700">{todaySchedule.morning || 'OFF'}</span>
                               </div>
-                              <div className="flex items-center justify-between pt-1 border-t border-indigo-100/30">
-                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Evening ({today})</span>
-                                <span className="text-xs font-black text-indigo-700">{todaySchedule.evening || 'OFF'}</span>
+                              <div className="flex items-center justify-between pt-1 border-t border-emerald-100/30">
+                                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Today Evening ({today})</span>
+                                <span className="text-xs font-black text-emerald-700">{todaySchedule.evening || 'OFF'}</span>
                               </div>
                             </>
                           );
@@ -1409,8 +1429,8 @@ export default function AdminRoutes() {
                           <td className="px-8 py-6">
                             <div className="flex flex-col gap-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                                  <MapPin size={14} className="fill-indigo-600/10" />
+                                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                                  <MapPin size={14} className="fill-emerald-600/10" />
                                 </div>
                                 <span className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</span>
                               </div>
@@ -1429,7 +1449,7 @@ export default function AdminRoutes() {
                           </td>
                           <td className="px-8 py-6">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100/30 w-full max-w-[200px]">
+                              <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/30 w-full max-w-[200px]">
                                 {(() => {
                                   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                                   const today = days[new Date().getDay()];
@@ -1437,12 +1457,12 @@ export default function AdminRoutes() {
                                   return (
                                     <div className="space-y-1.5 grayscale-[0.3]">
                                       <div className="flex justify-between items-baseline">
-                                        <span className="text-[8px] font-black text-indigo-400 uppercase">{today} AM</span>
-                                        <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
+                                        <span className="text-[8px] font-black text-emerald-400 uppercase">{today} AM</span>
+                                        <span className="text-[10px] font-black text-emerald-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
                                       </div>
-                                      <div className="flex justify-between items-baseline pt-1 border-t border-indigo-100/20">
-                                        <span className="text-[8px] font-black text-indigo-400 uppercase">{today} PM</span>
-                                        <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
+                                      <div className="flex justify-between items-baseline pt-1 border-t border-emerald-100/20">
+                                        <span className="text-[8px] font-black text-emerald-400 uppercase">{today} PM</span>
+                                        <span className="text-[10px] font-black text-emerald-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
                                       </div>
                                     </div>
                                   );
@@ -1469,7 +1489,7 @@ export default function AdminRoutes() {
                                     schedule: a.schedule || null
                                   });
                                   setShowAssignModal(true);
-                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15} /></button>
+                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15} /></button>
                               )}
                               {can('ROUTES', 'DELETE') && (
                                 <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15} /></button>
@@ -1497,7 +1517,7 @@ export default function AdminRoutes() {
                 <button
                   onClick={() => setAssignmentPage(prev => Math.max(1, prev - 1))}
                   disabled={assignmentPage === 1}
-                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -1510,7 +1530,7 @@ export default function AdminRoutes() {
                         <button
                           key={pageNum}
                           onClick={() => setAssignmentPage(pageNum)}
-                          className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                          className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
                         >
                           {pageNum}
                         </button>
@@ -1525,7 +1545,7 @@ export default function AdminRoutes() {
                 <button
                   onClick={() => setAssignmentPage(prev => Math.min(totalAssignmentPages, prev + 1))}
                   disabled={assignmentPage === totalAssignmentPages}
-                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -1541,7 +1561,7 @@ export default function AdminRoutes() {
       {showAssignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-indigo-500" /> Assign Route</h3>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-emerald-500" /> Assign Route</h3>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Route <span className="text-rose-500">*</span></label>
@@ -1589,19 +1609,19 @@ export default function AdminRoutes() {
                   <div className="space-y-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Weekly Field Schedule <span className="text-rose-500">*</span></label>
-                      <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
                     </div>
 
                     <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                       {daysOfWeek.map(day => (
-                        <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-indigo-100 transition-all">
+                        <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-emerald-100 transition-all">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-gray-900 uppercase tracking-tight">{day}</span>
                           </div>
 
                           <div className="grid grid-cols-2 gap-2">
                             <select
-                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500"
                               value={assignmentForm.schedule[day]?.morning || ''}
                               onChange={e => setAssignmentForm({
                                 ...assignmentForm,
@@ -1613,7 +1633,7 @@ export default function AdminRoutes() {
                             </select>
 
                             <select
-                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500"
                               value={assignmentForm.schedule[day]?.evening || ''}
                               onChange={e => setAssignmentForm({
                                 ...assignmentForm,
@@ -1631,7 +1651,7 @@ export default function AdminRoutes() {
                 );
               })()}
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white p-3 pt-4 pb-4 mt-4 rounded-xl font-bold">Assign</button>
+              <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white p-3 pt-4 pb-4 mt-4 rounded-xl font-bold">Assign</button>
               <button type="button" onClick={() => setShowAssignModal(false)} className="w-full bg-gray-100 text-gray-600 p-3 rounded-xl font-bold mt-2">Cancel</button>
             </form>
           </div>

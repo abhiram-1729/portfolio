@@ -27,7 +27,7 @@ import ShiftSelector from './ShiftSelector';
 import DenominationGrid from './DenominationGrid';
 import ShiftBreakdownView from './ShiftBreakdownView';
 import StoreSafeHeader from './StoreSafeHeader';
-import SimulatorTools from './SimulatorTools';
+
 import DailyReconciliationTab from './DailyReconciliationTab';
 import LiveCashTab from './LiveCashTab';
 import AuditLedgerTab from './AuditLedgerTab';
@@ -845,8 +845,6 @@ export default function AdminCashManagementContent() {
               canViewCashSection={canViewCashSection}
             />
           ) : null}
-
-          <SimulatorTools resetStoreCashRegister={resetStoreCashRegister} fetchStoreRegister={fetchStoreRegister} date={date} setDate={setDate} toast={toast} />
 
           {availableTabs.length > 0 && (
             <div className="space-y-6">

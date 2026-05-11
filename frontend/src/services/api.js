@@ -39,6 +39,13 @@ api.interceptors.request.use((config) => {
 api.interceptors.response.use(
   (response) => response,
   (error) => {
+    // 503 Service Unavailable or 500 Internal Server Error (usually DB connection issues)
+    // DO NOT LOGOUT the user for these. Just let the component handle the error toast.
+    if (error.response?.status === 503 || (error.response?.status === 500 && error.response?.data?.message?.includes('connection'))) {
+      console.warn('[API Interceptor] Server/DB busy. Skipping automatic logout.', error.response?.status);
+      return Promise.reject(error);
+    }
+
     if (error.response?.status === 401) {
       // Logic: If we are on the Success page, DON'T redirect immediately.
       // This prevents the 'Redirect to Login' issue where a background fetch fails.
@@ -70,6 +77,9 @@ export const authAPI = {
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
   updatePassword: (data) => api.put('/auth/password', data),
+  uploadMyDocument: (formData) => api.post('/auth/me/documents', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 export const productsAPI = {

@@ -24,7 +24,13 @@ export const getUsers = async (req, res) => {
       include: { 
         assignedVehicle: true, 
         store: true,
-        customRole: true 
+        customRole: true,
+        documents: true,
+        shift: true,
+        routeAssignments: {
+          where: { status: true },
+          include: { route: true }
+        }
       }
     });
     res.json(users);
@@ -37,7 +43,17 @@ export const getUsers = async (req, res) => {
 // Create a new user (Agent/helper/supervisor)
 export const createUser = async (req, res) => {
   try {
-    const { name, email, password, mobile, role, assignedVehicleId: rawVehicleId, storeId: rawStoreId, dailyTarget, vgeType, baseSalary, customRoleId: rawRoleId, attendanceEnabled } = req.body;
+    const { 
+      name, email, password, mobile, role, 
+      assignedVehicleId: rawVehicleId, 
+      storeId: rawStoreId, 
+      dailyTarget, vgeType, baseSalary, 
+      customRoleId: rawRoleId, 
+      attendanceEnabled,
+      shiftId,
+      kycStatus
+    } = req.body;
+    
     const storeId = (rawStoreId && rawStoreId !== 'null' && rawStoreId !== 'undefined' && rawStoreId !== '') ? rawStoreId : null;
     const assignedVehicleId = (rawVehicleId && rawVehicleId !== 'null' && rawVehicleId !== 'undefined' && rawVehicleId !== '') ? rawVehicleId : null;
     const customRoleId = (rawRoleId && rawRoleId !== 'null' && rawRoleId !== 'undefined' && rawRoleId !== '') ? rawRoleId : null;
@@ -80,7 +96,9 @@ export const createUser = async (req, res) => {
         dailyTarget: !isNaN(dailyTargetVal) ? dailyTargetVal : undefined,
         baseSalary: !isNaN(baseSalaryVal) ? baseSalaryVal : undefined,
         attendanceEnabled: attendanceEnabled !== undefined ? Boolean(attendanceEnabled) : true,
-        customRole: customRoleId ? { connect: { id: customRoleId } } : undefined
+        customRole: customRoleId ? { connect: { id: customRoleId } } : undefined,
+        shiftId: shiftId || undefined,
+        kycStatus: kycStatus || 'PENDING'
       }
     });
 
@@ -97,14 +115,7 @@ export const createUser = async (req, res) => {
     res.status(201).json({ message: 'User created', user: { id: user.id, name: user.name, role: user.role } });
   } catch (error) {
     console.error('[AdminUsers] Create error:', error);
-    console.error('[AdminUsers] Request Body:', JSON.stringify(req.body));
-    console.error('[AdminUsers] Error Code:', error.code);
-    res.status(500).json({ 
-      message: 'Error creating user', 
-      error: error.message, 
-      code: error.code,
-      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined 
-    });
+    res.status(500).json({ message: 'Error creating user', error: error.message });
   }
 };
 
@@ -112,7 +123,11 @@ export const createUser = async (req, res) => {
 export const updateUser = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, email, mobile, role, assignedVehicleId, storeId, status, dailyTarget, vgeType, password, baseSalary, customRoleId, attendanceEnabled } = req.body;
+    const { 
+      name, email, mobile, role, assignedVehicleId, storeId, status, 
+      dailyTarget, vgeType, password, baseSalary, customRoleId, 
+      attendanceEnabled, shiftId, kycStatus 
+    } = req.body;
 
     const updateData = {
       name,
@@ -121,44 +136,155 @@ export const updateUser = async (req, res) => {
       role,
       status,
       vgeType,
-      assignedVehicle: assignedVehicleId === null 
-        ? { disconnect: true } 
-        : (assignedVehicleId ? { connect: { id: assignedVehicleId } } : undefined),
-      store: storeId === null 
-        ? { disconnect: true } 
-        : (storeId ? { connect: { id: storeId } } : undefined),
-      dailyTarget: dailyTarget !== undefined ? parseFloat(dailyTarget) : undefined,
-      baseSalary: baseSalary !== undefined ? parseFloat(baseSalary) : undefined,
-      customRole: customRoleId === null 
-        ? { disconnect: true } 
-        : (customRoleId ? { connect: { id: customRoleId } } : undefined),
-      attendanceEnabled: attendanceEnabled !== undefined ? Boolean(attendanceEnabled) : undefined
+      assignedVehicleId: assignedVehicleId === null ? null : (assignedVehicleId || undefined),
+      storeId: storeId === null ? null : (storeId || undefined),
+      dailyTarget: (dailyTarget !== undefined && dailyTarget !== '') ? parseFloat(dailyTarget) : (dailyTarget === '' ? null : undefined),
+      baseSalary: (baseSalary !== undefined && baseSalary !== '') ? parseFloat(baseSalary) : (baseSalary === '' ? null : undefined),
+      customRoleId: customRoleId === null ? null : (customRoleId || undefined),
+      attendanceEnabled: attendanceEnabled !== undefined ? Boolean(attendanceEnabled) : undefined,
+      shiftId: shiftId === null ? null : (shiftId || undefined),
+      kycStatus: kycStatus || undefined
     };
 
-    // Safely update password if provided
+    // Clean up NaN values just in case
+    if (isNaN(updateData.dailyTarget)) delete updateData.dailyTarget;
+    if (isNaN(updateData.baseSalary)) delete updateData.baseSalary;
+
     if (password && password.trim() !== '') {
       const salt = await bcrypt.genSalt(10);
       updateData.password = await bcrypt.hash(password, salt);
     }
 
-    const updatedUser = await prisma.user.update({
+    const updateResult = await prisma.user.updateMany({
       where: { id, tenantId: req.user.tenantId },
       data: updateData
     });
 
-    logActivity({
-      userId: req.user.id,
-      tenantId: req.user.tenantId,
-      storeId: updatedUser.storeId || req.user.storeId,
-      action: 'USER_UPDATED',
-      details: `Updated details for user: ${updatedUser.name}`,
-      targetUserId: updatedUser.id,
-      metadata: { status: updatedUser.status }
+    if (updateResult.count === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    const updatedUser = await prisma.user.findFirst({
+      where: { id, tenantId: req.user.tenantId }
     });
 
     res.json({ message: 'User updated', user: updatedUser });
   } catch (error) {
     res.status(500).json({ message: 'Error updating user', error: error.message });
+  }
+};
+
+// Documents Management
+import { uploadToSupabase } from '../../utils/supabaseService.js';
+
+export const uploadUserDocument = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { type, documentNumber } = req.body;
+    
+    if (!req.file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    const fileUrl = await uploadToSupabase(
+      req.file.buffer,
+      req.file.originalname,
+      req.file.mimetype,
+      'users',
+      'kyc'
+    );
+
+    if (!fileUrl) {
+      return res.status(500).json({ message: 'Failed to upload to cloud storage' });
+    }
+
+    const document = await prisma.userDocument.create({
+      data: {
+        userId,
+        type,
+        documentNumber,
+        fileUrl,
+        status: 'PENDING'
+      }
+    });
+
+    res.status(201).json({ message: 'Document uploaded', document });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading document', error: error.message });
+  }
+};
+
+export const updateUserDocumentStatus = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const { status } = req.body;
+    
+    if (!documentId) {
+      return res.status(400).json({ message: 'Document ID is required' });
+    }
+
+    console.log(`[AdminUsers] Updating document ${documentId} to status: ${status}`);
+
+    if (!['PENDING', 'VERIFIED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status value' });
+    }
+
+    console.log(`[AdminUsers] Attempting status update for ${documentId} to ${status}`);
+
+    // Update the status using updateMany to be more resilient
+    const updateResult = await prisma.userDocument.updateMany({
+      where: { id: documentId },
+      data: { status: status }
+    });
+
+    if (updateResult.count === 0) {
+      console.warn(`[AdminUsers] No document found to update with ID: ${documentId}`);
+      return res.status(404).json({ message: 'Document not found' });
+    }
+
+    // Fetch the updated document to return it
+    const document = await prisma.userDocument.findUnique({
+      where: { id: documentId }
+    });
+
+    console.log(`[AdminUsers] Successfully updated document ${documentId}`);
+    res.json({ message: 'Document status updated', document });
+  } catch (error) {
+    console.error('[AdminUsers] Update Document Status CRITICAL Error:', error);
+    res.status(500).json({ 
+      message: 'Error updating document status', 
+      error: error.message,
+      stack: error.stack
+    });
+  }
+};
+
+// Shifts Management
+export const getShifts = async (req, res) => {
+  try {
+    const shifts = await prisma.shift.findMany({
+      where: { tenantId: req.user.tenantId }
+    });
+    res.json(shifts);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching shifts', error: error.message });
+  }
+};
+
+export const createShift = async (req, res) => {
+  try {
+    const { name, startTime, endTime } = req.body;
+    const shift = await prisma.shift.create({
+      data: {
+        name,
+        startTime,
+        endTime,
+        tenantId: req.user.tenantId
+      }
+    });
+    res.status(201).json(shift);
+  } catch (error) {
+    res.status(500).json({ message: 'Error creating shift', error: error.message });
   }
 };
 

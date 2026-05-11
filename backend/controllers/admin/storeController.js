@@ -5,11 +5,24 @@ import prisma from '../../utils/prisma.js';
 // @access  Private (Admin)
 export const getAdminStores = async (req, res, next) => {
   try {
+    const user = req.user;
+    const isGlobal = 
+        user.role === 'TENANT_OWNER' || 
+        user.role === 'SUPER_ADMIN' || 
+        (user.role === 'ADMIN' && !user.customRoleId) ||
+        user.portalType === 'ADMIN';
+
+    const where = {
+        tenantId: user.tenantId
+    };
+
+    // If not a global role, restrict to their assigned store
+    if (!isGlobal && user.storeId) {
+        where.id = user.storeId;
+    }
+
     const stores = await prisma.store.findMany({
-      where: {
-        tenantId: req.user.tenantId,
-        creatorId: req.user.id
-      },
+      where,
       orderBy: {
         createdAt: 'desc'
       },

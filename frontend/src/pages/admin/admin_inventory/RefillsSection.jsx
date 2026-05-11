@@ -21,8 +21,12 @@ const RefillsSection = ({
   isSubmitting,
   handleRejectRefill,
   handleApproveRefill,
-  can
+  can,
+  currentUser
 }) => {
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
+  const hasUpdatePerm = can && can('INVENTORY', 'UPDATE');
+  const canApprove = isAdmin || hasUpdatePerm;
   const [activeTab, setActiveTab] = useState('active');
   const [historyData, setHistoryData] = useState([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -38,11 +42,11 @@ const RefillsSection = ({
     setIsLoadingHistory(true);
     try {
       const res = await adminAPI.getRefillHistory();
-      
+
       const grouped = {};
       res.data.forEach(item => {
         const d = new Date(item.date);
-        const timeKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${Math.floor(d.getMinutes() / 5)}`; 
+        const timeKey = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}-${d.getHours()}-${Math.floor(d.getMinutes() / 5)}`;
         const key = `${item.vehicleId}_${timeKey}`;
         if (!grouped[key]) {
           grouped[key] = {
@@ -54,8 +58,8 @@ const RefillsSection = ({
         }
         grouped[key].items.push(item);
       });
-      
-      setHistoryData(Object.values(grouped).sort((a,b) => new Date(b.date) - new Date(a.date)));
+
+      setHistoryData(Object.values(grouped).sort((a, b) => new Date(b.date) - new Date(a.date)));
     } catch (err) {
       console.error(err);
     } finally {
@@ -129,19 +133,22 @@ const RefillsSection = ({
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3 bg-emerald-50 px-4 py-3 rounded-2xl border border-emerald-100">
-            <div className="flex flex-col">
+          <div className="flex items-center gap-3">
+            <div className="flex flex-col items-end px-4 py-2 bg-emerald-50 rounded-2xl border border-emerald-100">
               <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Total Sessions</span>
               <span className="text-lg font-black text-emerald-950">{group.requests.length}</span>
             </div>
             {pendingCount > 0 && (
-              <div className="ml-4 flex flex-col items-end">
+              <div className="flex flex-col items-end px-4 py-2 bg-amber-50 rounded-2xl border border-amber-100">
                 <span className="text-[10px] font-black text-amber-600 uppercase tracking-widest">Action Required</span>
                 <span className="text-lg font-black text-amber-500">{pendingCount} Pending</span>
               </div>
             )}
           </div>
         </div>
+
+        {/* Bulk Action Controls */}
+
 
         {/* Refill Timeline */}
         <div className="bg-white p-6 rounded-[2.5rem] border border-gray-100 shadow-sm">
@@ -177,6 +184,30 @@ const RefillsSection = ({
                         {req.status}
                       </div>
                     </div>
+                    {req.status === 'PENDING' && (
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => {
+                            const allItemIds = req.items.map(i => i.id);
+                            const currentlySelected = allItemIds.filter(id => !unselectedRefillItems.includes(id));
+                            if (currentlySelected.length === allItemIds.length) {
+                              // Deselect all
+                              allItemIds.forEach(id => {
+                                if (!unselectedRefillItems.includes(id)) toggleRefillItemSelection(id);
+                              });
+                            } else {
+                              // Select all
+                              allItemIds.forEach(id => {
+                                if (unselectedRefillItems.includes(id)) toggleRefillItemSelection(id);
+                              });
+                            }
+                          }}
+                          className="text-[9px] font-black text-indigo-600 uppercase tracking-widest hover:underline"
+                        >
+                          {req.items.every(i => !unselectedRefillItems.includes(i.id)) ? 'Select None' : 'Select All'}
+                        </button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Items List */}
@@ -208,7 +239,7 @@ const RefillsSection = ({
                         <div key={item.id} className={`bg-white p-3.5 rounded-[1.5rem] border transition-all duration-300 ${!isSelected ? 'border-gray-100 opacity-40 grayscale' : 'border-indigo-100 shadow-sm'}`}>
                           {/* Integrated Top: Info + Toggle */}
                           <div className="flex items-center gap-3 mb-2.5">
-                            {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE', 'REFILLS') && (
+                            {req.status === 'PENDING' && canApprove && (
                               <button
                                 onClick={(e) => { e.stopPropagation(); toggleRefillItemSelection(item.id); }}
                                 className={`shrink-0 transition-all ${isSelected ? 'text-indigo-600' : 'text-gray-300'}`}
@@ -216,23 +247,43 @@ const RefillsSection = ({
                                 {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
                               </button>
                             )}
-                              <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-black shrink-0 ${req.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
-                                req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
-                                  'bg-emerald-50 text-emerald-600 border-emerald-200'
-                                }`}>
+                            <div className={`w-8 h-8 rounded-full border-2 flex items-center justify-center text-[10px] font-black shrink-0 ${req.status === 'REJECTED' ? 'bg-rose-50 text-rose-600 border-rose-200' :
+                              req.status === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-200' :
+                                'bg-emerald-50 text-emerald-600 border-emerald-200'
+                              }`}>
                               <Package size={16} />
                               {excessBadge}
                             </div>
                             <div className="flex-1 min-w-0">
                               <span className="text-[13px] font-black text-gray-900 leading-none truncate block">{item.product?.name}</span>
-                              {req.status === 'PENDING' && (
-                                <div className="flex items-center gap-1.5 mt-1">
-                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Store:</span>
-                                  <span className={`text-[10px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
+                              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Store:</span>
+                                  <span className={`text-[9px] font-black ${(prod?.stock || 0) < (editedQuantities[item.id] ?? item.quantity) ? 'text-rose-600' : 'text-emerald-600'}`}>
                                     {prod?.stock || 0}
                                   </span>
                                 </div>
-                              )}
+                                {req.status === 'PENDING' && (
+                                  <>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">In Vehicle:</span>
+                                      <span className="text-[9px] font-black text-indigo-600">{(allVehiclesStock[req.vehicleId]?.find(v => v.productId === item.productId)?.quantity || 0)}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Shortfall:</span>
+                                      <span className="text-[9px] font-black text-amber-600">
+                                        {(() => {
+                                          const vInv = allVehiclesStock[req.vehicleId] || [];
+                                          const si = vInv.find(v => v.productId === item.productId);
+                                          const tc = si ? Math.max(si.openingQuantity || 0, si.quantity) : 0;
+                                          const cq = si ? si.quantity : 0;
+                                          return Math.max(0, tc - cq);
+                                        })()}
+                                      </span>
+                                    </div>
+                                  </>
+                                )}
+                              </div>
                             </div>
                           </div>
 
@@ -241,7 +292,7 @@ const RefillsSection = ({
                             <div className="flex items-center gap-2">
                               {/* Qty Adj */}
                               <div className="flex-1 flex items-center justify-between bg-gray-50 rounded-xl px-2 py-1.5 border border-gray-100">
-                                {can && can('INVENTORY', 'UPDATE', 'REFILLS') ? (
+                                {canApprove ? (
                                   <>
                                     <button onClick={() => setEditedQuantities(p => ({ ...p, [item.id]: Math.max(0, (editedQuantities[item.id] ?? item.quantity) - 1) }))} className="p-1 text-gray-400 hover:text-indigo-600"><Minus size={14} /></button>
                                     <input
@@ -260,7 +311,7 @@ const RefillsSection = ({
                               </div>
 
                               {/* Quick Actions */}
-                              {can && can('INVENTORY', 'UPDATE', 'REFILLS') && (
+                              {canApprove && (
                                 <div className="flex gap-1.5 shrink-0">
                                   <button
                                     onClick={(e) => { e.stopPropagation(); handleRejectSingleItem(req.id, item.id); }}
@@ -291,7 +342,7 @@ const RefillsSection = ({
                   </div>
 
                   {/* Action Controls */}
-                  {req.status === 'PENDING' && can && can('INVENTORY', 'UPDATE') && (
+                  {req.status === 'PENDING' && canApprove && (
                     <div className="flex flex-col sm:flex-row items-center gap-3 pt-4 border-t border-gray-100 mt-2">
                       <button
                         onClick={(e) => { e.stopPropagation(); handleRejectRefill(req.id); }}
@@ -334,145 +385,148 @@ const RefillsSection = ({
     <div className="space-y-6 animate-in fade-in duration-300">
       <div className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 max-w-fit overflow-x-auto">
         <button onClick={() => setActiveTab('active')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'active' ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
-           <ArrowUpCircle size={14} className="inline mr-2 mb-0.5" /> Pending Requests
+          <ArrowUpCircle size={14} className="inline mr-2 mb-0.5" /> Pending Requests
         </button>
         <button onClick={() => setActiveTab('history')} className={`px-6 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all whitespace-nowrap ${activeTab === 'history' ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}>
-           <History size={14} className="inline mr-2 mb-0.5" /> Refill History
+          <History size={14} className="inline mr-2 mb-0.5" /> Refill History
         </button>
       </div>
 
       {activeTab === 'active' ? (
         <>
-      {/* Skeleton Loading State */}
-      {loadingRefills ? (
-        <div className="space-y-4">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" />
-          ))}
-        </div>
-      ) : groupedRefills.length === 0 ? (
-        <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
-          <Truck size={48} className="mx-auto text-gray-200 mb-4" />
-          <h3 className="text-xl font-black text-gray-900 tracking-tight">No Refill Requests</h3>
-          <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">Everything is up to date.</p>
-        </div>
-      ) : (
-        <>
-          {/* Desktop Table View */}
-          <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50/50">
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Refill Sessions</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                  <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {groupedRefills
-                  .filter(g =>
-                    g.user?.name?.toLowerCase().includes(auditSearch.toLowerCase()) ||
-                    g.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase())
-                  )
-                  .map(group => {
-                    const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
-                    return (
-                      <tr
-                        key={group.user?.id || 'unknown'}
-                        onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
-                        className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
-                      >
-                        <td className="px-6 py-4">
-                          <div className="flex items-center gap-4">
-                            <div className="w-12 h-12 bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center font-black text-xl transition-all shadow-inner">
-                              {group.user?.name?.[0] || '?'}
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{group.user?.name || 'Unknown Agent'}</span>
-                              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
-                            </div>
+          {/* Skeleton Loading State */}
+          {loadingRefills ? (
+            <div className="space-y-4">
+              {[...Array(4)].map((_, i) => (
+                <div key={i} className="h-20 bg-white rounded-2xl border border-gray-100 shadow-sm animate-pulse" />
+              ))}
+            </div>
+          ) : groupedRefills.length === 0 ? (
+            <div className="text-center py-16 bg-white rounded-[2.5rem] border border-dashed border-gray-100 shadow-sm">
+              <Truck size={48} className="mx-auto text-gray-200 mb-4" />
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">No Refill Requests</h3>
+              <p className="text-xs text-gray-400 mt-2 font-black uppercase tracking-widest">Everything is up to date.</p>
+            </div>
+          ) : (
+            <>
+
+
+              {/* Desktop Table View */}
+              <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-gray-50/50">
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Agent & Vehicle</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Refill Sessions</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                      <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {groupedRefills
+                      .filter(g =>
+                        g.user?.name?.toLowerCase().includes(auditSearch.toLowerCase()) ||
+                        g.vehicle?.vehicleNumber?.toLowerCase().includes(auditSearch.toLowerCase())
+                      )
+                      .map(group => {
+                        const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+                        return (
+                          <tr
+                            key={group.user?.id || 'unknown'}
+                            onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                            className="hover:bg-emerald-50/20 transition-all cursor-pointer group"
+                          >
+                            <td className="px-6 py-4">
+                              <div className="flex items-center gap-4">
+                                <div className="w-12 h-12 bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white rounded-2xl flex items-center justify-center font-black text-xl transition-all shadow-inner">
+                                  {group.user?.name?.[0] || '?'}
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-sm font-black text-gray-900 tracking-tight leading-none mb-1">{group.user?.name || 'Unknown Agent'}</span>
+                                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className="text-sm font-black text-gray-700">{group.requests.length} Sessions</span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${pendingCount > 0 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
+                                {pendingCount > 0 ? `${pendingCount} Action Required` : 'Verified'}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-right">
+                              <div className="flex items-center justify-end gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest transition-colors">
+                                Manage Refills
+                                <X className="rotate-180" size={14} strokeWidth={3} />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card View */}
+              <div className="md:hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {groupedRefills.map(group => {
+                  const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
+
+                  return (
+                    <div
+                      key={group.user?.id || 'unknown'}
+                      onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
+                      className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
+                    >
+                      <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500">
+                          <X className="rotate-180" size={16} strokeWidth={3} />
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="w-14 h-14 bg-emerald-50 group-hover/card:bg-emerald-600 rounded-3xl flex items-center justify-center text-emerald-600 group-hover/card:text-white font-black text-2xl transition-all shadow-inner">
+                          {group.user?.name?.[0] || '?'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h3 className="font-black text-gray-900 tracking-tight text-lg truncate mb-1">{group.user?.name || 'Unknown Agent'}</h3>
+                          <div className="flex items-center gap-2">
+                            <Truck size={12} className="text-gray-300" />
+                            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
                           </div>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className="text-sm font-black text-gray-700">{group.requests.length} Sessions</span>
-                        </td>
-                        <td className="px-6 py-4 text-center">
-                          <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${pendingCount > 0 ? 'bg-amber-50 text-amber-600 border-amber-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'}`}>
-                            {pendingCount > 0 ? `${pendingCount} Action Required` : 'Verified'}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 mt-1">
+                        <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
+                          <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
+                          <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
+                        </div>
+                        <div className={`${pendingCount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-3 border`}>
+                          <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
+                          <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <div className="flex items-center justify-end gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest transition-colors">
-                            Manage Refills
-                            <X className="rotate-180" size={14} strokeWidth={3} />
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-          </div>
+                        </div>
+                      </div>
 
-          {/* Mobile Card View */}
-          <div className="md:hidden grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {groupedRefills.map(group => {
-              const pendingCount = group.requests.filter(r => r.status === 'PENDING').length;
-
-              return (
-                <div
-                  key={group.user?.id || 'unknown'}
-                  onClick={() => setViewingAgentId(group.user?.id || group.user?.name || 'unknown')}
-                  className="bg-white group/card cursor-pointer rounded-[2.5rem] p-6 border border-gray-100 shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:border-emerald-200 transition-all active:scale-[0.98] relative overflow-hidden flex flex-col gap-5"
-                >
-                  <div className="absolute top-0 right-0 p-4 opacity-0 group-hover/card:opacity-100 transition-opacity">
-                    <div className="p-2 bg-emerald-50 rounded-xl text-emerald-500">
-                      <X className="rotate-180" size={16} strokeWidth={3} />
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 bg-emerald-50 group-hover/card:bg-emerald-600 rounded-3xl flex items-center justify-center text-emerald-600 group-hover/card:text-white font-black text-2xl transition-all shadow-inner">
-                      {group.user?.name?.[0] || '?'}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-black text-gray-900 tracking-tight text-lg truncate mb-1">{group.user?.name || 'Unknown Agent'}</h3>
-                      <div className="flex items-center gap-2">
-                        <Truck size={12} className="text-gray-300" />
-                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{group.vehicle?.vehicleNumber}</span>
+                      <div className="text-[10px] font-black text-center text-emerald-600 uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-opacity">
+                        Click to View Details →
                       </div>
                     </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 mt-1">
-                    <div className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50">
-                      <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest block mb-0.5">History</span>
-                      <span className="text-sm font-black text-gray-800">{group.requests.length} Sessions</span>
-                    </div>
-                    <div className={`${pendingCount > 0 ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100'} rounded-2xl p-3 border`}>
-                      <span className={`text-[9px] font-black uppercase tracking-widest block mb-0.5 ${pendingCount > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>Status</span>
-                      <span className={`text-sm font-black ${pendingCount > 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-                        {pendingCount > 0 ? `${pendingCount} Pending` : 'Verified'}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className="text-[10px] font-black text-center text-emerald-600 uppercase tracking-tighter opacity-0 group-hover/card:opacity-100 transition-opacity">
-                    Click to View Details →
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </>
-      )}
-    </>
-  ) : (
+      ) : (
         <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm space-y-4 min-h-[400px]">
           {selectedSession ? (
             <div className="animate-in fade-in slide-in-from-right-4 duration-300 print:p-0">
-              <style dangerouslySetInnerHTML={{ __html: `
+              <style dangerouslySetInnerHTML={{
+                __html: `
                 @media print {
                   @page { size: A4; margin: 10mm; }
                   body { background: white !important; -webkit-print-color-adjust: exact; }
@@ -499,7 +553,7 @@ const RefillsSection = ({
               `}} />
               <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-100 no-print">
                 <div className="flex items-center gap-4">
-                  <button 
+                  <button
                     onClick={() => setSelectedSession(null)}
                     className="p-2.5 rounded-xl bg-gray-50 text-gray-500 hover:bg-gray-100 transition-all border border-gray-100"
                   >
@@ -528,7 +582,7 @@ const RefillsSection = ({
                       <p className="text-xs font-bold text-gray-400 tracking-[0.2em] uppercase">VillageKart Sales Tracker</p>
                     </div>
                     <div className="text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">
-                      Session ID: {selectedSession.id || 'N/A'}<br/>
+                      Session ID: {selectedSession.id || 'N/A'}<br />
                       Date: {new Date(selectedSession.date).toLocaleString()}
                     </div>
                   </div>
@@ -605,7 +659,8 @@ const RefillsSection = ({
             </div>
           ) : (
             <div className="print-section">
-              <style dangerouslySetInnerHTML={{ __html: `
+              <style dangerouslySetInnerHTML={{
+                __html: `
                 @media print {
                   @page { size: A4 landscape; margin: 10mm; }
                   body { background: white !important; -webkit-print-color-adjust: exact; }
@@ -676,8 +731,8 @@ const RefillsSection = ({
                       </thead>
                       <tbody className="divide-y divide-gray-50">
                         {historyData.map((session, idx) => (
-                          <tr 
-                            key={`ref-hist-row-${idx}`} 
+                          <tr
+                            key={`ref-hist-row-${idx}`}
                             onClick={() => setSelectedSession(session)}
                             className="hover:bg-emerald-50/30 transition-all cursor-pointer group"
                           >
@@ -760,7 +815,7 @@ const RefillsSection = ({
                     </div>
                   </div>
                 </>
-              ) }
+              )}
             </div>
           )}
         </div>

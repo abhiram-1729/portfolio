@@ -1,7 +1,6 @@
 import api from './api';
 
 export const addExpense = async (data) => {
-    // Check if it's FormData (for image upload)
     const response = await api.post('/expenses', data);
     return response.data;
 };
@@ -27,8 +26,18 @@ export const getAllExpenses = async (params) => {
     return response.data;
 };
 
-export const updateExpenseStatus = async (id, status) => {
-    const response = await api.put(`/expenses/admin/${id}/status`, { status });
+export const updateExpenseStatus = async (id, status, extras = {}) => {
+    const response = await api.put(`/expenses/admin/${id}/status`, { status, ...extras });
+    return response.data;
+};
+
+export const bulkUpdateExpenseStatus = async (ids, status) => {
+    const response = await api.put('/expenses/admin/bulk-status', { ids, status });
+    return response.data;
+};
+
+export const getExpenseAnalytics = async (params) => {
+    const response = await api.get('/expenses/admin/analytics', { params });
     return response.data;
 };
 
@@ -39,5 +48,15 @@ export const getExpenseCategories = async () => {
 
 export const createExpenseCategory = async (data) => {
     const response = await api.post('/expenses/admin/categories', data);
+    return response.data;
+};
+
+export const updateExpenseCategory = async (id, data) => {
+    const response = await api.put(`/expenses/admin/categories/${id}`, data);
+    return response.data;
+};
+
+export const deleteExpenseCategory = async (id) => {
+    const response = await api.delete(`/expenses/admin/categories/${id}`);
     return response.data;
 };

@@ -39,7 +39,8 @@ import {
   Navigation,
   RotateCcw,
   FileText,
-  Zap
+  Zap,
+  ShoppingBag
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -54,7 +55,7 @@ function cn(...inputs) {
 }
 
 export default function AdminLayout() {
-  const { clearUser, user } = useUserStore();
+  const { clearUser, user, refreshUserProfile } = useUserStore();
   const unreadCount = useNotificationStore(s => s.unreadCount);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
@@ -63,12 +64,22 @@ export default function AdminLayout() {
   const userDropdownRef = React.useRef(null);
   const [lastOpenedMenu, setLastOpenedMenu] = React.useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    refreshUserProfile();
+  }, []);
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const [openMenus, setOpenMenus] = React.useState({
     Procurement: location.pathname.startsWith('/admin/procurement'),
     Inventory: location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage'),
-    Operation: location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes'),
+    Operation: location.pathname.startsWith('/admin/users'),
+    Routes: location.pathname.startsWith('/admin/routes') || (location.pathname.startsWith('/admin/vehicles') && (
+      location.search.includes('sub=route_mapping') ||
+      location.search.includes('sub=sales') ||
+      location.search.includes('sub=collection')
+    )),
+    Vehicles: location.pathname.startsWith('/admin/vehicles'),
     'Return & Stock': location.search.includes('tab=return'),
     Reports: location.pathname.startsWith('/admin/reports')
   });
@@ -108,8 +119,8 @@ export default function AdminLayout() {
       const timer = setTimeout(() => {
         const element = document.getElementById(`nav-group-${lastOpenedMenu.replace(/\s+/g, '-').toLowerCase()}`);
         if (element) {
-          element.scrollIntoView({ 
-            behavior: 'smooth', 
+          element.scrollIntoView({
+            behavior: 'smooth',
             block: 'center',
             inline: 'nearest'
           });
@@ -128,11 +139,40 @@ export default function AdminLayout() {
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
     {
       label: 'Operation',
-      icon: ClipboardList,
+      icon: Users,
       subItems: [
         { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
-        { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
-        { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES', section: 'ROUTES' },
+      ]
+    },
+    {
+      label: 'Routes',
+      icon: Navigation,
+      module: 'ROUTES',
+      subItems: [
+        { to: '/admin/routes?tab=villages', icon: MapPin, label: 'Village', section: 'VILLAGES' },
+        { to: '/admin/routes?tab=routes', icon: Navigation, label: 'Routes', section: 'ROUTES' },
+        { to: '/admin/routes?tab=assignments', icon: ClipboardList, label: 'Assignments', section: 'ASSIGNMENTS' },
+        // { to: '/admin/vehicles?sub=route_mapping', icon: Link2, label: 'Assignment Cards' },
+        { to: '/admin/vehicles?sub=sales', icon: ShoppingBag, label: 'Sales' },
+        { to: '/admin/vehicles?sub=collection', icon: Coins, label: 'Collections' },
+      ]
+    },
+    {
+      label: 'Vehicles',
+      icon: Truck,
+      module: 'VEHICLES',
+      subItems: [
+        { to: '/admin/vehicles?sub=master', icon: Truck, label: 'Master' },
+        { to: '/admin/vehicles?sub=inventory', icon: Grid, label: 'Inventory' },
+        { to: '/admin/vehicles?sub=loading', icon: ArrowUpCircle, label: 'Stock Loading' },
+        { to: '/admin/vehicles?sub=return', icon: ArrowDownCircle, label: 'Stock Return' },
+        { to: '/admin/vehicles?sub=refill', icon: Package, label: 'Refill Requests' },
+        // { to: '/admin/vehicles?sub=closing', icon: Clock, label: 'Shift Closing' },
+        { to: '/admin/vehicles?sub=fuel', icon: CreditCard, label: 'Fuel Logs' },
+        { to: '/admin/vehicles?sub=maintenance', icon: Settings, label: 'Maintenance' },
+        // { to: '/admin/vehicles?sub=driver_mapping', icon: Users, label: 'Driver Mapping' },
+        // { to: '/admin/vehicles?sub=opening_stock', icon: ClipboardList, label: 'Opening Stock' },
+        { to: '/admin/vehicles?sub=damages', icon: AlertTriangle, label: 'Vehicle Damages' },
       ]
     },
     { to: '/admin/stores', icon: Store, label: 'Stores' },
@@ -143,7 +183,7 @@ export default function AdminLayout() {
       icon: Package,
       module: 'INVENTORY',
       subItems: [
-        { to: '/admin/inventory?tab=main_master', label: 'Registry', icon: Shield, section: 'MAIN_MASTER' },
+        // { to: '/admin/inventory?tab=main_master', label: 'Registry', icon: Shield, section: 'MAIN_MASTER' },
         { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid, section: 'MASTER' },
         { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package, section: 'STORE_STOCK' },
         { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck, section: 'VEHICLE_STOCK' },
@@ -151,6 +191,9 @@ export default function AdminLayout() {
         { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle, section: 'RETURN' },
         { to: '/admin/inventory?tab=return&sub=refills', label: 'Refills', icon: Package, section: 'REFILLS' },
         { to: '/admin/damage', label: 'Damage', icon: AlertTriangle, section: 'DAMAGE' },
+        { to: '/admin/inventory?tab=return&sub=trips', label: 'Trips/Shifts', icon: HistoryIcon, section: 'TRIPS' },
+        { to: '/admin/inventory?tab=return&sub=fuel', icon: CreditCard, label: 'Fuel Logs', section: 'FUEL' },
+        { to: '/admin/inventory?tab=return&sub=maintenance', icon: Settings, label: 'Maintenance', section: 'MAINTENANCE' },
         { to: '/admin/inventory?tab=return&sub=audits', label: 'Audit History', icon: CheckSquare, section: 'AUDITS' },
       ]
     },
@@ -202,7 +245,10 @@ export default function AdminLayout() {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter(sub => {
         const requiredModule = sub.module || item.module;
-        if (!requiredModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+        // Global Bypass for Admins
+        if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+
+        if (!requiredModule || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
         // 1. Prioritize Section-Level Gating (REPORTS bypass module READ)
         if (sub.section) {
@@ -212,10 +258,11 @@ export default function AdminLayout() {
           }
 
           if (requiredModule === 'INVENTORY') {
+            if (['TRIPS', 'FUEL', 'MAINTENANCE'].includes(sub.section)) return true;
             const sections = user?.permissions?.INVENTORY_SECTIONS;
             if (sections) return (sections[sub.section] || []).includes('READ');
             if (user?.permissions?.INVENTORY_TARGET_SECTIONS) return user.permissions.INVENTORY_TARGET_SECTIONS.includes(sub.section);
-            return false;
+            return true; // Fallback for new sections
           }
 
           if (requiredModule === 'PROCUREMENT') {
@@ -241,7 +288,10 @@ export default function AdminLayout() {
     return item;
   }).filter(item => {
     if (item.subItems) return item.subItems.length > 0;
-    if (!item.module || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    // Global Bypass for Admins
+    if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+
+    if (!item.module || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
     const hasModuleRead = (user?.permissions?.[item.module] || []).includes('READ');
     if (!hasModuleRead) return false;
@@ -305,7 +355,7 @@ export default function AdminLayout() {
   const isAuthorizedRoute = () => {
     if (location.pathname.startsWith('/admin/privileges')) return true; // Explicitly allow privileges if in Admin portal
     if (location.pathname.startsWith('/admin/stores')) return true; // Explicitly allow stores
-    if (!currentModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    if (!currentModule || ['TENANT_OWNER', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role)) return true;
 
     if (location.pathname.startsWith('/admin/reports')) {
       if (user?.permissions?.REPORT_TARGET_SECTIONS?.length > 0) return true;
@@ -441,12 +491,12 @@ export default function AdminLayout() {
                     <span className="text-xs font-black text-gray-900 leading-none mb-1 uppercase tracking-tight">{user?.name}</span>
                     <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">{user?.role?.replace('_', ' ')}</span>
                   </div>
-                  <ChevronDown 
-                    size={14} 
+                  <ChevronDown
+                    size={14}
                     className={cn(
                       "text-gray-400 transition-transform duration-300",
                       isUserDropdownOpen && "rotate-180 text-emerald-600"
-                    )} 
+                    )}
                   />
                 </button>
 
@@ -456,7 +506,7 @@ export default function AdminLayout() {
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p>
                       <p className="text-xs font-black text-gray-900 truncate">{user?.email || user?.name}</p>
                     </div>
-                    
+
                     <div className="p-2">
                       {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
                         <button
@@ -530,7 +580,9 @@ export default function AdminLayout() {
                           isSidebarCollapsed ? "justify-center px-0" : "justify-between",
                           (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
                             ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
-                            ((location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes')) && item.label === 'Operation')
+                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Operation') ||
+                            ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
+                            ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
                             ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
                         )}
@@ -613,8 +665,20 @@ export default function AdminLayout() {
                                 const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
                                 isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
                               }
-                            } else if (item.label === 'Operation' || item.label === 'Reports') {
-                              isActive = location.pathname === sub.to;
+                            } else if (['Operation', 'Reports', 'Vehicles', 'Routes'].includes(item.label)) {
+                              if (item.label === 'Vehicles' || item.label === 'Routes') {
+                                const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
+                                const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                                if (targetSub) {
+                                  isActive = location.pathname === '/admin/vehicles' && searchParams.get('sub') === targetSub;
+                                } else if (targetTab) {
+                                  isActive = location.pathname === '/admin/routes' && searchParams.get('tab') === targetTab;
+                                } else {
+                                  isActive = location.pathname === sub.to;
+                                }
+                              } else {
+                                isActive = location.pathname === sub.to;
+                              }
                             }
 
                             return (
