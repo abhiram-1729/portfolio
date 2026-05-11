@@ -34,4 +34,8 @@ jobs:
 
             npm install
 
+            npx prisma generate
+
+            npx prisma db push
+
             pm2 restart vsms-backend
