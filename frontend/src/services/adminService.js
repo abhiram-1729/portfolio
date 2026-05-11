@@ -69,6 +69,7 @@ export const adminAPI = {
   approveRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/approve`, data),
   rejectRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/reject`, data),
   updateProductStock: (data) => api.post('/admin/inventory/stock', data),
+  updateInventory: (data) => api.post('/admin/inventory/stock', data),
   importZipInventory: (data) => api.post('/admin/inventory/items/zip-import', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -97,6 +98,12 @@ export const adminAPI = {
   getPaymentReport: (params) => api.get('/admin/reports/daily', { params }),
   getDamageReports: (params) => api.get('/damage/reports', { params }),
   getDamageEntries: (params) => api.get('/damage/entries', { params }),
+
+  // Vehicle Damage CRUD (Separate)
+  getVehicleDamages: (params) => api.get('/admin/vehicle-damages', { params }),
+  createVehicleDamage: (data) => api.post('/admin/vehicle-damages', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateVehicleDamage: (id, data) => api.put(`/admin/vehicle-damages/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteVehicleDamage: (id) => api.delete(`/admin/vehicle-damages/${id}`),
   getInvoiceReport: (params) => api.get('/admin/sales', { params }),
   getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
   getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),

@@ -162,16 +162,16 @@ export default function AdminLayout() {
       icon: Truck,
       module: 'VEHICLES',
       subItems: [
-        { to: '/admin/vehicles?sub=master', icon: Truck, label: 'Vehicle Master' },
-        { to: '/admin/vehicles?sub=inventory', icon: Grid, label: 'Fleet Inventory' },
+        { to: '/admin/vehicles?sub=master', icon: Truck, label: 'Master' },
+        { to: '/admin/vehicles?sub=inventory', icon: Grid, label: 'Inventory' },
         { to: '/admin/vehicles?sub=loading', icon: ArrowUpCircle, label: 'Stock Loading' },
         { to: '/admin/vehicles?sub=return', icon: ArrowDownCircle, label: 'Stock Return' },
         { to: '/admin/vehicles?sub=refill', icon: Package, label: 'Refill Requests' },
-        { to: '/admin/vehicles?sub=closing', icon: Clock, label: 'Shift Closing' },
+        // { to: '/admin/vehicles?sub=closing', icon: Clock, label: 'Shift Closing' },
         { to: '/admin/vehicles?sub=fuel', icon: CreditCard, label: 'Fuel Logs' },
         { to: '/admin/vehicles?sub=maintenance', icon: Settings, label: 'Maintenance' },
-        { to: '/admin/vehicles?sub=driver_mapping', icon: Users, label: 'Driver Mapping' },
-        { to: '/admin/vehicles?sub=opening_stock', icon: ClipboardList, label: 'Opening Stock' },
+        // { to: '/admin/vehicles?sub=driver_mapping', icon: Users, label: 'Driver Mapping' },
+        // { to: '/admin/vehicles?sub=opening_stock', icon: ClipboardList, label: 'Opening Stock' },
         { to: '/admin/vehicles?sub=damages', icon: AlertTriangle, label: 'Vehicle Damages' },
       ]
     },
@@ -581,8 +581,8 @@ export default function AdminLayout() {
                           (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
                             ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
                             ((location.pathname.startsWith('/admin/users')) && item.label === 'Operation') ||
-                            ((location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics')) ||
-                            ((location.pathname.startsWith('/admin/vehicles')) && item.label === 'Vehicles')
+                            ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
+                            ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
                             ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
                         )}

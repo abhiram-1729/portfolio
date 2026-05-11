@@ -62,6 +62,9 @@ export default function AdminVehicles() {
   const [auditTargetUser, setAuditTargetUser] = useState(null);
   const [vehicleInventory, setVehicleInventory] = useState([]);
   const [isAuditing, setIsAuditing] = useState(false);
+  const [auditSearch, setAuditSearch] = useState('');
+  const [agentSearch, setAgentSearch] = useState('');
+  const [mappingSearch, setMappingSearch] = useState('');
   
   // Inventory Operation States
   const [items, setItems] = useState([]);
@@ -378,7 +381,7 @@ export default function AdminVehicles() {
   const handleUpdateStock = async (productId, quantity, type) => {
     setProcessingItems(prev => new Set(prev).add(productId));
     try {
-      await adminAPI.updateInventory(productId, { quantity, type });
+      await adminAPI.updateInventory({ productId, quantity, mode: type });
       toast.success('Stock updated');
       fetchData();
     } catch (error) {
@@ -466,11 +469,27 @@ export default function AdminVehicles() {
       case 'driver_mapping':
         return (
             <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-              <div className="flex justify-between items-center mb-8">
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <h3 className="text-xl font-black text-gray-900 tracking-tight">Driver Mapping Status</h3>
+                <div className="relative group w-full md:w-72">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search vehicle or driver..." 
+                    value={mappingSearch}
+                    onChange={(e) => setMappingSearch(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  />
+                </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                 {vehicles.filter(v => v.assignedUsers?.length > 0).map(v => (
+                 {vehicles
+                   .filter(v => v.assignedUsers?.length > 0)
+                   .filter(v => 
+                     v.vehicleNumber?.toLowerCase().includes(mappingSearch.toLowerCase()) || 
+                     v.assignedUsers[0].name.toLowerCase().includes(mappingSearch.toLowerCase())
+                   )
+                   .map(v => (
                    <div key={v.id} className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col gap-4">
                       <div className="flex items-center gap-4">
                          <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
@@ -583,6 +602,8 @@ export default function AdminVehicles() {
             can={can}
           />
         );
+      case 'closing':
+        return <TripManagementSection storeId={storeFilterId} vehicles={vehicles} />;
       default:
         return null;
     }
@@ -1466,9 +1487,23 @@ export default function AdminVehicles() {
               <button onClick={() => setShowAssignModal(false)} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={20} /></button>
             </div>
 
+            <div className="mb-4 relative group shrink-0">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+              <input 
+                type="text" 
+                placeholder="Search drivers..." 
+                value={agentSearch}
+                onChange={(e) => setAgentSearch(e.target.value)}
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+              />
+            </div>
+
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-              {users.filter(u => !u.assignedVehicleId && u.storeId === selectedVehicle?.storeId).map(user => (
-                <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
+              {users
+                .filter(u => !u.assignedVehicleId && u.storeId === selectedVehicle?.storeId)
+                .filter(u => u.name.toLowerCase().includes(agentSearch.toLowerCase()))
+                .map(user => (
+                  <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
                   className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
@@ -1511,6 +1546,19 @@ export default function AdminVehicles() {
             </div>
 
             <div className="flex-1 overflow-y-auto pr-2 space-y-4">
+              {vehicleInventory.length > 0 && (
+                <div className="relative group shrink-0">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                  <input 
+                    type="text" 
+                    placeholder="Search items in vehicle..." 
+                    value={auditSearch}
+                    onChange={(e) => setAuditSearch(e.target.value)}
+                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  />
+                </div>
+              )}
+
               {vehicleInventory.length === 0 ? (
                 <div className="p-8 text-center bg-gray-50 rounded-2xl border border-dashed border-gray-200">
                   <Package size={32} className="mx-auto text-gray-300 mb-3" />
@@ -1528,8 +1576,16 @@ export default function AdminVehicles() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
-                      {vehicleInventory.map((item, idx) => (
-                        <tr key={idx} className={item.oldQuantity !== item.newQuantity ? 'bg-orange-50/30' : ''}>
+                      {vehicleInventory
+                        .filter(item => 
+                          item.name.toLowerCase().includes(auditSearch.toLowerCase()) || 
+                          item.sku.toLowerCase().includes(auditSearch.toLowerCase())
+                        )
+                        .map((item, idx) => {
+                          // Find original index in vehicleInventory for update logic
+                          const originalIdx = vehicleInventory.findIndex(orig => orig.productId === item.productId);
+                          return (
+                            <tr key={item.productId} className={item.oldQuantity !== item.newQuantity ? 'bg-orange-50/30' : ''}>
                           <td className="px-4 py-3">
                             <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.name}</p>
                             <p className="text-[10px] text-gray-400 tracking-wider font-mono mt-0.5">{item.sku}</p>
@@ -1548,7 +1604,7 @@ export default function AdminVehicles() {
                                 onChange={(e) => {
                                   const val = parseInt(e.target.value) || 0;
                                   const newInv = [...vehicleInventory];
-                                  newInv[idx].newQuantity = Math.max(0, val);
+                                  newInv[originalIdx].newQuantity = Math.max(0, val);
                                   setVehicleInventory(newInv);
                                 }}
                                 className={cn(
@@ -1561,7 +1617,7 @@ export default function AdminVehicles() {
                             </div>
                           </td>
                         </tr>
-                      ))}
+                      )})}
                     </tbody>
                   </table>
                 </div>

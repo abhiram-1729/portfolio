@@ -136,6 +136,7 @@ model User {
   targetActions      ActivityLog[]         @relation("TargetActions")
   damageReports      DamageEntry[]         @relation("DamageReporter")
   damageReviews      DamageEntry[]         @relation("DamageReviewer")
+  vehicleDamageReports VehiclePhysicalDamage[] @relation("VehicleDamageReporter")
   deductionsReceived DamageDeduction[]     @relation("DeductionTarget")
   deductionsApplied  DamageDeduction[]     @relation("DeductionApplier")
   safeTransactions   SafeTransaction[]
@@ -481,9 +482,56 @@ model Vehicle {
   trips             VehicleTrip[]
   fuelLogs          FuelLog[]
   maintenanceLogs   MaintenanceLog[]
+  physicalDamages   VehiclePhysicalDamage[]
 
   @@unique([tenantId, vehicleNumber])
   @@index([tenantId])
+}
+
+// ─── Vehicle Physical Damage (Body / Mechanical) ─────────────────
+model VehiclePhysicalDamage {
+  id              String                  @id @default(cuid())
+  tenantId        String                  @default("VK001")
+  storeId         String?
+  vehicleId       String
+  reportedById    String
+  damageType      String                  // DENT, SCRATCH, TIRE, ACCIDENT, MECHANICAL, ELECTRICAL, GLASS, BODY, OTHER
+  severity        VehicleDamageSeverity   @default(MINOR)
+  title           String                  // Short title e.g. "Front bumper dent"
+  description     String?
+  location        String?                 // Where on the vehicle: "Front Left", "Rear Bumper", etc.
+  images          String[]
+  estimatedCost   Float?                  @default(0)
+  actualCost      Float?
+  status          VehicleDamageStatus     @default(REPORTED)
+  repairDate      DateTime?
+  repairNotes     String?
+  odometerReading Float?
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+
+  vehicle         Vehicle                 @relation(fields: [vehicleId], references: [id])
+  reportedBy      User                    @relation("VehicleDamageReporter", fields: [reportedById], references: [id])
+
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@index([status])
+}
+
+enum VehicleDamageSeverity {
+  MINOR
+  MODERATE
+  MAJOR
+  CRITICAL
+}
+
+enum VehicleDamageStatus {
+  REPORTED
+  UNDER_REVIEW
+  REPAIR_SCHEDULED
+  IN_REPAIR
+  REPAIRED
+  CLOSED
 }
 
 model VehicleStock {

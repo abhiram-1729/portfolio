@@ -5,7 +5,7 @@ name: Backend Deploy
 on:
   push:
     branches:
-      - cicd
+      - new
     paths:
       - 'backend/**'
 
@@ -26,9 +26,9 @@ jobs:
 
             cd /opt/apps/villagkart/cicd-test
 
-            git checkout cicd
+            git checkout new
 
-            git pull origin cicd
+            git pull origin new
 
             cd backend
 

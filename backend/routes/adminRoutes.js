@@ -20,6 +20,7 @@ import * as mediaCtr from '../controllers/admin/mediaController.js';
 import * as vehicleTripCtr from '../controllers/admin/vehicleTripController.js';
 import * as fuelCtr from '../controllers/admin/fuelController.js';
 import * as maintenanceCtr from '../controllers/admin/maintenanceController.js';
+import * as vehDmgCtr from '../controllers/admin/vehicleDamageController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
@@ -225,5 +226,11 @@ router.route('/stores')
 router.route('/stores/:id')
   .put(adminStoreCtr.updateAdminStore)
   .delete(adminStoreCtr.deleteAdminStore);
+
+// Vehicle Damage CRUD (Separate from general damage flow)
+router.get('/vehicle-damages', vehDmgCtr.getVehicleDamages);
+router.post('/vehicle-damages', uploadMiddleware.array('images', 5), vehDmgCtr.createVehicleDamage);
+router.put('/vehicle-damages/:id', uploadMiddleware.array('images', 5), vehDmgCtr.updateVehicleDamage);
+router.delete('/vehicle-damages/:id', vehDmgCtr.deleteVehicleDamage);
 
 export default router;
