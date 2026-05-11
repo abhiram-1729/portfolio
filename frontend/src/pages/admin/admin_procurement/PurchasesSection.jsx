@@ -499,7 +499,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 h-full overflow-y-auto custom-scrollbar pb-10 pr-2">
       {(!showForm && !showQuickProduct && !showQuickVendor) && (
         <>
           <div className="flex flex-col md:flex-row gap-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
@@ -843,7 +843,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                   </button>
                 </div>
               </div>
-              <div className="bg-white rounded-b-3xl border-t border-gray-100 overflow-hidden" onClick={() => setShowItemResults(false)}>
+              <div className="bg-white rounded-b-3xl border-t border-gray-100 overflow-x-auto custom-scrollbar" onClick={() => setShowItemResults(false)}>
                 {form.items.length === 0 ? (
                   <div className="py-12 text-center">
                     <Package className="mx-auto text-gray-200 mb-3" size={48} />
