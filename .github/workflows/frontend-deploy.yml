@@ -3,7 +3,7 @@ name: Frontend Deploy
 on:
   push:
     branches:
-      - cicd
+      - develop
     paths:
       - 'frontend/**'
 
@@ -23,11 +23,11 @@ jobs:
           script: |
             export PATH=$PATH:/home/ubuntu/n/bin
 
-            cd /opt/apps/villagkart/cicd-test
+            cd /opt/apps/villagkart/vsms
 
-            git checkout cicd
+            git checkout develop
 
-            git pull origin cicd
+            git pull origin develop
 
             cd frontend
 

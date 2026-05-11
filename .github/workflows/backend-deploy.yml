@@ -5,7 +5,7 @@ name: Backend Deploy
 on:
   push:
     branches:
-      - new
+      - develop
     paths:
       - 'backend/**'
 
@@ -24,14 +24,18 @@ jobs:
           script: |
             export PATH=$PATH:/home/ubuntu/n/bin
 
-            cd /opt/apps/villagkart/cicd-test
+            cd /opt/apps/villagkart/vsms
 
-            git checkout new
+            git checkout develop
 
-            git pull origin new
+            git pull origin develop
 
             cd backend
 
             npm install
+
+            npx prisma generate
+
+            npx prisma db push
 
             pm2 restart vsms-backend
