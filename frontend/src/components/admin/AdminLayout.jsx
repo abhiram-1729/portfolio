@@ -93,7 +93,11 @@ export default function AdminLayout() {
   const appendParams = (path) => {
     if (!activeStoreId || path.startsWith('/admin/cash')) return path;
     const separator = path.includes('?') ? '&' : '?';
-    return `${path}${separator}storeId=${activeStoreId}&storeName=${activeStoreName || ''}`;
+    let url = `${path}${separator}storeId=${activeStoreId}`;
+    if (activeStoreName) {
+      url += `&storeName=${encodeURIComponent(activeStoreName)}`;
+    }
+    return url;
   };
 
   React.useEffect(() => {

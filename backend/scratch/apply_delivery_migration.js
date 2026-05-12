@@ -1,4 +1,7 @@
-import prisma from '../backend/utils/prisma.js';
+import prisma from '../utils/prisma.js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 async function applyMigration() {
   console.log('--- Applying Module 9 Schema Changes ---');

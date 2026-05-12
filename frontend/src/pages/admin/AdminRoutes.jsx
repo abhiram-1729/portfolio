@@ -127,7 +127,7 @@ export default function AdminRoutes() {
 
       // Auto-select if only one store exists
       if (fetchedStores.length === 1 && !storeId) {
-        setSearchParams({ storeId: fetchedStores[0].id });
+        setSearchParams({ storeId: fetchedStores[0].id, storeName: fetchedStores[0].name });
       }
     } catch (error) {
       toast.error('Failed to fetch data');
@@ -406,7 +406,7 @@ export default function AdminRoutes() {
             return (
               <button
                 key={store.id}
-                onClick={() => setSearchParams({ storeId: store.id })}
+                onClick={() => setSearchParams({ storeId: store.id, storeName: store.name })}
                 className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
               >
                 <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
@@ -491,7 +491,8 @@ export default function AdminRoutes() {
               value={storeId || ''}
               onChange={(e) => {
                 if (e.target.value) {
-                  setSearchParams({ storeId: e.target.value });
+                  const selected = stores.find(s => s.id === e.target.value);
+                  setSearchParams({ storeId: e.target.value, storeName: selected?.name || '' });
                 } else {
                   setSearchParams({});
                 }
