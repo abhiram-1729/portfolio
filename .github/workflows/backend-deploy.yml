@@ -41,3 +41,6 @@ jobs:
             npx prisma db push
 
             pm2 restart vsms-backend
+
+            pm2 save
+            
