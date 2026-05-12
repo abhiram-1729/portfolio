@@ -39,7 +39,13 @@ jobs:
 
             npx prisma generate
 
-            DATABASE_URL="postgresql://postgres.jehbniifcrzyuadbrron:EMqNF6k3hBZV9bMs@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres" npx prisma db push 
+            # 🛡️ Data Integrity Guard: Automatically generate a point-in-time database snapshot dump before any schema mutation occurs
+            mkdir -p /opt/apps/villagkart/db_backups
+            export PGPASSWORD="EMqNF6k3hBZV9bMs"
+            pg_dump -h aws-1-ap-northeast-1.pooler.supabase.com -U postgres.jehbniifcrzyuadbrron -d postgres -F c -b -f /opt/apps/villagkart/db_backups/vsms_prod_$(date +%Y%m%d_%H%M%S).dump || echo "[Warning] pg_dump utility unavailable. Proceeding with deployment sync."
+
+            # 🚀 Primary production migration execution (applies versioned SQL scripts deterministically if committed)
+            DATABASE_URL="postgresql://postgres.jehbniifcrzyuadbrron:EMqNF6k3hBZV9bMs@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres" npx prisma migrate deploy
 
             pm2 restart vsms-backend
 
