@@ -39,7 +39,7 @@ jobs:
 
             npx prisma generate
 
-            npx prisma db push
+            DATABASE_URL="postgresql://postgres.jehbniifcrzyuadbrron:EMqNF6k3hBZV9bMs@aws-1-ap-northeast-1.pooler.supabase.com:5432/postgres" npx prisma db push 
 
             pm2 restart vsms-backend
 
