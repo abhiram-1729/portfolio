@@ -57,11 +57,18 @@ export const createManualSale = async (req, res) => {
   try {
     const { storeId, vehicleId, agentId, routeId, villageName, saleDate, customerName, mobile, paymentMode, cashAmount, upiAmount, remark, items } = req.body;
     const tenantId = req.user.tenantId;
-    const finalStoreId = storeId || req.user.storeId;
+    let finalStoreId = (storeId && storeId !== '') ? storeId : req.user.storeId;
+    if (!finalStoreId) {
+      const fallbackStore = await prisma.store.findFirst({ where: { tenantId } });
+      if (fallbackStore) finalStoreId = fallbackStore.id;
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Items array is required' });
     }
+
+    // Sort items deterministically by productId to prevent DB row-level deadlocks during concurrent updates
+    items.sort((a, b) => String(a.productId).localeCompare(String(b.productId)));
 
     let totalAmount = 0;
     for (const item of items) {
@@ -76,8 +83,8 @@ export const createManualSale = async (req, res) => {
       });
 
       const orderData = {
-        tenantId,
-        storeId: finalStoreId,
+        tenant: { connect: { id: tenantId } },
+        store: { connect: { id: finalStoreId } },
         displayId: orderDisplayId,
         customerName: customerName || 'Manual Entry',
         mobile: mobile || null,
@@ -102,8 +109,8 @@ export const createManualSale = async (req, res) => {
           ...orderData,
           items: {
             create: items.map(item => ({
-              tenantId,
-              storeId: finalStoreId,
+              tenant: { connect: { id: tenantId } },
+              store: { connect: { id: finalStoreId } },
               product: { connect: { id: item.productId } },
               quantity: parseInt(item.quantity) || 1,
               price: parseFloat(item.price) || 0,
@@ -117,8 +124,8 @@ export const createManualSale = async (req, res) => {
 
       await tx.payment.create({
         data: {
-          tenantId,
-          storeId: finalStoreId,
+          tenant: { connect: { id: tenantId } },
+          store: { connect: { id: finalStoreId } },
           order: { connect: { id: newOrder.id } },
           paymentMode: orderData.paymentMode,
           amount: totalAmount,
@@ -178,6 +185,9 @@ export const createManualSale = async (req, res) => {
     res.status(201).json(result);
   } catch (error) {
     console.error('🔥 Create Manual Sale Error:', error);
-    res.status(400).json({ message: error.message || 'Error creating manual sale' });
+    res.status(400).json({ 
+      message: error.message || 'Error creating manual sale',
+      detail: error.meta?.cause || JSON.stringify(error.meta) || error.code
+    });
   }
 };

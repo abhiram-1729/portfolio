@@ -23,7 +23,10 @@ import {
   Circle as CircleIcon,
   RotateCcw,
   FileText,
-  Download
+  Download,
+  Navigation,
+  ShoppingBag,
+  Coins
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, CircleF, InfoWindow } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
@@ -35,6 +38,8 @@ import { useUserStore } from '../../store/userStore';
 import StoreSelector from './StoreSelector';
 import * as XLSX from 'xlsx';
 import { generateReportPDF } from './adminreports/ReportUtils';
+import VehicleSalesSection from './admin_vehicles/VehicleSalesSection';
+import RouteCollectionSection from './admin_vehicles/RouteCollectionSection';
 
 export default function AdminRoutes() {
   const [villages, setVillages] = useState([]);
@@ -55,7 +60,7 @@ export default function AdminRoutes() {
   const location = useLocation();
 
   const getInitialTab = () => {
-    if (urlTab && ['villages', 'routes', 'assignments'].includes(urlTab)) return urlTab;
+    if (urlTab && ['villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab)) return urlTab;
     if (isAdmin || !currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
     const sections = currentUser.permissions.ROUTE_TARGET_SECTIONS;
     if (sections.includes('VILLAGES')) return 'villages';
@@ -67,7 +72,7 @@ export default function AdminRoutes() {
   const [activeTab, setActiveTab] = useState(getInitialTab());
 
   useEffect(() => {
-    if (urlTab && ['villages', 'routes', 'assignments'].includes(urlTab) && urlTab !== activeTab) {
+    if (urlTab && ['villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab) && urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
   }, [urlTab]);
@@ -403,7 +408,7 @@ export default function AdminRoutes() {
   };
 
   const renderClassifiedRoutes = () => {
-    if (!storeId) {
+    if (!storeId && stores.length > 1) {
       const personnelByStore = users.reduce((acc, u) => {
         if (u.storeId && u.id !== currentUser?.id) {
           acc[u.storeId] = (acc[u.storeId] || 0) + 1;
@@ -487,89 +492,121 @@ export default function AdminRoutes() {
 
   return (
     <div className="space-y-6">
-      {/* Header & Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
+      {/* Header & Tabs Container */}
+      <div className="flex flex-col gap-5 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xs">
+        {/* Top Row: Title, Description & Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Left: Title & Subtitle */}
+          <div className="flex items-start gap-3">
             {storeId && (
               <button
                 onClick={() => setSearchParams({})}
-                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                className="p-2.5 bg-gray-50 border border-gray-100/80 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/50 transition-all shadow-2xs active:scale-95 mt-0.5"
                 title="Back to All Branches"
               >
-                <ChevronLeft size={18} />
+                <ChevronLeft size={18} strokeWidth={2.5} />
               </button>
             )}
-            <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-gray-500">Manage villages, routes, and agent schedules</p>
-            <span className="text-gray-300">•</span>
-            <select
-              value={storeId || ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSearchParams({ storeId: e.target.value });
-                } else {
-                  setSearchParams({});
-                }
-              }}
-              className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                backgroundPosition: 'right 0.25rem center',
-                backgroundRepeat: 'no-repeat',
-                backgroundSize: '1rem'
-              }}
-            >
-              <option value="">All Branches</option>
-              {stores.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
+            <div className="flex flex-col gap-1 text-left">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none">Route & Coverage</h2>
+                {stores.length > 1 && (
+                  <select
+                    value={storeId || ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSearchParams({ storeId: e.target.value });
+                      } else {
+                        setSearchParams({});
+                      }
+                    }}
+                    className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2.5 pr-6 py-1 rounded-lg border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.35rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem'
+                    }}
+                  >
+                    <option value="">All Branches</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <p className="text-xs font-bold text-gray-400 tracking-wide">Manage villages, active routes, sales distribution, and collection cycles</p>
+            </div>
           </div>
 
-        <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
-          {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
+          {/* Right: Export Control Actions */}
+          <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
             <button
-              onClick={() => handleTabChange('villages')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'villages' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-2xs text-xs font-bold"
+              title="Export PDF Report"
             >
-              Villages
+              <FileText size={15} strokeWidth={2.5} />
+              <span className="hidden sm:inline">PDF</span>
             </button>
-          )}
-          {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
             <button
-              onClick={() => handleTabChange('routes')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'routes' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+              onClick={handleExportExcel}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-2xs text-xs font-bold"
+              title="Export Excel Report"
             >
-              Routes
+              <Download size={15} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Excel</span>
             </button>
-          )}
-          {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
-            <button
-              onClick={() => handleTabChange('assignments')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'assignments' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Assignments
-            </button>
-          )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleExportPDF}
-            className="p-2.5 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm"
-            title="Export PDF"
-          >
-            <FileText size={18} />
-          </button>
-          <button
-            onClick={handleExportExcel}
-            className="p-2.5 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm"
-            title="Export Excel"
-          >
-            <Download size={18} />
-          </button>
+        {/* Bottom Row: Fully Horizontally Scrollable Professional Tabs */}
+        <div className="pt-2 border-t border-gray-50">
+          <div className="w-full overflow-x-auto custom-scrollbar pb-1.5">
+            <div className="flex items-center gap-1.5 bg-gray-50/80 p-1.5 rounded-2xl w-fit min-w-max border border-gray-100/80 shadow-2xs">
+              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
+                <button
+                  onClick={() => handleTabChange('villages')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'villages' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                >
+                  <MapPin size={15} strokeWidth={2.5} />
+                  <span>Village</span>
+                </button>
+              )}
+              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
+                <button
+                  onClick={() => handleTabChange('routes')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'routes' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                >
+                  <Navigation size={15} strokeWidth={2.5} />
+                  <span>Routes</span>
+                </button>
+              )}
+              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
+                <button
+                  onClick={() => handleTabChange('assignments')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'assignments' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                >
+                  <ClipboardList size={15} strokeWidth={2.5} />
+                  <span>Assignments</span>
+                </button>
+              )}
+              <button
+                onClick={() => handleTabChange('sales')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'sales' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+              >
+                <ShoppingBag size={15} strokeWidth={2.5} />
+                <span>Sales</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('collections')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'collections' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+              >
+                <Coins size={15} strokeWidth={2.5} />
+                <span>Collections</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -1552,6 +1589,20 @@ export default function AdminRoutes() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* --- SALES TAB --- */}
+      {activeTab === 'sales' && (
+        <div className="animate-fade-in">
+          <VehicleSalesSection storeId={storeId} />
+        </div>
+      )}
+
+      {/* --- COLLECTIONS TAB --- */}
+      {activeTab === 'collections' && (
+        <div className="animate-fade-in">
+          <RouteCollectionSection storeId={storeId} />
         </div>
       )}
 

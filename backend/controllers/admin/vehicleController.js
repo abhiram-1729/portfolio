@@ -52,6 +52,24 @@ export const createVehicle = async (req, res) => {
 
     console.log('📝 Creating vehicle order:', { vehicleNumber, vehicleName, status, assignedUserId, storeId });
 
+    if (!vehicleNumber || !vehicleNumber.trim()) {
+      return res.status(400).json({ message: 'Vehicle number is strictly required' });
+    }
+
+    // Pre-validate uniqueness before performing heavy storage uploads
+    const existingVehicle = await prisma.vehicle.findUnique({
+      where: {
+        tenantId_vehicleNumber: {
+          tenantId: req.user.tenantId,
+          vehicleNumber: vehicleNumber.trim()
+        }
+      }
+    });
+
+    if (existingVehicle) {
+      return res.status(400).json({ message: 'A vehicle with this registration number already exists in your fleet' });
+    }
+
     // Convert string status from FormData to boolean
     const isStatusActive = status === 'true' || status === true;
 
@@ -96,7 +114,7 @@ export const createVehicle = async (req, res) => {
 
     const vehicle = await prisma.vehicle.create({
       data: {
-        vehicleNumber,
+        vehicleNumber: vehicleNumber.trim(),
         vehicleName,
         displayId,
         status: isStatusActive,
@@ -111,13 +129,13 @@ export const createVehicle = async (req, res) => {
     logActivity({
       userId: req.user.id,
       tenantId: req.user.tenantId,
-      storeId: resolvedStoreId,
+      storeId: cleanStoreId,
       action: 'VEHICLE_CREATED',
-      details: `Registered new vehicle: ${vehicle.vehicleNumber} (${vehicle.vehicleName})`,
+      details: `Registered new vehicle: ${vehicle.vehicleNumber} (${vehicle.vehicleName || 'N/A'})`,
       metadata: { vehicleId: vehicle.id }
     });
 
-    if (assignedUserId) {
+    if (assignedUserId && assignedUserId !== 'null' && assignedUserId !== '') {
       const user = await prisma.user.update({
         where: { id: assignedUserId },
         data: { assignedVehicleId: vehicle.id }
@@ -126,7 +144,7 @@ export const createVehicle = async (req, res) => {
       logActivity({
         userId: req.user.id,
         tenantId: req.user.tenantId,
-        storeId: resolvedStoreId,
+        storeId: cleanStoreId,
         action: 'DRIVER_ASSIGNED',
         details: `Assigned driver ${user.name} to vehicle ${vehicle.vehicleNumber}`,
         targetUserId: user.id,
@@ -137,6 +155,9 @@ export const createVehicle = async (req, res) => {
     res.status(201).json({ message: 'Vehicle created successfully', vehicle });
   } catch (error) {
     console.error('❌ Error creating vehicle:', error.message);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'A vehicle with this registration number already exists in your fleet' });
+    }
     res.status(500).json({ message: 'Error creating vehicle', error: error.message });
   }
 };

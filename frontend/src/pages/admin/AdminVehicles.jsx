@@ -1064,7 +1064,7 @@ export default function AdminVehicles() {
   );
 
   const renderClassifiedVehicles = () => {
-    if (!storeFilterId) {
+    if (!storeFilterId && stores.length > 1) {
       const personnelByStore = users.reduce((acc, u) => {
         if (u.storeId && u.id !== currentUser?.id) {
           acc[u.storeId] = (acc[u.storeId] || 0) + 1;
@@ -1387,90 +1387,133 @@ export default function AdminVehicles() {
         </div>
       ) : (
         <>
-          {/* Navigation and Context Header */}
-          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-8">
-            <div className="flex flex-col gap-2">
-              <div className="flex items-center gap-4">
-                {activeSub !== 'master' && (
+          {/* Navigation and Context Header Card */}
+          <div className="flex flex-col gap-5 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xs mb-8">
+            {/* Top Row: Title, Description & Actions */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+              {/* Left: Title & Subtitle */}
+              <div className="flex items-start gap-3">
+                {storeFilterId && activeSub === 'master' && (
                   <button
-                    onClick={() => setSearchParams({ sub: 'master', storeId: storeFilterId })}
-                    className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                    title="Back to Master"
+                    onClick={() => setSearchParams({ sub: activeSub })}
+                    className="p-2.5 bg-gray-50 border border-gray-100/80 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/50 transition-all shadow-2xs active:scale-95 mt-0.5"
+                    title="Back to All Branches"
                   >
-                    <ArrowLeft size={18} />
+                    <ChevronLeft size={18} strokeWidth={2.5} />
                   </button>
                 )}
-                <h2 className="text-3xl font-black text-gray-900 tracking-tight capitalize">
-                  {activeSub === 'master' ? 'Fleet Management' : activeSub.replace('_', ' ')}
-                </h2>
+                <div className="flex flex-col gap-1 text-left">
+                  <div className="flex items-center gap-3">
+                    <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none capitalize">
+                      {activeSub === 'master' ? 'Fleet Management' : activeSub.replace('_', ' ')}
+                    </h2>
+                    {activeSub === 'master' && stores.length > 1 && (
+                      <select
+                        value={storeFilterId || ''}
+                        onChange={(e) => setSearchParams({ sub: 'master', storeId: e.target.value })}
+                        className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2.5 pr-6 py-1 rounded-lg border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 0.35rem center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '1rem'
+                        }}
+                      >
+                        <option value="">All Branches</option>
+                        {stores.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <p className="text-xs font-bold text-gray-400 tracking-wide">
+                    {activeSub === 'master' ? 'Monitor transport assets, track driver allocations, and record operating metrics' : `Manage ${activeSub.replace('_', ' ')} records across operational transport hubs`}
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
-                <p className="text-sm font-medium text-gray-500">
-                  {activeSub === 'master' ? 'Monitor and assign your transport assets' : `Manage ${activeSub.replace('_', ' ')} for ${stores.find(s => s.id === storeFilterId)?.name || 'All Branches'}`}
-                </p>
-                {activeSub === 'master' && (
-                  <>
-                    <span className="text-gray-300">•</span>
-                    <select
-                      value={storeFilterId || ''}
-                      onChange={(e) => setSearchParams({ storeId: e.target.value })}
-                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 0.25rem center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1rem'
-                      }}
+
+              {/* Right: Search & Fleet Actions */}
+              {activeSub === 'master' && (
+                <div className="flex flex-wrap items-center gap-2.5 self-end lg:self-center shrink-0">
+                  <div className="relative group hidden sm:block">
+                    <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={15} strokeWidth={2.5} />
+                    <input
+                      type="text"
+                      placeholder="Search fleet or driver..."
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                      className="pl-9 pr-4 py-2 bg-gray-50 border-none rounded-xl text-xs focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all w-48 outline-none font-bold"
+                    />
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      onClick={handleExportPDF}
+                      className="flex items-center gap-1.5 px-2.5 py-2 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-2xs text-xs font-bold"
+                      title="Export PDF Report"
                     >
-                      <option value="">All Branches</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </>
-                )}
-              </div>
+                      <FileText size={14} strokeWidth={2.5} />
+                      <span className="hidden md:inline">PDF</span>
+                    </button>
+                    <button
+                      onClick={handleExportExcel}
+                      className="flex items-center gap-1.5 px-2.5 py-2 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-2xs text-xs font-bold"
+                      title="Export Excel Report"
+                    >
+                      <Download size={14} strokeWidth={2.5} />
+                      <span className="hidden md:inline">Excel</span>
+                    </button>
+                    {can('VEHICLES', 'CREATE') && (
+                      <button
+                        onClick={() => setShowAddModal(true)}
+                        className="px-3.5 py-2 bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-wider hover:bg-emerald-700 transition-all shadow-md shadow-emerald-500/10 flex items-center gap-1.5 active:scale-95 shrink-0"
+                      >
+                        <Plus size={15} strokeWidth={2.5} />
+                        <span>Add</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
-            {activeSub === 'master' && (
-              <div className="flex items-center gap-3">
-                <div className="relative group hidden sm:block">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 focus-within:text-emerald-500 transition-colors" size={16} />
-                  <input
-                    type="text"
-                    placeholder="Search by number or driver..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 pr-4 py-2.5 bg-white border border-gray-100 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all w-64 shadow-sm font-medium"
-                  />
-                </div>
-                <div className="flex items-center gap-2">
+            {/* Bottom Row: Fully Horizontally Scrollable Professional Tabs Bar */}
+            <div className="pt-2 border-t border-gray-50">
+              <div className="w-full overflow-x-auto custom-scrollbar pb-1.5">
+                <div className="flex items-center gap-1.5 bg-gray-50/80 p-1.5 rounded-2xl w-fit min-w-max border border-gray-100/80 shadow-2xs">
                   <button
-                    onClick={handleExportPDF}
-                    className="p-3 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-sm active:scale-95"
-                    title="Export PDF"
+                    onClick={() => setSearchParams({ sub: 'master', storeId: storeFilterId || '' })}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeSub === 'master' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
                   >
-                    <FileText size={20} />
+                    <Truck size={15} strokeWidth={2.5} />
+                    <span>Master</span>
                   </button>
+
                   <button
-                    onClick={handleExportExcel}
-                    className="p-3 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-sm active:scale-95"
-                    title="Export Excel"
+                    onClick={() => setSearchParams({ sub: 'fuel', storeId: storeFilterId || '' })}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeSub === 'fuel' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
                   >
-                    <Download size={20} />
+                    <Fuel size={15} strokeWidth={2.5} />
+                    <span>Fuel Logs</span>
                   </button>
-                  {can('VEHICLES', 'CREATE') && (
-                    <button
-                      onClick={() => setShowAddModal(true)}
-                      className="px-6 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-500/20 flex items-center gap-2 active:scale-95"
-                    >
-                      <Plus size={18} />
-                      Add Vehicle
-                    </button>
-                  )}
+
+                  <button
+                    onClick={() => setSearchParams({ sub: 'maintenance', storeId: storeFilterId || '' })}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeSub === 'maintenance' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                  >
+                    <Settings size={15} strokeWidth={2.5} />
+                    <span>Maintenance</span>
+                  </button>
+
+                  <button
+                    onClick={() => setSearchParams({ sub: 'damages', storeId: storeFilterId || '' })}
+                    className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeSub === 'damages' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                  >
+                    <AlertCircle size={15} strokeWidth={2.5} />
+                    <span>Vehicle Damages</span>
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
           </div>
 
           {activeSub === 'master' ? (

@@ -3,7 +3,8 @@ import {
   FileDown, Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, ChevronLeft, 
   Loader2, ArrowLeft, User, Smartphone, Shield, Coins, Package, Info, MapPin, Printer, Clock, 
   CreditCard, Wallet, CalendarClock, Map, Building2, Tag, CheckCircle2, AlertCircle, RefreshCw, 
-  FileText, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Lock, Unlock, BarChart3 
+  FileText, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Lock, Unlock, BarChart3,
+  FileSpreadsheet, Upload
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
@@ -71,6 +72,10 @@ export default function AdminSales() {
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingOrder, setViewingOrder] = useState(null);
   const [showCreateSale, setShowCreateSale] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [autoCreateProducts, setAutoCreateProducts] = useState(true);
   const ITEMS_PER_PAGE = 10;
 
   // ── Order Edit / Return / Cancel States ──
@@ -574,6 +579,342 @@ export default function AdminSales() {
     }
   };
 
+  const handleDownloadSample = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        "Invoice Group ID": "INV-001",
+        "Customer Name": "Rajesh Kumar",
+        "Mobile Number": "9876543210",
+        "Payment Mode": "CASH",
+        "Sale Date": format(new Date(), 'yyyy-MM-dd'),
+        "Village Name": "Rampur",
+        "Product Name": "Basmati Rice 1kg",
+        "Quantity": 2,
+        "Unit Price": 110,
+        "Discount": 0,
+        "Remark": "Bulk purchase delivery"
+      },
+      {
+        "Invoice Group ID": "INV-001",
+        "Customer Name": "Rajesh Kumar",
+        "Mobile Number": "9876543210",
+        "Payment Mode": "CASH",
+        "Sale Date": format(new Date(), 'yyyy-MM-dd'),
+        "Village Name": "Rampur",
+        "Product Name": "Toor Dal 1kg",
+        "Quantity": 1,
+        "Unit Price": 150,
+        "Discount": 5,
+        "Remark": "Bulk purchase delivery"
+      },
+      {
+        "Invoice Group ID": "INV-002",
+        "Customer Name": "Suresh Walk-in",
+        "Mobile Number": "9123456789",
+        "Payment Mode": "UPI",
+        "Sale Date": format(new Date(), 'yyyy-MM-dd'),
+        "Village Name": "Sitapur",
+        "Product Name": "Mustard Oil 1L",
+        "Quantity": 3,
+        "Unit Price": 180,
+        "Discount": 10,
+        "Remark": "Paid via PhonePe"
+      }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "SalesBulkImport");
+    XLSX.writeFile(wb, "Sales_Bulk_Import_Template.xlsx");
+    toast.success('Sample template downloaded successfully');
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadProgress('Reading Excel file structure...');
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          toast.error('Uploaded Excel file contains no data rows');
+          setIsUploading(false);
+          setUploadProgress('');
+          e.target.value = '';
+          return;
+        }
+
+        setUploadProgress('Fetching product catalog for automated mapping...');
+        // Fetch all products to resolve product IDs accurately
+        const itemsRes = await adminAPI.getItems({ limit: 5000 });
+        let productsList = itemsRes.data?.data || itemsRes.data || [];
+
+        // Determine default store ID
+        const resolvedStoreId = storeFilterId || currentUser?.storeId || (stores.length > 0 ? stores[0].id : undefined);
+
+        // ── SELF-HEALING AUTO-CREATE PHASE ──
+        if (autoCreateProducts) {
+          const missingPayloads = [];
+          const seenNames = new Set(productsList.map(p => p.name.toLowerCase().trim()));
+          
+          data.forEach(row => {
+            const keys = Object.keys(row);
+            const findVal = (search) => {
+              const matchedKey = keys.find(k => k.toLowerCase().includes(search.toLowerCase()));
+              return matchedKey ? row[matchedKey] : undefined;
+            };
+            const productName = findVal('product name') || findVal('product') || findVal('item name') || findVal('item');
+            if (productName) {
+              const cleanName = productName.toString().trim();
+              const lowerName = cleanName.toLowerCase();
+              if (!seenNames.has(lowerName)) {
+                seenNames.add(lowerName);
+                const unitPrice = parseFloat(findVal('unit price') || findVal('price') || findVal('rate')) || 100;
+                const discount = parseFloat(findVal('discount')) || 0;
+                missingPayloads.push({
+                  name: cleanName,
+                  price: unitPrice,
+                  mrp: unitPrice,
+                  landingPrice: Math.round(unitPrice * 0.8),
+                  discount: discount,
+                  gst: 0,
+                  description: 'Auto-registered via Bulk Sales Spreadsheet',
+                  categoryName: 'General',
+                  subCategoryName: 'General Items',
+                  unitType: 'PCS',
+                  unitValue: 1
+                });
+              }
+            }
+          });
+
+          if (missingPayloads.length > 0) {
+            setUploadProgress(`Auto-registering ${missingPayloads.length} missing products into master inventory...`);
+            try {
+              await adminAPI.bulkCreateItems(missingPayloads);
+              // Refetch product catalog to obtain their newly assigned unique database IDs
+              const freshRes = await adminAPI.getItems({ limit: 5000 });
+              productsList = freshRes.data?.data || freshRes.data || [];
+            } catch (createErr) {
+              console.error('Auto-create products failed:', createErr);
+              toast.error('Failed to auto-create missing products. Continuing with available items.');
+            }
+          }
+        }
+
+        // Group rows into separate orders intelligently
+        const ordersGroups = [];
+        let currentGroup = null;
+
+        data.forEach((row, index) => {
+          const keys = Object.keys(row);
+          const findVal = (search) => {
+            const matchedKey = keys.find(k => k.toLowerCase().includes(search.toLowerCase()));
+            return matchedKey ? row[matchedKey] : undefined;
+          };
+
+          const invoiceGroupId = findVal('invoice group id') || findVal('invoice id') || findVal('group id');
+          const customerName = findVal('customer name') || findVal('customer') || 'Walk-in Customer';
+          const mobile = findVal('mobile number') || findVal('mobile') || findVal('phone') || '';
+          const pModeRaw = findVal('payment mode') || findVal('payment') || 'CASH';
+          let paymentMode = 'CASH';
+          if (pModeRaw.toString().toUpperCase().includes('UPI')) paymentMode = 'UPI';
+          if (pModeRaw.toString().toUpperCase().includes('SPLIT') || pModeRaw.toString().toUpperCase().includes('CASH_UPI')) paymentMode = 'CASH_UPI';
+
+          const saleDateStr = findVal('sale date') || findVal('date');
+          let saleDate = undefined;
+          if (saleDateStr) {
+            // Check if Excel serial date or string
+            if (typeof saleDateStr === 'number') {
+              const dateObj = new Date((saleDateStr - (25567 + 2)) * 86400 * 1000);
+              saleDate = format(dateObj, 'yyyy-MM-dd');
+            } else {
+              saleDate = new Date(saleDateStr).toISOString().split('T')[0];
+            }
+          }
+
+          const villageName = findVal('village name') || findVal('village') || findVal('location') || '';
+          const remark = findVal('remark') || findVal('notes') || '';
+
+          // Item fields
+          const productName = findVal('product name') || findVal('product') || findVal('item name') || findVal('item');
+          const qty = parseInt(findVal('quantity') || findVal('qty')) || 1;
+          const unitPrice = parseFloat(findVal('unit price') || findVal('price') || findVal('rate'));
+          const discount = parseFloat(findVal('discount')) || 0;
+
+          if (!productName) return; // Skip rows without products
+
+          // Resolve product object
+          const matchedProduct = productsList.find(p => p.name.toLowerCase().trim() === productName.toString().toLowerCase().trim() || (p.sku && p.sku.toLowerCase().trim() === productName.toString().toLowerCase().trim()));
+
+          const itemObj = {
+            productNameRaw: productName,
+            productId: matchedProduct ? matchedProduct.id : null,
+            quantity: qty,
+            price: !isNaN(unitPrice) ? unitPrice : (matchedProduct ? matchedProduct.price : 0),
+            discount: discount,
+            gst: matchedProduct ? (matchedProduct.taxPercent || matchedProduct.gst || 0) : 0
+          };
+
+          // Decide whether to merge into current group or start new group
+          let shouldMerge = false;
+          if (currentGroup) {
+            if (invoiceGroupId && currentGroup.invoiceGroupId === invoiceGroupId) {
+              shouldMerge = true;
+            } else if (!invoiceGroupId && !currentGroup.invoiceGroupId) {
+              // Merge if consecutive rows share identical customer credentials and dates
+              if (currentGroup.mobile === mobile && currentGroup.customerName === customerName) {
+                shouldMerge = true;
+              }
+            }
+          }
+
+          if (shouldMerge && currentGroup) {
+            currentGroup.items.push(itemObj);
+          } else {
+            // Push active group and create new
+            if (currentGroup) ordersGroups.push(currentGroup);
+            currentGroup = {
+              invoiceGroupId,
+              customerName,
+              mobile: mobile ? mobile.toString() : '',
+              paymentMode,
+              saleDate,
+              villageName,
+              remark,
+              storeId: resolvedStoreId,
+              items: [itemObj]
+            };
+          }
+
+          // Push the final group on last iteration
+          if (index === data.length - 1 && currentGroup) {
+            ordersGroups.push(currentGroup);
+          }
+        });
+
+        if (ordersGroups.length === 0) {
+          toast.error('No valid products or items mapped from the Excel sheet');
+          setIsUploading(false);
+          setUploadProgress('');
+          e.target.value = '';
+          return;
+        }
+
+        // Process orders concurrently in optimized batches for ultra-fast throughput
+        let successCount = 0;
+        let missingProducts = [];
+        const CONCURRENT_BATCH_SIZE = 15;
+
+        for (let i = 0; i < ordersGroups.length; i += CONCURRENT_BATCH_SIZE) {
+          const batchGroups = ordersGroups.slice(i, i + CONCURRENT_BATCH_SIZE);
+          setUploadProgress(`Optimized Batch Ingestion: Processing records ${i + 1} to ${Math.min(i + CONCURRENT_BATCH_SIZE, ordersGroups.length)} of ${ordersGroups.length}...`);
+
+          const batchPromises = batchGroups.map(async (grp, localIdx) => {
+            const absoluteIdx = i + localIdx;
+            const validItems = grp.items.filter(item => {
+              if (!item.productId) {
+                missingProducts.push(item.productNameRaw);
+                return false;
+              }
+              return true;
+            });
+
+            if (validItems.length === 0) {
+              console.warn(`Skipping order group for ${grp.customerName} because no products were successfully matched.`);
+              return { success: false, skipped: true };
+            }
+
+            const orderTotalAmt = validItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const payload = {
+              storeId: grp.storeId || undefined,
+              customerName: grp.customerName !== 'Walk-in Customer' ? grp.customerName : undefined,
+              mobile: grp.mobile || undefined,
+              paymentMode: grp.paymentMode,
+              saleDate: grp.saleDate || undefined,
+              villageName: grp.villageName || undefined,
+              remark: grp.remark || undefined,
+              cashAmount: grp.paymentMode === 'CASH' ? orderTotalAmt : (grp.paymentMode === 'CASH_UPI' ? orderTotalAmt / 2 : 0),
+              upiAmount: grp.paymentMode === 'UPI' ? orderTotalAmt : (grp.paymentMode === 'CASH_UPI' ? orderTotalAmt / 2 : 0),
+              items: validItems.map(vi => ({
+                productId: vi.productId,
+                quantity: vi.quantity,
+                price: vi.price,
+                discount: vi.discount,
+                gst: vi.gst
+              }))
+            };
+            let attempt = 0;
+            let success = false;
+            let serverMsg = '';
+
+            while (attempt < 4 && !success) {
+              try {
+                await adminAPI.createManualSale(payload);
+                success = true;
+                return { success: true, absoluteIdx };
+              } catch (err) {
+                serverMsg = err.response?.data?.message || err.response?.data?.detail || err.message;
+                if (serverMsg && serverMsg.toLowerCase().includes('deadlock')) {
+                  attempt++;
+                  if (attempt < 4) {
+                    await new Promise(r => setTimeout(r, 40 * attempt + Math.random() * 60));
+                  }
+                } else {
+                  console.error(`Row upload failed for order ${absoluteIdx + 1}:`, err.response?.data || err);
+                  return { success: false, absoluteIdx, serverMsg };
+                }
+              }
+            }
+            return { success: false, absoluteIdx, serverMsg };
+          });
+
+          const results = await Promise.all(batchPromises);
+          results.forEach(res => {
+            if (res.success) {
+              successCount++;
+            } else if (!res.skipped) {
+              toast.error(`Order ${res.absoluteIdx + 1} failed: ${res.serverMsg}`);
+            }
+          });
+        }
+
+        setIsUploading(false);
+        setUploadProgress('');
+        setShowBulkUploadModal(false);
+        e.target.value = ''; // Reset input
+
+        if (successCount > 0) {
+          toast.success(`Successfully recorded ${successCount} sales orders in bulk!`);
+          fetchSales();
+        } else {
+          toast.error('Bulk upload completed but zero rows could be fully finalized.');
+        }
+
+        if (missingProducts.length > 0) {
+          const uniqueMissing = [...new Set(missingProducts)];
+          toast.error(`Unrecognized products skipped: ${uniqueMissing.slice(0, 3).join(', ')}${uniqueMissing.length > 3 ? '...' : ''}`, { duration: 6000 });
+        }
+
+      } catch (err) {
+        console.error('Excel Parsing Error:', err);
+        toast.error('Encountered an exception parsing Excel binary layout');
+        setIsUploading(false);
+        setUploadProgress('');
+        e.target.value = '';
+      }
+    };
+
+    reader.readAsBinaryString(file);
+  };
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
@@ -758,6 +1099,14 @@ export default function AdminSales() {
             >
               <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
               Create Sale
+            </button>
+            <button
+              onClick={() => setShowBulkUploadModal(true)}
+              className="bg-amber-50 text-amber-700 border border-amber-100 px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-amber-100 transition-all flex items-center gap-2 group"
+              title="Bulk Import Sales via Excel"
+            >
+              <FileSpreadsheet size={18} className="group-hover:-translate-y-0.5 transition-transform" />
+              Bulk Import
             </button>
             <button
               onClick={exportHistoryToExcel}
@@ -1982,6 +2331,114 @@ export default function AdminSales() {
                 <div className="w-40 h-[1px] bg-slate-900 mb-2 mx-auto"></div>
                 <p className="text-[9px] font-black text-slate-900 uppercase">Authorized Signatory</p>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Upload Modal ─────────────────────────────────────── */}
+      {showBulkUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl max-w-xl w-full p-8 space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-emerald-500 to-teal-500" />
+            
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet size={24} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Bulk Sales Import</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Excel Spreadsheet Parser</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !isUploading && setShowBulkUploadModal(false)}
+                disabled={isUploading}
+                className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all disabled:opacity-50"
+              >
+                <Minus size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50/50 border border-amber-100/60 rounded-2xl p-4 text-xs text-amber-800 space-y-2">
+                <p className="font-bold">💡 How to Import Multi-Item Sales:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 font-medium">
+                  <li>Download the sample template to view strict column layout.</li>
+                  <li>Assign an identical <span className="font-bold text-slate-900">Invoice Group ID</span> to group multi-product rows into a unified sales receipt.</li>
+                  <li>Product names must align directly with Master Inventory.</li>
+                </ul>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 pt-2">
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Step 1: Get Layout Template</span>
+                <button
+                  type="button"
+                  onClick={handleDownloadSample}
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-100 transition-all shadow-sm flex items-center gap-1.5"
+                >
+                  <Download size={14} className="text-emerald-600" /> Download Template
+                </button>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 space-y-2">
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Step 2: Upload Populated Sheet</span>
+                <label className="relative flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/20 rounded-2xl cursor-pointer transition-all group overflow-hidden">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                    <Upload size={28} className="text-slate-400 group-hover:text-emerald-600 group-hover:-translate-y-1 transition-all mb-2" />
+                    <p className="text-xs font-bold text-slate-700">Click to upload spreadsheet file</p>
+                    <p className="text-[10px] font-medium text-slate-400 mt-1">Supports standard .xlsx or .xls files</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={handleExcelUpload}
+                    disabled={isUploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                </label>
+
+                <div className="flex items-center gap-2 pt-2 px-1">
+                  <input
+                    type="checkbox"
+                    id="autoCreate"
+                    checked={autoCreateProducts}
+                    onChange={(e) => setAutoCreateProducts(e.target.checked)}
+                    disabled={isUploading}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                  />
+                  <label htmlFor="autoCreate" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                    Auto-register unrecognized spreadsheet items into Master Inventory
+                  </label>
+                </div>
+              </div>
+
+              {isUploading && (
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center space-y-3 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 size={16} className="animate-spin text-emerald-600" />
+                    <span className="text-xs font-black uppercase tracking-widest text-emerald-700">Processing Upload</span>
+                  </div>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden relative">
+                    <div className="absolute inset-y-0 left-0 bg-emerald-500 rounded-full animate-[pulse_1.5s_infinite] w-3/4" />
+                  </div>
+                  {uploadProgress && (
+                    <p className="text-[11px] font-bold text-slate-500 tracking-tight">{uploadProgress}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-50">
+              <button
+                type="button"
+                onClick={() => setShowBulkUploadModal(false)}
+                disabled={isUploading}
+                className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-200 transition-all disabled:opacity-50"
+              >
+                Close Drawer
+              </button>
             </div>
           </div>
         </div>

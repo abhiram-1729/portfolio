@@ -142,37 +142,8 @@ export default function AdminLayout() {
       icon: Users,
       subItems: [
         { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
-      ]
-    },
-    {
-      label: 'Routes',
-      icon: Navigation,
-      module: 'ROUTES',
-      subItems: [
-        { to: '/admin/routes?tab=villages', icon: MapPin, label: 'Village', section: 'VILLAGES' },
-        { to: '/admin/routes?tab=routes', icon: Navigation, label: 'Routes', section: 'ROUTES' },
-        { to: '/admin/routes?tab=assignments', icon: ClipboardList, label: 'Assignments', section: 'ASSIGNMENTS' },
-        // { to: '/admin/vehicles?sub=route_mapping', icon: Link2, label: 'Assignment Cards' },
-        { to: '/admin/vehicles?sub=sales', icon: ShoppingBag, label: 'Sales' },
-        { to: '/admin/vehicles?sub=collection', icon: Coins, label: 'Collections' },
-      ]
-    },
-    {
-      label: 'Vehicles',
-      icon: Truck,
-      module: 'VEHICLES',
-      subItems: [
-        { to: '/admin/vehicles?sub=master', icon: Truck, label: 'Master' },
-        { to: '/admin/vehicles?sub=inventory', icon: Grid, label: 'Inventory' },
-        { to: '/admin/vehicles?sub=loading', icon: ArrowUpCircle, label: 'Stock Loading' },
-        { to: '/admin/vehicles?sub=return', icon: ArrowDownCircle, label: 'Stock Return' },
-        { to: '/admin/vehicles?sub=refill', icon: Package, label: 'Refill Requests' },
-        // { to: '/admin/vehicles?sub=closing', icon: Clock, label: 'Shift Closing' },
-        { to: '/admin/vehicles?sub=fuel', icon: CreditCard, label: 'Fuel Logs' },
-        { to: '/admin/vehicles?sub=maintenance', icon: Settings, label: 'Maintenance' },
-        // { to: '/admin/vehicles?sub=driver_mapping', icon: Users, label: 'Driver Mapping' },
-        // { to: '/admin/vehicles?sub=opening_stock', icon: ClipboardList, label: 'Opening Stock' },
-        { to: '/admin/vehicles?sub=damages', icon: AlertTriangle, label: 'Vehicle Damages' },
+        { to: '/admin/routes', icon: Navigation, label: 'Routes', module: 'ROUTES' },
+        { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
       ]
     },
     { to: '/admin/stores', icon: Store, label: 'Stores' },

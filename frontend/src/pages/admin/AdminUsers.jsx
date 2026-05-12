@@ -663,7 +663,7 @@ export default function AdminUsers({ type }) {
 
   const renderClassifiedUsers = () => {
     // Show store selection grid if no store is selected
-    if (!storeFilterId) {
+    if (!storeFilterId && stores.length > 1) {
       const personnelByStore = users.reduce((acc, u) => {
         if (u.storeId && u.id !== currentUser?.id) {
           acc[u.storeId] = (acc[u.storeId] || 0) + 1;
@@ -1610,7 +1610,7 @@ export default function AdminUsers({ type }) {
           </div>
           <div className="flex items-center gap-2 mt-2">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{filteredUsers.length} members found</p>
-            {true && (
+            {stores.length > 1 && (
               <>
                 <span className="text-gray-300">•</span>
                 <select
