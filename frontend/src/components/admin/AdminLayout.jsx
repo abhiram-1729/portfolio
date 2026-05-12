@@ -146,7 +146,7 @@ export default function AdminLayout() {
         { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
       ]
     },
-    { to: '/admin/stores', icon: Store, label: 'Stores' },
+    // { to: '/admin/stores', icon: Store, label: 'Stores' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
@@ -162,9 +162,9 @@ export default function AdminLayout() {
         { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle, section: 'RETURN' },
         { to: '/admin/inventory?tab=return&sub=refills', label: 'Refills', icon: Package, section: 'REFILLS' },
         { to: '/admin/damage', label: 'Damage', icon: AlertTriangle, section: 'DAMAGE' },
-        { to: '/admin/inventory?tab=return&sub=trips', label: 'Trips/Shifts', icon: HistoryIcon, section: 'TRIPS' },
-        { to: '/admin/inventory?tab=return&sub=fuel', icon: CreditCard, label: 'Fuel Logs', section: 'FUEL' },
-        { to: '/admin/inventory?tab=return&sub=maintenance', icon: Settings, label: 'Maintenance', section: 'MAINTENANCE' },
+        // { to: '/admin/inventory?tab=return&sub=trips', label: 'Trips/Shifts', icon: HistoryIcon, section: 'TRIPS' },
+        // { to: '/admin/inventory?tab=return&sub=fuel', icon: CreditCard, label: 'Fuel Logs', section: 'FUEL' },
+        // { to: '/admin/inventory?tab=return&sub=maintenance', icon: Settings, label: 'Maintenance', section: 'MAINTENANCE' },
         { to: '/admin/inventory?tab=return&sub=audits', label: 'Audit History', icon: CheckSquare, section: 'AUDITS' },
       ]
     },
