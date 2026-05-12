@@ -398,6 +398,11 @@ model Order {
   returns      OrderReturn[]
   payment      Payment?
 
+  // Delivery Fields
+  deliveryCharge   Float             @default(0)
+  deliverySlot     String?
+  deliveryDate     DateTime?
+
   @@index([tenantId])
   @@index([userId])
   @@index([agentId])
@@ -661,6 +666,12 @@ model BusinessSettings {
   taxRates     String   @default("0,5,12,18")
   shifts       Json? // Array of { id, name, startTime, endTime, isActive }
   shiftMode    String   @default("STANDARD")
+  
+  // Delivery Logistics
+  deliverySlabs          Json? // Array of { minOrderValue, fee }
+  deliverySlots          Json? // Array of { id, name, startTime, endTime, capacity }
+  deliveryRadiusEnforced Boolean @default(true)
+
   updatedAt    DateTime @updatedAt
   tenantId     String   @default("VK001")
   storeId      String?  @unique

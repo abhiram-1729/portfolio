@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ordersAPI } from '../services/api';
-import { ArrowLeft, Printer, Package, Smartphone, IndianRupee, Calendar, ShieldCheck, User, MapPin, Hash, CheckCircle2, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Printer, Package, Smartphone, IndianRupee, Calendar, ShieldCheck, User, MapPin, Hash, CheckCircle2, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Loader2, Truck } from 'lucide-react';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 
@@ -175,6 +175,21 @@ export default function OrderDetail() {
             <p className="font-black text-emerald-950 text-sm leading-tight truncate">{order.villageName || 'Unspecified'}</p>
             <p className="text-[10px] font-bold text-emerald-500/60 uppercase tracking-widest mt-1">{order.coverageType || 'TOWN'}</p>
           </div>
+          {(order.deliverySlot || order.deliveryDate) && (
+            <div className="col-span-2 glass rounded-[1.5rem] p-5 bg-blue-50 border border-blue-100 shadow-sm flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center text-blue-600 shadow-sm"><Truck size={18} /></div>
+                <div>
+                   <p className="text-[10px] font-black text-blue-900/40 uppercase tracking-widest">Scheduled Fulfillment</p>
+                   <p className="text-sm font-black text-blue-950">{order.deliverySlot || 'Standard Slot'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                 <p className="text-[10px] font-black text-blue-900/40 uppercase tracking-widest">Delivery Date</p>
+                 <p className="text-sm font-black text-blue-950">{order.deliveryDate ? format(new Date(order.deliveryDate), 'dd MMM yyyy') : 'TBD'}</p>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Items List with Actions */}
@@ -232,10 +247,21 @@ export default function OrderDetail() {
           {/* Bill */}
           <div className="p-6 bg-slate-50/50 space-y-3">
             <div className="flex justify-between text-xs font-bold text-slate-500"><span>Subtotal (MRP)</span><span className="line-through">₹{totalMRP.toFixed(2)}</span></div>
+            <div className="flex justify-between text-xs font-black text-emerald-800/40 uppercase tracking-widest px-1">
+              <span>Items Total</span>
+              <span className="text-emerald-900/60">₹{(order.totalAmount - (order.deliveryCharge || 0)).toFixed(2)}</span>
+            </div>
+            
+            <div className="flex justify-between text-xs font-black uppercase tracking-widest px-1">
+              <span className={(order.deliveryCharge || 0) === 0 ? 'text-emerald-600' : 'text-blue-600'}>Delivery Charge</span>
+              <span className={(order.deliveryCharge || 0) === 0 ? 'text-emerald-600' : 'text-blue-600'}>
+                {(order.deliveryCharge || 0) === 0 ? 'FREE' : `₹${order.deliveryCharge.toFixed(2)}`}
+              </span>
+            </div>
             {totalSavings > 0 && <div className="flex justify-between text-xs font-black text-orange-600 uppercase tracking-widest"><span>Savings</span><span>- ₹{totalSavings.toFixed(2)}</span></div>}
             {totalReturned > 0 && <div className="flex justify-between text-xs font-black text-red-500 uppercase tracking-widest"><span>Returns</span><span>- ₹{totalReturned.toFixed(2)}</span></div>}
             <div className="flex justify-between items-center pt-3 border-t border-emerald-100">
-              <span className="text-sm font-black text-emerald-950 uppercase tracking-widest">Total</span>
+              <span className="text-sm font-black text-emerald-950 uppercase tracking-widest">Total Bill</span>
               <span className="text-xl font-black text-emerald-600 tracking-tighter">₹{order.totalAmount.toFixed(2)}</span>
             </div>
           </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useCartStore } from '../store/cartStore';
 import { useUserStore } from '../store/userStore';
 import { ordersAPI } from '../services/api';
@@ -22,6 +22,8 @@ export default function PaymentScreen() {
   const { items, customerMobile, customerName, clearCart, totalAmount } = useCartStore();
   const { user } = useUserStore();
   const navigate = useNavigate();
+  const location = useLocation();
+  const { deliverySlot, deliveryDate } = location.state || {};
 
   const changeDue = (parseFloat(cashReceived) || 0) - totalAmount;
 
@@ -68,11 +70,39 @@ export default function PaymentScreen() {
 
     setLoading(true);
     try {
+      // Get current location for radius check
+      let lat, lon;
+      const isAgent = user?.role === 'SALES_AGENT';
+
+      try {
+        const pos = await new Promise((resolve, reject) => {
+          navigator.geolocation.getCurrentPosition(resolve, reject, { 
+            timeout: 8000, 
+            enableHighAccuracy: true 
+          });
+        });
+        lat = pos.coords.latitude;
+        lon = pos.coords.longitude;
+      } catch (err) {
+        console.warn('Geolocation failed', err);
+        if (isAgent) {
+           setLoading(false);
+           return toast.error('Location Access Required: Please enable GPS and allow location access to verify delivery radius.', {
+             duration: 5000,
+             icon: '📍'
+           });
+        }
+      }
+
       // Step 1: Create order from cart
       const { data: order } = await ordersAPI.createFromCart({
         mobile: customerMobile || undefined,
         customerName: customerName || undefined,
         items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+        deliverySlot,
+        deliveryDate,
+        lat,
+        lon
       });
 
       // Step 2: Complete payment

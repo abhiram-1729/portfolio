@@ -1,14 +1,37 @@
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useCartStore } from '../store/cartStore';
-import { ArrowLeft, ArrowRight, Package, Smartphone } from 'lucide-react';
+import { useCartStore, checkIsFree } from '../store/cartStore';
+import { ArrowLeft, ArrowRight, Package, Smartphone, Truck, Calendar, Clock } from 'lucide-react';
+import adminAPI from '../services/adminService';
+import toast from 'react-hot-toast';
 
 export default function InvoicePreview() {
-  const { items, customerMobile, customerName, totalAmount } = useCartStore();
+  const { items, customerMobile, customerName, totalAmount, deliveryCharge } = useCartStore();
+  const [slots, setSlots] = useState([]);
+  const [selectedSlot, setSelectedSlot] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const { data } = await adminAPI.getSettings();
+        if (data?.success) {
+          setSlots(data.data.deliverySlots || []);
+          if (data.data.deliverySlots?.length > 0) {
+            setSelectedSlot(data.data.deliverySlots[0].name);
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load delivery slots');
+      }
+    };
+    fetchSettings();
+  }, []);
 
   // Calculate subtotal for free item threshold comparison
   const subtotalRaw = items.reduce((sum, i) => {
-    const isFree = i.isFree === true || i.isFree === 'true';
+    const isFree = checkIsFree(i.isFree);
     return !isFree ? sum + Number(i.price || 0) * i.quantity : sum;
   }, 0);
   const subtotal = Math.round(subtotalRaw * 100) / 100;
@@ -66,6 +89,47 @@ export default function InvoicePreview() {
           </div>
         </div>
 
+        {/* Delivery Logistics */}
+        <div className="glass rounded-[1.5rem] p-6 shadow-sm border border-blue-50 bg-white/70 space-y-5">
+          <div className="flex items-center gap-2 px-1">
+             <Truck size={16} className="text-blue-600" />
+             <p className="text-[10px] font-black text-blue-900/60 uppercase tracking-widest">Fulfillment Logistics</p>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Delivery Date</label>
+              <div className="relative">
+                <input 
+                  type="date" 
+                  value={selectedDate}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e => setSelectedDate(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black text-emerald-950 focus:bg-white transition-all outline-none" 
+                />
+                <Calendar size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-300 pointer-events-none" />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Preferred Slot</label>
+              <div className="relative">
+                <select 
+                  value={selectedSlot}
+                  onChange={e => setSelectedSlot(e.target.value)}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-xl px-4 py-3 text-xs font-black text-emerald-950 focus:bg-white appearance-none outline-none transition-all"
+                >
+                  {slots.length > 0 ? (
+                    slots.map(s => <option key={s.id} value={s.name}>{s.name} ({s.startTime}-{s.endTime})</option>)
+                  ) : (
+                    <option value="">No Slots Available</option>
+                  )}
+                </select>
+                <Clock size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-emerald-300 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+        </div>
+
         {/* Items List */}
         <div className="glass rounded-[2rem] overflow-hidden shadow-sm border border-emerald-50 bg-white/70">
           <div className="px-6 py-4 border-b border-emerald-100/50 flex text-[10px] uppercase tracking-widest text-emerald-800/40 font-black bg-emerald-50/30">
@@ -112,7 +176,14 @@ export default function InvoicePreview() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/20 blur-3xl rounded-full translate-x-12 -translate-y-12" />
           <div className="flex justify-between items-center text-xs font-black text-emerald-800/40 uppercase tracking-widest px-1">
             <span>Bill Subtotal</span>
-            <span className="text-emerald-900/60">₹{totalMRP.toFixed(2)}</span>
+            <span className="text-emerald-900/60">₹{(totalAmount - deliveryCharge).toFixed(2)}</span>
+          </div>
+          
+          <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest px-1">
+            <span className={deliveryCharge === 0 ? 'text-emerald-600' : 'text-blue-600'}>Delivery Charge</span>
+            <span className={deliveryCharge === 0 ? 'text-emerald-600' : 'text-blue-600'}>
+              {deliveryCharge === 0 ? 'FREE' : `₹${deliveryCharge.toFixed(2)}`}
+            </span>
           </div>
           {totalSavings > 0 && (
             <div className="flex justify-between items-center text-xs font-black text-orange-600 uppercase tracking-widest px-1">
@@ -137,7 +208,7 @@ export default function InvoicePreview() {
         </button>
         <button
           id="proceed-to-payment"
-          onClick={() => navigate('/payment')}
+          onClick={() => navigate('/payment', { state: { deliverySlot: selectedSlot, deliveryDate: selectedDate } })}
           className="bg-emerald-600 text-white flex-1 h-16 text-lg font-black rounded-[1.5rem] shadow-2xl shadow-emerald-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-3 hover:bg-emerald-700 relative overflow-hidden group"
         >
           <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />

@@ -13,7 +13,7 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private
 export const createOrderFromCart = async (req, res, next) => {
     try {
-        const { mobile, customerName, items } = req.body;
+        const { mobile, customerName, items, deliverySlot, deliveryDate, lat, lon } = req.body;
         const agentId = req.user.id;
 
         let cartItems = [];
@@ -49,12 +49,13 @@ export const createOrderFromCart = async (req, res, next) => {
         }, {});
 
         let totalAmount = 0;
+        let subtotal = 0;
         const orderItemsData = [];
 
         // Pre-calculate subtotal for non-free items to determine 'Free' eligibility
         const paidSubtotal = cartItems.reduce((sum, item) => {
             const product = productMap[item.productId];
-            const isFree = product.isFree === true || product.isFree === 'true';
+            const isFree = product?.isFree === true || product?.isFree === 'true';
             if (product && !isFree) {
                 return sum + Number(product.price || 0) * item.quantity;
             }
@@ -63,13 +64,9 @@ export const createOrderFromCart = async (req, res, next) => {
 
         // Ensure subtotal is rounded to 2 decimal places to avoid floating point errors in comparison
         const subtotalForComparison = Math.round(paidSubtotal * 100) / 100;
-        console.log(`[OrderCreate] Paid Subtotal: ₹${subtotalForComparison} | Total Items: ${cartItems.length}`);
 
-        console.log(`[OrderCreate] Starting Processing. Total Items: ${cartItems.length}`);
         for (const item of cartItems) {
             const product = productMap[item.productId];
-            console.log(`[OrderCreate] Processing: ${product?.name} | Qty: ${item.quantity} | isFree: ${product?.isFree} | Min: ${product?.minShopAmount}`);
-
             if (!product) {
                 res.status(400);
                 throw new Error(`Product ${item.productId} not found`);
@@ -82,19 +79,14 @@ export const createOrderFromCart = async (req, res, next) => {
 
             if (isFreeProduct) {
                 const threshold = Number(product.minShopAmount || 0);
-                console.log(`[OrderCreate] Evaluating Gift: ${product.name} | Threshold: ₹${threshold} | Cart Subtotal: ₹${subtotalForComparison}`);
-
                 if (subtotalForComparison >= threshold) {
-                    console.log(`[OrderCreate] Success: Threshold met for GIFT: ${product.name}`);
                     finalPrice = 0;
                     isItemFree = true;
-                } else {
-                    console.warn(`[OrderCreate] Threshold NOT met for GIFT: ${product.name}. Charging regular price.`);
-                    // Fall back to regular price instead of skipping
                 }
             }
 
             const itemTotal = finalPrice * item.quantity;
+            subtotal += itemTotal;
             totalAmount += itemTotal;
 
             orderItemsData.push({
@@ -160,6 +152,64 @@ export const createOrderFromCart = async (req, res, next) => {
             }
         }
 
+        // 2.8 Delivery Logistics
+        let deliveryCharge = 0;
+        const settings = await prisma.businessSettings.findUnique({
+            where: { tenantId_storeId: { tenantId: req.user.tenantId, storeId: req.user.storeId || null } }
+        });
+
+        if (settings) {
+            // A. Calculate Delivery Charge from Slabs
+            if (settings.deliverySlabs && Array.isArray(settings.deliverySlabs)) {
+                const slabs = [...settings.deliverySlabs].sort((a, b) => b.minOrderValue - a.minOrderValue);
+                const matchedSlab = slabs.find(slab => subtotal >= slab.minOrderValue);
+                if (matchedSlab) {
+                    deliveryCharge = Number(matchedSlab.fee || 0);
+                }
+            }
+
+            // B. Radius Enforcement
+            const isAgent = req.user.role === 'SALES_AGENT';
+            if (settings.deliveryRadiusEnforced && isAgent) {
+                const uLat = Number(lat);
+                const uLon = Number(lon);
+
+                if (!uLat || !uLon) {
+                    res.status(400);
+                    throw new Error("Delivery location coordinates are required to verify geofencing compliance.");
+                }
+                
+                if (!routeTag?.villageName) {
+                    res.status(400);
+                    throw new Error("Unable to verify geofencing: No active village assignment found for this shift.");
+                }
+
+                const village = await prisma.village.findFirst({
+                    where: { name: routeTag.villageName, tenantId: req.user.tenantId }
+                });
+
+                if (village && village.latitude && village.longitude) {
+                    const R = 6371e3; // metres
+                    const φ1 = uLat * Math.PI / 180;
+                    const φ2 = village.latitude * Math.PI / 180;
+                    const Δφ = (village.latitude - uLat) * Math.PI / 180;
+                    const Δλ = (village.longitude - uLon) * Math.PI / 180;
+                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                              Math.cos(φ1) * Math.cos(φ2) *
+                              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    const distance = R * c;
+
+                    if (distance > (village.radius || 500)) {
+                        res.status(400);
+                        throw new Error(`Delivery location is outside the authorized radius for ${village.name} (${Math.round(distance)}m > ${village.radius}m)`);
+                    }
+                }
+            }
+        }
+
+        totalAmount += deliveryCharge;
+
         // 3. Create Order + OrderItems in a transaction
         const order = await prisma.$transaction(async (tx) => {
             const orderDisplayId = await generateId({
@@ -183,6 +233,9 @@ export const createOrderFromCart = async (req, res, next) => {
                     route: routeTag.routeId ? { connect: { id: routeTag.routeId } } : undefined,
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
+                    deliveryCharge: deliveryCharge,
+                    deliverySlot: deliverySlot || null,
+                    deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
                     items: {
                         create: orderItemsData.map(item => ({
                             ...item,
@@ -205,8 +258,6 @@ export const createOrderFromCart = async (req, res, next) => {
         res.status(201).json(order);
     } catch (error) {
         console.error('[Order Create Error]:', error);
-        if (error.code) console.error('[Prisma Error Code]:', error.code);
-        if (error.meta) console.error('[Prisma Error Meta]:', error.meta);
         next(error);
     }
 };

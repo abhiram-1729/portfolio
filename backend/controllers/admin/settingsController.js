@@ -42,7 +42,11 @@ export const getSettings = async (req, res) => {
 // Update business settings
 export const updateSettings = async (req, res) => {
   try {
-    const { businessName, gstNo, contactNo, email, address, taxRates, shifts, storeId: bodyStoreId } = req.body;
+    const { 
+      businessName, gstNo, contactNo, email, address, taxRates, shifts, 
+      deliverySlabs, deliverySlots, deliveryRadiusEnforced,
+      storeId: bodyStoreId 
+    } = req.body;
     const tenantId = req.user.tenantId;
     const storeId = bodyStoreId || req.user.storeId || null;
 
@@ -56,7 +60,10 @@ export const updateSettings = async (req, res) => {
         address,
         taxRates,
         shifts: shifts || [],
-        shiftMode: req.body.shiftMode || 'STANDARD'
+        shiftMode: req.body.shiftMode || 'STANDARD',
+        deliverySlabs: deliverySlabs || [],
+        deliverySlots: deliverySlots || [],
+        deliveryRadiusEnforced: deliveryRadiusEnforced !== undefined ? deliveryRadiusEnforced : true
       },
       create: {
         businessName,
@@ -67,6 +74,9 @@ export const updateSettings = async (req, res) => {
         taxRates,
         shifts: shifts || [],
         shiftMode: req.body.shiftMode || 'STANDARD',
+        deliverySlabs: deliverySlabs || [],
+        deliverySlots: deliverySlots || [],
+        deliveryRadiusEnforced: deliveryRadiusEnforced !== undefined ? deliveryRadiusEnforced : true,
         tenantId,
         storeId: storeId || null
       }
