@@ -23,12 +23,16 @@ export const adminAPI = {
 
   // Vehicles
   getVehicles: (params) => api.get('/admin/vehicles', { params }),
-  createVehicle: (data) => api.post('/admin/vehicles', data),
+  createVehicle: (data) => api.post('/admin/vehicles', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   updateVehicle: (id, data) => api.put(`/admin/vehicles/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   deleteVehicle: (id) => api.delete(`/admin/vehicles/${id}`),
   assignDriver: (id, userId) => api.put(`/admin/vehicles/${id}/assign`, { userId }),
+  executeVehicleHandover: (id, payload) => api.post(`/admin/vehicles/${id}/handover`, payload),
+  getVehicleStock: (id) => api.get(`/admin/vehicles/${id}/stock`),
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
   
   // Vehicle Operations
@@ -198,6 +202,15 @@ export const adminAPI = {
   uploadProductImage: (data) => api.post('/admin/upload-image', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+
+  // Customers Module
+  getCustomers: (params) => api.get('/customers', { params }),
+  registerCustomer: (data) => api.post('/customers', data),
+  loginCustomer: (data) => api.post('/customers/login', data),
+  getCustomerHistory: (id) => api.get(`/customers/${id}/history`),
+  updateCustomerProfile: (id, data) => api.put(`/customers/${id}`, data),
+  adjustCreditBalance: (id, data) => api.post(`/customers/${id}/credit`, data),
+  adjustLoyaltyPoints: (id, data) => api.post(`/customers/${id}/points`, data),
 };
 
 export default adminAPI;

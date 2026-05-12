@@ -13,8 +13,25 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private
 export const createOrderFromCart = async (req, res, next) => {
     try {
-        const { mobile, customerName, items } = req.body;
+        const { mobile, customerName, items, customerId } = req.body;
         const agentId = req.user.id;
+
+        let resolvedCustomerId = customerId || null;
+        if (!resolvedCustomerId && mobile) {
+            let cust = await prisma.customer.findUnique({ where: { mobile } });
+            if (!cust && customerName) {
+                cust = await prisma.customer.create({
+                    data: {
+                        tenantId: req.user.tenantId,
+                        storeId: req.user.storeId || null,
+                        name: customerName,
+                        mobile,
+                        segment: 'REGULAR'
+                    }
+                });
+            }
+            if (cust) resolvedCustomerId = cust.id;
+        }
 
         let cartItems = [];
         let cartId = null;
@@ -178,6 +195,7 @@ export const createOrderFromCart = async (req, res, next) => {
                     totalAmount: totalAmount,
                     status: 'PENDING',
                     agentId: agentId,
+                    customerId: resolvedCustomerId,
                     user: agentId ? { connect: { id: agentId } } : undefined,
                     vehicle: vehicleId ? { connect: { id: vehicleId } } : undefined,
                     route: routeTag.routeId ? { connect: { id: routeTag.routeId } } : undefined,

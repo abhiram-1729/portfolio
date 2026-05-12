@@ -15,6 +15,7 @@ export default function ManualSaleDrawer({ isOpen, onClose, onSuccess }) {
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
   const [products, setProducts] = useState([]);
+  const [customers, setCustomers] = useState([]);
 
   // Form State
   const [storeId, setStoreId] = useState(currentUser?.storeId || '');
@@ -23,6 +24,7 @@ export default function ManualSaleDrawer({ isOpen, onClose, onSuccess }) {
   const [routeId, setRouteId] = useState('');
   const [villageName, setVillageName] = useState('');
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
+  const [customerId, setCustomerId] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [mobile, setMobile] = useState('');
   const [paymentMode, setPaymentMode] = useState('CASH'); // CASH, UPI, CASH_UPI
@@ -43,16 +45,18 @@ export default function ManualSaleDrawer({ isOpen, onClose, onSuccess }) {
   const fetchDependencies = async () => {
     setLoading(true);
     try {
-      const [storesRes, vehiclesRes, usersRes, productsRes] = await Promise.all([
+      const [storesRes, vehiclesRes, usersRes, productsRes, customersRes] = await Promise.all([
         adminAPI.getStores(),
         adminAPI.getVehicles(),
         adminAPI.getUsers(),
-        adminAPI.getItems({ limit: 1000 }) // Assuming getItems returns products
+        adminAPI.getItems({ limit: 1000 }), // Assuming getItems returns products
+        adminAPI.getCustomers({})
       ]);
       setStores(storesRes.data?.success ? storesRes.data.data : (storesRes.data || []));
       setVehicles(vehiclesRes.data || []);
       setUsers(usersRes.data || []);
       setProducts(productsRes.data?.data || productsRes.data || []);
+      setCustomers(customersRes.data?.data || customersRes.data || []);
       
       // Auto-set store if only 1
       const fetchedStores = storesRes.data?.success ? storesRes.data.data : (storesRes.data || []);
@@ -119,6 +123,7 @@ export default function ManualSaleDrawer({ isOpen, onClose, onSuccess }) {
         villageName: villageName || undefined,
         saleDate: saleDate || undefined,
         customerName: customerName || undefined,
+        customerId: customerId || undefined,
         mobile: mobile || undefined,
         paymentMode,
         cashAmount: paymentMode === 'CASH' ? totalAmount : (paymentMode === 'CASH_UPI' ? cashAmount : 0),
@@ -267,26 +272,55 @@ export default function ManualSaleDrawer({ isOpen, onClose, onSuccess }) {
                 <User size={16} /> Customer Details
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Customer Name</label>
-                  <input 
-                    type="text"
-                    value={customerName}
-                    onChange={(e) => setCustomerName(e.target.value)}
-                    placeholder="Walk-in Customer"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                  />
+                  <label className="text-[10px] font-black uppercase tracking-widest text-emerald-600 block">Link Registered Profile (DB Module 7)</label>
+                  <select
+                    value={customerId}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      setCustomerId(id);
+                      if (id) {
+                        const cust = customers.find(c => c.id === id);
+                        if (cust) {
+                          setCustomerName(cust.name);
+                          setMobile(cust.mobile);
+                          if (cust.village?.name) setVillageName(cust.village.name);
+                        }
+                      }
+                    }}
+                    className="w-full bg-emerald-50/50 border border-emerald-100 rounded-xl px-4 py-3 text-xs font-bold text-emerald-900 focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                  >
+                    <option value="">Walk-in / Unregistered profile</option>
+                    {customers.map(c => (
+                      <option key={c.id} value={c.id}>
+                        {c.name} ({c.mobile}) - {c.segment.replace('_', ' ')}
+                      </option>
+                    ))}
+                  </select>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Mobile Number</label>
-                  <input 
-                    type="tel"
-                    value={mobile}
-                    onChange={(e) => setMobile(e.target.value)}
-                    placeholder="e.g. 9876543210"
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                  />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Customer Name</label>
+                    <input 
+                      type="text"
+                      value={customerName}
+                      onChange={(e) => setCustomerName(e.target.value)}
+                      placeholder="Walk-in Customer"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                    />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-gray-500">Mobile Number</label>
+                    <input 
+                      type="tel"
+                      value={mobile}
+                      onChange={(e) => setMobile(e.target.value)}
+                      placeholder="e.g. 9876543210"
+                      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
