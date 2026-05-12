@@ -112,6 +112,52 @@ export const getCustomers = async (req, res, next) => {
       ];
     }
 
+    // 🛡️ Self-Healing Layer: Auto-discover any completed orders with mobile numbers that haven't been mapped to the master Customer directory yet.
+    try {
+      const unmappedOrders = await prisma.order.findMany({
+        where: {
+          tenantId,
+          customerId: null,
+          mobile: { not: null },
+          status: 'COMPLETED'
+        },
+        select: {
+          mobile: true,
+          customerName: true,
+          storeId: true
+        },
+        distinct: ['mobile']
+      });
+
+      for (const ord of unmappedOrders) {
+        if (ord.mobile && ord.mobile.trim() !== '') {
+          const mob = ord.mobile.trim();
+          // Auto-upsert customer profile
+          const cust = await prisma.customer.upsert({
+            where: { mobile: mob },
+            update: {},
+            create: {
+              tenant: { connect: { id: tenantId } },
+              ...(ord.storeId ? { store: { connect: { id: ord.storeId } } } : {}),
+              name: ord.customerName || 'Walk-in Customer',
+              mobile: mob,
+              segment: 'REGULAR',
+              loyaltyPoints: 0,
+              creditBalance: 0
+            }
+          });
+
+          // Permanent association to accelerate future DB resolution
+          await prisma.order.updateMany({
+            where: { tenantId, mobile: mob, customerId: null },
+            data: { customerId: cust.id }
+          });
+        }
+      }
+    } catch (healErr) {
+      console.warn('[Self-Healing CRM] Non-fatal indexing bypass:', healErr.message);
+    }
+
     const customers = await prisma.customer.findMany({
       where,
       include: {

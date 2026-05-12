@@ -104,6 +104,35 @@ export const createManualSale = async (req, res) => {
       if (villageName) orderData.villageName = villageName;
       if (agentId) orderData.user = { connect: { id: agentId } };
 
+      // Ensure persistent Customer Profile mapping to reflect in CRM directory views
+      let customerIdResolved = null;
+      if (mobile && mobile.trim() !== '') {
+        try {
+          const cust = await tx.customer.upsert({
+            where: { mobile: mobile.trim() },
+            update: {},
+            create: {
+              tenant: { connect: { id: tenantId } },
+              store: { connect: { id: finalStoreId } },
+              name: customerName || 'Walk-in Customer',
+              mobile: mobile.trim(),
+              segment: 'REGULAR',
+              loyaltyPoints: 0,
+              creditBalance: 0
+            }
+          });
+          customerIdResolved = cust.id;
+        } catch (custErr) {
+          // Graceful fallback for concurrent transaction indexing races
+          const existingCust = await tx.customer.findUnique({ where: { mobile: mobile.trim() } });
+          if (existingCust) customerIdResolved = existingCust.id;
+        }
+      }
+
+      if (customerIdResolved) {
+        orderData.customer = { connect: { id: customerIdResolved } };
+      }
+
       const newOrder = await tx.order.create({
         data: {
           ...orderData,

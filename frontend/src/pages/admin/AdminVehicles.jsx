@@ -56,7 +56,7 @@ export default function AdminVehicles() {
   const [deletingId, setDeletingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  
+
   // Audit Modal States
   const [showAuditModal, setShowAuditModal] = useState(false);
   const [showPolicyModal, setShowPolicyModal] = useState(false);
@@ -72,7 +72,7 @@ export default function AdminVehicles() {
   const [auditSearch, setAuditSearch] = useState('');
   const [agentSearch, setAgentSearch] = useState('');
   const [mappingSearch, setMappingSearch] = useState('');
-  
+
   // Inventory Operation States
   const [items, setItems] = useState([]);
   const [stockQuantities, setStockQuantities] = useState({});
@@ -114,8 +114,8 @@ export default function AdminVehicles() {
     try {
       setLoading(true);
       const [vRes, uRes, sRes, stockRes, auditRes] = await Promise.all([
-        adminAPI.getVehicles({ storeId: storeFilterId }), 
-        adminAPI.getUsers({ storeId: storeFilterId }), 
+        adminAPI.getVehicles({ storeId: storeFilterId }),
+        adminAPI.getUsers({ storeId: storeFilterId }),
         adminAPI.getStores(),
         adminAPI.getInventoryInit({ storeId: storeFilterId }),
         adminAPI.getAuditHistory({ storeId: storeFilterId })
@@ -125,9 +125,9 @@ export default function AdminVehicles() {
       setStores(fetchedStores);
       // Filter out Consumers AND Admins - only show agents/staff for vehicles
       setUsers(uRes.data.filter(u => u.role !== 'CONSUMER' && u.role !== 'ADMIN'));
-      
+
       if (stockRes.data?.items) {
-          setItems(stockRes.data.items);
+        setItems(stockRes.data.items);
       }
       if (stockRes.data?.vehicleStock) {
         setAllVehiclesStock(stockRes.data.vehicleStock);
@@ -300,14 +300,14 @@ export default function AdminVehicles() {
       const uId = req.user?.id || req.user?.name || 'unknown';
       const vId = req.vehicleId || req.vehicle?.id || 'unknown';
       const groupKey = `${uId}_${vId}`;
-      
+
       if (!groups[groupKey]) {
-        groups[groupKey] = { 
+        groups[groupKey] = {
           id: groupKey,
-          user: req.user, 
-          vehicle: req.vehicle, 
-          requests: [], 
-          latestDate: new Date(req.createdAt) 
+          user: req.user,
+          vehicle: req.vehicle,
+          requests: [],
+          latestDate: new Date(req.createdAt)
         };
       }
       groups[groupKey].requests.push(req);
@@ -447,10 +447,10 @@ export default function AdminVehicles() {
   }, [selectedVehicleId, activeSub]);
 
   const renderSubTabContent = () => {
-    switch(activeSub) {
+    switch (activeSub) {
       case 'inventory':
         return (
-          <VehicleStockSection 
+          <VehicleStockSection
             loadingVehicles={loading}
             vehicles={vehicles}
             allVehiclesStock={allVehiclesStock}
@@ -479,7 +479,7 @@ export default function AdminVehicles() {
         return <MaintenanceSection storeId={storeFilterId} vehicles={vehicles} />;
       case 'route_mapping':
         return (
-          <RouteMappingSection 
+          <RouteMappingSection
             storeId={storeFilterId}
             can={can}
             currentUser={currentUser}
@@ -489,46 +489,46 @@ export default function AdminVehicles() {
         );
       case 'driver_mapping':
         return (
-            <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <h3 className="text-xl font-black text-gray-900 tracking-tight">Driver Mapping Status</h3>
-                <div className="relative group w-full md:w-72">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Search vehicle or driver..." 
-                    value={mappingSearch}
-                    onChange={(e) => setMappingSearch(e.target.value)}
-                    className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
-                  />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-                 {vehicles
-                   .filter(v => v.assignedUsers?.length > 0)
-                   .filter(v => 
-                     v.vehicleNumber?.toLowerCase().includes(mappingSearch.toLowerCase()) || 
-                     v.assignedUsers[0].name.toLowerCase().includes(mappingSearch.toLowerCase())
-                   )
-                   .map(v => (
-                   <div key={v.id} className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col gap-4">
-                      <div className="flex items-center gap-4">
-                         <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
-                            <User size={24} />
-                         </div>
-                         <div className="flex flex-col">
-                            <span className="text-sm font-black text-gray-900">{v.assignedUsers[0].name}</span>
-                            <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{v.vehicleNumber}</span>
-                         </div>
-                      </div>
-                   </div>
-                 ))}
+          <div className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+              <h3 className="text-xl font-black text-gray-900 tracking-tight">Driver Mapping Status</h3>
+              <div className="relative group w-full md:w-72">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+                <input
+                  type="text"
+                  placeholder="Search vehicle or driver..."
+                  value={mappingSearch}
+                  onChange={(e) => setMappingSearch(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
+                />
               </div>
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {vehicles
+                .filter(v => v.assignedUsers?.length > 0)
+                .filter(v =>
+                  v.vehicleNumber?.toLowerCase().includes(mappingSearch.toLowerCase()) ||
+                  v.assignedUsers[0].name.toLowerCase().includes(mappingSearch.toLowerCase())
+                )
+                .map(v => (
+                  <div key={v.id} className="p-6 bg-gray-50 rounded-[2rem] border border-gray-100 flex flex-col gap-4">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-white rounded-2xl flex items-center justify-center text-emerald-600 shadow-sm">
+                        <User size={24} />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black text-gray-900">{v.assignedUsers[0].name}</span>
+                        <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">{v.vehicleNumber}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </div>
         );
       case 'loading':
         return (
-          <LoadingSection 
+          <LoadingSection
             groupedLoadingItems={groupedLoadingItems}
             itemsPerPage={itemsPerPage}
             currentPage={currentPage}
@@ -558,7 +558,7 @@ export default function AdminVehicles() {
         return <VehicleDamagesSection storeId={storeFilterId} />;
       case 'return':
         return (
-          <ReturnSection 
+          <ReturnSection
             groupedReturnItems={groupedReturnItems}
             itemsPerPage={itemsPerPage}
             currentPage={currentPage}
@@ -583,7 +583,7 @@ export default function AdminVehicles() {
         );
       case 'refill':
         return (
-          <RefillsSection 
+          <RefillsSection
             activeRefillGroup={activeRefillGroup}
             setViewingAgentId={setViewingAgentId}
             loadingRefills={loadingRefills}
@@ -608,7 +608,7 @@ export default function AdminVehicles() {
         );
       case 'opening_stock':
         return (
-          <OpeningStockSection 
+          <OpeningStockSection
             items={items}
             openingSearch={openingSearch}
             setOpeningSearch={setOpeningSearch}
@@ -868,7 +868,7 @@ export default function AdminVehicles() {
         productId: item.productId,
         quantity: item.newQuantity
       }));
-      
+
       await adminAPI.executeVehicleHandover(selectedVehicle.id, {
         targetUserId: auditTargetUser.id,
         policy: 'INHERIT',
@@ -1139,7 +1139,7 @@ export default function AdminVehicles() {
                 className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
               >
                 <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
-                
+
                 <div className="flex items-center gap-5">
                   <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
                     <Truck size={24} strokeWidth={2.5} />
@@ -1568,18 +1568,18 @@ export default function AdminVehicles() {
           </div>
 
           {activeSub === 'master' ? (
-             <div className="space-y-4">
-                {filteredVehicles.length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
-                    <Truck size={48} className="mx-auto text-gray-300 mb-2" />
-                    <p className="text-gray-500">No vehicles found</p>
-                  </div>
-                ) : (
-                  renderClassifiedVehicles()
-                )}
-              </div>
+            <div className="space-y-4">
+              {filteredVehicles.length === 0 ? (
+                <div className="text-center py-12 bg-white rounded-2xl border border-dashed border-gray-200">
+                  <Truck size={48} className="mx-auto text-gray-300 mb-2" />
+                  <p className="text-gray-500">No vehicles found</p>
+                </div>
+              ) : (
+                renderClassifiedVehicles()
+              )}
+            </div>
           ) : (
-             renderSubTabContent()
+            renderSubTabContent()
           )}
         </>
       )}
@@ -1598,9 +1598,9 @@ export default function AdminVehicles() {
 
             <div className="mb-4 relative group shrink-0">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
-              <input 
-                type="text" 
-                placeholder="Search drivers..." 
+              <input
+                type="text"
+                placeholder="Search drivers..."
                 value={agentSearch}
                 onChange={(e) => setAgentSearch(e.target.value)}
                 className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
@@ -1613,31 +1613,31 @@ export default function AdminVehicles() {
                 .filter(u => u.name.toLowerCase().includes(agentSearch.toLowerCase()))
                 .map(user => (
                   <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
-                  className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
-                      {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
-                    </div>
-                    <div className="flex flex-col items-start">
-                      <span className="font-bold text-gray-900 text-sm">{user.name}</span>
-                      <div className="flex items-center gap-1.5 mt-0.5">
-                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border tracking-tighter ${user.role === 'SALES_AGENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                          {user.role === 'SALES_AGENT' ? 'Field Agent' : user.role === 'HELPER' ? 'Helper' : user.role}
-                        </span>
-                        {user.assignedVehicleId && (
-                          <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded-md">
-                            Assigned
+                    className="w-full flex items-center justify-between p-4 hover:bg-emerald-50 rounded-2xl border border-transparent hover:border-emerald-100 transition-all group disabled:opacity-50">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-gray-500 group-hover:bg-emerald-100 group-hover:text-emerald-600 transition-colors">
+                        {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <User size={20} />}
+                      </div>
+                      <div className="flex flex-col items-start">
+                        <span className="font-bold text-gray-900 text-sm">{user.name}</span>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border tracking-tighter ${user.role === 'SALES_AGENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                            {user.role === 'SALES_AGENT' ? 'Field Agent' : user.role === 'HELPER' ? 'Helper' : user.role}
                           </span>
-                        )}
+                          {user.assignedVehicleId && (
+                            <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded-md">
+                              Assigned
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
-                  </div>
-                  {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
-                </button>
-              ))}
+                    {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
+                  </button>
+                ))}
               <button onClick={() => {
                 if (window.confirm("Are you sure you want to unassign the current driver?")) {
-                   handleUnassignDriver();
+                  handleUnassignDriver();
                 }
               }} className="w-full py-4 bg-gray-50 text-gray-500 font-bold text-sm uppercase tracking-widest rounded-2xl hover:bg-rose-50 hover:text-rose-600 transition-colors border border-gray-100 hover:border-rose-100 mt-4">
                 Unassign Current Driver
@@ -1665,9 +1665,9 @@ export default function AdminVehicles() {
               {vehicleInventory.length > 0 && (
                 <div className="relative group shrink-0">
                   <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
-                  <input 
-                    type="text" 
-                    placeholder="Search items in vehicle..." 
+                  <input
+                    type="text"
+                    placeholder="Search items in vehicle..."
                     value={auditSearch}
                     onChange={(e) => setAuditSearch(e.target.value)}
                     className="w-full pl-12 pr-4 py-3 bg-gray-50 border border-gray-100 rounded-2xl text-sm font-medium focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all"
@@ -1693,8 +1693,8 @@ export default function AdminVehicles() {
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {vehicleInventory
-                        .filter(item => 
-                          item.name.toLowerCase().includes(auditSearch.toLowerCase()) || 
+                        .filter(item =>
+                          item.name.toLowerCase().includes(auditSearch.toLowerCase()) ||
                           item.sku.toLowerCase().includes(auditSearch.toLowerCase())
                         )
                         .map((item, idx) => {
@@ -1702,38 +1702,39 @@ export default function AdminVehicles() {
                           const originalIdx = vehicleInventory.findIndex(orig => orig.productId === item.productId);
                           return (
                             <tr key={item.productId} className={item.oldQuantity !== item.newQuantity ? 'bg-orange-50/30' : ''}>
-                          <td className="px-4 py-3">
-                            <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.name}</p>
-                            <p className="text-[10px] text-gray-400 tracking-wider font-mono mt-0.5">{item.sku}</p>
-                          </td>
-                          <td className="px-4 py-3 text-center">
-                            <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
-                              {item.oldQuantity} {item.unit}
-                            </span>
-                          </td>
-                          <td className="px-4 py-3">
-                            <div className="flex items-center justify-center">
-                              <input 
-                                type="number"
-                                min="0"
-                                value={item.newQuantity}
-                                onChange={(e) => {
-                                  const val = parseInt(e.target.value) || 0;
-                                  const newInv = [...vehicleInventory];
-                                  newInv[originalIdx].newQuantity = Math.max(0, val);
-                                  setVehicleInventory(newInv);
-                                }}
-                                className={cn(
-                                  "w-20 px-2 py-1.5 text-center text-sm font-bold border rounded-lg outline-none transition-all focus:ring-2",
-                                  item.oldQuantity !== item.newQuantity 
-                                    ? "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500/20 focus:border-orange-500"
-                                    : "border-gray-200 bg-gray-50 focus:ring-emerald-500/20 focus:border-emerald-500"
-                                )}
-                              />
-                            </div>
-                          </td>
-                        </tr>
-                      )})}
+                              <td className="px-4 py-3">
+                                <p className="text-xs font-bold text-gray-900 line-clamp-1">{item.name}</p>
+                                <p className="text-[10px] text-gray-400 tracking-wider font-mono mt-0.5">{item.sku}</p>
+                              </td>
+                              <td className="px-4 py-3 text-center">
+                                <span className="text-xs font-bold text-gray-500 bg-gray-100 px-2 py-1 rounded-md">
+                                  {item.oldQuantity} {item.unit}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-center">
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={item.newQuantity}
+                                    onChange={(e) => {
+                                      const val = parseInt(e.target.value) || 0;
+                                      const newInv = [...vehicleInventory];
+                                      newInv[originalIdx].newQuantity = Math.max(0, val);
+                                      setVehicleInventory(newInv);
+                                    }}
+                                    className={cn(
+                                      "w-20 px-2 py-1.5 text-center text-sm font-bold border rounded-lg outline-none transition-all focus:ring-2",
+                                      item.oldQuantity !== item.newQuantity
+                                        ? "border-orange-200 bg-orange-50 text-orange-700 focus:ring-orange-500/20 focus:border-orange-500"
+                                        : "border-gray-200 bg-gray-50 focus:ring-emerald-500/20 focus:border-emerald-500"
+                                    )}
+                                  />
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                     </tbody>
                   </table>
                 </div>
@@ -1741,8 +1742,8 @@ export default function AdminVehicles() {
 
               <div className="pt-2">
                 <label className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 block">Audit Remark (Optional)</label>
-                <input 
-                  type="text" 
+                <input
+                  type="text"
                   placeholder="e.g. Broken items found during handover..."
                   value={auditRemark}
                   onChange={(e) => setAuditRemark(e.target.value)}
@@ -1752,7 +1753,7 @@ export default function AdminVehicles() {
             </div>
 
             <div className="pt-6 border-t border-gray-100 flex items-center justify-end gap-3 shrink-0 mt-4">
-              <button onClick={() => { setShowAuditModal(false); setAuditTargetUser(null); setVehicleInventory([]); }} 
+              <button onClick={() => { setShowAuditModal(false); setAuditTargetUser(null); setVehicleInventory([]); }}
                 className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-all">
                 Cancel
               </button>
@@ -1783,7 +1784,7 @@ export default function AdminVehicles() {
 
             <div className="grid grid-cols-1 gap-4">
               {/* Policy A: Inherit */}
-              <div 
+              <div
                 onClick={() => setHandoverPolicy('INHERIT')}
                 className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${handoverPolicy === 'INHERIT' ? 'bg-emerald-50/50 border-emerald-500 shadow-sm' : 'bg-gray-50/50 border-gray-100 hover:border-gray-200'}`}
               >
@@ -1799,7 +1800,7 @@ export default function AdminVehicles() {
               </div>
 
               {/* Policy B: Carry-Over */}
-              <div 
+              {/* <div
                 onClick={() => setHandoverPolicy('CARRY_OVER')}
                 className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${handoverPolicy === 'CARRY_OVER' ? 'bg-emerald-50/50 border-emerald-500 shadow-sm' : 'bg-gray-50/50 border-gray-100 hover:border-gray-200'}`}
               >
@@ -1812,7 +1813,7 @@ export default function AdminVehicles() {
                 <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${handoverPolicy === 'CARRY_OVER' ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300'}`}>
                   {handoverPolicy === 'CARRY_OVER' && <div className="w-2 h-2 rounded-full bg-white" />}
                 </div>
-              </div>
+              </div> */}
 
               {/* Destination Pre-Routing Flow for Already Assigned Vehicles */}
               {handoverPolicy === 'CARRY_OVER' && auditTargetUser?.assignedVehicleId && auditTargetUser.assignedVehicleId !== selectedVehicle.id && (
@@ -1822,7 +1823,7 @@ export default function AdminVehicles() {
                     <span>Incoming Agent Context Detected</span>
                   </div>
                   <p className="text-xs font-medium text-amber-900 leading-relaxed">
-                    <span className="font-bold">{auditTargetUser.name}</span> brings their stock from <span className="font-extrabold underline">{auditTargetUser.assignedVehicle?.vehicleNumber || 'Assigned Configuration'}</span>. 
+                    <span className="font-bold">{auditTargetUser.name}</span> brings their stock from <span className="font-extrabold underline">{auditTargetUser.assignedVehicle?.vehicleNumber || 'Assigned Configuration'}</span>.
                     {loadingDestStocks ? (
                       <span className="text-gray-500 inline-flex items-center gap-1 ml-1"><Loader2 className="animate-spin inline" size={12} /> Checking incoming items...</span>
                     ) : destExistingStocks.length > 0 ? (
@@ -1856,8 +1857,8 @@ export default function AdminVehicles() {
                     }
                   </select>
                   <p className="text-[11px] text-emerald-800 font-medium">
-                    {carryOverTargetVehicleId === 'WAREHOUSE' 
-                      ? 'Flushes leaving stock line-items back into aggregate master inventory reserves.' 
+                    {carryOverTargetVehicleId === 'WAREHOUSE'
+                      ? 'Flushes leaving stock line-items back into aggregate master inventory reserves.'
                       : `Instantly reallocates piece-level quantities into the chosen vehicle matrix.`
                     }
                   </p>
@@ -1889,13 +1890,13 @@ export default function AdminVehicles() {
             </div>
 
             <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
-              <button 
+              <button
                 onClick={() => { setShowPolicyModal(false); setAuditTargetUser(null); }}
                 className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-all"
               >
                 Cancel
               </button>
-              <button 
+              <button
                 onClick={handleConfirmPolicySelection}
                 disabled={isAuditing}
                 className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2"

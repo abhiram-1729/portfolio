@@ -1,4 +1,4 @@
- ##Date:11-05-2026
+##Date:11-05-2026
 
 name: Backend Deploy
 
@@ -16,15 +16,18 @@ jobs:
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
+
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
 
           script: |
+            set -e
+
             export PATH=$PATH:/home/ubuntu/n/bin
 
-            cd /opt/apps/villagkart/vsms
+            cd /opt/apps/villagkart/vgk_sales
 
             git checkout develop
 
@@ -39,3 +42,5 @@ jobs:
             npx prisma db push
 
             pm2 restart vsms-backend
+
+            pm2 save
