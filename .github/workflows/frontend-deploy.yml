@@ -23,7 +23,7 @@ jobs:
           script: |
             export PATH=$PATH:/home/ubuntu/n/bin
 
-            cd /opt/apps/villagkart/cicd-test
+            cd /opt/apps/villagkart/vgk_sales
 
             git checkout cicd
 
