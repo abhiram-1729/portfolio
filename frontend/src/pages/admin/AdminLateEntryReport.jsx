@@ -192,7 +192,7 @@ const AdminLateEntryReport = ({ storeId }) => {
         {/* Trend Chart */}
         <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 h-80">
           <h3 className="text-sm font-bold text-gray-800 mb-4 uppercase tracking-wider">Late Entry Trend</h3>
-          <ResponsiveContainer width="100%" height="90%">
+          <ResponsiveContainer width="100%" height="100%" minHeight={250}>
             <LineChart data={stats.dailyTrend}>
               <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
               <XAxis dataKey="date" fontSize={10} tickFormatter={(val) => val.split('-')[2]} />
@@ -253,7 +253,7 @@ const AdminLateEntryReport = ({ storeId }) => {
                 <tr><td colSpan="8" className="px-6 py-12 text-center text-gray-400">No late entries found for this period.</td></tr>
               ) : records.map((record) => (
                 <tr key={record.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 font-medium text-gray-800">{record.user.name}</td>
+                  <td className="px-6 py-4 font-medium text-gray-800">{record.user?.name || 'Unknown User'}</td>
                   <td className="px-6 py-4 text-gray-600 text-sm">{record.date}</td>
                   <td className="px-6 py-4 text-gray-600 text-sm">{record.shiftStart}</td>
                   <td className="px-6 py-4 text-gray-600 text-sm">{format(new Date(record.checkinTime), 'HH:mm')}</td>

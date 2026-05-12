@@ -41,15 +41,20 @@ export const getLateEntryStats = async (req, res, next) => {
     });
 
     // 3. Exception Status
-    const exceptionStats = await prisma.lateEntryException.groupBy({
-      by: ['status'],
+    const exceptions = await prisma.lateEntryException.findMany({
       where: {
-        ...where,
-        // Since lateEntryException also has storeId (assuming schema), we use it.
-        // If not, we might need to filter by related lateEntry.
+        tenantId: where.tenantId,
+        createdAt: where.createdAt,
+        ...(where.storeId ? { lateEntry: { storeId: where.storeId } } : {})
       },
-      _count: { id: true }
+      select: { status: true }
     });
+
+    const exceptionStats = Object.values(exceptions.reduce((acc, curr) => {
+      acc[curr.status] = acc[curr.status] || { status: curr.status, _count: { id: 0 } };
+      acc[curr.status]._count.id++;
+      return acc;
+    }, {}));
 
     res.json({
       success: true,
