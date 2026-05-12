@@ -22,6 +22,8 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
 
           script: |
+            set -e
+            
             export PATH=$PATH:/home/ubuntu/n/bin
 
             cd /opt/apps/villagkart/cicd-test
