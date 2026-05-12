@@ -77,6 +77,8 @@ router.route('/vehicles/:id')
   )
   .delete(vehicleCtr.deleteVehicle);
 router.put('/vehicles/:id/assign', vehicleCtr.assignDriver);
+router.post('/vehicles/:id/handover', vehicleCtr.executeVehicleHandover);
+router.get('/vehicles/:id/stock', vehicleCtr.getVehicleStock);
 router.get('/vehicles/:id/sales', vehicleCtr.getVehicleSales);
 
 // Vehicle Operations

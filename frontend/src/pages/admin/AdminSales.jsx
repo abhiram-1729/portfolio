@@ -17,6 +17,7 @@ import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
 import { generateReportPDF } from './adminreports/ReportUtils';
 import ManualSaleDrawer from './ManualSaleDrawer';
+import CustomerManagement from './customers/CustomerManagement';
 export default function AdminSales() {
   // Add Print Styles
   useEffect(() => {
@@ -1979,97 +1980,7 @@ export default function AdminSales() {
 
           {/* ── CUSTOMERS TAB ── */}
           {activeTab === 'customers' && (
-            <div className="space-y-6 animate-in fade-in duration-500">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-emerald-50 border border-emerald-100 rounded-3xl p-6 flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-emerald-600 shadow-sm border border-emerald-100">
-                      <User size={20} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mb-1">Total Unique Customers</p>
-                    <p className="text-3xl font-black text-emerald-900 tabular-nums">{customerData.length}</p>
-                  </div>
-                </div>
-                <div className="bg-indigo-50 border border-indigo-100 rounded-3xl p-6 flex flex-col justify-between">
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
-                      <Wallet size={20} />
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-[10px] font-black text-indigo-600 uppercase tracking-widest mb-1">Avg Spend / Customer</p>
-                    <p className="text-3xl font-black text-indigo-900 tabular-nums">
-                      ₹{customerData.length ? (customerData.reduce((sum, c) => sum + c.totalSpent, 0) / customerData.length).toFixed(0) : 0}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm max-w-md">
-                <Search size={20} className="text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search customer by name or mobile..."
-                  className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium"
-                  value={customerSearchQuery}
-                  onChange={(e) => setCustomerSearchQuery(e.target.value)}
-                />
-              </div>
-
-              <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left border-collapse">
-                    <thead>
-                      <tr className="bg-gray-50/50">
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer Info</th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Total Orders</th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Total Lifetime Spend</th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Favorite Product</th>
-                        <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Last Purchase</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-50 text-sm">
-                      {filteredCustomers.length === 0 ? (
-                        <tr>
-                          <td colSpan="5" className="text-center py-12 text-gray-400 font-medium">No customers found</td>
-                        </tr>
-                      ) : (
-                        filteredCustomers.map((cust, idx) => (
-                          <tr key={idx} className="hover:bg-gray-50/30 transition-colors">
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                <span className="font-black text-gray-900 uppercase text-xs">{cust.name}</span>
-                                <span className="text-[10px] text-gray-500 font-bold">{cust.mobile}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-center">
-                              <span className="font-black text-gray-700 bg-gray-100 px-3 py-1 rounded-full text-[10px]">
-                                {cust.totalOrders}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <span className="font-black text-emerald-700 tabular-nums">₹{cust.totalSpent.toFixed(0)}</span>
-                            </td>
-                            <td className="px-6 py-4">
-                              <span className="text-[10px] text-gray-600 font-bold uppercase truncate max-w-[150px] inline-block" title={cust.favoriteProduct}>
-                                {cust.favoriteProduct}
-                              </span>
-                            </td>
-                            <td className="px-6 py-4 text-right">
-                              <span className="text-[10px] text-gray-500 font-bold">
-                                {format(new Date(cust.lastOrderDate), 'dd MMM yyyy')}
-                              </span>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
+            <CustomerManagement storeFilterId={storeFilterId} />
           )}
 
           {/* ── ANALYTICS TAB ── */}

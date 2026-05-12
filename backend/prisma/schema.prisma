@@ -78,6 +78,7 @@ model Tenant {
   lateExceptions           LateEntryException[]
   leaveBalances            LeaveBalance[]
   shifts                   Shift[]
+  customers                Customer[]
 }
 
 enum TenantStatus {
@@ -87,75 +88,75 @@ enum TenantStatus {
 }
 
 model User {
-  id                 String                @id @default(cuid())
-  name               String?
-  email              String                @unique
-  password           String
-  mobile             String?               @unique
-  role               UserRole              @default(CONSUMER)
-  createdAt          DateTime              @default(now())
-  updatedAt          DateTime              @updatedAt
-  assignedVehicleId  String?
-  dailyTarget        Float?                @default(10000)
-  status             UserStatus            @default(ACTIVE)
-  fcmToken           String?
-  baseSalary         Float?                @default(12000)
-  tenantId           String                @default("VK001")
-  vgeType            String                @default("EMPLOYEE")
-  storeId            String?
-  displayId          String?               @unique
-  attendanceEnabled  Boolean               @default(true)
-  customRoleId       String?
-  tenant             Tenant                @relation(fields: [tenantId], references: [id])
-  assignedVehicle    Vehicle?              @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
-  store              Store?                @relation(fields: [storeId], references: [id])
-  customRole         CustomRole?           @relation(fields: [customRoleId], references: [id])
-  orders             Order[]
-  carts              Cart[]
-  openingCash        OpeningCash[]
-  closingCash        ClosingCash[]
-  routeAssignments   RouteAssignment[]
-  refillRequests     RefillRequest[]
-  notifications      Notification[]
-  stockTransactions  StockTransaction[]    @relation("UserStockTransactions")
-  shiftLogs          ShiftLog[]
-  attendances        Attendance[]
-  dailyPerformance   VgeDailyPerformance[] @relation("UserDailyPerformance")
-  monthlySummaries   VgeMonthlySummary[]   @relation("UserMonthlySummary")
-  assetAssignments   AssetAssignment[]
-  assetIssues        AssetIssue[]
-  expenses           Expense[]
-  cashTransfers      CashTransfer[]
-  storeDeposits      StoreDeposit[]
-  dailySummaries     DailyCashSummary[]    @relation("UserDailyCashSummary")
-  assetRequests      AssetRequest[]        @relation("UserAssetRequests")
-  locationCheckIns   LocationCheckIn[]
-  stockAudits        StockAudit[]
-  bankDeposits       BankDeposit[]
-  actions            ActivityLog[]         @relation("UserActions")
-  targetActions      ActivityLog[]         @relation("TargetActions")
-  damageReports      DamageEntry[]         @relation("DamageReporter")
-  damageReviews      DamageEntry[]         @relation("DamageReviewer")
+  id                   String                  @id @default(cuid())
+  name                 String?
+  email                String                  @unique
+  password             String
+  mobile               String?                 @unique
+  role                 UserRole                @default(CONSUMER)
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
+  assignedVehicleId    String?
+  dailyTarget          Float?                  @default(10000)
+  status               UserStatus              @default(ACTIVE)
+  fcmToken             String?
+  baseSalary           Float?                  @default(12000)
+  tenantId             String                  @default("VK001")
+  vgeType              String                  @default("EMPLOYEE")
+  storeId              String?
+  displayId            String?                 @unique
+  attendanceEnabled    Boolean                 @default(true)
+  customRoleId         String?
+  tenant               Tenant                  @relation(fields: [tenantId], references: [id])
+  assignedVehicle      Vehicle?                @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
+  store                Store?                  @relation(fields: [storeId], references: [id])
+  customRole           CustomRole?             @relation(fields: [customRoleId], references: [id])
+  orders               Order[]
+  carts                Cart[]
+  openingCash          OpeningCash[]
+  closingCash          ClosingCash[]
+  routeAssignments     RouteAssignment[]
+  refillRequests       RefillRequest[]
+  notifications        Notification[]
+  stockTransactions    StockTransaction[]      @relation("UserStockTransactions")
+  shiftLogs            ShiftLog[]
+  attendances          Attendance[]
+  dailyPerformance     VgeDailyPerformance[]   @relation("UserDailyPerformance")
+  monthlySummaries     VgeMonthlySummary[]     @relation("UserMonthlySummary")
+  assetAssignments     AssetAssignment[]
+  assetIssues          AssetIssue[]
+  expenses             Expense[]
+  cashTransfers        CashTransfer[]
+  storeDeposits        StoreDeposit[]
+  dailySummaries       DailyCashSummary[]      @relation("UserDailyCashSummary")
+  assetRequests        AssetRequest[]          @relation("UserAssetRequests")
+  locationCheckIns     LocationCheckIn[]
+  stockAudits          StockAudit[]
+  bankDeposits         BankDeposit[]
+  actions              ActivityLog[]           @relation("UserActions")
+  targetActions        ActivityLog[]           @relation("TargetActions")
+  damageReports        DamageEntry[]           @relation("DamageReporter")
+  damageReviews        DamageEntry[]           @relation("DamageReviewer")
   vehicleDamageReports VehiclePhysicalDamage[] @relation("VehicleDamageReporter")
-  deductionsReceived DamageDeduction[]     @relation("DeductionTarget")
-  deductionsApplied  DamageDeduction[]     @relation("DeductionApplier")
-  safeTransactions   SafeTransaction[]
-  openedRegisters    StoreCashRegister[]   @relation("OpenedRegisters")
-  closedRegisters    StoreCashRegister[]   @relation("ClosedRegisters")
-  villageActivities  VillageActivity[]
-  locationLogs       LocationLog[]
-  approvedRefills    RefillRequest[]       @relation("ApprovedRefills")
-  lateEntries        LateEntry[]
-  lateExceptions     LateEntryException[]  @relation("UserExceptions")
-  approvedExceptions LateEntryException[]  @relation("ApprovedBy")
-  leaveBalances      LeaveBalance[]
-  createdStores      Store[]               @relation("StoreCreator")
-  vehicleTrips       VehicleTrip[]
+  deductionsReceived   DamageDeduction[]       @relation("DeductionTarget")
+  deductionsApplied    DamageDeduction[]       @relation("DeductionApplier")
+  safeTransactions     SafeTransaction[]
+  openedRegisters      StoreCashRegister[]     @relation("OpenedRegisters")
+  closedRegisters      StoreCashRegister[]     @relation("ClosedRegisters")
+  villageActivities    VillageActivity[]
+  locationLogs         LocationLog[]
+  approvedRefills      RefillRequest[]         @relation("ApprovedRefills")
+  lateEntries          LateEntry[]
+  lateExceptions       LateEntryException[]    @relation("UserExceptions")
+  approvedExceptions   LateEntryException[]    @relation("ApprovedBy")
+  leaveBalances        LeaveBalance[]
+  createdStores        Store[]                 @relation("StoreCreator")
+  vehicleTrips         VehicleTrip[]
 
-  documents          UserDocument[]
-  kycStatus          KYCStatus             @default(PENDING)
-  shiftId            String?
-  shift              Shift?                @relation(fields: [shiftId], references: [id])
+  documents UserDocument[]
+  kycStatus KYCStatus      @default(PENDING)
+  shiftId   String?
+  shift     Shift?         @relation(fields: [shiftId], references: [id])
 
   @@index([tenantId])
   @@index([assignedVehicleId])
@@ -396,6 +397,8 @@ model Order {
   vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
   route        Route?        @relation(fields: [routeId], references: [id])
   store        Store?        @relation(fields: [storeId], references: [id])
+  customerId   String?
+  customer     Customer?     @relation(fields: [customerId], references: [id])
   items        OrderItem[]
   returns      OrderReturn[]
   payment      Payment?
@@ -408,6 +411,7 @@ model Order {
   @@index([createdAt])
   @@index([routeId])
   @@index([storeId])
+  @@index([customerId])
 }
 
 model OrderItem {
@@ -453,19 +457,19 @@ model Payment {
 }
 
 model Vehicle {
-  id                String             @id @default(cuid())
+  id                String                  @id @default(cuid())
   vehicleNumber     String
-  status            Boolean            @default(true)
+  status            Boolean                 @default(true)
   insuranceDocument String?
   permitDocument    String?
   rcDocument        String?
   vehicleName       String?
-  tenantId          String             @default("VK001")
+  tenantId          String                  @default("VK001")
   storeId           String?
-  displayId         String?            @unique
-  tenant            Tenant             @relation(fields: [tenantId], references: [id])
-  store             Store?             @relation(fields: [storeId], references: [id])
-  assignedUsers     User[]             @relation("UserVehicle")
+  displayId         String?                 @unique
+  tenant            Tenant                  @relation(fields: [tenantId], references: [id])
+  store             Store?                  @relation(fields: [storeId], references: [id])
+  assignedUsers     User[]                  @relation("UserVehicle")
   stocks            VehicleStock[]
   transactions      StockTransaction[]
   orders            Order[]
@@ -490,28 +494,28 @@ model Vehicle {
 
 // ─── Vehicle Physical Damage (Body / Mechanical) ─────────────────
 model VehiclePhysicalDamage {
-  id              String                  @id @default(cuid())
-  tenantId        String                  @default("VK001")
+  id              String                @id @default(cuid())
+  tenantId        String                @default("VK001")
   storeId         String?
   vehicleId       String
   reportedById    String
-  damageType      String                  // DENT, SCRATCH, TIRE, ACCIDENT, MECHANICAL, ELECTRICAL, GLASS, BODY, OTHER
-  severity        VehicleDamageSeverity   @default(MINOR)
-  title           String                  // Short title e.g. "Front bumper dent"
+  damageType      String // DENT, SCRATCH, TIRE, ACCIDENT, MECHANICAL, ELECTRICAL, GLASS, BODY, OTHER
+  severity        VehicleDamageSeverity @default(MINOR)
+  title           String // Short title e.g. "Front bumper dent"
   description     String?
-  location        String?                 // Where on the vehicle: "Front Left", "Rear Bumper", etc.
+  location        String? // Where on the vehicle: "Front Left", "Rear Bumper", etc.
   images          String[]
-  estimatedCost   Float?                  @default(0)
+  estimatedCost   Float?                @default(0)
   actualCost      Float?
-  status          VehicleDamageStatus     @default(REPORTED)
+  status          VehicleDamageStatus   @default(REPORTED)
   repairDate      DateTime?
   repairNotes     String?
   odometerReading Float?
-  createdAt       DateTime                @default(now())
-  updatedAt       DateTime                @updatedAt
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime              @updatedAt
 
-  vehicle         Vehicle                 @relation(fields: [vehicleId], references: [id])
-  reportedBy      User                    @relation("VehicleDamageReporter", fields: [reportedById], references: [id])
+  vehicle    Vehicle @relation(fields: [vehicleId], references: [id])
+  reportedBy User    @relation("VehicleDamageReporter", fields: [reportedById], references: [id])
 
   @@index([tenantId])
   @@index([vehicleId])
@@ -552,33 +556,33 @@ model VehicleStock {
 }
 
 model VehicleTrip {
-  id               String   @id @default(cuid())
-  vehicleId        String
-  userId           String
-  date             String
-  shift            Int      @default(1)
-  status           TripStatus @default(OPEN)
-  
-  startOdometer    Float?
-  endOdometer      Float?
-  
-  openingCash      Float?   @default(0)
-  closingCash      Float?   @default(0)
-  
+  id        String     @id @default(cuid())
+  vehicleId String
+  userId    String
+  date      String
+  shift     Int        @default(1)
+  status    TripStatus @default(OPEN)
+
+  startOdometer Float?
+  endOdometer   Float?
+
+  openingCash Float? @default(0)
+  closingCash Float? @default(0)
+
   // Stats
-  totalSales       Float?   @default(0)
-  totalExpenses    Float?   @default(0)
-  
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
-  tenantId         String   @default("VK001")
-  storeId          String?
-  
-  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
-  user             User     @relation(fields: [userId], references: [id])
-  
-  fuelLogs         FuelLog[]
-  maintenanceLogs  MaintenanceLog[]
+  totalSales    Float? @default(0)
+  totalExpenses Float? @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tenantId  String   @default("VK001")
+  storeId   String?
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  user    User    @relation(fields: [userId], references: [id])
+
+  fuelLogs        FuelLog[]
+  maintenanceLogs MaintenanceLog[]
 
   @@unique([vehicleId, date, shift])
   @@index([tenantId])
@@ -591,23 +595,23 @@ enum TripStatus {
 }
 
 model FuelLog {
-  id               String   @id @default(cuid())
-  vehicleId        String
-  tripId           String?
-  date             String
-  odometer         Float
-  liters           Float
-  rate             Float
-  totalAmount      Float
-  paymentMode      ExpensePaymentMode
-  billImage        String?
-  
-  createdAt        DateTime @default(now())
-  tenantId         String   @default("VK001")
-  storeId          String?
-  
-  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
-  trip             VehicleTrip? @relation(fields: [tripId], references: [id])
+  id          String             @id @default(cuid())
+  vehicleId   String
+  tripId      String?
+  date        String
+  odometer    Float
+  liters      Float
+  rate        Float
+  totalAmount Float
+  paymentMode ExpensePaymentMode
+  billImage   String?
+
+  createdAt DateTime @default(now())
+  tenantId  String   @default("VK001")
+  storeId   String?
+
+  vehicle Vehicle      @relation(fields: [vehicleId], references: [id])
+  trip    VehicleTrip? @relation(fields: [tripId], references: [id])
 
   @@index([tenantId])
   @@index([storeId])
@@ -615,23 +619,23 @@ model FuelLog {
 }
 
 model MaintenanceLog {
-  id               String   @id @default(cuid())
-  vehicleId        String
-  tripId           String?
-  date             String
-  odometer         Float
-  serviceType      String   // General, Repair, Tire, Oil Change, etc.
-  details          String?
-  amount           Float
-  mechanicName     String?
-  billImage        String?
-  
-  createdAt        DateTime @default(now())
-  tenantId         String   @default("VK001")
-  storeId          String?
-  
-  vehicle          Vehicle  @relation(fields: [vehicleId], references: [id])
-  trip             VehicleTrip? @relation(fields: [tripId], references: [id])
+  id           String  @id @default(cuid())
+  vehicleId    String
+  tripId       String?
+  date         String
+  odometer     Float
+  serviceType  String // General, Repair, Tire, Oil Change, etc.
+  details      String?
+  amount       Float
+  mechanicName String?
+  billImage    String?
+
+  createdAt DateTime @default(now())
+  tenantId  String   @default("VK001")
+  storeId   String?
+
+  vehicle Vehicle      @relation(fields: [vehicleId], references: [id])
+  trip    VehicleTrip? @relation(fields: [tripId], references: [id])
 
   @@index([tenantId])
   @@index([storeId])
@@ -732,6 +736,7 @@ model Village {
   tenant     Tenant            @relation(fields: [tenantId], references: [id])
   store      Store?            @relation(fields: [storeId], references: [id])
   activities VillageActivity[]
+  customers  Customer[]
 
   @@unique([tenantId, storeId, name])
   @@index([tenantId])
@@ -889,33 +894,34 @@ model StoreDeposit {
 }
 
 model Expense {
-  id                   String             @id @default(cuid())
-  userId               String
-  vehicleId            String?
-  type                 String
+  id          String             @id @default(cuid())
+  userId      String
+  vehicleId   String?
+  type        String
   // expenseSubCategoryId String?
-  amount               Float
+  amount      Float
   // taxableAmount        Float?             @default(0)
   // gstAmount            Float?             @default(0)
   // gstNumber            String?
   // vendorBillNumber     String?
-  paymentMode          ExpensePaymentMode
-  description          String?
-  billImage            String?
-  status               ExpenseStatus      @default(PENDING)
-  date                 String
-  paidTo               String?
-  paidDate             String?
-  billDate             String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  tenantId             String             @default("VK001")
-  storeId              String?
-  displayId            String?            @unique
-  user                 User               @relation(fields: [userId], references: [id])
-  vehicle              Vehicle?           @relation(fields: [vehicleId], references: [id])
-  store                Store?             @relation(fields: [storeId], references: [id])
+  paymentMode ExpensePaymentMode
+  description String?
+  billImage   String?
+  status      ExpenseStatus      @default(PENDING)
+  date        String
+  paidTo      String?
+  paidDate    String?
+  billDate    String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  tenantId    String             @default("VK001")
+  storeId     String?
+  displayId   String?            @unique
+  user        User               @relation(fields: [userId], references: [id])
+  vehicle     Vehicle?           @relation(fields: [vehicleId], references: [id])
+  store       Store?             @relation(fields: [storeId], references: [id])
   // subCategory          ExpenseSubCategory? @relation(fields: [expenseSubCategoryId], references: [id])
+  // @@index([expenseSubCategoryId])
 
   @@index([tenantId])
   @@index([userId])
@@ -923,7 +929,6 @@ model Expense {
   @@index([date])
   @@index([status])
   @@index([storeId])
-  // @@index([expenseSubCategoryId])
 }
 
 model CashTransfer {
@@ -949,14 +954,14 @@ model CashTransfer {
 }
 
 model ExpenseCategory {
-  id           String               @id @default(cuid())
-  name         String
-  limit        Float?
-  status       Boolean              @default(true)
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
-  tenantId     String               @default("VK001")
-  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  id            String               @id @default(cuid())
+  name          String
+  limit         Float?
+  status        Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  tenantId      String               @default("VK001")
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
   subCategories ExpenseSubCategory[]
 
   @@unique([tenantId, name])
@@ -1403,6 +1408,7 @@ model Store {
   safeTransactions       SafeTransaction[]
   lateConfigs            LateEntryConfig[]
   lateEntries            LateEntry[]
+  customers              Customer[]
 
   @@index([tenantId])
 }
@@ -1634,7 +1640,7 @@ model PurchaseInvoiceItem {
   discountPercent        Float           @default(0)
   unitCostBeforeTax      Float           @default(0)
   subtotalBeforeTax      Float           @default(0)
-  taxType                String?         // 'NONE', 'GST', 'VAT'
+  taxType                String? // 'NONE', 'GST', 'VAT'
   taxPercent             Float?          @default(0)
   netCost                Float           @default(0)
   profitMargin           Float           @default(0)
@@ -2170,36 +2176,36 @@ enum AttendanceStatus {
 }
 
 model Attendance {
-  id               String           @id @default(cuid())
-  userId           String
-  tenantId         String           @default("VK001")
-  storeId          String?
-  date             String
-  punchInTime      DateTime
-  punchOutTime     DateTime?
-  status           AttendanceStatus @default(ACTIVE)
-  punchInLat       Float?
-  punchInLng       Float?
-  punchOutLat      Float?
-  punchOutLng      Float?
-  totalHours       Float?
-  punchInPhoto     String?
-  punchInLocation  String?
-  punchOutPhoto    String?
-  punchOutLocation String?
-  notes            String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  isLate           Boolean          @default(false)
-  lateMinutes      Int?
-  graceApplied     Int?
-  shiftStartTime   String?
+  id                String           @id @default(cuid())
+  userId            String
+  tenantId          String           @default("VK001")
+  storeId           String?
+  date              String
+  punchInTime       DateTime
+  punchOutTime      DateTime?
+  status            AttendanceStatus @default(ACTIVE)
+  punchInLat        Float?
+  punchInLng        Float?
+  punchOutLat       Float?
+  punchOutLng       Float?
+  totalHours        Float?
+  punchInPhoto      String?
+  punchInLocation   String?
+  punchOutPhoto     String?
+  punchOutLocation  String?
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  isLate            Boolean          @default(false)
+  lateMinutes       Int?
+  graceApplied      Int?
+  shiftStartTime    String?
   lateEntryConfigId String?
-  exceptionId      String?
+  exceptionId       String?
 
-  user   User   @relation(fields: [userId], references: [id])
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  store  Store? @relation(fields: [storeId], references: [id])
+  user            User             @relation(fields: [userId], references: [id])
+  tenant          Tenant           @relation(fields: [tenantId], references: [id])
+  store           Store?           @relation(fields: [storeId], references: [id])
   lateEntryConfig LateEntryConfig? @relation(fields: [lateEntryConfigId], references: [id])
   lateEntry       LateEntry?
 
@@ -2268,53 +2274,53 @@ model VillageActivity {
 }
 
 model LateEntryConfig {
-  id              String    @id @default(cuid())
-  tenantId        String    @default("VK001")
-  storeId         String?
-  scope           String    @default("COMPANY") // COMPANY | DEPARTMENT | SHIFT | ROLE
-  scopeValue      String?   // e.g. "SALES_AGENT", shift id, dept name
-  graceMins       Int       @default(10)
-  penaltyType     String    @default("COUNT") // COUNT | TIME | PROGRESSIVE
-  rules           Json      // array of rule objects
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  store           Store?    @relation(fields: [storeId], references: [id])
-  lateEntries     LateEntry[]
-  attendances     Attendance[]
+  id          String       @id @default(cuid())
+  tenantId    String       @default("VK001")
+  storeId     String?
+  scope       String       @default("COMPANY") // COMPANY | DEPARTMENT | SHIFT | ROLE
+  scopeValue  String? // e.g. "SALES_AGENT", shift id, dept name
+  graceMins   Int          @default(10)
+  penaltyType String       @default("COUNT") // COUNT | TIME | PROGRESSIVE
+  rules       Json // array of rule objects
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  store       Store?       @relation(fields: [storeId], references: [id])
+  lateEntries LateEntry[]
+  attendances Attendance[]
 
   @@index([tenantId])
   @@index([storeId])
 }
 
 model LateEntry {
-  id              String      @id @default(cuid())
-  tenantId        String      @default("VK001")
-  storeId         String?
-  userId          String
-  attendanceId    String      @unique
-  configId        String?
-  date            String
-  shiftStart      String      // "09:00"
-  checkinTime     DateTime
-  lateMinutes     Int
-  monthlyCount    Int         // running count in that month
-  penaltyApplied  String      @default("NONE") // NONE | WARNING | HALF_DAY | FULL_DAY | LOP
-  penaltyValue    Float       @default(0)
-  isWaived        Boolean     @default(false)
-  waivedById      String?
-  waivedReason    String?
-  notified        Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
-  
-  user            User        @relation(fields: [userId], references: [id])
-  attendance      Attendance  @relation(fields: [attendanceId], references: [id])
-  config          LateEntryConfig? @relation(fields: [configId], references: [id])
-  tenant          Tenant      @relation(fields: [tenantId], references: [id])
-  store           Store?      @relation(fields: [storeId], references: [id])
-  exception       LateEntryException?
+  id             String   @id @default(cuid())
+  tenantId       String   @default("VK001")
+  storeId        String?
+  userId         String
+  attendanceId   String   @unique
+  configId       String?
+  date           String
+  shiftStart     String // "09:00"
+  checkinTime    DateTime
+  lateMinutes    Int
+  monthlyCount   Int // running count in that month
+  penaltyApplied String   @default("NONE") // NONE | WARNING | HALF_DAY | FULL_DAY | LOP
+  penaltyValue   Float    @default(0)
+  isWaived       Boolean  @default(false)
+  waivedById     String?
+  waivedReason   String?
+  notified       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  user       User                @relation(fields: [userId], references: [id])
+  attendance Attendance          @relation(fields: [attendanceId], references: [id])
+  config     LateEntryConfig?    @relation(fields: [configId], references: [id])
+  tenant     Tenant              @relation(fields: [tenantId], references: [id])
+  store      Store?              @relation(fields: [storeId], references: [id])
+  exception  LateEntryException?
 
   @@index([tenantId])
   @@index([userId])
@@ -2323,22 +2329,22 @@ model LateEntry {
 }
 
 model LateEntryException {
-  id            String    @id @default(cuid())
-  tenantId      String    @default("VK001")
-  lateEntryId   String    @unique
-  userId        String
-  reason        String    // MANAGER_APPROVED | WFH | CLIENT_VISIT | BIOMETRIC_FAILURE | OTHER
-  description   String?
-  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
-  approvedById  String?
-  approvedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  lateEntry     LateEntry @relation(fields: [lateEntryId], references: [id])
-  user          User      @relation("UserExceptions", fields: [userId], references: [id])
-  approvedBy    User?     @relation("ApprovedBy", fields: [approvedById], references: [id])
-  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  id           String    @id @default(cuid())
+  tenantId     String    @default("VK001")
+  lateEntryId  String    @unique
+  userId       String
+  reason       String // MANAGER_APPROVED | WFH | CLIENT_VISIT | BIOMETRIC_FAILURE | OTHER
+  description  String?
+  status       String    @default("PENDING") // PENDING | APPROVED | REJECTED
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  lateEntry  LateEntry @relation(fields: [lateEntryId], references: [id])
+  user       User      @relation("UserExceptions", fields: [userId], references: [id])
+  approvedBy User?     @relation("ApprovedBy", fields: [approvedById], references: [id])
+  tenant     Tenant    @relation(fields: [tenantId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
@@ -2346,32 +2352,67 @@ model LateEntryException {
 }
 
 model LeaveBalance {
-  id            String    @id @default(cuid())
-  tenantId      String    @default("VK001")
-  userId        String
-  month         String    // "2026-04"
-  annualLeave   Float     @default(0)
-  sickLeave     Float     @default(0)
-  casualLeave   Float     @default(0)
-  lopDays       Float     @default(0)
-  halfDays      Float     @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  
-  user          User      @relation(fields: [userId], references: [id])
-  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  id          String   @id @default(cuid())
+  tenantId    String   @default("VK001")
+  userId      String
+  month       String // "2026-04"
+  annualLeave Float    @default(0)
+  sickLeave   Float    @default(0)
+  casualLeave Float    @default(0)
+  lopDays     Float    @default(0)
+  halfDays    Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  tenant Tenant @relation(fields: [tenantId], references: [id])
 
   @@unique([userId, month])
   @@index([tenantId])
 }
+
 model Shift {
-  id        String   @id @default(cuid())
+  id        String @id @default(cuid())
   name      String
-  startTime String   // "09:00"
-  endTime   String   // "18:00"
-  tenantId  String   @default("VK001")
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
+  startTime String // "09:00"
+  endTime   String // "18:00"
+  tenantId  String @default("VK001")
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
   users     User[]
 
   @@index([tenantId])
+}
+
+model Customer {
+  id            String          @id @default(cuid())
+  tenantId      String          @default("VK001")
+  storeId       String?
+  name          String
+  mobile        String          @unique
+  address       String?
+  villageId     String?
+  village       Village?        @relation(fields: [villageId], references: [id])
+  segment       CustomerSegment @default(REGULAR)
+  loyaltyPoints Int             @default(0)
+  creditBalance Float           @default(0)
+  isOnline      Boolean         @default(false)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  tenant Tenant  @relation(fields: [tenantId], references: [id])
+  store  Store?  @relation(fields: [storeId], references: [id])
+  orders Order[]
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([villageId])
+  @@index([mobile])
+}
+
+enum CustomerSegment {
+  REGULAR
+  PREMIUM
+  ROUTE_WISE
+  HIGH_VALUE
+  ONLINE
 }

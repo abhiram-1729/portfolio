@@ -59,6 +59,13 @@ export default function AdminVehicles() {
   
   // Audit Modal States
   const [showAuditModal, setShowAuditModal] = useState(false);
+  const [showPolicyModal, setShowPolicyModal] = useState(false);
+  const [handoverPolicy, setHandoverPolicy] = useState('INHERIT'); // 'INHERIT' | 'CARRY_OVER'
+  const [existingStockPolicy, setExistingStockPolicy] = useState('MERGE'); // 'MERGE' | 'SWAP_TO_SOURCE' | 'FLUSH_TO_WAREHOUSE'
+  const [carryOverTargetVehicleId, setCarryOverTargetVehicleId] = useState('WAREHOUSE');
+  const [carryOverTargetUserId, setCarryOverTargetUserId] = useState('');
+  const [destExistingStocks, setDestExistingStocks] = useState([]);
+  const [loadingDestStocks, setLoadingDestStocks] = useState(false);
   const [auditTargetUser, setAuditTargetUser] = useState(null);
   const [vehicleInventory, setVehicleInventory] = useState([]);
   const [isAuditing, setIsAuditing] = useState(false);
@@ -776,12 +783,66 @@ export default function AdminVehicles() {
         newQuantity: item.quantity,
         unit: item.product?.unit?.name || 'pcs'
       })));
+
+      // Pre-select outgoing driver if present
+      const currentAssigned = users.find(u => u.assignedVehicleId === selectedVehicle.id);
+      setCarryOverTargetUserId(currentAssigned ? currentAssigned.id : '');
+
+      // Fetch destination vehicle inventory if user is already bound to another active vehicle
+      if (user.assignedVehicleId && user.assignedVehicleId !== selectedVehicle.id) {
+        setLoadingDestStocks(true);
+        setCarryOverTargetVehicleId(user.assignedVehicleId);
+        try {
+          const destRes = await adminAPI.getVehicleStock(user.assignedVehicleId);
+          setDestExistingStocks(destRes.data || []);
+        } catch (e) {
+          console.error('Failed to fetch destination vehicle stocks', e);
+          setDestExistingStocks([]);
+        } finally {
+          setLoadingDestStocks(false);
+        }
+      } else {
+        setCarryOverTargetVehicleId('WAREHOUSE');
+        setDestExistingStocks([]);
+      }
+
       setShowAssignModal(false);
-      setShowAuditModal(true);
+      setHandoverPolicy('INHERIT');
+      setExistingStockPolicy('MERGE');
+      setShowPolicyModal(true);
     } catch (error) {
-      toast.error('Failed to fetch vehicle inventory for audit');
+      toast.error('Failed to fetch vehicle inventory for handover');
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleConfirmPolicySelection = async () => {
+    if (handoverPolicy === 'INHERIT') {
+      setShowPolicyModal(false);
+      setShowAuditModal(true);
+    } else {
+      setIsAuditing(true);
+      try {
+        await adminAPI.executeVehicleHandover(selectedVehicle.id, {
+          targetUserId: auditTargetUser.id,
+          policy: 'CARRY_OVER',
+          existingStockPolicy,
+          carryOverTargetVehicleId,
+          carryOverTargetUserId
+        });
+        toast.success(`Vehicle assigned to ${auditTargetUser.name} & stock carried over`);
+        setShowPolicyModal(false);
+        setAuditTargetUser(null);
+        setSelectedVehicle(null);
+        setVehicleInventory([]);
+        setDestExistingStocks([]);
+        fetchData();
+      } catch (error) {
+        toast.error(error.response?.data?.message || 'Failed to complete carry-over handover');
+      } finally {
+        setIsAuditing(false);
+      }
     }
   };
 
@@ -803,24 +864,18 @@ export default function AdminVehicles() {
   const handleConfirmAuditAndAssign = async () => {
     setIsAuditing(true);
     try {
-      // 1. Submit Audit
       const auditItems = vehicleInventory.map(item => ({
         productId: item.productId,
         quantity: item.newQuantity
       }));
       
-      // Even if items is empty, we can still audit (0 items), or just skip if empty
-      // But it's safer to always send it so a 0-item audit is logged, except backend might reject empty array.
-      if (auditItems.length > 0) {
-        await adminAPI.auditVehicleStock(selectedVehicle.id, { 
-          items: auditItems, 
-          remark: auditRemark || `Handover audit to ${auditTargetUser.name}` 
-        });
-      }
+      await adminAPI.executeVehicleHandover(selectedVehicle.id, {
+        targetUserId: auditTargetUser.id,
+        policy: 'INHERIT',
+        auditItems,
+        remark: auditRemark || `Handover audit to ${auditTargetUser.name}`
+      });
 
-      // 2. Assign Driver
-      await adminAPI.assignDriver(selectedVehicle.id, auditTargetUser.id);
-      
       toast.success(`Vehicle assigned to ${auditTargetUser.name} & stock audited`);
       setShowAuditModal(false);
       setAuditTargetUser(null);
@@ -943,12 +998,10 @@ export default function AdminVehicles() {
                   <span className="text-sm font-bold text-gray-800">{vehicle.assignedUsers?.[0]?.name || 'Not Assigned'}</span>
                 </div>
               </div>
-              {can('VEHICLES', 'UPDATE') && (
-                <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                  className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
-                  <ArrowRight size={20} />
-                </button>
-              )}
+              <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                className="text-emerald-600 hover:bg-emerald-50 p-2 rounded-full transition-colors">
+                <ArrowRight size={20} />
+              </button>
             </div>
           </div>
         ))}
@@ -1014,12 +1067,10 @@ export default function AdminVehicles() {
                       </div>
                       <span className="text-sm font-bold text-gray-700">{vehicle.assignedUsers?.[0]?.name || 'Unassigned'}</span>
                     </div>
-                    {can('VEHICLES', 'UPDATE') && (
-                      <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
-                        className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
-                        <ArrowRight size={16} />
-                      </button>
-                    )}
+                    <button onClick={() => { setSelectedVehicle(vehicle); setShowAssignModal(true); }}
+                      className="text-emerald-600 hover:bg-emerald-100 p-1.5 rounded-full transition-colors">
+                      <ArrowRight size={16} />
+                    </button>
                   </div>
                 </td>
                 <td className="px-6 py-4">
@@ -1558,7 +1609,7 @@ export default function AdminVehicles() {
 
             <div className="flex-1 overflow-y-auto space-y-2 pr-1">
               {users
-                .filter(u => !u.assignedVehicleId && u.storeId === selectedVehicle?.storeId)
+                .filter(u => u.storeId === selectedVehicle?.storeId)
                 .filter(u => u.name.toLowerCase().includes(agentSearch.toLowerCase()))
                 .map(user => (
                   <button key={user.id} disabled={isSubmitting} onClick={() => initiateAssignDriver(user)}
@@ -1569,9 +1620,16 @@ export default function AdminVehicles() {
                     </div>
                     <div className="flex flex-col items-start">
                       <span className="font-bold text-gray-900 text-sm">{user.name}</span>
-                      <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border tracking-tighter mt-0.5 ${user.role === 'SALES_AGENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
-                        {user.role === 'SALES_AGENT' ? 'Field Agent' : user.role === 'HELPER' ? 'Helper' : user.role}
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`text-[9px] font-black uppercase px-1.5 py-0.5 rounded-md border tracking-tighter ${user.role === 'SALES_AGENT' ? 'bg-emerald-50 text-emerald-700 border-emerald-100' : 'bg-amber-50 text-amber-700 border-amber-100'}`}>
+                          {user.role === 'SALES_AGENT' ? 'Field Agent' : user.role === 'HELPER' ? 'Helper' : user.role}
+                        </span>
+                        {user.assignedVehicleId && (
+                          <span className="text-[9px] font-bold bg-purple-50 text-purple-700 border border-purple-100 px-1.5 py-0.5 rounded-md">
+                            Assigned
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   {!isSubmitting && <ArrowRight size={18} className="text-gray-300 group-hover:text-emerald-500 transition-colors" />}
@@ -1701,6 +1759,148 @@ export default function AdminVehicles() {
               <button onClick={handleConfirmAuditAndAssign} disabled={isAuditing}
                 className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2">
                 {isAuditing ? <><Loader2 className="animate-spin" size={16} /> Submitting...</> : <><CheckCircle2 size={16} /> Confirm Audit & Assign</>}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Handover Policy Selector Modal ───────────────────────── */}
+      {showPolicyModal && selectedVehicle && auditTargetUser && (
+        <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white w-full max-w-xl rounded-3xl p-6 shadow-2xl animate-in slide-in-from-bottom duration-300 flex flex-col gap-6">
+            <div className="flex items-center justify-between shrink-0">
+              <div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight">Select Handover Strategy</h3>
+                <p className="text-xs text-gray-400 font-bold mt-1">
+                  Assigning <span className="text-emerald-600">{auditTargetUser.name}</span> to vehicle <span className="text-gray-700">{selectedVehicle.vehicleNumber}</span>
+                </p>
+              </div>
+              <button onClick={() => { setShowPolicyModal(false); setAuditTargetUser(null); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-400">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 gap-4">
+              {/* Policy A: Inherit */}
+              <div 
+                onClick={() => setHandoverPolicy('INHERIT')}
+                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${handoverPolicy === 'INHERIT' ? 'bg-emerald-50/50 border-emerald-500 shadow-sm' : 'bg-gray-50/50 border-gray-100 hover:border-gray-200'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${handoverPolicy === 'INHERIT' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 shadow-sm'}`}>
+                    A
+                  </div>
+                  <h4 className="text-sm font-black text-gray-900">Assign agent</h4>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${handoverPolicy === 'INHERIT' ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300'}`}>
+                  {handoverPolicy === 'INHERIT' && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+              </div>
+
+              {/* Policy B: Carry-Over */}
+              <div 
+                onClick={() => setHandoverPolicy('CARRY_OVER')}
+                className={`p-4 rounded-2xl border-2 cursor-pointer transition-all flex items-center justify-between ${handoverPolicy === 'CARRY_OVER' ? 'bg-emerald-50/50 border-emerald-500 shadow-sm' : 'bg-gray-50/50 border-gray-100 hover:border-gray-200'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${handoverPolicy === 'CARRY_OVER' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 shadow-sm'}`}>
+                    B
+                  </div>
+                  <h4 className="text-sm font-black text-gray-900">Assign agent + Stock</h4>
+                </div>
+                <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${handoverPolicy === 'CARRY_OVER' ? 'border-emerald-600 bg-emerald-600' : 'border-gray-300'}`}>
+                  {handoverPolicy === 'CARRY_OVER' && <div className="w-2 h-2 rounded-full bg-white" />}
+                </div>
+              </div>
+
+              {/* Destination Pre-Routing Flow for Already Assigned Vehicles */}
+              {handoverPolicy === 'CARRY_OVER' && auditTargetUser?.assignedVehicleId && auditTargetUser.assignedVehicleId !== selectedVehicle.id && (
+                <div className="mt-2 p-4 rounded-2xl bg-amber-50/50 border border-amber-200/80 animate-in fade-in duration-200 flex flex-col gap-2">
+                  <div className="flex items-center gap-2 text-amber-800 font-bold text-xs">
+                    <span className="flex h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span>Incoming Agent Context Detected</span>
+                  </div>
+                  <p className="text-xs font-medium text-amber-900 leading-relaxed">
+                    <span className="font-bold">{auditTargetUser.name}</span> brings their stock from <span className="font-extrabold underline">{auditTargetUser.assignedVehicle?.vehicleNumber || 'Assigned Configuration'}</span>. 
+                    {loadingDestStocks ? (
+                      <span className="text-gray-500 inline-flex items-center gap-1 ml-1"><Loader2 className="animate-spin inline" size={12} /> Checking incoming items...</span>
+                    ) : destExistingStocks.length > 0 ? (
+                      <span className="text-emerald-700 font-bold ml-1">Contains {destExistingStocks.length} line items that will automatically pull into this vehicle.</span>
+                    ) : (
+                      <span className="text-gray-500 ml-1">Currently holds zero existing lines.</span>
+                    )}
+                  </p>
+                </div>
+              )}
+
+              {/* Manual Destination Vehicle Selector for Current Stock */}
+              {handoverPolicy === 'CARRY_OVER' && (
+                <div className="mt-1 p-4 rounded-2xl bg-emerald-50/40 border border-emerald-100 flex flex-col gap-3 animate-in fade-in duration-200">
+                  <label className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                    Route Current Vehicle's Leaving Stock ({vehicleInventory.length} items) To:
+                  </label>
+                  <select
+                    value={carryOverTargetVehicleId}
+                    onChange={(e) => setCarryOverTargetVehicleId(e.target.value)}
+                    className="w-full p-3 rounded-xl border border-emerald-200 bg-white text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 shadow-2xs cursor-pointer"
+                  >
+                    <option value="WAREHOUSE">🏢 Return to Main Branch / Warehouse Reserves</option>
+                    {vehicles
+                      .filter(v => v.id !== selectedVehicle.id)
+                      .map(v => (
+                        <option key={v.id} value={v.id}>
+                          🚚 {v.vehicleNumber} {v.vehicleName ? `(${v.vehicleName})` : ''} {v.assignedUsers?.length > 0 ? `— Driver: ${v.assignedUsers.map(u => u.name).join(', ')}` : '— (Unassigned)'}
+                        </option>
+                      ))
+                    }
+                  </select>
+                  <p className="text-[11px] text-emerald-800 font-medium">
+                    {carryOverTargetVehicleId === 'WAREHOUSE' 
+                      ? 'Flushes leaving stock line-items back into aggregate master inventory reserves.' 
+                      : `Instantly reallocates piece-level quantities into the chosen vehicle matrix.`
+                    }
+                  </p>
+
+                  {carryOverTargetVehicleId !== 'WAREHOUSE' && (
+                    <div className="pt-2 border-t border-emerald-100 flex flex-col gap-2">
+                      <label className="text-xs font-black uppercase tracking-wider text-emerald-950">
+                        Simultaneously Assign Agent To Destination Vehicle:
+                      </label>
+                      <select
+                        value={carryOverTargetUserId}
+                        onChange={(e) => setCarryOverTargetUserId(e.target.value)}
+                        className="w-full p-3 rounded-xl border border-emerald-200 bg-white text-xs font-bold text-gray-800 outline-none focus:border-emerald-500 shadow-2xs cursor-pointer"
+                      >
+                        <option value="">🚫 Do Not Assign / Leave Driverless</option>
+                        {users.map(u => (
+                          <option key={u.id} value={u.id}>
+                            👤 {u.name} {u.role ? `(${u.role})` : ''} {u.store ? `— ${u.store.name}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <p className="text-[10px] text-emerald-700 font-bold">
+                        Tip: Pre-selected to the leaving driver of the current vehicle so driver & stock transfer together.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="pt-4 border-t border-gray-100 flex items-center justify-end gap-3">
+              <button 
+                onClick={() => { setShowPolicyModal(false); setAuditTargetUser(null); }}
+                className="px-6 py-3 rounded-xl font-bold text-xs uppercase tracking-widest text-gray-500 hover:bg-gray-50 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleConfirmPolicySelection}
+                disabled={isAuditing}
+                className="px-8 py-3 bg-emerald-600 text-white rounded-xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-95 disabled:opacity-70 flex items-center gap-2"
+              >
+                {isAuditing ? <><Loader2 className="animate-spin" size={16} /> Processing...</> : <><ArrowRight size={16} /> Continue Handover</>}
               </button>
             </div>
           </div>
