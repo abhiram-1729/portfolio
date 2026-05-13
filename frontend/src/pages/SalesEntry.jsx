@@ -340,7 +340,13 @@ export default function SalesEntry() {
       )}
 
       {/* Cart Drawer */}
-      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} products={products} />
+      <CartDrawer 
+        isOpen={cartOpen} 
+        onClose={() => setCartOpen(false)} 
+        products={products} 
+        routeId={plan?.routeId}
+        villageName={plan?.villageName}
+      />
 
       {/* Barcode Scanner Overlay */}
       {showScanner && (

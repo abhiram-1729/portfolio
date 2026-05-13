@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, Tag } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { attendanceAPI } from '../services/api';
@@ -123,6 +123,14 @@ export default function Sidebar({ isOpen, onClose }) {
       color: 'text-indigo-600',
       bg: 'bg-indigo-50',
       module: 'ADMIN',
+      isAdmin: true
+    },
+    {
+      name: 'Offers & Promotions',
+      path: '/admin/promotions',
+      icon: Tag,
+      color: 'text-emerald-600',
+      bg: 'bg-emerald-50',
       isAdmin: true
     },
     {

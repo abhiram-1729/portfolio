@@ -252,14 +252,24 @@ export default function OrderDetail() {
               <span className="text-emerald-900/60">₹{(order.totalAmount - (order.deliveryCharge || 0)).toFixed(2)}</span>
             </div>
             
+            {order.appliedPromotion && (
+              <div className="flex justify-between items-center text-xs font-black text-emerald-600 uppercase tracking-widest px-1">
+                <div className="flex items-center gap-2">
+                   <span>Promotion ({order.appliedPromotion.code})</span>
+                   <span className="text-[8px] bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200 uppercase">{order.appliedPromotion.name}</span>
+                </div>
+                <span>- ₹{order.discountAmount.toFixed(2)}</span>
+              </div>
+            )}
+
             <div className="flex justify-between text-xs font-black uppercase tracking-widest px-1">
               <span className={(order.deliveryCharge || 0) === 0 ? 'text-emerald-600' : 'text-blue-600'}>Delivery Charge</span>
               <span className={(order.deliveryCharge || 0) === 0 ? 'text-emerald-600' : 'text-blue-600'}>
                 {(order.deliveryCharge || 0) === 0 ? 'FREE' : `₹${order.deliveryCharge.toFixed(2)}`}
               </span>
             </div>
-            {totalSavings > 0 && <div className="flex justify-between text-xs font-black text-orange-600 uppercase tracking-widest"><span>Savings</span><span>- ₹{totalSavings.toFixed(2)}</span></div>}
-            {totalReturned > 0 && <div className="flex justify-between text-xs font-black text-red-500 uppercase tracking-widest"><span>Returns</span><span>- ₹{totalReturned.toFixed(2)}</span></div>}
+            {totalSavings > 0 && <div className="flex justify-between text-xs font-black text-orange-600 uppercase tracking-widest px-1"><span>Savings</span><span>- ₹{totalSavings.toFixed(2)}</span></div>}
+            {totalReturned > 0 && <div className="flex justify-between text-xs font-black text-red-500 uppercase tracking-widest px-1"><span>Returns</span><span>- ₹{totalReturned.toFixed(2)}</span></div>}
             <div className="flex justify-between items-center pt-3 border-t border-emerald-100">
               <span className="text-sm font-black text-emerald-950 uppercase tracking-widest">Total Bill</span>
               <span className="text-xl font-black text-emerald-600 tracking-tighter">₹{order.totalAmount.toFixed(2)}</span>

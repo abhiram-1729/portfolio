@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt, Truck } from 'lucide-react';
+import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt, Truck, Tag } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import { getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '../../services/expenseService';
 import toast from 'react-hot-toast';
@@ -514,6 +514,15 @@ export default function AdminSettings() {
         { label: 'Delivery Fee Slabs', action: () => navigate('/admin/delivery-logistics') },
         { label: 'Time Slots Management', action: () => navigate('/admin/delivery-logistics') },
         { label: 'Radius Enforcement', action: () => navigate('/admin/delivery-logistics') }
+      ]
+    },
+    {
+      title: 'Marketing & Offers',
+      icon: Tag,
+      items: [
+        { label: 'Coupons & Promo Codes', action: () => navigate('/admin/promotions') },
+        { label: 'BOGO & Combo Deals', action: () => navigate('/admin/promotions') },
+        { label: 'Targeted Campaigns', action: () => navigate('/admin/promotions') }
       ]
     }
   ];

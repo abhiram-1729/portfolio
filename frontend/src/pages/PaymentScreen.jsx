@@ -102,7 +102,8 @@ export default function PaymentScreen() {
         deliverySlot,
         deliveryDate,
         lat,
-        lon
+        lon,
+        couponCode: useCartStore.getState().appliedPromotion?.code
       });
 
       // Step 2: Complete payment

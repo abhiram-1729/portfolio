@@ -1,10 +1,24 @@
-import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus, Sparkles, Gift, Package } from 'lucide-react';
+import { ShoppingCart, X, Trash2, ArrowRight, Minus, Plus, Sparkles, Gift, Package, Loader2 } from 'lucide-react';
+import { useState } from 'react';
 import { useCartStore, checkIsFree } from '../store/cartStore';
 import { useNavigate } from 'react-router-dom';
+import promotionService from '../services/promotionService';
 import toast from 'react-hot-toast';
 
-export default function CartDrawer({ isOpen, onClose, products = [] }) {
-  const { items, addItem, updateQuantity, clearCart, totalAmount, deliveryCharge } = useCartStore();
+export default function CartDrawer({ isOpen, onClose, products = [], routeId, villageName }) {
+  const { 
+    items, 
+    addItem, 
+    updateQuantity, 
+    clearCart, 
+    totalAmount, 
+    deliveryCharge, 
+    promotionDiscount, 
+    appliedPromotion, 
+    setAppliedPromotion 
+  } = useCartStore();
+  const [couponCode, setCouponCode] = useState('');
+  const [validating, setValidating] = useState(false);
   const navigate = useNavigate();
 
   const handleUpdate = (item, newQty) => {
@@ -30,6 +44,32 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
     setTimeout(() => {
         navigate('/invoice');
     }, 150); // wait for animation
+  };
+
+  const handleApplyCoupon = async () => {
+    if (!couponCode.trim()) return;
+    setValidating(true);
+    try {
+        const { data } = await promotionService.validate({
+            code: couponCode,
+            subtotal,
+            items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+            routeId,
+            villageName
+        });
+        setAppliedPromotion(data);
+        toast.success(`Coupon "${data.code}" applied!`, { icon: '🎉' });
+        setCouponCode('');
+    } catch (err) {
+        toast.error(err.response?.data?.message || 'Invalid coupon code');
+    } finally {
+        setValidating(false);
+    }
+  };
+
+  const handleRemoveCoupon = () => {
+    setAppliedPromotion(null);
+    toast.success('Coupon removed');
   };
 
   return (
@@ -216,15 +256,62 @@ export default function CartDrawer({ isOpen, onClose, products = [] }) {
           </div>
         )}
 
+        {/* Coupon Input */}
+        {items.length > 0 && (
+          <div className="px-6 py-4 border-t border-emerald-50 bg-emerald-50/10">
+            {!appliedPromotion ? (
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Enter Coupon Code"
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  className="flex-1 bg-white border border-emerald-100 rounded-xl px-4 py-2 text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-500/20"
+                />
+                <button
+                  onClick={handleApplyCoupon}
+                  disabled={validating}
+                  className="bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-tighter disabled:opacity-50"
+                >
+                  {validating ? <Loader2 className="animate-spin" size={16} /> : 'Apply'}
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between bg-emerald-600 text-white px-4 py-3 rounded-xl shadow-lg animate-in zoom-in-95">
+                <div className="flex items-center gap-2">
+                  <Sparkles size={18} className="fill-white" />
+                  <div>
+                    <p className="text-[10px] font-black uppercase tracking-widest opacity-80">Coupon Applied</p>
+                    <p className="text-sm font-black">{appliedPromotion.code}</p>
+                  </div>
+                </div>
+                <button onClick={handleRemoveCoupon} className="p-1 hover:bg-white/20 rounded-lg transition-colors">
+                  <X size={20} strokeWidth={3} />
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Footer */}
         {items.length > 0 && (
           <div className="px-6 py-6 border-t border-emerald-100 bg-emerald-50/10">
-            <div className="space-y-3 mb-6">
+            <div className="space-y-2 mb-6">
                <div className="flex justify-between items-center px-2">
                  <span className="text-[11px] font-black text-emerald-800/40 uppercase tracking-[0.2em]">Subtotal</span>
-                 <span className="text-sm font-black text-emerald-950 tracking-tight">₹{(totalAmount - (deliveryCharge || 0)).toFixed(2)}</span>
+                 <span className="text-sm font-black text-emerald-950 tracking-tight">₹{subtotal.toFixed(2)}</span>
                </div>
                
+               {promotionDiscount > 0 && (
+                 <div className="flex justify-between items-center px-2 text-emerald-600 animate-in slide-in-from-right-4">
+                   <div className="flex items-center gap-2">
+                     <span className="text-[11px] font-black uppercase tracking-[0.2em]">Discount</span>
+                     <span className="text-[8px] font-black bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">PROMO</span>
+                   </div>
+                   <span className="text-sm font-black tracking-tight">- ₹{promotionDiscount.toFixed(2)}</span>
+                 </div>
+               )}
+
                <div className="flex justify-between items-center px-2 animate-in slide-in-from-right-4 duration-500">
                  <div className="flex items-center gap-2">
                    <span className="text-[11px] font-black text-emerald-800/40 uppercase tracking-[0.2em]">Delivery</span>

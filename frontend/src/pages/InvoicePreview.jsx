@@ -176,9 +176,21 @@ export default function InvoicePreview() {
           <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-100/20 blur-3xl rounded-full translate-x-12 -translate-y-12" />
           <div className="flex justify-between items-center text-xs font-black text-emerald-800/40 uppercase tracking-widest px-1">
             <span>Bill Subtotal</span>
-            <span className="text-emerald-900/60">₹{(totalAmount - deliveryCharge).toFixed(2)}</span>
+            <span className="text-emerald-950/60">₹{subtotal.toFixed(2)}</span>
           </div>
           
+          {useCartStore.getState().promotionDiscount > 0 && (
+            <div className="flex justify-between items-center text-xs font-black text-emerald-600 uppercase tracking-widest px-1">
+              <div className="flex items-center gap-2">
+                <span>Promo Discount</span>
+                <span className="text-[8px] bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200">
+                  {useCartStore.getState().appliedPromotion?.code}
+                </span>
+              </div>
+              <span>- ₹{useCartStore.getState().promotionDiscount.toFixed(2)}</span>
+            </div>
+          )}
+
           <div className="flex justify-between items-center text-xs font-black uppercase tracking-widest px-1">
             <span className={deliveryCharge === 0 ? 'text-emerald-600' : 'text-blue-600'}>Delivery Charge</span>
             <span className={deliveryCharge === 0 ? 'text-emerald-600' : 'text-blue-600'}>

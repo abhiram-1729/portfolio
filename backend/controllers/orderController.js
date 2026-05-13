@@ -13,7 +13,7 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private
 export const createOrderFromCart = async (req, res, next) => {
     try {
-        const { mobile, customerName, items, deliverySlot, deliveryDate, lat, lon } = req.body;
+        const { mobile, customerName, items, deliverySlot, deliveryDate, lat, lon, couponCode } = req.body;
         const agentId = req.user.id;
 
         let cartItems = [];
@@ -110,6 +110,49 @@ export const createOrderFromCart = async (req, res, next) => {
             villageName: plan?.villageName || (plan?.noVillage ? 'Unspecified Village' : 'No Active Plan'),
             coverageType: coverage
         };
+
+        // 2.6 Handle Promotion / Coupon
+        let discountAmount = 0;
+        let appliedPromotionId = null;
+
+        if (couponCode) {
+            const promotion = await prisma.promotion.findUnique({
+                where: { code: couponCode }
+            });
+
+            if (promotion && promotion.isActive) {
+                // Perform validation similar to promotionController.validatePromotion
+                const now = new Date();
+                const isDateValid = (!promotion.startDate || now >= promotion.startDate) && 
+                                   (!promotion.endDate || now <= promotion.endDate);
+                const isLimitValid = !promotion.usageLimit || promotion.usedCount < promotion.usageLimit;
+                const isAmountValid = !promotion.minOrderAmount || subtotal >= promotion.minOrderAmount;
+                const isRouteValid = promotion.targetRouteIds.length === 0 || promotion.targetRouteIds.includes(routeTag.routeId);
+                const isVillageValid = promotion.targetVillageNames.length === 0 || promotion.targetVillageNames.includes(routeTag.villageName);
+
+                if (isDateValid && isLimitValid && isAmountValid && isRouteValid && isVillageValid) {
+                    appliedPromotionId = promotion.id;
+                    
+                    if (promotion.discountType === 'PERCENTAGE') {
+                        discountAmount = (subtotal * promotion.discountValue) / 100;
+                        if (promotion.maxDiscount && discountAmount > promotion.maxDiscount) {
+                            discountAmount = promotion.maxDiscount;
+                        }
+                    } else if (promotion.discountType === 'FLAT_AMOUNT') {
+                        discountAmount = promotion.discountValue;
+                    }
+                    
+                    // Increment usage count
+                    await prisma.promotion.update({
+                        where: { id: promotion.id },
+                        data: { usedCount: { increment: 1 } }
+                    });
+                }
+            }
+        }
+
+        // Final total after discount
+        totalAmount = Math.max(0, totalAmount - discountAmount);
 
         // 2.7 Verify Stock Availability (Vehicle Stock OR Store Stock)
         if (vehicleId) {
@@ -233,6 +276,9 @@ export const createOrderFromCart = async (req, res, next) => {
                     route: routeTag.routeId ? { connect: { id: routeTag.routeId } } : undefined,
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
+                    appliedPromotion: appliedPromotionId ? { connect: { id: appliedPromotionId } } : undefined,
+                    discountAmount,
+                    storeId: req.user.storeId || null,
                     deliveryCharge: deliveryCharge,
                     deliverySlot: deliverySlot || null,
                     deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
@@ -469,6 +515,9 @@ export const getOrderById = async (req, res, next) => {
                 returns: {
                     orderBy: { createdAt: 'desc' }
                 },
+                appliedPromotion: {
+                    select: { name: true, code: true, type: true, discountType: true }
+                }
             },
         });
 

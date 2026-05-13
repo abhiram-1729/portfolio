@@ -64,26 +64,18 @@ model Tenant {
   vendorPayments           VendorPayment[]
   vendorPaymentAllocations VendorPaymentAllocation[]
   attendances              Attendance[]
-  // Damage & Deduction Relations
   damageEntries            DamageEntry[]
   damageDeductions         DamageDeduction[]
-  // Tracking Relations
   shiftLogs                ShiftLog[]
   villageActivities        VillageActivity[]
   locationLogs             LocationLog[]
-  // ID Generation
   idSequences              IdSequence[]
   lateConfigs              LateEntryConfig[]
   lateEntries              LateEntry[]
   lateExceptions           LateEntryException[]
   leaveBalances            LeaveBalance[]
   shifts                   Shift[]
-}
-
-enum TenantStatus {
-  ACTIVE
-  INACTIVE
-  SUSPENDED
+  promotions               Promotion[]
 }
 
 model User {
@@ -104,8 +96,10 @@ model User {
   vgeType            String                @default("EMPLOYEE")
   storeId            String?
   displayId          String?               @unique
-  attendanceEnabled  Boolean               @default(true)
   customRoleId       String?
+  attendanceEnabled  Boolean               @default(true)
+  kycStatus          KYCStatus             @default(PENDING)
+  shiftId            String?
   tenant             Tenant                @relation(fields: [tenantId], references: [id])
   assignedVehicle    Vehicle?              @relation("UserVehicle", fields: [assignedVehicleId], references: [id])
   store              Store?                @relation(fields: [storeId], references: [id])
@@ -149,10 +143,7 @@ model User {
   approvedExceptions LateEntryException[]  @relation("ApprovedBy")
   leaveBalances      LeaveBalance[]
   createdStores      Store[]               @relation("StoreCreator")
-
   documents          UserDocument[]
-  kycStatus          KYCStatus             @default(PENDING)
-  shiftId            String?
   shift              Shift?                @relation(fields: [shiftId], references: [id])
 
   @@index([tenantId])
@@ -160,12 +151,6 @@ model User {
   @@index([role])
   @@index([status])
   @@index([customRoleId])
-}
-
-enum KYCStatus {
-  PENDING
-  VERIFIED
-  REJECTED
 }
 
 model UserDocument {
@@ -181,21 +166,6 @@ model UserDocument {
   user           User           @relation(fields: [userId], references: [id])
 
   @@index([userId])
-}
-
-enum DocumentType {
-  AADHAR
-  PAN
-  LICENSE
-  VOTER_ID
-  PASSPORT
-  OTHER
-}
-
-enum DocumentStatus {
-  PENDING
-  VERIFIED
-  REJECTED
 }
 
 model CustomRole {
@@ -369,39 +339,43 @@ model CartItem {
 }
 
 model Order {
-  id           String        @id @default(cuid())
-  userId       String?
-  agentId      String?
-  totalAmount  Float
-  status       OrderStatus   @default(PENDING)
-  paymentMode  PaymentMode?
-  mobile       String?
-  createdAt    DateTime      @default(now())
-  updatedAt    DateTime      @updatedAt
-  vehicleId    String?
-  orderNumber  Int           @unique @default(autoincrement())
-  customerName String?
-  coverageType CoverageType?
-  routeId      String?
-  villageName  String?
-  tenantId     String        @default("VK001")
-  storeId      String?
-  displayId    String?       @unique
-  cashAmount   Float?        @default(0)
-  upiAmount    Float?        @default(0)
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  user         User?         @relation(fields: [userId], references: [id])
-  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
-  route        Route?        @relation(fields: [routeId], references: [id])
-  store        Store?        @relation(fields: [storeId], references: [id])
-  items        OrderItem[]
-  returns      OrderReturn[]
-  payment      Payment?
-
-  // Delivery Fields
-  deliveryCharge   Float             @default(0)
-  deliverySlot     String?
-  deliveryDate     DateTime?
+  id             String        @id @default(cuid())
+  userId         String?
+  agentId        String?
+  totalAmount    Float
+  status         OrderStatus   @default(PENDING)
+  paymentMode    PaymentMode?
+  mobile         String?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  vehicleId      String?
+  orderNumber    Int           @unique @default(autoincrement())
+  customerName   String?
+  coverageType   CoverageType?
+  routeId        String?
+  villageName    String?
+  tenantId       String        @default("VK001")
+  storeId        String?
+  displayId      String?       @unique
+  cashAmount     Float?        @default(0)
+  upiAmount      Float?        @default(0)
+  customerId     String?
+  deliveryCharge Float         @default(0)
+  deliverySlot   String?
+  deliveryDate   DateTime?
+  
+  // Promotion Fields
+  appliedPromotionId String?
+  appliedPromotion   Promotion? @relation(fields: [appliedPromotionId], references: [id])
+  discountAmount     Float      @default(0)
+  tenant         Tenant        @relation(fields: [tenantId], references: [id])
+  user           User?         @relation(fields: [userId], references: [id])
+  vehicle        Vehicle?      @relation(fields: [vehicleId], references: [id])
+  route          Route?        @relation(fields: [routeId], references: [id])
+  store          Store?        @relation(fields: [storeId], references: [id])
+  items          OrderItem[]
+  returns        OrderReturn[]
+  payment        Payment?
 
   @@index([tenantId])
   @@index([userId])
@@ -411,6 +385,7 @@ model Order {
   @@index([createdAt])
   @@index([routeId])
   @@index([storeId])
+  @@index([customerId])
 }
 
 model OrderItem {
@@ -429,6 +404,8 @@ model OrderItem {
   product      Product @relation(fields: [productId], references: [id])
   tenant       Tenant  @relation(fields: [tenantId], references: [id])
   store        Store?  @relation(fields: [storeId], references: [id])
+  promotionId  String?
+  promotion    Promotion? @relation(fields: [promotionId], references: [id])
 
   @@index([tenantId])
   @@index([storeId])
@@ -585,16 +562,16 @@ model RouteAssignment {
 model Village {
   id         String            @id @default(cuid())
   name       String
-  latitude   Float?
-  longitude  Float?
-  boundary   Json? // GeoJSON Polygon
-  isPolygon  Boolean           @default(false)
   status     Boolean           @default(true)
   createdAt  DateTime          @default(now())
   updatedAt  DateTime          @updatedAt
   tenantId   String            @default("VK001")
+  latitude   Float?
+  longitude  Float?
   storeId    String?
   radius     Int               @default(500)
+  boundary   Json?
+  isPolygon  Boolean           @default(false)
   tenant     Tenant            @relation(fields: [tenantId], references: [id])
   store      Store?            @relation(fields: [storeId], references: [id])
   activities VillageActivity[]
@@ -657,28 +634,25 @@ model ClosingCash {
 }
 
 model BusinessSettings {
-  id           String   @id @default(cuid())
-  businessName String   @default("VillagKart")
-  gstNo        String?
-  contactNo    String?
-  email        String?
-  address      String?
-  taxRates     String   @default("0,5,12,18")
-  shifts       Json? // Array of { id, name, startTime, endTime, isActive }
-  shiftMode    String   @default("STANDARD")
-  
-  // Delivery Logistics
-  deliverySlabs          Json? // Array of { minOrderValue, fee }
-  deliverySlots          Json? // Array of { id, name, startTime, endTime, capacity }
-  deliveryRadius         Float?  @default(20)
-  deliveryRadiusEnforced Boolean @default(true)
-  surcharges            Json?   // { rain: { active, fee }, peak: { active, fee }, ... }
-
-  updatedAt    DateTime @updatedAt
-  tenantId     String   @default("VK001")
-  storeId      String?  @unique
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  store        Store?   @relation(fields: [storeId], references: [id])
+  id                     String   @id @default(cuid())
+  businessName           String   @default("VillagKart")
+  gstNo                  String?
+  contactNo              String?
+  email                  String?
+  address                String?
+  taxRates               String   @default("0,5,12,18")
+  updatedAt              DateTime @updatedAt
+  tenantId               String   @default("VK001")
+  storeId                String?  @unique
+  shifts                 Json?
+  shiftMode              String   @default("STANDARD")
+  deliveryRadius         Float?   @default(20)
+  deliveryRadiusEnforced Boolean  @default(true)
+  deliverySlabs          Json?
+  deliverySlots          Json?
+  surcharges             Json?
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id])
+  store                  Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([tenantId, storeId])
   @@index([tenantId])
@@ -763,33 +737,27 @@ model StoreDeposit {
 }
 
 model Expense {
-  id                   String             @id @default(cuid())
-  userId               String
-  vehicleId            String?
-  type                 String
-  // expenseSubCategoryId String?
-  amount               Float
-  // taxableAmount        Float?             @default(0)
-  // gstAmount            Float?             @default(0)
-  // gstNumber            String?
-  // vendorBillNumber     String?
-  paymentMode          ExpensePaymentMode
-  description          String?
-  billImage            String?
-  status               ExpenseStatus      @default(PENDING)
-  date                 String
-  // paidTo               String?
-  // paidDate             String?
-  // billDate             String?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
-  tenantId             String             @default("VK001")
-  storeId              String?
-  displayId            String?            @unique
-  user                 User               @relation(fields: [userId], references: [id])
-  vehicle              Vehicle?           @relation(fields: [vehicleId], references: [id])
-  store                Store?             @relation(fields: [storeId], references: [id])
-  // subCategory          ExpenseSubCategory? @relation(fields: [expenseSubCategoryId], references: [id])
+  id          String             @id @default(cuid())
+  userId      String
+  vehicleId   String?
+  type        String
+  amount      Float
+  paymentMode ExpensePaymentMode
+  description String?
+  billImage   String?
+  status      ExpenseStatus      @default(PENDING)
+  date        String
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  tenantId    String             @default("VK001")
+  storeId     String?
+  displayId   String?            @unique
+  billDate    String?
+  paidDate    String?
+  paidTo      String?
+  user        User               @relation(fields: [userId], references: [id])
+  vehicle     Vehicle?           @relation(fields: [vehicleId], references: [id])
+  store       Store?             @relation(fields: [storeId], references: [id])
 
   @@index([tenantId])
   @@index([userId])
@@ -797,7 +765,6 @@ model Expense {
   @@index([date])
   @@index([status])
   @@index([storeId])
-  // @@index([expenseSubCategoryId])
 }
 
 model CashTransfer {
@@ -823,14 +790,14 @@ model CashTransfer {
 }
 
 model ExpenseCategory {
-  id           String               @id @default(cuid())
-  name         String
-  limit        Float?
-  status       Boolean              @default(true)
-  createdAt    DateTime             @default(now())
-  updatedAt    DateTime             @updatedAt
-  tenantId     String               @default("VK001")
-  tenant       Tenant               @relation(fields: [tenantId], references: [id])
+  id            String               @id @default(cuid())
+  name          String
+  limit         Float?
+  status        Boolean              @default(true)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+  tenantId      String               @default("VK001")
+  tenant        Tenant               @relation(fields: [tenantId], references: [id])
   subCategories ExpenseSubCategory[]
 
   @@unique([tenantId, name])
@@ -846,7 +813,6 @@ model ExpenseSubCategory {
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   category          ExpenseCategory @relation(fields: [expenseCategoryId], references: [id], onDelete: Cascade)
-  // expenses          Expense[]
 
   @@unique([tenantId, expenseCategoryId, name])
   @@index([tenantId])
@@ -861,12 +827,12 @@ model DailyCoverage {
   villageName String
   morningDone Boolean  @default(false)
   eveningDone Boolean  @default(false)
-  shiftStatus Json?
   status      String   @default("PENDING")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   tenantId    String   @default("VK001")
   storeId     String?
+  shiftStatus Json?
   vehicle     Vehicle  @relation(fields: [vehicleId], references: [id])
   store       Store?   @relation(fields: [storeId], references: [id])
 
@@ -1109,6 +1075,7 @@ model AssetUnit {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   tenantId     String            @default("VK001")
+  vehicleId    String?
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
   assignments  AssetAssignment[]
   issues       AssetIssue[]
@@ -1118,6 +1085,7 @@ model AssetUnit {
   @@index([tenantId])
   @@index([assetId])
   @@index([status])
+  @@index([vehicleId])
 }
 
 model AssetAssignment {
@@ -1134,6 +1102,7 @@ model AssetAssignment {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   tenantId        String          @default("VK001")
+  vehicleId       String?
   assetUnit       AssetUnit       @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
   user            User            @relation(fields: [userId], references: [id])
 
@@ -1141,6 +1110,7 @@ model AssetAssignment {
   @@index([assetUnitId])
   @@index([userId])
   @@index([isActive])
+  @@index([vehicleId])
 }
 
 model AssetIssue {
@@ -1195,11 +1165,11 @@ model LocationCheckIn {
   latitude          Float
   longitude         Float
   villageName       String?
-  subLocation       String?
   status            String
   createdAt         DateTime @default(now())
   isLocationMatched Boolean  @default(true)
   storeId           String?
+  subLocation       String?
   user              User     @relation(fields: [userId], references: [id])
   store             Store?   @relation(fields: [storeId], references: [id])
 
@@ -1277,6 +1247,7 @@ model Store {
   safeTransactions       SafeTransaction[]
   lateConfigs            LateEntryConfig[]
   lateEntries            LateEntry[]
+  promotions             Promotion[]
 
   @@index([tenantId])
 }
@@ -1504,18 +1475,18 @@ model PurchaseInvoiceItem {
   productId              String
   quantity               Int
   price                  Float
-  unitCostBeforeDiscount Float           @default(0)
+  total                  Float           @default(0)
   discountPercent        Float           @default(0)
-  unitCostBeforeTax      Float           @default(0)
-  subtotalBeforeTax      Float           @default(0)
-  taxType                String?         // 'NONE', 'GST', 'VAT'
-  taxPercent             Float?          @default(0)
+  expDate                DateTime?
+  mfgDate                DateTime?
   netCost                Float           @default(0)
   profitMargin           Float           @default(0)
+  subtotalBeforeTax      Float           @default(0)
+  taxPercent             Float?          @default(0)
+  taxType                String?
+  unitCostBeforeDiscount Float           @default(0)
+  unitCostBeforeTax      Float           @default(0)
   unitSellingPrice       Float           @default(0)
-  mfgDate                DateTime?
-  expDate                DateTime?
-  total                  Float           @default(0)
   tenant                 Tenant          @relation(fields: [tenantId], references: [id])
   invoice                PurchaseInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   product                Product         @relation(fields: [productId], references: [id])
@@ -1799,6 +1770,405 @@ model SessionSales {
   @@index([agentId])
 }
 
+model LocationLog {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("VK001")
+  userId      String
+  lat         Float
+  long        Float
+  accuracy    Float?
+  timestamp   DateTime @default(now())
+  subLocation String?
+  user        User     @relation(fields: [userId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([timestamp])
+}
+
+model Attendance {
+  id                String           @id @default(cuid())
+  userId            String
+  tenantId          String           @default("VK001")
+  storeId           String?
+  date              String
+  punchInTime       DateTime
+  punchOutTime      DateTime?
+  status            AttendanceStatus @default(ACTIVE)
+  punchInLat        Float?
+  punchInLng        Float?
+  punchOutLat       Float?
+  punchOutLng       Float?
+  totalHours        Float?
+  notes             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  punchInPhoto      String?
+  punchOutPhoto     String?
+  punchInLocation   String?
+  punchOutLocation  String?
+  exceptionId       String?
+  graceApplied      Int?
+  isLate            Boolean          @default(false)
+  lateEntryConfigId String?
+  lateMinutes       Int?
+  shiftStartTime    String?
+  user              User             @relation(fields: [userId], references: [id])
+  tenant            Tenant           @relation(fields: [tenantId], references: [id])
+  store             Store?           @relation(fields: [storeId], references: [id])
+  lateEntryConfig   LateEntryConfig? @relation(fields: [lateEntryConfigId], references: [id])
+  lateEntry         LateEntry?
+
+  @@unique([userId, date])
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+  @@index([storeId])
+}
+
+model ShiftLog {
+  id             String            @id @default(cuid())
+  tenantId       String            @default("VK001")
+  storeId        String?
+  userId         String
+  vehicleId      String?
+  date           String
+  shift          Int               @default(1)
+  startTime      DateTime          @default(now())
+  endTime        DateTime?
+  startLat       Float
+  startLong      Float
+  startFacePhoto String?
+  endLat         Float?
+  endLong        Float?
+  status         String            @default("STARTED")
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  user           User              @relation(fields: [userId], references: [id])
+  tenant         Tenant            @relation(fields: [tenantId], references: [id])
+  store          Store?            @relation(fields: [storeId], references: [id])
+  activities     VillageActivity[]
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+  @@index([storeId])
+}
+
+model VillageActivity {
+  id          String    @id @default(cuid())
+  tenantId    String    @default("VK001")
+  userId      String
+  shiftLogId  String
+  villageId   String?
+  villageName String
+  startTime   DateTime  @default(now())
+  endTime     DateTime?
+  startLat    Float
+  startLong   Float
+  endLat      Float?
+  endLong     Float?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  subLocation String?
+  shiftLog    ShiftLog  @relation(fields: [shiftLogId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id])
+  village     Village?  @relation(fields: [villageId], references: [id])
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([shiftLogId])
+}
+
+model LateEntryConfig {
+  id          String       @id @default(cuid())
+  tenantId    String       @default("VK001")
+  storeId     String?
+  scope       String       @default("COMPANY")
+  scopeValue  String?
+  graceMins   Int          @default(10)
+  penaltyType String       @default("COUNT")
+  rules       Json
+  isActive    Boolean      @default(true)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  store       Store?       @relation(fields: [storeId], references: [id])
+  lateEntries LateEntry[]
+  attendances Attendance[]
+
+  @@index([tenantId])
+  @@index([storeId])
+}
+
+model LateEntry {
+  id             String              @id @default(cuid())
+  tenantId       String              @default("VK001")
+  storeId        String?
+  userId         String
+  attendanceId   String              @unique
+  configId       String?
+  date           String
+  shiftStart     String
+  checkinTime    DateTime
+  lateMinutes    Int
+  monthlyCount   Int
+  penaltyApplied String              @default("NONE")
+  penaltyValue   Float               @default(0)
+  isWaived       Boolean             @default(false)
+  waivedById     String?
+  waivedReason   String?
+  notified       Boolean             @default(false)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  user           User                @relation(fields: [userId], references: [id])
+  attendance     Attendance          @relation(fields: [attendanceId], references: [id])
+  config         LateEntryConfig?    @relation(fields: [configId], references: [id])
+  tenant         Tenant              @relation(fields: [tenantId], references: [id])
+  store          Store?              @relation(fields: [storeId], references: [id])
+  exception      LateEntryException?
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([date])
+  @@index([storeId])
+}
+
+model LateEntryException {
+  id           String    @id @default(cuid())
+  tenantId     String    @default("VK001")
+  lateEntryId  String    @unique
+  userId       String
+  reason       String
+  description  String?
+  status       String    @default("PENDING")
+  approvedById String?
+  approvedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  lateEntry    LateEntry @relation(fields: [lateEntryId], references: [id])
+  user         User      @relation("UserExceptions", fields: [userId], references: [id])
+  approvedBy   User?     @relation("ApprovedBy", fields: [approvedById], references: [id])
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([userId])
+  @@index([status])
+}
+
+model LeaveBalance {
+  id          String   @id @default(cuid())
+  tenantId    String   @default("VK001")
+  userId      String
+  month       String
+  annualLeave Float    @default(0)
+  sickLeave   Float    @default(0)
+  casualLeave Float    @default(0)
+  lopDays     Float    @default(0)
+  halfDays    Float    @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id])
+  tenant      Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@unique([userId, month])
+  @@index([tenantId])
+}
+
+model Shift {
+  id        String @id @default(cuid())
+  name      String
+  startTime String
+  endTime   String
+  tenantId  String @default("VK001")
+  tenant    Tenant @relation(fields: [tenantId], references: [id])
+  users     User[]
+
+  @@index([tenantId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model AssetAuditLog {
+  id                String   @id
+  assetId           String?
+  assetUnitId       String?
+  tenantId          String   @default("VK001")
+  auditedByUserId   String
+  auditDate         DateTime @default(now())
+  status            String   @default("VERIFIED")
+  physicalCondition String   @default("GOOD")
+  remarks           String?
+  createdAt         DateTime @default(now())
+
+  @@index([assetId])
+  @@index([assetUnitId])
+  @@index([auditedByUserId])
+  @@index([tenantId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model AssetDepreciation {
+  id              String   @id
+  assetId         String
+  tenantId        String   @default("VK001")
+  costBasis       Float    @default(0)
+  salvageValue    Float    @default(0)
+  usefulLifeYears Int      @default(5)
+  method          String   @default("STRAIGHT_LINE")
+  ratePercentage  Float    @default(20)
+  currentBookVal  Float    @default(0)
+  lastCalculated  DateTime @default(now())
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime
+
+  @@index([assetId])
+  @@index([tenantId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model Customer {
+  id            String          @id
+  name          String
+  mobile        String          @unique
+  address       String?
+  villageId     String?
+  tenantId      String          @default("VK001")
+  storeId       String?
+  creditBalance Float           @default(0)
+  loyaltyPoints Int             @default(0)
+  segment       CustomerSegment @default(REGULAR)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime
+  isOnline      Boolean         @default(false)
+
+  @@index([mobile])
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([villageId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model FuelLog {
+  id          String             @id
+  vehicleId   String
+  tripId      String?
+  date        String
+  odometer    Float
+  liters      Float
+  rate        Float
+  totalAmount Float
+  paymentMode ExpensePaymentMode
+  billImage   String?
+  createdAt   DateTime           @default(now())
+  tenantId    String             @default("VK001")
+  storeId     String?
+
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([tripId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model MaintenanceLog {
+  id           String   @id
+  vehicleId    String
+  tripId       String?
+  date         String
+  odometer     Float
+  serviceType  String
+  details      String?
+  amount       Float
+  mechanicName String?
+  billImage    String?
+  createdAt    DateTime @default(now())
+  tenantId     String   @default("VK001")
+  storeId      String?
+
+  @@index([storeId])
+  @@index([tenantId])
+  @@index([tripId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model VehiclePhysicalDamage {
+  id              String                @id
+  tenantId        String                @default("VK001")
+  storeId         String?
+  vehicleId       String
+  reportedById    String
+  damageType      String
+  severity        VehicleDamageSeverity @default(MINOR)
+  title           String
+  description     String?
+  location        String?
+  images          String[]
+  estimatedCost   Float?                @default(0)
+  actualCost      Float?
+  status          VehicleDamageStatus   @default(REPORTED)
+  repairDate      DateTime?
+  repairNotes     String?
+  odometerReading Float?
+  createdAt       DateTime              @default(now())
+  updatedAt       DateTime
+
+  @@index([status])
+  @@index([tenantId])
+  @@index([vehicleId])
+}
+
+/// This model contains row level security and requires additional setup for migrations. Visit https://pris.ly/d/row-level-security for more info.
+model VehicleTrip {
+  id            String     @id
+  vehicleId     String
+  userId        String
+  date          String
+  shift         Int        @default(1)
+  status        TripStatus @default(OPEN)
+  startOdometer Float?
+  endOdometer   Float?
+  openingCash   Float?     @default(0)
+  closingCash   Float?     @default(0)
+  totalSales    Float?     @default(0)
+  totalExpenses Float?     @default(0)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime
+  tenantId      String     @default("VK001")
+  storeId       String?
+
+  @@unique([vehicleId, date, shift])
+  @@index([storeId])
+  @@index([tenantId])
+}
+
+enum TenantStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum KYCStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum DocumentType {
+  AADHAR
+  PAN
+  LICENSE
+  VOTER_ID
+  PASSPORT
+  OTHER
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
 enum ExpensePaymentMode {
   CASH
   UPI
@@ -1894,6 +2264,12 @@ enum VgeLevel {
 enum AssetType {
   ELECTRONIC
   NON_ELECTRONIC
+  POS_MACHINE
+  WEIGHING_MACHINE
+  FREEZER
+  SHELF
+  DELIVERY_BAG
+  TABLET
 }
 
 enum AssetStatus {
@@ -1936,26 +2312,6 @@ enum RequestStatus {
   REJECTED
   COMPLETED
 }
-
-model LocationLog {
-  id          String   @id @default(cuid())
-  tenantId    String   @default("VK001")
-  userId      String
-  lat         Float
-  long        Float
-  accuracy    Float?
-  subLocation String?
-  timestamp   DateTime @default(now())
-
-  user   User   @relation(fields: [userId], references: [id])
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId])
-  @@index([userId])
-  @@index([timestamp])
-}
-
-// ─── PROCUREMENT, INVENTORY & ACCOUNTS PAYABLE ─────────────
 
 enum VendorStatus {
   ACTIVE
@@ -2043,209 +2399,100 @@ enum AttendanceStatus {
   COMPLETED
 }
 
-model Attendance {
-  id               String           @id @default(cuid())
-  userId           String
-  tenantId         String           @default("VK001")
-  storeId          String?
-  date             String
-  punchInTime      DateTime
-  punchOutTime     DateTime?
-  status           AttendanceStatus @default(ACTIVE)
-  punchInLat       Float?
-  punchInLng       Float?
-  punchOutLat      Float?
-  punchOutLng      Float?
-  totalHours       Float?
-  punchInPhoto     String?
-  punchInLocation  String?
-  punchOutPhoto    String?
-  punchOutLocation String?
-  notes            String?
-  createdAt        DateTime         @default(now())
-  updatedAt        DateTime         @updatedAt
-  isLate           Boolean          @default(false)
-  lateMinutes      Int?
-  graceApplied     Int?
-  shiftStartTime   String?
-  lateEntryConfigId String?
-  exceptionId      String?
-
-  user   User   @relation(fields: [userId], references: [id])
-  tenant Tenant @relation(fields: [tenantId], references: [id])
-  store  Store? @relation(fields: [storeId], references: [id])
-  lateEntryConfig LateEntryConfig? @relation(fields: [lateEntryConfigId], references: [id])
-  lateEntry       LateEntry?
-
-  @@unique([userId, date])
-  @@index([tenantId])
-  @@index([userId])
-  @@index([date])
-  @@index([storeId])
+enum CustomerSegment {
+  REGULAR
+  PREMIUM
+  HIGH_VALUE
+  ONLINE
+  ROUTE_WISE
 }
 
-model ShiftLog {
-  id             String    @id @default(cuid())
-  tenantId       String    @default("VK001")
-  storeId        String?
-  userId         String
-  vehicleId      String?
-  date           String // YYYY-MM-DD
-  shift          Int       @default(1) // 1 = Morning, 2 = Afternoon
-  startTime      DateTime  @default(now())
-  endTime        DateTime?
-  startLat       Float
-  startLong      Float
-  startFacePhoto String?
-  endLat         Float?
-  endLong        Float?
-  status         String    @default("STARTED") // STARTED, COMPLETED
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
-
-  user       User              @relation(fields: [userId], references: [id])
-  tenant     Tenant            @relation(fields: [tenantId], references: [id])
-  store      Store?            @relation(fields: [storeId], references: [id])
-  activities VillageActivity[]
-
-  @@index([tenantId])
-  @@index([userId])
-  @@index([date])
-  @@index([storeId])
+enum TripStatus {
+  OPEN
+  CLOSED
 }
 
-model VillageActivity {
-  id          String    @id @default(cuid())
-  tenantId    String    @default("VK001")
-  userId      String
-  shiftLogId  String
-  villageId   String?
-  villageName String
-  startTime   DateTime  @default(now())
-  endTime     DateTime?
-  startLat    Float
-  startLong   Float
-  endLat      Float?
-  endLong     Float?
-  subLocation String?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  shiftLog ShiftLog @relation(fields: [shiftLogId], references: [id], onDelete: Cascade)
-  user     User     @relation(fields: [userId], references: [id])
-  village  Village? @relation(fields: [villageId], references: [id])
-  tenant   Tenant   @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId])
-  @@index([userId])
-  @@index([shiftLogId])
+enum VehicleDamageSeverity {
+  MINOR
+  MODERATE
+  MAJOR
+  CRITICAL
 }
 
-model LateEntryConfig {
-  id              String    @id @default(cuid())
-  tenantId        String    @default("VK001")
+enum VehicleDamageStatus {
+  REPORTED
+  UNDER_REVIEW
+  REPAIR_SCHEDULED
+  IN_REPAIR
+  REPAIRED
+  CLOSED
+}
+
+model Promotion {
+  id              String        @id @default(cuid())
+  tenantId        String        @default("VK001")
   storeId         String?
-  scope           String    @default("COMPANY") // COMPANY | DEPARTMENT | SHIFT | ROLE
-  scopeValue      String?   // e.g. "SALES_AGENT", shift id, dept name
-  graceMins       Int       @default(10)
-  penaltyType     String    @default("COUNT") // COUNT | TIME | PROGRESSIVE
-  rules           Json      // array of rule objects
-  isActive        Boolean   @default(true)
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
-  tenant          Tenant    @relation(fields: [tenantId], references: [id])
-  store           Store?    @relation(fields: [storeId], references: [id])
-  lateEntries     LateEntry[]
-  attendances     Attendance[]
-
-  @@index([tenantId])
-  @@index([storeId])
-}
-
-model LateEntry {
-  id              String      @id @default(cuid())
-  tenantId        String      @default("VK001")
-  storeId         String?
-  userId          String
-  attendanceId    String      @unique
-  configId        String?
-  date            String
-  shiftStart      String      // "09:00"
-  checkinTime     DateTime
-  lateMinutes     Int
-  monthlyCount    Int         // running count in that month
-  penaltyApplied  String      @default("NONE") // NONE | WARNING | HALF_DAY | FULL_DAY | LOP
-  penaltyValue    Float       @default(0)
-  isWaived        Boolean     @default(false)
-  waivedById      String?
-  waivedReason    String?
-  notified        Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  name            String
+  description     String?
+  code            String?       @unique // For coupon codes
+  type            PromotionType // COUPON, COMBO, BOGO, ROUTE_BASED, VILLAGE_BASED, FESTIVAL
+  discountType    DiscountType? // PERCENTAGE, FLAT_AMOUNT, FIXED_PRICE
+  discountValue   Float?
+  minOrderAmount  Float?        @default(0)
+  maxDiscount     Float?
   
-  user            User        @relation(fields: [userId], references: [id])
-  attendance      Attendance  @relation(fields: [attendanceId], references: [id])
-  config          LateEntryConfig? @relation(fields: [configId], references: [id])
-  tenant          Tenant      @relation(fields: [tenantId], references: [id])
-  store           Store?      @relation(fields: [storeId], references: [id])
-  exception       LateEntryException?
-
-  @@index([tenantId])
-  @@index([userId])
-  @@index([date])
-  @@index([storeId])
-}
-
-model LateEntryException {
-  id            String    @id @default(cuid())
-  tenantId      String    @default("VK001")
-  lateEntryId   String    @unique
-  userId        String
-  reason        String    // MANAGER_APPROVED | WFH | CLIENT_VISIT | BIOMETRIC_FAILURE | OTHER
-  description   String?
-  status        String    @default("PENDING") // PENDING | APPROVED | REJECTED
-  approvedById  String?
-  approvedAt    DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  // Dates
+  startDate       DateTime?
+  endDate         DateTime?
   
-  lateEntry     LateEntry @relation(fields: [lateEntryId], references: [id])
-  user          User      @relation("UserExceptions", fields: [userId], references: [id])
-  approvedBy    User?     @relation("ApprovedBy", fields: [approvedById], references: [id])
-  tenant        Tenant    @relation(fields: [tenantId], references: [id])
-
-  @@index([tenantId])
-  @@index([userId])
-  @@index([status])
-}
-
-model LeaveBalance {
-  id            String    @id @default(cuid())
-  tenantId      String    @default("VK001")
-  userId        String
-  month         String    // "2026-04"
-  annualLeave   Float     @default(0)
-  sickLeave     Float     @default(0)
-  casualLeave   Float     @default(0)
-  lopDays       Float     @default(0)
-  halfDays      Float     @default(0)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  // Usage
+  usageLimit      Int?          // Total times this promotion can be used
+  usedCount       Int           @default(0)
+  userUsageLimit  Int?          // Limit per user
   
-  user          User      @relation(fields: [userId], references: [id])
-  tenant        Tenant    @relation(fields: [tenantId], references: [id])
+  // Specific targets
+  isActive        Boolean       @default(true)
+  
+  // Relations/Targeting
+  targetProductIds String[]     // Products this applies to
+  targetCategoryIds String[]
+  targetRouteIds   String[]
+  targetVillageNames String[]
+  
+  // BOGO details
+  buyQuantity     Int?
+  getQuantity     Int?
+  
+  // Combo details
+  comboProducts   Json?         // Array of { productId, quantity, specialPrice }
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  tenant          Tenant        @relation(fields: [tenantId], references: [id])
+  store           Store?        @relation(fields: [storeId], references: [id])
+  appliedToOrders Order[]
+  appliedToItems  OrderItem[]
 
-  @@unique([userId, month])
   @@index([tenantId])
+  @@index([code])
+  @@index([type])
+  @@index([isActive])
 }
-model Shift {
-  id        String   @id @default(cuid())
-  name      String
-  startTime String   // "09:00"
-  endTime   String   // "18:00"
-  tenantId  String   @default("VK001")
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  users     User[]
 
-  @@index([tenantId])
+enum PromotionType {
+  COUPON
+  COMBO
+  BOGO
+  ROUTE_BASED
+  VILLAGE_BASED
+  FESTIVAL
+  FLAT_DISCOUNT
+  PERCENTAGE_DISCOUNT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT_AMOUNT
+  FIXED_PRICE
 }
