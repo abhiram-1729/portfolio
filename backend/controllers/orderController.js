@@ -196,9 +196,9 @@ export const createOrderFromCart = async (req, res, next) => {
                     status: 'PENDING',
                     agentId: agentId,
                     customerId: resolvedCustomerId,
-                    user: agentId ? { connect: { id: agentId } } : undefined,
-                    vehicle: vehicleId ? { connect: { id: vehicleId } } : undefined,
-                    route: routeTag.routeId ? { connect: { id: routeTag.routeId } } : undefined,
+                    userId: agentId || null,
+                    vehicleId: vehicleId || null,
+                    routeId: routeTag.routeId || null,
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
                     items: {

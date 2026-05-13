@@ -45,7 +45,7 @@ const prisma = basePrisma.$extends({
 
             // Injection for Write operations
             if (operation === 'create' || operation === 'upsert') {
-              const relationalMandatory = ['Order', 'User', 'Store', 'Tenant', 'OrderItem', 'Payment', 'Customer']; // Models where scalars are hidden in CreateInput
+              const relationalMandatory = []; // Models where scalars are hidden in CreateInput
 
               const h_clean = (modelName, obj) => {
                 if (!obj || typeof obj !== 'object') return obj;
