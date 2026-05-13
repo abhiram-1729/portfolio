@@ -1444,7 +1444,7 @@ export default function AdminVehicles() {
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               {/* Left: Title & Subtitle */}
               <div className="flex items-start gap-3">
-                {storeFilterId && activeSub === 'master' && (
+                {storeFilterId && stores.length > 1 && (
                   <button
                     onClick={() => setSearchParams({ sub: activeSub })}
                     className="p-2.5 bg-gray-50 border border-gray-100/80 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/50 transition-all shadow-2xs active:scale-95 mt-0.5"
@@ -1458,10 +1458,10 @@ export default function AdminVehicles() {
                     <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none capitalize">
                       {activeSub === 'master' ? 'Fleet Management' : activeSub.replace('_', ' ')}
                     </h2>
-                    {activeSub === 'master' && stores.length > 1 && (
+                    {stores.length > 1 && (
                       <select
                         value={storeFilterId || ''}
-                        onChange={(e) => setSearchParams({ sub: 'master', storeId: e.target.value })}
+                        onChange={(e) => setSearchParams({ sub: activeSub, storeId: e.target.value })}
                         className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2.5 pr-6 py-1 rounded-lg border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
                         style={{
                           backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,

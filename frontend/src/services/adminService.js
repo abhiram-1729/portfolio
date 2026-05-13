@@ -211,6 +211,13 @@ export const adminAPI = {
   updateCustomerProfile: (id, data) => api.put(`/customers/${id}`, data),
   adjustCreditBalance: (id, data) => api.post(`/customers/${id}/credit`, data),
   adjustLoyaltyPoints: (id, data) => api.post(`/customers/${id}/points`, data),
+
+  // Module 14 Enterprise Asset Extensions
+  updateAssetVehicleMapping: (data) => api.put('/admin/assets/vehicle-mapping', data),
+  getDepreciationSchedules: (params) => api.get('/admin/assets/depreciation', { params }),
+  saveDepreciationSchedule: (data) => api.post('/admin/assets/depreciation', data),
+  getAssetAudits: (params) => api.get('/admin/assets/audits', { params }),
+  createAssetAudit: (data) => api.post('/admin/assets/audits', data),
 };
 
 export default adminAPI;

@@ -1048,8 +1048,8 @@ export default function AdminSales() {
     <div className="main-content-to-print space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            {storeFilterId && (
+          <div className="flex items-center gap-3 flex-wrap">
+            {storeFilterId && stores.length > 1 && (
               <button
                 onClick={() => setSearchParams({})}
                 className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -1059,37 +1059,32 @@ export default function AdminSales() {
               </button>
             )}
             <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
-            {isTenantRoute && (
-              <>
-                <span className="text-gray-300">•</span>
-                <select
-                  value={storeFilterId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSearchParams({ storeId: e.target.value });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
-                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.25rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
-                >
-                  <option value="">All Branches</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </>
+            {stores.length > 1 && (
+              <select
+                value={storeFilterId || ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSearchParams({ storeId: e.target.value });
+                  } else {
+                    setSearchParams({});
+                  }
+                }}
+                className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                  backgroundPosition: 'right 0.35rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1.1rem'
+                }}
+              >
+                <option value="">All Branches</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             )}
           </div>
+          <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
         </div>
 
         {can('SALES', 'CREATE') && !viewingOrder && !showCreateSale && (

@@ -223,6 +223,13 @@ router.get('/assets/requests', assetCtr.getAssetRequests);
 router.put('/assets/requests/:id', assetCtr.updateAssetRequestStatus);
 router.get('/assets/reports', assetCtr.getAssetReports);
 
+// Module 14 Enterprise Asset Extensions
+router.put('/assets/vehicle-mapping', assetCtr.updateAssetVehicleMapping);
+router.get('/assets/depreciation', assetCtr.getDepreciationSchedules);
+router.post('/assets/depreciation', assetCtr.saveDepreciationSchedule);
+router.get('/assets/audits', assetCtr.getAssetAudits);
+router.post('/assets/audits', assetCtr.createAssetAudit);
+
 // Organization Stores (Admin specific)
 router.route('/stores')
   .get(adminStoreCtr.getAdminStores)

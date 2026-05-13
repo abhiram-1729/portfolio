@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Package, Plus, Search, X, Loader2, Pencil, Trash2, Truck, Users, ArrowLeft, AlertTriangle,
-  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw, Download, Printer, FileText, ChevronLeft } from 'lucide-react';
+  CheckCircle2, XCircle, Monitor, Box, Tag, Hash, ArrowUpCircle, ArrowDownCircle, BarChart3, Eye, MessageSquare, RefreshCcw, Download, Printer, FileText, ChevronLeft, Lock } from 'lucide-react';
 import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
@@ -31,6 +31,14 @@ export default function AdminAssets() {
   const [reports, setReports] = useState(null);
   const [assetCategories, setAssetCategories] = useState([]);
   const [stores, setStores] = useState([]);
+
+  // Module 14 Enterprise states
+  const [vehicles, setVehicles] = useState([]);
+  const [depreciations, setDepreciations] = useState([]);
+  const [audits, setAudits] = useState([]);
+  const [auditForm, setAuditForm] = useState({ assetId: '', assetUnitId: '', status: 'VERIFIED', physicalCondition: 'GOOD', remarks: '' });
+  const [showAuditForm, setShowAuditForm] = useState(false);
+  const [depreciationForm, setDepreciationForm] = useState({ assetId: '', costBasis: '', salvageValue: '', usefulLifeYears: '5', method: 'STRAIGHT_LINE', ratePercentage: '20' });
 
   // Form states
   const [form, setForm] = useState({ name: '', categoryId: '', assetType: 'NON_ELECTRONIC', model: '', brand: '', description: '', estimatedCost: '' });
@@ -63,6 +71,9 @@ export default function AdminAssets() {
     if (activeTab === 'issues') loadIssues();
     if (activeTab === 'requests') loadRequests();
     if (activeTab === 'reports') loadReports();
+    if (activeTab === 'vehicle-mapping') loadVehicles();
+    if (activeTab === 'depreciation') loadDepreciations();
+    if (activeTab === 'audit') loadAudits();
   }, [activeTab]);
 
   const fetchAll = async () => {
@@ -125,6 +136,30 @@ export default function AdminAssets() {
       const { data } = await adminAPI.getAssetRequests({ storeId });
       setRequests(data);
     } catch { toast.error('Failed to load requests'); }
+  };
+
+  const loadVehicles = async () => {
+    try {
+      const { data } = await adminAPI.getVehicles({ storeId });
+      setVehicles(Array.isArray(data) ? data : data?.data || []);
+      // Also load tracking assignments to render the mapping lists
+      const trackRes = await adminAPI.getAssetTracking({ storeId });
+      setTracking(trackRes.data);
+    } catch { toast.error('Failed to load vehicles for asset mapping'); }
+  };
+
+  const loadDepreciations = async () => {
+    try {
+      const { data } = await adminAPI.getDepreciationSchedules({ storeId });
+      setDepreciations(data);
+    } catch { toast.error('Failed to load depreciation schedules'); }
+  };
+
+  const loadAudits = async () => {
+    try {
+      const { data } = await adminAPI.getAssetAudits({ storeId });
+      setAudits(data);
+    } catch { toast.error('Failed to load asset inspection audits'); }
   };
 
   const handleRequestUpdate = async (id, status, remark = '') => {
@@ -260,6 +295,44 @@ export default function AdminAssets() {
     generateReportPDF(type, data, true);
   };
 
+  // Module 14 Handlers
+  const handleVehicleMappingUpdate = async (assetUnitId, vehicleId) => {
+    try {
+      await adminAPI.updateAssetVehicleMapping({ assetUnitId, vehicleId });
+      toast.success('Vehicle mapping updated successfully');
+      loadVehicles();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update vehicle mapping');
+    }
+  };
+
+  const handleSaveDepreciation = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await adminAPI.saveDepreciationSchedule(depreciationForm);
+      toast.success('Depreciation schedule saved successfully');
+      setDepreciationForm({ assetId: '', costBasis: '', salvageValue: '', usefulLifeYears: '5', method: 'STRAIGHT_LINE', ratePercentage: '20' });
+      loadDepreciations();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to save depreciation');
+    } finally { setIsSubmitting(false); }
+  };
+
+  const handleCreateAudit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      await adminAPI.createAssetAudit(auditForm);
+      toast.success('Audit verification logged successfully');
+      setAuditForm({ assetId: '', assetUnitId: '', status: 'VERIFIED', physicalCondition: 'GOOD', remarks: '' });
+      loadAudits();
+      fetchAll(); // refresh item conditions
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to log audit');
+    } finally { setIsSubmitting(false); }
+  };
+
   const filteredAssets = useMemo(() => {
     const q = searchQuery.toLowerCase();
     return assets.filter(a => a.name.toLowerCase().includes(q) || (a.model || '').toLowerCase().includes(q) || (a.brand || '').toLowerCase().includes(q));
@@ -279,12 +352,14 @@ export default function AdminAssets() {
   }
 
   const tabs = [
-    { key: 'master', label: 'Assets', icon: <Package size={14} /> },
-    { key: 'assign', label: 'Assign', icon: <Users size={14} /> },
-    { key: 'tracking', label: 'Tracking', icon: <Eye size={14} /> },
-    { key: 'issues', label: 'Issues', icon: <AlertTriangle size={14} /> },
+    { key: 'master', label: 'Registration', icon: <Package size={14} /> },
+    { key: 'assign', label: 'Assignment', icon: <Users size={14} /> },
+    { key: 'vehicle-mapping', label: 'Vehicle Mapping', icon: <Truck size={14} /> },
+    { key: 'issues', label: 'Maintenance', icon: <AlertTriangle size={14} /> },
+    { key: 'depreciation', label: 'Depreciation', icon: <BarChart3 size={14} /> },
+    { key: 'audit', label: 'Asset Audit', icon: <CheckCircle2 size={14} /> },
     { key: 'requests', label: 'Requests', icon: <MessageSquare size={14} /> },
-    { key: 'reports', label: 'Reports', icon: <BarChart3 size={14} /> },
+    { key: 'reports', label: 'Reports', icon: <FileText size={14} /> },
   ];
 
   // ─── Master Tab ─────────────────────────────────────────
@@ -423,86 +498,89 @@ export default function AdminAssets() {
 
   // ─── Assign Tab ─────────────────────────────────────────
   const renderAssign = () => (
-    <div className="max-w-lg mx-auto space-y-6">
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-        <h3 className="text-lg font-black text-gray-900 flex items-center gap-2"><Users size={20} className="text-emerald-500" /> Assign Asset</h3>
+    <div className="w-full bg-white p-3 lg:p-4 rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+      <form onSubmit={handleAssign} className="flex flex-col lg:flex-row items-center justify-between gap-2 w-full">
+        {/* Title */}
+        <div className="flex items-center gap-1.5 shrink-0 px-2.5">
+          <Users size={16} className="text-emerald-500" />
+          <span className="text-xs font-black text-gray-900 uppercase tracking-tight">Assign</span>
+        </div>
 
-        <form onSubmit={handleAssign} className="space-y-4">
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Executive (VGE)</label>
-            <select value={assignForm.userId} onChange={e => setAssignForm({ ...assignForm, userId: e.target.value })} required
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
-              <option value="">Select Executive</option>
-              {users.map(u => <option key={u.id} value={u.id} className="truncate">{u.name} ({u.role})</option>)}
+        {/* Executive Select */}
+        <div className="flex-1 min-w-[120px] w-full lg:w-auto">
+          <select value={assignForm.userId} onChange={e => setAssignForm({ ...assignForm, userId: e.target.value })} required
+            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2.5 py-2 text-[11px] font-bold text-gray-800 appearance-none focus:outline-none focus:bg-white truncate">
+            <option value="">Executive</option>
+            {users.map(u => <option key={u.id} value={u.id} className="truncate">{u.name} ({u.role})</option>)}
+          </select>
+        </div>
+
+        {/* Asset Select */}
+        <div className="flex-1 min-w-[120px] w-full lg:w-auto">
+          <select value={assignForm.assetId} onChange={e => setAssignForm({ ...assignForm, assetId: e.target.value, serialNumber: '' })} required
+            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2.5 py-2 text-[11px] font-bold text-gray-800 appearance-none focus:outline-none focus:bg-white truncate">
+            <option value="">Asset</option>
+            {assets.map(a => {
+              const avail = (a.units || []).filter(u => u.status === 'AVAILABLE').length;
+              return <option key={a.id} value={a.id} className="truncate">{a.name} ({avail})</option>;
+            })}
+          </select>
+        </div>
+
+        {/* Serial Number / Quantity */}
+        {selectedAssetForAssign?.assetType === 'ELECTRONIC' ? (
+          <div className="w-full lg:w-28 shrink-0">
+            <select value={assignForm.serialNumber} onChange={e => setAssignForm({ ...assignForm, serialNumber: e.target.value })} required
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-[11px] font-bold text-gray-800 appearance-none focus:outline-none focus:bg-white truncate">
+              <option value="">Serial #</option>
+              {(selectedAssetForAssign.units || []).filter(u => u.status === 'AVAILABLE' && u.serialNumber).map(u =>
+                <option key={u.id} value={u.serialNumber} className="truncate">{u.serialNumber}</option>
+              )}
             </select>
           </div>
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Asset</label>
-            <select value={assignForm.assetId} onChange={e => setAssignForm({ ...assignForm, assetId: e.target.value, serialNumber: '' })} required
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
-              <option value="">Select Asset</option>
-              {assets.map(a => {
-                const avail = (a.units || []).filter(u => u.status === 'AVAILABLE').length;
-                return <option key={a.id} value={a.id} className="truncate">{a.name} {a.model ? `(${a.model})` : ''} — {avail} available</option>;
-              })}
-            </select>
+        ) : (
+          <div className="w-full lg:w-16 shrink-0 flex items-center gap-1">
+            <span className="text-[9px] font-bold text-gray-400 lg:hidden">Qty:</span>
+            <input type="number" min="1" placeholder="Qty" value={assignForm.quantity} onChange={e => setAssignForm({ ...assignForm, quantity: e.target.value })}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-[11px] font-bold text-center text-gray-800 focus:outline-none focus:bg-white" />
           </div>
+        )}
 
-          {selectedAssetForAssign?.assetType === 'ELECTRONIC' && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Serial Number</label>
-              <select value={assignForm.serialNumber} onChange={e => setAssignForm({ ...assignForm, serialNumber: e.target.value })} required
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20 truncate">
-                <option value="">Select Serial Number</option>
-                {(selectedAssetForAssign.units || []).filter(u => u.status === 'AVAILABLE' && u.serialNumber).map(u =>
-                  <option key={u.id} value={u.serialNumber} className="truncate">{u.serialNumber}</option>
-                )}
-              </select>
-            </div>
-          )}
+        {/* Condition */}
+        <div className="w-full lg:w-20 shrink-0">
+          <select value={assignForm.condition} onChange={e => setAssignForm({ ...assignForm, condition: e.target.value })}
+            className="w-full bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-[11px] font-bold text-gray-800 appearance-none focus:outline-none focus:bg-white text-center">
+            <option value="NEW">New</option>
+            <option value="GOOD">Good</option>
+            <option value="USED">Used</option>
+          </select>
+        </div>
 
-          {selectedAssetForAssign?.assetType !== 'ELECTRONIC' && (
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Quantity</label>
-              <input type="number" min="1" value={assignForm.quantity} onChange={e => setAssignForm({ ...assignForm, quantity: e.target.value })}
-                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
-            </div>
-          )}
-
-          <div className="space-y-1">
-            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Condition</label>
-            <select value={assignForm.condition} onChange={e => setAssignForm({ ...assignForm, condition: e.target.value })}
-              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-medium appearance-none focus:outline-none focus:ring-2 focus:ring-emerald-500/20">
-              <option value="NEW">New</option>
-              <option value="GOOD">Good</option>
-              <option value="USED">Used</option>
-            </select>
-          </div>
-
+        {/* Assign Button */}
+        <div className="shrink-0 w-full lg:w-auto">
           {(can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) ? (
             <button type="submit" disabled={isSubmitting}
-              className="w-full bg-emerald-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-              {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Assigning...</> : '✅ Assign Asset'}
+              className="w-full lg:w-auto bg-emerald-600 text-white font-black text-[11px] px-4 py-2 rounded-xl shadow-xs hover:bg-emerald-700 transition-all flex items-center justify-center gap-1 shrink-0 whitespace-nowrap">
+              {isSubmitting ? <Loader2 size={14} className="animate-spin" /> : <><CheckCircle2 size={12} /> Assign</>}
             </button>
           ) : (
-            <p className="text-center text-[10px] font-black text-rose-500 uppercase tracking-widest bg-rose-50 p-3 rounded-xl border border-rose-100">
-              You do not have permission to assign assets
-            </p>
+            <span className="text-[9px] text-rose-500 font-bold px-2">No Perms</span>
           )}
-        </form>
-      </div>
+        </div>
 
-      {/* Return Asset */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm space-y-4">
-        <h3 className="text-lg font-black text-gray-900 flex items-center gap-2"><ArrowDownCircle size={20} className="text-orange-500" /> Return Asset</h3>
-        {(can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
-          <button onClick={() => { loadTracking(); setShowReturnModal(true); }}
-            className="w-full bg-orange-50 text-orange-600 font-bold py-3 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors">
-            Process Return
-          </button>
-        )}
-      </div>
+        {/* Separator */}
+        <div className="hidden lg:block w-px h-5 bg-gray-200 shrink-0 mx-0.5"></div>
+
+        {/* Return Action */}
+        <div className="shrink-0 w-full lg:w-auto">
+          {(can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
+            <button type="button" onClick={() => { loadTracking(); setShowReturnModal(true); }}
+              className="w-full lg:w-auto bg-orange-50 text-orange-600 font-black text-[11px] px-3 py-2 rounded-xl border border-orange-100 hover:bg-orange-100 transition-colors flex items-center justify-center gap-1 shrink-0 whitespace-nowrap">
+              <ArrowDownCircle size={12} /> Return
+            </button>
+          )}
+        </div>
+      </form>
     </div>
   );
 
@@ -576,63 +654,91 @@ export default function AdminAssets() {
 
   // ─── Issues Tab ─────────────────────────────────────────
   const renderIssues = () => (
-    <div className="space-y-4">
+    <div className="space-y-4 animate-in fade-in duration-200">
       {issues.length === 0 ? (
         <div className="py-12 bg-white rounded-2xl border border-gray-100 text-center">
           <CheckCircle2 size={32} className="mx-auto text-emerald-200 mb-2" />
           <p className="text-sm font-bold text-gray-400">No issues reported</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {issues.map(issue => (
-            <div key={issue.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 space-y-3">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                    issue.status === 'OPEN' ? 'bg-red-50 text-red-500' : issue.status === 'RESOLVED' ? 'bg-emerald-50 text-emerald-500' : 'bg-gray-50 text-gray-400'
-                  }`}>
-                    <AlertTriangle size={20} />
-                  </div>
-                  <div>
-                    <h4 className="text-sm font-black text-gray-900">{issue.assetUnit?.asset?.name}</h4>
-                    <span className="text-[10px] text-gray-400 font-bold">{issue.assetUnit?.asset?.model} • Reported by {issue.user?.name}</span>
-                  </div>
-                </div>
-                <span className={`text-[9px] font-black px-2 py-1 rounded-lg uppercase ${
-                  issue.status === 'OPEN' ? 'bg-red-100 text-red-600' : issue.status === 'RESOLVED' ? 'bg-emerald-100 text-emerald-600' : 'bg-gray-100 text-gray-500'
-                }`}>{issue.status}</span>
-              </div>
-
-              <div className="bg-gray-50 p-3 rounded-xl space-y-1">
-                <span className="text-[10px] font-black text-gray-400 uppercase">Issue: {issue.issueType?.replace('_', ' ')}</span>
-                {issue.description && <p className="text-xs text-gray-600">{issue.description}</p>}
-              </div>
-
-              {issue.photos && issue.photos.length > 0 && (
-                <div className="flex gap-2 overflow-x-auto pb-1">
-                  {issue.photos.map((p, i) => (
-                    <img key={i} src={p} alt="" className="w-16 h-16 rounded-lg object-cover border border-gray-100 shrink-0" />
-                  ))}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-1">
-                <span className="text-[10px] text-gray-400">{new Date(issue.createdAt).toLocaleDateString('en-IN')}</span>
-                {issue.status === 'OPEN' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) && (
-                  <div className="flex gap-2">
-                    <button onClick={() => handleIssueStatus(issue.id, 'RESOLVED')}
-                      className="text-[10px] font-black uppercase bg-emerald-50 text-emerald-600 px-3 py-1.5 rounded-xl hover:bg-emerald-100 border border-emerald-100">
-                      Resolve
-                    </button>
-                    <button onClick={() => handleIssueStatus(issue.id, 'CLOSED')}
-                      className="text-[10px] font-black uppercase bg-gray-50 text-gray-500 px-3 py-1.5 rounded-xl hover:bg-gray-100 border border-gray-100">
-                      Close
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          ))}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/75 border-b border-gray-100 text-[10px] font-black text-gray-400 uppercase tracking-wider">
+                  <th className="py-3 px-4">Asset Specifics</th>
+                  <th className="py-3 px-4">Reported By</th>
+                  <th className="py-3 px-4">Issue Category</th>
+                  <th className="py-3 px-4">Details & Evidence</th>
+                  <th className="py-3 px-4">Reported Date</th>
+                  <th className="py-3 px-4 text-center">Status</th>
+                  <th className="py-3 px-4 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50 text-xs font-medium">
+                {issues.map(issue => (
+                  <tr key={issue.id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="py-3 px-4 align-middle">
+                      <div className="font-bold text-gray-900 truncate max-w-[150px]">{issue.assetUnit?.asset?.name}</div>
+                      <div className="text-[10px] text-gray-400 truncate max-w-[150px]">{issue.assetUnit?.asset?.model || 'General'}</div>
+                    </td>
+                    <td className="py-3 px-4 align-middle text-gray-600 truncate max-w-[120px]">
+                      {issue.user?.name || 'Unknown Agent'}
+                    </td>
+                    <td className="py-3 px-4 align-middle">
+                      <span className="text-[10px] font-black uppercase text-gray-700 bg-gray-100 px-2 py-0.5 rounded">
+                        {issue.issueType?.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 align-middle">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[11px] text-gray-600 truncate max-w-[180px] block">
+                          {issue.description || 'No description provided'}
+                        </span>
+                        {issue.photos && issue.photos.length > 0 && (
+                          <div className="flex gap-1 shrink-0">
+                            {issue.photos.map((p, i) => (
+                              <a key={i} href={p} target="_blank" rel="noopener noreferrer" className="block hover:opacity-80">
+                                <img src={p} alt="" className="w-6 h-6 rounded object-cover border border-gray-200" />
+                              </a>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 align-middle text-[11px] text-gray-400 whitespace-nowrap">
+                      {new Date(issue.createdAt).toLocaleDateString('en-IN')}
+                    </td>
+                    <td className="py-3 px-4 align-middle text-center whitespace-nowrap">
+                      <span className={`text-[9px] font-black px-2 py-0.5 rounded-md uppercase tracking-wider ${
+                        issue.status === 'OPEN' ? 'bg-red-50 text-red-600 border border-red-100' : 
+                        issue.status === 'RESOLVED' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 
+                        'bg-gray-50 text-gray-500 border border-gray-100'
+                      }`}>
+                        {issue.status}
+                      </span>
+                    </td>
+                    <td className="py-3 px-4 align-middle text-right whitespace-nowrap">
+                      {issue.status === 'OPEN' && (can('ASSETS', 'UPDATE') || can('ASSETS', 'CREATE')) ? (
+                        <div className="inline-flex gap-1.5 justify-end">
+                          <button onClick={() => handleIssueStatus(issue.id, 'RESOLVED')}
+                            className="text-[9px] font-black uppercase bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-lg hover:bg-emerald-100 border border-emerald-100 transition-colors">
+                            Resolve
+                          </button>
+                          <button onClick={() => handleIssueStatus(issue.id, 'CLOSED')}
+                            className="text-[9px] font-black uppercase bg-gray-50 text-gray-500 px-2.5 py-1 rounded-lg hover:bg-gray-100 border border-gray-100 transition-colors">
+                            Close
+                          </button>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] text-gray-300 italic">-- Actioned --</span>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>
@@ -816,6 +922,416 @@ export default function AdminAssets() {
       </div>
     );
   };
+
+  // ─── Vehicle Mapping Tab ────────────────────────────────
+  const renderVehicleMapping = () => (
+    <div className="space-y-6">
+      <div className="bg-gradient-to-r from-emerald-600 to-teal-700 p-8 rounded-3xl text-white shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div>
+          <h3 className="text-xl font-black tracking-tight flex items-center gap-2.5">
+            <Truck size={24} className="text-emerald-200" /> Dynamic Fleet Asset Distribution
+          </h3>
+          <p className="text-xs text-emerald-100 font-medium mt-1">
+            Real-time reflection of attached transport logistics. Vehicle allocations and primary agent assignments are administered centrally via the <strong className="underline underline-offset-2">Admin Vehicles</strong> module.
+          </p>
+        </div>
+        <div className="bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 text-xs font-bold">
+          {tracking.filter(t => t.vehicleId || t.assetUnit?.vehicleId || t.user?.assignedVehicleId).length} Bound Assets
+        </div>
+      </div>
+
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-4 bg-gray-50/50 border-b border-gray-100 font-bold text-xs text-gray-500 uppercase tracking-wider px-6 flex items-center justify-between">
+          <span>Assigned Devices & Vehicle Binding List</span>
+          <span className="text-[10px] text-emerald-600 font-bold lowercase bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-100 flex items-center gap-1">
+            <Lock size={10} /> read-only view
+          </span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-emerald-50/30">
+                <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Asset Specifics</th>
+                <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Serial Number</th>
+                <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Current Holder</th>
+                <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Assigned Delivery Vehicle</th>
+                <th className="text-right py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Binding Source</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {tracking.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center py-12 text-gray-400 font-bold text-xs uppercase tracking-widest">
+                    No Active Asset Assignments to Monitor
+                  </td>
+                </tr>
+              ) : (
+                tracking.map(item => {
+                  const currentVehicleId = item.vehicleId || item.assetUnit?.vehicleId || item.user?.assignedVehicleId || '';
+                  const targetVehicleObj = item.user?.assignedVehicle || vehicles.find(v => v.id === currentVehicleId);
+                  
+                  return (
+                    <tr key={item.id} className="hover:bg-emerald-50/20 transition-colors">
+                      <td className="py-4 px-6">
+                        <div className="font-bold text-gray-900">{item.assetUnit?.asset?.name || 'Asset'}</div>
+                        <div className="text-[10px] text-gray-400">{item.assetUnit?.asset?.assetType}</div>
+                      </td>
+                      <td className="py-4 px-6 font-mono text-xs font-bold text-emerald-600">
+                        {item.assetUnit?.serialNumber || <span className="text-gray-300 italic">Bulk Asset</span>}
+                      </td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col gap-0.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-6 h-6 rounded-full bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-600 shrink-0">
+                              {(item.user?.name || 'U')[0]}
+                            </div>
+                            <span className="text-xs font-bold text-gray-700">{item.user?.name}</span>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6">
+                        {targetVehicleObj ? (
+                          <div className="flex items-center gap-2">
+                            <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 font-black text-xs rounded-xl border border-emerald-100 flex items-center gap-1.5 shadow-2xs">
+                              <Truck size={12} className="text-emerald-600" />
+                              {targetVehicleObj.vehicleNumber}
+                            </span>
+                            {targetVehicleObj.vehicleName && (
+                              <span className="text-[10px] text-gray-400 font-bold">({targetVehicleObj.vehicleName})</span>
+                            )}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-gray-400 italic">Unassigned (Manage via Admin Vehicles)</span>
+                        )}
+                      </td>
+                      <td className="py-4 px-6 text-right">
+                        <span className={`px-2.5 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                          currentVehicleId ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-400 border-gray-100'
+                        }`}>
+                          {currentVehicleId ? (item.user?.assignedVehicleId ? 'Agent Allocation' : 'Direct Link') : 'Unassigned'}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Depreciation Tab ───────────────────────────────────
+  const renderDepreciation = () => (
+    <div className="space-y-6">
+      {/* Configuration Controller Form */}
+      <div className="bg-white p-6 md:p-8 rounded-3xl border border-gray-100 shadow-sm">
+        <div className="flex items-center gap-2 mb-6">
+          <BarChart3 className="text-emerald-600" size={20} />
+          <h4 className="text-sm font-black uppercase tracking-widest text-gray-800">Configure Depreciation Matrix</h4>
+        </div>
+        <form onSubmit={handleSaveDepreciation} className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Select Physical Asset</label>
+            <select 
+              required
+              value={depreciationForm.assetId} 
+              onChange={e => {
+                const a = assets.find(x => x.id === e.target.value);
+                setDepreciationForm({ 
+                  ...depreciationForm, 
+                  assetId: e.target.value,
+                  costBasis: a?.estimatedCost || ''
+                });
+              }}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs font-bold"
+            >
+              <option value="">-- Select Master Asset --</option>
+              {assets.map(a => <option key={a.id} value={a.id}>{a.name} ({a.assetType})</option>)}
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Cost Basis (₹)</label>
+            <input 
+              type="number" required placeholder="15000"
+              value={depreciationForm.costBasis} 
+              onChange={e => setDepreciationForm({...depreciationForm, costBasis: e.target.value})}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20" 
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Salvage / Residual Value (₹)</label>
+            <input 
+              type="number" required placeholder="1500"
+              value={depreciationForm.salvageValue} 
+              onChange={e => setDepreciationForm({...depreciationForm, salvageValue: e.target.value})}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20" 
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Useful Life (Years)</label>
+            <input 
+              type="number" min="1" required
+              value={depreciationForm.usefulLifeYears} 
+              onChange={e => setDepreciationForm({...depreciationForm, usefulLifeYears: e.target.value})}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20" 
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Depreciation Methodology</label>
+            <select 
+              value={depreciationForm.method} 
+              onChange={e => setDepreciationForm({...depreciationForm, method: e.target.value})}
+              className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs font-bold"
+            >
+              <option value="STRAIGHT_LINE">Straight-Line Method</option>
+              <option value="DECLINING_BALANCE">Declining Balance Method</option>
+            </select>
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Annual Rate (%)</label>
+            <div className="flex gap-2">
+              <input 
+                type="number" step="0.1" required
+                value={depreciationForm.ratePercentage} 
+                onChange={e => setDepreciationForm({...depreciationForm, ratePercentage: e.target.value})}
+                className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-xs font-bold focus:ring-2 focus:ring-emerald-500/20" 
+              />
+              <button 
+                type="submit" disabled={isSubmitting}
+                className="bg-emerald-600 text-white font-bold text-xs px-6 rounded-xl hover:bg-emerald-700 transition-all shrink-0 shadow-md"
+              >
+                {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : 'Save Matrix'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      {/* Calculated Schedule Overview Table */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-4 bg-gray-50/50 border-b border-gray-100 font-bold text-xs text-gray-500 uppercase tracking-wider px-6">
+          Asset Depreciation Matrix & Live Book Valuation
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-emerald-50/30">
+                <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Asset Details</th>
+                <th className="text-left py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest whitespace-nowrap">Methodology</th>
+                <th className="text-right py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Cost Basis</th>
+                <th className="text-right py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Salvage Limit</th>
+                <th className="text-center py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Useful Life</th>
+                <th className="text-right py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Annual Rate</th>
+                <th className="text-right py-4 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Real-Time Book Val</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {depreciations.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="text-center py-12 text-gray-400 font-bold text-xs uppercase tracking-widest">
+                    No Fixed-Asset Depreciation Configuration Seeded
+                  </td>
+                </tr>
+              ) : (
+                depreciations.map(dep => (
+                  <tr key={dep.id} className="hover:bg-emerald-50/10 transition-colors">
+                    <td className="py-4 px-6 max-w-xs">
+                      <div className="font-black text-gray-900 truncate">{dep.assetName}</div>
+                      {dep.assetModel && <div className="text-[10px] text-gray-400 truncate font-bold">{dep.assetModel}</div>}
+                    </td>
+                    <td className="py-4 px-6 whitespace-nowrap">
+                      <span className="text-[8px] font-black px-2 py-0.5 bg-emerald-50 text-emerald-700 rounded-lg uppercase tracking-tight border border-emerald-100 inline-block">
+                        {dep.method.replace('_', ' ')}
+                      </span>
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono font-bold text-gray-700">
+                      ₹{dep.costBasis?.toLocaleString()}
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono font-bold text-gray-700">
+                      ₹{dep.salvageValue?.toLocaleString()}
+                    </td>
+                    <td className="py-4 px-6 text-center font-bold text-gray-700">
+                      {dep.usefulLifeYears} Years
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono font-bold text-emerald-600">
+                      {dep.ratePercentage}%
+                    </td>
+                    <td className="py-4 px-6 text-right font-mono font-black text-emerald-600 text-base">
+                      ₹{dep.realTimeBookValue?.toLocaleString()}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ─── Asset Audit Tab ────────────────────────────────────
+  // ─── Asset Audit Tab ────────────────────────────────────
+  const renderAudit = () => (
+    <div className="space-y-6">
+      {/* Logger Expandable Controller */}
+      <div className="bg-white p-4 rounded-3xl border border-gray-100 shadow-sm flex flex-col transition-all duration-300">
+        <div className="flex items-center justify-between px-2">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="text-emerald-600" size={20} />
+            <div>
+              <h4 className="text-xs font-black uppercase tracking-widest text-gray-800">Physical Asset Audit & Inspection</h4>
+              <p className="text-[10px] text-gray-400 font-bold">Perform manual inspection checks and log unit verification records</p>
+            </div>
+          </div>
+          <button 
+            type="button" 
+            onClick={() => setShowAuditForm(!showAuditForm)}
+            className={`px-4 py-2 rounded-xl font-black text-xs transition-all flex items-center gap-1.5 border ${
+              showAuditForm 
+                ? 'bg-gray-50 text-gray-500 border-gray-200 hover:bg-gray-100' 
+                : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'
+            }`}
+          >
+            {showAuditForm ? <><X size={14} /> Close Logger</> : <><Plus size={14} /> Record New Audit</>}
+          </button>
+        </div>
+
+        {showAuditForm && (
+          <form onSubmit={(e) => { handleCreateAudit(e); setShowAuditForm(false); }} className="space-y-4 pt-4 mt-4 border-t border-gray-50 animate-fadeIn">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Target Master Asset</label>
+                <select 
+                  required
+                  value={auditForm.assetId} 
+                  onChange={e => setAuditForm({ ...auditForm, assetId: e.target.value, assetUnitId: '' })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white"
+                >
+                  <option value="">-- Select Master Asset --</option>
+                  {assets.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Specific Unit Serial (Optional)</label>
+                <select 
+                  value={auditForm.assetUnitId} 
+                  onChange={e => setAuditForm({ ...auditForm, assetUnitId: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white"
+                >
+                  <option value="">-- All / General Unit --</option>
+                  {(() => {
+                    const targetAsset = assets.find(a => a.id === auditForm.assetId);
+                    if (!targetAsset || !targetAsset.units) return null;
+                    return targetAsset.units.map(u => (
+                      <option key={u.id} value={u.id}>SN: {u.serialNumber || u.id.slice(-6)} ({u.condition})</option>
+                    ));
+                  })()}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Audit Result Status</label>
+                <select 
+                  value={auditForm.status} 
+                  onChange={e => setAuditForm({ ...auditForm, status: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white"
+                >
+                  <option value="VERIFIED">Verified Present</option>
+                  <option value="MISSING">Reported Missing / Lost</option>
+                  <option value="DAMAGED">Physically Damaged</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Physical Hardware Condition</label>
+                <select 
+                  value={auditForm.physicalCondition} 
+                  onChange={e => setAuditForm({ ...auditForm, physicalCondition: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white"
+                >
+                  <option value="NEW">Pristine / New</option>
+                  <option value="GOOD">Operational / Good</option>
+                  <option value="DAMAGED">Requires Attention / Damaged</option>
+                </select>
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Verification Notes / Supervisor Remarks</label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" placeholder="Scanned label successfully, operating nominal..."
+                    value={auditForm.remarks} 
+                    onChange={e => setAuditForm({ ...auditForm, remarks: e.target.value })}
+                    className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2 text-xs font-bold focus:bg-white"
+                  />
+                  <button 
+                    type="submit" disabled={isSubmitting}
+                    className="bg-emerald-600 text-white font-black text-xs px-6 rounded-xl hover:bg-emerald-700 transition-all shrink-0 flex items-center gap-1 shadow-md"
+                  >
+                    {isSubmitting ? <Loader2 size={16} className="animate-spin" /> : <><CheckCircle2 size={14} /> Log Audit</>}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Audit Logs Table */}
+      <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="p-4 bg-gray-50/50 border-b border-gray-100 font-bold text-xs text-gray-500 uppercase tracking-wider px-6">
+          Recent Audit Verification Trail
+        </div>
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-emerald-50/30">
+              <th className="text-left py-3 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Date & Time</th>
+              <th className="text-left py-3 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Asset Target</th>
+              <th className="text-left py-3 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Auditor</th>
+              <th className="text-left py-3 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Result Status</th>
+              <th className="text-left py-3 px-6 text-[10px] font-black text-emerald-800 uppercase tracking-widest">Condition & Notes</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50 text-xs">
+            {audits.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="text-center py-8 text-gray-400 font-bold uppercase tracking-widest">
+                  No Asset Audits Logged Yet
+                </td>
+              </tr>
+            ) : (
+              audits.map(a => (
+                <tr key={a.id} className="hover:bg-gray-50/50">
+                  <td className="py-3 px-6 font-mono text-gray-500">
+                    {new Date(a.auditDate).toLocaleString('en-IN', { dateStyle: 'short', timeStyle: 'short' })}
+                  </td>
+                  <td className="py-3 px-6">
+                    <span className="font-bold text-gray-900 block">{a.assetName}</span>
+                    {a.serialNumber !== 'N/A' && <span className="text-[10px] font-mono text-emerald-600 font-bold">SN: {a.serialNumber}</span>}
+                  </td>
+                  <td className="py-3 px-6 font-bold text-gray-700">{a.auditedByName}</td>
+                  <td className="py-3 px-6">
+                    <span className={`px-2 py-0.5 rounded text-[9px] font-black uppercase tracking-wider border ${
+                      a.status === 'VERIFIED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                      a.status === 'MISSING' ? 'bg-red-50 text-red-600 border-red-100' : 'bg-orange-50 text-orange-600 border-orange-100'
+                    }`}>
+                      {a.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-6">
+                    <span className="font-bold text-gray-800 block text-[11px]">Cond: {a.physicalCondition}</span>
+                    {a.remarks && <span className="text-[10px] text-gray-400 italic">"{a.remarks}"</span>}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
 
   // ─── Requests Tab ───────────────────────────────────────
   const renderRequests = () => (
@@ -1159,60 +1675,73 @@ export default function AdminAssets() {
   return (
     <div key={storeId} className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-3">
-          {storeId && (
-            <button
-              onClick={() => setSearchParams({})}
-              className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-              title="Back to All Branches"
-            >
-              <ChevronLeft size={18} />
-            </button>
-          )}
-          <h2 className="text-2xl font-bold text-gray-900">
-            {(() => {
-              const selectedStore = stores.find(s => s.id === storeId);
-              return selectedStore ? `${selectedStore.name} Assets` : 'Asset Management';
-            })()}
-          </h2>
-        </div>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-gray-500">Track, assign and manage company assets</p>
-            {isGlobalRole && storeId && (
-              <>
-                <span className="text-gray-300">•</span>
-                <button 
-                  onClick={() => setSearchParams({})} 
-                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
-                >
-                  Change Store
-                </button>
-              </>
+          <div className="flex items-center gap-3">
+            {storeId && stores.length > 1 && (
+              <button
+                onClick={() => setSearchParams({})}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                title="Back to All Branches"
+              >
+                <ChevronLeft size={18} />
+              </button>
             )}
+            <h2 className="text-2xl font-bold text-gray-900">
+              {(() => {
+                const selectedStore = stores.find(s => s.id === storeId);
+                return selectedStore ? `${selectedStore.name} Assets` : 'Asset Management';
+              })()}
+            </h2>
           </div>
+          <p className="text-sm text-gray-500">Track, assign and manage company assets</p>
         </div>
+        {stores.length > 1 && (
+          <select
+            value={storeId || ''}
+            onChange={(e) => {
+              if (e.target.value) {
+                setSearchParams({ storeId: e.target.value });
+              } else {
+                setSearchParams({});
+              }
+            }}
+            className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm w-fit"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+              backgroundPosition: 'right 0.35rem center',
+              backgroundRepeat: 'no-repeat',
+              backgroundSize: '1.1rem'
+            }}
+          >
+            <option value="">All Branches</option>
+            {stores.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-2 p-1 rounded-2xl flex-wrap border-b border-gray-100 mb-6 overflow-x-auto">
+      <div className="grid grid-cols-8 gap-1 p-1 rounded-2xl bg-gray-50 border border-gray-100 mb-6 w-full overflow-hidden">
         {tabs.map(tab => (
           <button key={tab.key}
             onClick={() => { setActiveTab(tab.key); setSearchQuery(''); }}
-            className={`flex items-center gap-2 py-2 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all duration-200 ${
-              activeTab === tab.key ? 'bg-emerald-50 text-emerald-700 border border-emerald-100' : 'text-gray-400 hover:text-gray-600'
+            className={`flex flex-col lg:flex-row items-center justify-center gap-1 lg:gap-1.5 py-2 px-1 rounded-xl text-[9px] lg:text-[10px] font-black uppercase tracking-tight text-center truncate transition-all duration-200 ${
+              activeTab === tab.key ? 'bg-white text-emerald-700 border border-emerald-100 shadow-sm' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-100/50'
             }`}>
-            {tab.icon}
-            {tab.label}
+            <span className="shrink-0">{tab.icon}</span>
+            <span className="truncate max-w-full">{tab.label}</span>
           </button>
         ))}
       </div>
 
       {activeTab === 'master' && renderMaster()}
       {activeTab === 'assign' && renderAssign()}
-      {activeTab === 'tracking' && renderTracking()}
+      {activeTab === 'vehicle-mapping' && renderVehicleMapping()}
       {activeTab === 'issues' && renderIssues()}
+      {activeTab === 'depreciation' && renderDepreciation()}
+      {activeTab === 'audit' && renderAudit()}
       {activeTab === 'requests' && renderRequests()}
       {activeTab === 'reports' && renderReports()}
 
@@ -1354,7 +1883,7 @@ export default function AdminAssets() {
               </div>
               <button type="submit" disabled={isSubmitting}
                 className="w-full bg-orange-500 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-orange-600 transition-all flex items-center justify-center gap-2 disabled:opacity-50">
-                {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : '✅ Submit Return'}
+                {isSubmitting ? <><Loader2 size={18} className="animate-spin" /> Processing...</> : <><CheckCircle2 size={16} /> Submit Return</>}
               </button>
             </form>
           </div>

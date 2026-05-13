@@ -498,7 +498,7 @@ export default function AdminRoutes() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Left: Title & Subtitle */}
           <div className="flex items-start gap-3">
-            {storeId && (
+            {storeId && stores.length > 1 && (
               <button
                 onClick={() => setSearchParams({})}
                 className="p-2.5 bg-gray-50 border border-gray-100/80 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/50 transition-all shadow-2xs active:scale-95 mt-0.5"

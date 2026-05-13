@@ -1551,175 +1551,166 @@ export default function AdminUsers({ type }) {
   };
 
   return (
-    <div className="p-2 md:p-4 space-y-3">
+    <div className="p-2 md:p-4 space-y-4">
       {showEditModal && editingUser ? (
         renderEditView()
       ) : (
         <>
-          {/* Header Section */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-3">
-            {storeFilterId && (
-              <button
-                onClick={() => setSearchParams({})}
-                className="p-2 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                title="Back to All Branches"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            <h2 className="text-xl font-bold text-gray-900">User Management</h2>
-          </div>
-          <div className="flex flex-col gap-1.5 mt-2">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 opacity-70">
-              Department View
-            </span>
-            <div className="flex items-center bg-gray-200/50 p-1.5 rounded-2xl w-fit flex-wrap gap-1 border border-gray-100 shadow-sm">
-              <button
-                onClick={() => setActiveTab('all')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'all' ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
-              >
-                All Members
-              </button>
+          {/* Header Container */}
+          <div className="flex flex-col gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
+            {/* Top Row: Title & Back Button */}
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                {storeFilterId && stores.length > 1 && (
+                  <button
+                    onClick={() => setSearchParams({})}
+                    className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-500 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all shadow-2xs active:scale-95 mt-0.5"
+                    title="Back to All Branches"
+                  >
+                    <ArrowLeft size={18} strokeWidth={2.5} />
+                  </button>
+                )}
+                <div className="text-left">
+                  <h2 className="text-xl font-black text-gray-900 tracking-tight leading-none">User Management</h2>
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                    {filteredUsers.length} members found
+                  </p>
+                </div>
+              </div>
 
-              <button
-                onClick={() => setActiveTab('admin')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'admin' ? 'bg-rose-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
-              >
-                Admins
-              </button>
+              {/* Branch Selector */}
+              {stores.length > 1 && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Branch:</span>
+                  <select
+                    value={storeFilterId || ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSearchParams({ storeId: e.target.value });
+                      } else {
+                        setSearchParams({});
+                      }
+                    }}
+                    className="bg-emerald-50 text-emerald-700 text-xs font-black uppercase tracking-widest pl-3 pr-8 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.5rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.25rem'
+                    }}
+                  >
+                    <option value="">All Branches</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
 
-              <button
-                onClick={() => setActiveTab('agent')}
-                className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-blue-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
-              >
-                Agents
-              </button>
-
-              {relevantCustomRoles.map(role => (
+            {/* Department Views Bar */}
+            <div className="pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-left">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 opacity-70">
+                Department View
+              </span>
+              <div className="flex items-center bg-gray-50 p-1.5 rounded-2xl w-fit flex-wrap gap-1 border border-gray-100/80 shadow-2xs">
                 <button
-                  key={role.id}
-                  onClick={() => setActiveTab(role.id)}
-                  className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === role.id ? 'bg-emerald-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
+                  onClick={() => setActiveTab('all')}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'all' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
                 >
-                  {role.name}
+                  All Members
                 </button>
-              ))}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 mt-2">
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-tight">{filteredUsers.length} members found</p>
-            {stores.length > 1 && (
-              <>
-                <span className="text-gray-300">•</span>
-                <select
-                  value={storeFilterId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSearchParams({ storeId: e.target.value });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
-                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.25rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
+
+                <button
+                  onClick={() => setActiveTab('admin')}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'admin' ? 'bg-rose-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
                 >
-                  <option value="">All Branches</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </>
-            )}
-          </div>
-        </div>
-        <div className="flex items-center gap-3">
-        
-        {/* Search & Actions */}
-        {storeFilterId && (
-          <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm">
-            <div className="relative flex-1 w-full group">
-              <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
-              <input
-                type="text"
-                placeholder={`Search ${activeTab === 'admin' ? 'Admins' : 'Staff'} by name, mobile or role...`}
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={handleExportExcel}
-                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                title="Export to Excel"
-              >
-                <FileText size={18} />
-              </button>
-              <button
-                onClick={handleExportPDF}
-                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                title="Download PDF Report"
-              >
-                <Download size={18} />
-              </button>
-              <button
-                onClick={handlePrint}
-                className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
-                title="Print Current List"
-              >
-                <Printer size={18} />
-              </button>
-              <button
-                onClick={() => {
-                  setNewUser({
-                    name: '',
-                    email: '',
-                    password: '',
-                    mobile: '',
-                    role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
-                    vgeType: 'EMPLOYEE',
-                    storeId: storeFilterId || currentUser?.storeId || '',
-                    dailyTarget: 10000,
-                    baseSalary: 12000,
-                  });
-                  setAddStep(1);
-                  setShowAddModal(true);
-                }}
-                className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
-              >
-                <Plus size={18} />
-                <span className="hidden md:inline">Hire Member</span>
-                <span className="md:hidden">Add</span>
-              </button>
+                  Admins
+                </button>
+
+                <button
+                  onClick={() => setActiveTab('agent')}
+                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'agent' ? 'bg-blue-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
+                >
+                  Agents
+                </button>
+
+                {relevantCustomRoles.map(role => (
+                  <button
+                    key={role.id}
+                    onClick={() => setActiveTab(role.id)}
+                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === role.id ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
+                  >
+                    {role.name}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
-        )}
-      </div>
-    </div>
 
-      {/* Mobile Search - Only visible on small screens */}
-      {storeFilterId && (
-        <div className="sm:hidden relative group px-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
-          <input
-            type="text"
-            placeholder="Search staff members..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 outline-none transition-all shadow-sm font-medium"
-          />
-        </div>
-      )}
+          {/* Search & Actions Bar */}
+          {storeFilterId && (
+            <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-5 rounded-[2rem] border border-gray-100 shadow-sm">
+              <div className="relative flex-1 w-full group">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" />
+                <input
+                  type="text"
+                  placeholder={`Search ${activeTab === 'admin' ? 'Admins' : 'Staff'} by name, mobile or role...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-12 pr-4 py-3 bg-gray-50 border-none rounded-xl text-sm focus:bg-white focus:ring-2 focus:ring-emerald-500/20 transition-all outline-none font-bold"
+                />
+              </div>
+              <div className="flex items-center gap-2 self-end md:self-center">
+                <button
+                  onClick={handleExportExcel}
+                  className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                  title="Export to Excel"
+                >
+                  <FileText size={18} />
+                </button>
+                <button
+                  onClick={handleExportPDF}
+                  className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                  title="Download PDF Report"
+                >
+                  <Download size={18} />
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="p-3 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm"
+                  title="Print Current List"
+                >
+                  <Printer size={18} />
+                </button>
+                <button
+                  onClick={() => {
+                    setNewUser({
+                      name: '',
+                      email: '',
+                      password: '',
+                      mobile: '',
+                      role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
+                      vgeType: 'EMPLOYEE',
+                      storeId: storeFilterId || currentUser?.storeId || '',
+                      dailyTarget: 10000,
+                      baseSalary: 12000,
+                    });
+                    setAddStep(1);
+                    setShowAddModal(true);
+                  }}
+                  className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95 shrink-0"
+                >
+                  <Plus size={18} />
+                  <span className="hidden md:inline">Hire Member</span>
+                  <span className="md:hidden">Add</span>
+                </button>
+              </div>
+            </div>
+          )}
 
-        {renderClassifiedUsers()}
-      </>
+          {renderClassifiedUsers()}
+        </>
       )}
     </div>
   );

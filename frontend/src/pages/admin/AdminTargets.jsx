@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Target, TrendingUp, Award, Zap, Trophy, Star, Crown, Users, Calendar, Settings, RefreshCw, Loader2, ChevronDown, ChevronRight, ArrowLeft, BarChart3, Package, Lock, Play, MapPin, X, Store } from 'lucide-react';
+import { Target, TrendingUp, Award, Zap, Trophy, Star, Crown, Users, Calendar, Settings, RefreshCw, Loader2, ChevronDown, ChevronRight, ChevronLeft, ArrowLeft, BarChart3, Package, Lock, Play, MapPin, X, Store } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 import { useSearchParams } from 'react-router-dom';
@@ -444,12 +444,13 @@ export default function AdminTargets() {
     <div key={storeId || 'branch'} className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
       <div className="flex items-center justify-between pb-4">
         <div className="flex items-center gap-4">
-          {isGlobalRole && storeId && (
+          {storeId && stores.length > 1 && (
             <button 
               onClick={() => setSearchParams({})} 
-              className="p-3 rounded-2xl bg-white border border-gray-100 text-gray-400 hover:bg-emerald-50 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm group"
+              className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+              title="Back to All Branches"
             >
-              <ArrowLeft size={20} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" />
+              <ChevronLeft size={18} />
             </button>
           )}
           <div className="flex items-center gap-3">
@@ -459,30 +460,48 @@ export default function AdminTargets() {
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-xl font-black text-gray-900 tracking-tight">VGE Performance</h2>
-              <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest border border-emerald-100">
-                {performances.length} Agents
-              </span>
-            </div>
-            <div className="flex items-center gap-2 mt-0.5">
-              <p className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
-                <Store size={10} />
-                {currentUser?.storeId ? (performances[0]?.user?.store?.name || 'Assigned Branch') : (storeId ? 'Selected Branch' : 'Cross-Branch View')}
-              </p>
-              {isGlobalRole && (
-                <button 
-                  onClick={() => setSearchParams({})} 
-                  className="text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest underline underline-offset-2 ml-1"
-                >
-                  Change Store
-                </button>
-              )}
+                <span className="px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                  {performances.length} Agents
+                </span>
+              </div>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-xs font-black text-emerald-600 uppercase tracking-widest flex items-center gap-1">
+                  <Store size={10} />
+                  {currentUser?.storeId ? (performances[0]?.user?.store?.name || 'Assigned Branch') : (storeId ? 'Selected Branch' : 'Cross-Branch View')}
+                </p>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-        <div className="text-right hidden sm:block">
-          <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Tracking</p>
-          <p className="text-xs font-bold text-gray-500">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</p>
+        <div className="flex items-center gap-3">
+          {stores.length > 1 && (
+            <select
+              value={storeId || ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSearchParams({ storeId: e.target.value });
+                } else {
+                  setSearchParams({});
+                }
+              }}
+              className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 0.35rem center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1.1rem'
+              }}
+            >
+              <option value="">All Branches</option>
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="text-right hidden sm:block">
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Target Tracking</p>
+            <p className="text-xs font-bold text-gray-500">{new Date().toLocaleDateString('en-IN', { month: 'long', year: 'numeric' })}</p>
+          </div>
         </div>
       </div>
 

@@ -52,7 +52,10 @@ export default function AgentAssets() {
 
   const handleReportIssue = async (e) => {
     e.preventDefault();
-    if (!selectedAsset) return;
+    if (!selectedAsset || selectedAsset.isTopLevel) {
+      toast.error('Please select a specific hardware item first');
+      return;
+    }
     setIsSubmitting(true);
     try {
       const fd = new FormData();
@@ -137,24 +140,40 @@ export default function AgentAssets() {
       {activeTab === 'assets' ? (
         <div className="space-y-4">
           {/* Quick Actions */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             <button
               onClick={() => { setRequestForm({ ...requestForm, type: 'NEW_ASSET' }); setShowRequestModal(true); }}
-              className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all text-center"
+              className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all text-center"
             >
-              <div className="w-10 h-10 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
-                <Plus size={20} />
+              <div className="w-9 h-9 bg-emerald-100 text-emerald-600 rounded-xl flex items-center justify-center">
+                <Plus size={18} />
               </div>
-              <span className="text-[10px] font-black text-gray-700 uppercase">Request New</span>
+              <span className="text-[9px] font-black text-gray-700 uppercase tracking-tight">Request New</span>
             </button>
             <button
               onClick={() => { setRequestForm({ ...requestForm, type: 'NEW_REQUIREMENT' }); setShowRequestModal(true); }}
-              className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all text-center"
+              className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all text-center"
             >
-              <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
-                <MessageSquare size={20} />
+              <div className="w-9 h-9 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center">
+                <MessageSquare size={18} />
               </div>
-              <span className="text-[10px] font-black text-gray-700 uppercase">Requirement</span>
+              <span className="text-[9px] font-black text-gray-700 uppercase tracking-tight">Requirement</span>
+            </button>
+            <button
+              onClick={() => { 
+                if (assets.length > 0) {
+                  setSelectedAsset(assets[0]);
+                } else {
+                  setSelectedAsset({ isTopLevel: true });
+                }
+                setShowIssueModal(true); 
+              }}
+              className="flex flex-col items-center gap-2 p-3 bg-white rounded-2xl border border-gray-100 shadow-sm hover:border-red-200 transition-all text-center"
+            >
+              <div className="w-9 h-9 bg-red-50 text-red-500 rounded-xl flex items-center justify-center">
+                <AlertTriangle size={18} />
+              </div>
+              <span className="text-[9px] font-black text-gray-700 uppercase tracking-tight">Report Issue</span>
             </button>
           </div>
 
@@ -380,15 +399,38 @@ export default function AgentAssets() {
               <button onClick={() => { setShowIssueModal(false); setSelectedAsset(null); }} className="p-2 hover:bg-gray-100 rounded-full text-gray-400"><X size={18} /></button>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-2xl mb-4 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
-                <Package size={20} className="text-emerald-500" />
+            {selectedAsset.isTopLevel ? (
+              <div className="space-y-1 mb-4">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Select Assigned Hardware</label>
+                <select 
+                  required
+                  onChange={e => {
+                    const found = assets.find(a => a.assetUnitId === e.target.value);
+                    if (found) {
+                      setSelectedAsset(found);
+                    }
+                  }}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-sm font-bold focus:ring-2 focus:ring-red-500/20 truncate"
+                >
+                  <option value="">-- Select Hardware Item --</option>
+                  {assets.map(a => (
+                    <option key={a.id} value={a.assetUnitId}>
+                      {a.assetUnit?.asset?.name} {a.assetUnit?.serialNumber ? `(SN: ${a.assetUnit.serialNumber})` : ''}
+                    </option>
+                  ))}
+                </select>
               </div>
-              <div>
-                <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{selectedAsset.assetUnit?.asset?.name}</span>
-                {selectedAsset.assetUnit?.serialNumber && <span className="text-[10px] font-mono text-gray-400 block">{selectedAsset.assetUnit.serialNumber}</span>}
+            ) : (
+              <div className="bg-gray-50 p-4 rounded-2xl mb-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-white border border-gray-100 flex items-center justify-center shadow-sm">
+                  <Package size={20} className="text-emerald-500" />
+                </div>
+                <div>
+                  <span className="text-xs font-black text-gray-800 uppercase tracking-tight">{selectedAsset.assetUnit?.asset?.name}</span>
+                  {selectedAsset.assetUnit?.serialNumber && <span className="text-[10px] font-mono text-gray-400 block">{selectedAsset.assetUnit.serialNumber}</span>}
+                </div>
               </div>
-            </div>
+            )}
 
             <form onSubmit={handleReportIssue} className="space-y-4">
               <div className="space-y-1">

@@ -184,9 +184,9 @@ export default function AdminProcurement() {
           {/* Header */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
-              {isGlobalRole && stores.length > 1 && (
+              {storeId && stores.length > 1 && (
                 <button
-                  onClick={() => setSearchParams({})}
+                  onClick={() => setSearchParams({ tab: activeTab })}
                   className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
                   title="Back to Organizational Overview"
                 >
@@ -194,12 +194,36 @@ export default function AdminProcurement() {
                 </button>
               )}
               <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 flex-wrap">
                   <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Procurement & Payables</h2>
                   {storeId && (
                     <span className="text-[10px] font-black px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full uppercase tracking-widest">
                       {stores.find(s => s.id === storeId)?.name || 'Branch'} Context
                     </span>
+                  )}
+                  {stores.length > 1 && (
+                    <select
+                      value={storeId || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSearchParams({ storeId: e.target.value, tab: activeTab });
+                        } else {
+                          setSearchParams({ tab: activeTab });
+                        }
+                      }}
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.35rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1.1rem'
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
                   )}
                 </div>
                 <p className="text-sm text-gray-400 font-bold uppercase tracking-widest text-[10px]">Vendor → PO → GRN → Purchase → Stock → Payment</p>

@@ -308,7 +308,7 @@ export default function AdminAttendance() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
-          {storeFilterId && (
+          {storeFilterId && stores.length > 1 && (
             <button
               onClick={() => setSearchParams({})}
               className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -325,22 +325,48 @@ export default function AdminAttendance() {
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Agent Punch-In Tracker with Photo Proof</p>
           </div>
         </div>
-        {storeFilterId && (
-          <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
-            <button
-              onClick={() => setActiveTab('live')}
-              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-                activeTab === 'live' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-              }`}
-            >Live Tracker</button>
-            <button
-              onClick={() => setActiveTab('late-reports')}
-              className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
-                activeTab === 'late-reports' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
-              }`}
-            >Late Reports</button>
-          </div>
-        )}
+        <div className="flex flex-wrap items-center gap-3">
+          {stores.length > 1 && (
+            <select
+              value={storeFilterId || ''}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setSearchParams({ storeId: e.target.value });
+                } else {
+                  setSearchParams({});
+                }
+              }}
+              className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm"
+              style={{
+                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                backgroundPosition: 'right 0.35rem center',
+                backgroundRepeat: 'no-repeat',
+                backgroundSize: '1.1rem'
+              }}
+            >
+              <option value="">All Branches</option>
+              {stores.map(s => (
+                <option key={s.id} value={s.id}>{s.name}</option>
+              ))}
+            </select>
+          )}
+          {storeFilterId && (
+            <div className="flex items-center gap-2 bg-white rounded-xl p-1 border border-gray-200 shadow-sm">
+              <button
+                onClick={() => setActiveTab('live')}
+                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'live' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >Live Tracker</button>
+              <button
+                onClick={() => setActiveTab('late-reports')}
+                className={`px-4 py-2 rounded-lg text-xs font-black uppercase tracking-widest transition-all ${
+                  activeTab === 'late-reports' ? 'bg-emerald-600 text-white shadow-md' : 'text-gray-500 hover:bg-gray-50'
+                }`}
+              >Late Reports</button>
+            </div>
+          )}
+        </div>
       </div>
 
       {storeFilterId && activeTab === 'late-reports' && <AdminLateEntryReport storeId={storeFilterId} />}

@@ -404,7 +404,17 @@ export const getAssetTracking = async (req, res) => {
       },
       orderBy: { assignedDate: 'desc' },
       include: {
-        user: { select: { id: true, name: true, email: true } },
+        user: { 
+          select: { 
+            id: true, 
+            name: true, 
+            email: true,
+            assignedVehicleId: true,
+            assignedVehicle: {
+              select: { id: true, vehicleNumber: true, vehicleName: true }
+            }
+          } 
+        },
         assetUnit: {
           include: {
             asset: { select: { id: true, name: true, assetType: true, model: true, brand: true, image: true } }
@@ -688,3 +698,246 @@ export const getMyAssetRequests = async (req, res) => {
     res.status(500).json({ message: 'Error fetching requests', error: error.message });
   }
 };
+
+// ─── Module 14 Enterprise Extensions ───────────────────────
+
+// 1. Vehicle Asset Mapping Update
+export const updateAssetVehicleMapping = async (req, res) => {
+  try {
+    const { assetUnitId, vehicleId } = req.body;
+    const targetVehicleId = vehicleId || null;
+
+    const updatedUnit = await prisma.assetUnit.update({
+      where: { id: assetUnitId },
+      data: { vehicleId: targetVehicleId }
+    });
+
+    // Also update active assignments targeting this unit to maintain parallel synchronization
+    await prisma.assetAssignment.updateMany({
+      where: { assetUnitId, isActive: true },
+      data: { vehicleId: targetVehicleId }
+    });
+
+    res.json({ message: 'Vehicle asset mapping updated successfully', unit: updatedUnit });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: req.user.storeId,
+      action: 'ASSET_ASSIGNED',
+      details: `Updated vehicle mapping for asset unit ${assetUnitId} to vehicle ${targetVehicleId || 'Unassigned'}`,
+      metadata: { assetUnitId, vehicleId: targetVehicleId }
+    });
+  } catch (error) {
+    console.error('❌ Update Vehicle Mapping Error:', error);
+    res.status(500).json({ message: 'Error updating vehicle asset mapping', error: error.message });
+  }
+};
+
+// 2. Depreciation Modeling & Management
+export const getDepreciationSchedules = async (req, res) => {
+  try {
+    const storeId = getEffectiveStoreId(req);
+    
+    // Fetch all master assets to verify schedules exist
+    const assets = await prisma.asset.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        storeId: storeId
+      },
+      select: {
+        id: true,
+        name: true,
+        model: true,
+        estimatedCost: true,
+        createdAt: true
+      }
+    });
+
+    const schedules = [];
+
+    for (const asset of assets) {
+      let dep = await prisma.assetDepreciation.findFirst({
+        where: { assetId: asset.id }
+      });
+
+      // If no schedule exists, auto-seed a default straight line schedule based on estimatedCost
+      if (!dep) {
+        dep = await prisma.assetDepreciation.create({
+          data: {
+            assetId: asset.id,
+            tenantId: req.user.tenantId,
+            costBasis: asset.estimatedCost || 0,
+            salvageValue: (asset.estimatedCost || 0) * 0.1, // Default 10% salvage value
+            usefulLifeYears: 5,
+            method: 'STRAIGHT_LINE',
+            ratePercentage: 20,
+            currentBookVal: asset.estimatedCost || 0
+          }
+        });
+      }
+
+      // Calculate real-time net book value dynamically
+      const elapsedMs = Date.now() - new Date(asset.createdAt).getTime();
+      const elapsedYears = elapsedMs / (1000 * 60 * 60 * 24 * 365.25);
+      
+      let calculatedBookValue = dep.costBasis;
+      if (dep.method === 'STRAIGHT_LINE') {
+        const annualDep = (dep.costBasis - dep.salvageValue) * (dep.ratePercentage / 100);
+        calculatedBookValue = dep.costBasis - (annualDep * elapsedYears);
+      } else {
+        // Declining balance
+        calculatedBookValue = dep.costBasis * Math.pow(1 - (dep.ratePercentage / 100), elapsedYears);
+      }
+
+      // Clamp to salvage value
+      calculatedBookValue = Math.max(calculatedBookValue, dep.salvageValue);
+      if (isNaN(calculatedBookValue) || calculatedBookValue < 0) calculatedBookValue = 0;
+
+      schedules.push({
+        ...dep,
+        assetName: asset.name,
+        assetModel: asset.model,
+        realTimeBookValue: Math.round(calculatedBookValue)
+      });
+    }
+
+    res.json(schedules);
+  } catch (error) {
+    console.error('❌ Get Depreciation Schedules Error:', error);
+    res.status(500).json({ message: 'Error fetching depreciation matrices', error: error.message });
+  }
+};
+
+export const saveDepreciationSchedule = async (req, res) => {
+  try {
+    const { assetId, costBasis, salvageValue, usefulLifeYears, method, ratePercentage } = req.body;
+
+    // Find existing or create
+    const existing = await prisma.assetDepreciation.findFirst({
+      where: { assetId }
+    });
+
+    let updated;
+    const cBasis = parseFloat(costBasis) || 0;
+    const sVal = parseFloat(salvageValue) || 0;
+    const lifeYears = parseInt(usefulLifeYears) || 5;
+    const rate = parseFloat(ratePercentage) || 20;
+
+    if (existing) {
+      updated = await prisma.assetDepreciation.update({
+        where: { id: existing.id },
+        data: {
+          costBasis: cBasis,
+          salvageValue: sVal,
+          usefulLifeYears: lifeYears,
+          method: method || 'STRAIGHT_LINE',
+          ratePercentage: rate,
+          lastCalculated: new Date()
+        }
+      });
+    } else {
+      updated = await prisma.assetDepreciation.create({
+        data: {
+          assetId,
+          tenantId: req.user.tenantId,
+          costBasis: cBasis,
+          salvageValue: sVal,
+          usefulLifeYears: lifeYears,
+          method: method || 'STRAIGHT_LINE',
+          ratePercentage: rate,
+          currentBookVal: cBasis
+        }
+      });
+    }
+
+    res.json({ message: 'Depreciation matrix updated successfully', schedule: updated });
+  } catch (error) {
+    console.error('❌ Save Depreciation Error:', error);
+    res.status(500).json({ message: 'Error saving depreciation configuration', error: error.message });
+  }
+};
+
+// 3. Asset Audit Verification
+export const getAssetAudits = async (req, res) => {
+  try {
+    const audits = await prisma.assetAuditLog.findMany({
+      where: { tenantId: req.user.tenantId },
+      orderBy: { auditDate: 'desc' },
+      take: 100
+    });
+
+    // Populate transient asset references manually to optimize join lookups
+    const populated = await Promise.all(audits.map(async (audit) => {
+      let assetName = 'Unknown Asset';
+      let serialNumber = 'N/A';
+      let auditedByName = 'Supervisor';
+
+      if (audit.assetId) {
+        const a = await prisma.asset.findUnique({ where: { id: audit.assetId }, select: { name: true } });
+        if (a) assetName = a.name;
+      }
+      if (audit.assetUnitId) {
+        const u = await prisma.assetUnit.findUnique({ 
+          where: { id: audit.assetUnitId }, 
+          select: { serialNumber: true, asset: { select: { name: true } } } 
+        });
+        if (u) {
+          serialNumber = u.serialNumber || 'Unit';
+          if (u.asset) assetName = u.asset.name;
+        }
+      }
+      if (audit.auditedByUserId) {
+        const user = await prisma.user.findUnique({ where: { id: audit.auditedByUserId }, select: { name: true } });
+        if (user) auditedByName = user.name;
+      }
+
+      return {
+        ...audit,
+        assetName,
+        serialNumber,
+        auditedByName
+      };
+    }));
+
+    res.json(populated);
+  } catch (error) {
+    console.error('❌ Get Asset Audits Error:', error);
+    res.status(500).json({ message: 'Error fetching audit logs', error: error.message });
+  }
+};
+
+export const createAssetAudit = async (req, res) => {
+  try {
+    const { assetId, assetUnitId, status, physicalCondition, remarks } = req.body;
+
+    const auditLog = await prisma.assetAuditLog.create({
+      data: {
+        assetId: assetId || null,
+        assetUnitId: assetUnitId || null,
+        tenantId: req.user.tenantId,
+        auditedByUserId: req.user.id,
+        status: status || 'VERIFIED',
+        physicalCondition: physicalCondition || 'GOOD',
+        remarks: remarks || null
+      }
+    });
+
+    // If unit reported damaged or missing, update physical asset unit status natively
+    if (assetUnitId && (status === 'MISSING' || status === 'DAMAGED')) {
+      await prisma.assetUnit.update({
+        where: { id: assetUnitId },
+        data: { 
+          status: status === 'MISSING' ? 'LOST' : 'DAMAGED',
+          condition: 'DAMAGED' 
+        }
+      });
+    }
+
+    res.status(201).json({ message: 'Asset inspection verification recorded successfully', auditLog });
+  } catch (error) {
+    console.error('❌ Create Asset Audit Error:', error);
+    res.status(500).json({ message: 'Error recording asset inspection', error: error.message });
+  }
+};
+

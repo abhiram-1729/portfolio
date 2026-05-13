@@ -487,6 +487,8 @@ model Vehicle {
   fuelLogs          FuelLog[]
   maintenanceLogs   MaintenanceLog[]
   physicalDamages   VehiclePhysicalDamage[]
+  assetUnits        AssetUnit[]
+  assetAssignments  AssetAssignment[]
 
   @@unique([tenantId, vehicleNumber])
   @@index([tenantId])
@@ -1240,7 +1242,9 @@ model AssetUnit {
   createdAt    DateTime          @default(now())
   updatedAt    DateTime          @updatedAt
   tenantId     String            @default("VK001")
+  vehicleId    String?
   asset        Asset             @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  vehicle      Vehicle?          @relation(fields: [vehicleId], references: [id])
   assignments  AssetAssignment[]
   issues       AssetIssue[]
   requests     AssetRequest[]
@@ -1249,6 +1253,7 @@ model AssetUnit {
   @@index([tenantId])
   @@index([assetId])
   @@index([status])
+  @@index([vehicleId])
 }
 
 model AssetAssignment {
@@ -1265,13 +1270,16 @@ model AssetAssignment {
   createdAt       DateTime        @default(now())
   updatedAt       DateTime        @updatedAt
   tenantId        String          @default("VK001")
+  vehicleId       String?
   assetUnit       AssetUnit       @relation(fields: [assetUnitId], references: [id], onDelete: Cascade)
   user            User            @relation(fields: [userId], references: [id])
+  vehicle         Vehicle?        @relation(fields: [vehicleId], references: [id])
 
   @@index([tenantId])
   @@index([assetUnitId])
   @@index([userId])
   @@index([isActive])
+  @@index([vehicleId])
 }
 
 model AssetIssue {
@@ -1315,6 +1323,42 @@ model AssetRequest {
   @@index([tenantId])
   @@index([userId])
   @@index([status])
+}
+
+model AssetDepreciation {
+  id             String   @id @default(cuid())
+  assetId        String
+  tenantId       String   @default("VK001")
+  costBasis      Float    @default(0)
+  salvageValue   Float    @default(0)
+  usefulLifeYears Int     @default(5)
+  method         String   @default("STRAIGHT_LINE") // STRAIGHT_LINE, DECLINING_BALANCE
+  ratePercentage Float    @default(20)
+  currentBookVal Float    @default(0)
+  lastCalculated DateTime @default(now())
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([assetId])
+}
+
+model AssetAuditLog {
+  id              String   @id @default(cuid())
+  assetId         String?
+  assetUnitId     String?
+  tenantId        String   @default("VK001")
+  auditedByUserId String
+  auditDate       DateTime @default(now())
+  status          String   @default("VERIFIED") // VERIFIED, MISSING, DAMAGED
+  physicalCondition String @default("GOOD")
+  remarks         String?
+  createdAt       DateTime @default(now())
+
+  @@index([tenantId])
+  @@index([assetId])
+  @@index([assetUnitId])
+  @@index([auditedByUserId])
 }
 
 model LocationCheckIn {
@@ -2026,6 +2070,12 @@ enum VgeLevel {
 enum AssetType {
   ELECTRONIC
   NON_ELECTRONIC
+  POS_MACHINE
+  WEIGHING_MACHINE
+  FREEZER
+  SHELF
+  DELIVERY_BAG
+  TABLET
 }
 
 enum AssetStatus {

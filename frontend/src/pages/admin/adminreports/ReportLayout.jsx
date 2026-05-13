@@ -35,14 +35,14 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
             <div className="flex items-center gap-4">
               <button
                 onClick={() => {
-                  if (hasStore) {
+                  if (hasStore && stores.length > 1) {
                     setSearchParams({});
                   } else {
                     navigate('/admin/reports');
                   }
                 }}
                 className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                title={hasStore ? "Back to Branch Selection" : "Back to Reports Hub"}
+                title={hasStore && stores.length > 1 ? "Back to Branch Selection" : "Back to Reports Hub"}
               >
                 <ChevronLeft size={20} />
               </button>
@@ -53,7 +53,31 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
             </div>
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-14">Enterprise Analytics & Sales Audit Suite</p>
           </div>
-           <div className="flex items-center gap-3">
+           <div className="flex flex-wrap items-center gap-3">
+              {stores.length > 1 && (
+                <select
+                  value={storeFilterId || ''}
+                  onChange={(e) => {
+                    if (e.target.value) {
+                      setSearchParams({ storeId: e.target.value });
+                    } else {
+                      setSearchParams({});
+                    }
+                  }}
+                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm"
+                  style={{
+                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                    backgroundPosition: 'right 0.35rem center',
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: '1.1rem'
+                  }}
+                >
+                  <option value="">All Branches</option>
+                  {stores.map(s => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              )}
               <button onClick={() => exportReportToExcel(activeTab, reportData)} disabled={!reportData || isLoading} className="bg-white text-emerald-600 border border-emerald-100 px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-50 hover:bg-emerald-50 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Download size={16} /> Excel</button>
               <button onClick={() => generateReportPDF(activeTab, reportData, false)} disabled={!reportData || isLoading} className="bg-gray-900 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-gray-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Download size={16} /> PDF</button>
               <button onClick={() => generateReportPDF(activeTab, reportData, true)} disabled={!reportData || isLoading} className="bg-emerald-600 text-white px-5 py-3 rounded-2xl flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-xl shadow-emerald-200 hover:scale-105 active:scale-95 transition-all disabled:opacity-40 disabled:pointer-events-none"><Printer size={16} /> Print</button>

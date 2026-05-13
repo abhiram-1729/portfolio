@@ -1716,167 +1716,160 @@ export default function AdminInventory() {
       {isEditView && renderEditItemView()}
       {!isCreateView && !isEditView && (
     <div key={storeFilterId} className="space-y-6">
-          {/* Conditionally hide the main inventory header when vehicle ops subtabs are active for a cleaner look */}
-          {!['fuel', 'maintenance', 'trips'].includes(subTab) && (
-            <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-3">
-                  {storeFilterId && stores.length > 1 && (
-                    <button
-                      onClick={() => {
-                        const params = { tab: activeTab };
-                        if (subTab) params.sub = subTab;
-                        setSearchParams(params);
-                      }}
-                      className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                      title="Back to Organizational Overview"
-                    >
-                      <ChevronLeft size={20} />
-                    </button>
-                  )}
-                  <h2 className="text-2xl font-bold text-gray-900">
-                    {(() => {
-                      const selectedStore = stores.find(s => s.id === storeFilterId);
-                      const storePrefix = selectedStore ? `${selectedStore.name} ` : '';
-                      let label = 'Inventory Management';
-                      if (activeTab === 'main_master') label = 'Main Master Registry';
-                      else if (activeTab === 'master') label = 'Master';
-                      else if (activeTab === 'inventory') label = 'Store Stock';
-                      else if (activeTab === 'damage') label = 'Damage';
-                      else if (activeTab === 'return') {
-                        if (subTab === 'loading') label = 'Loading';
-                        else if (subTab === 'return') label = 'Return';
-                        else if (subTab === 'tracking') label = 'Vehicle Stock';
-                        else if (subTab === 'refills') label = 'Refills';
-                        else if (subTab === 'audits') label = 'Audit History';
-                        else if (subTab === 'opening') label = 'Opening Stock';
-                        else if (subTab === 'trips') label = 'Trip Management';
-                        else if (subTab === 'fuel') label = 'Fuel Logs';
-                        else if (subTab === 'maintenance') label = 'Maintenance';
-                      }
-                      return activeTab === 'main_master' ? label : `${storePrefix}${label}`;
-                    })()}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-2">
-                  {activeTab === 'inventory' ? (
-                    <div className="flex items-center gap-3 w-full">
-                      <div className="flex-1 min-w-[350px] md:min-w-[500px] flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm transition-all focus-within:ring-2 focus-within:ring-emerald-500/20">
-                        <Search size={14} className="text-gray-400" />
-                        <input
-                          type="text"
-                          placeholder="Search stock by name or barcode..."
-                          value={warehouseSearch}
-                          onChange={(e) => setWarehouseSearch(e.target.value)}
-                          className="bg-transparent text-[10px] font-bold text-gray-700 focus:outline-none w-full"
-                        />
-                        <button
-                          onClick={() => {
-                            setScannerTarget('warehouse');
-                            setShowScanner(true);
-                          }}
-                          className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-blue-600 transition-all"
-                          title="Scan Barcode"
-                        >
-                          <Barcode size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
-                  )}
-                  {isGlobalRole && (
-                    <>
-                      <span className="text-gray-300">•</span>
-                      <select
-                        value={storeFilterId || ''}
-                        onChange={(e) => {
-                          if (e.target.value) {
-                            setSearchParams({ storeId: e.target.value });
-                          } else {
-                            setSearchParams({});
-                          }
-                        }}
-                        className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                        style={{
-                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                          backgroundPosition: 'right 0.25rem center',
-                          backgroundRepeat: 'no-repeat',
-                          backgroundSize: '1rem'
-                        }}
-                      >
-                        <option value="">All Branches</option>
-                        {stores.map(s => (
-                          <option key={s.id} value={s.id}>{s.name}</option>
-                        ))}
-                      </select>
-                    </>
-                  )}
-                </div>
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                {storeFilterId && stores.length > 1 && (
+                  <button
+                    onClick={() => {
+                      const params = { tab: activeTab };
+                      if (subTab) params.sub = subTab;
+                      setSearchParams(params);
+                    }}
+                    className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                    title="Back to Organizational Overview"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                )}
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {(() => {
+                    const selectedStore = stores.find(s => s.id === storeFilterId);
+                    const storePrefix = selectedStore ? `${selectedStore.name} ` : '';
+                    let label = 'Inventory Management';
+                    if (activeTab === 'main_master') label = 'Main Master Registry';
+                    else if (activeTab === 'master') label = 'Master';
+                    else if (activeTab === 'inventory') label = 'Store Stock';
+                    else if (activeTab === 'damage') label = 'Damage';
+                    else if (activeTab === 'return') {
+                      if (subTab === 'loading') label = 'Loading';
+                      else if (subTab === 'return') label = 'Return';
+                      else if (subTab === 'tracking') label = 'Vehicle Stock';
+                      else if (subTab === 'refills') label = 'Refills';
+                      else if (subTab === 'audits') label = 'Audit History';
+                      else if (subTab === 'opening') label = 'Opening Stock';
+                      else if (subTab === 'trips') label = 'Trip Management';
+                      else if (subTab === 'fuel') label = 'Fuel Logs';
+                      else if (subTab === 'maintenance') label = 'Maintenance';
+                    }
+                    return activeTab === 'main_master' ? label : `${storePrefix}${label}`;
+                  })()}
+                </h2>
+                {stores.length > 1 && (
+                  <select
+                    value={storeFilterId || ''}
+                    onChange={(e) => {
+                      const params = { tab: activeTab };
+                      if (subTab) params.sub = subTab;
+                      if (e.target.value) params.storeId = e.target.value;
+                      setSearchParams(params);
+                    }}
+                    className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.35rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.1rem'
+                    }}
+                  >
+                    <option value="">All Branches</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
               </div>
-              {activeTab === 'master' && (
-                <div className="flex gap-2">
-                  <input
-                    type="file"
-                    id="excel-upload"
-                    accept=".xlsx, .xls, .csv"
-                    className="hidden"
-                    onChange={handleExcelUpload}
-                    disabled={isUploading}
-                  />
-                  <input
-                    type="file"
-                    id="zip-upload"
-                    accept=".zip"
-                    className="hidden"
-                    onChange={handleZipUpload}
-                    disabled={isUploading}
-                  />
-                  {can('INVENTORY', 'CREATE', 'MASTER') && (
-                    <button
-                      onClick={() => setShowBulkUploadModal(true)}
-                      disabled={isUploading}
-                      className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
-                      title="Bulk Upload Excel"
-                    >
-                      {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
-                      <span className="hidden md:block">Bulk Upload</span>
-                    </button>
-                  )}
-                  {can('INVENTORY', 'CREATE', 'MASTER') && (
-                    <button
-                      onClick={() => setShowZipImportModal(true)}
-                      disabled={isUploading}
-                      className="bg-orange-50 text-orange-600 p-3 rounded-xl border border-orange-100 shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-2 font-bold text-sm"
-                      title="Import ZIP (Excel + Images)"
-                    >
-                      {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Package size={24} />}
-                      <span className="hidden md:block">Zip Import</span>
-                    </button>
-                  )}
-                  {can('INVENTORY', 'CREATE', 'MASTER') && storeFilterId && !isRegistryView && (
-                    <button
-                      onClick={() => setIsRegistryView(true)}
-                      className="bg-indigo-50 text-indigo-600 p-3 rounded-xl border border-indigo-100 shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-2 font-bold text-sm"
-                      title="Import from Main Master"
-                    >
-                      <Grid size={24} />
-                      <span className="hidden md:block text-[11px] uppercase tracking-widest font-black">Import</span>
-                    </button>
-                  )}
-                  {can('INVENTORY', 'CREATE', 'MASTER') && (
-                    <button
-                      onClick={() => { setIsCreateView(true); setModalTab('info'); }}
-                      className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
-                      title="Add New Registry Item"
-                    >
-                      <Plus size={24} />
-                    </button>
-                  )}
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                {activeTab === 'inventory' ? (
+                  <div className="flex items-center gap-3 w-full">
+                    <div className="flex-1 min-w-[350px] md:min-w-[500px] flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm transition-all focus-within:ring-2 focus-within:ring-emerald-500/20">
+                      <Search size={14} className="text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search stock by name or barcode..."
+                        value={warehouseSearch}
+                        onChange={(e) => setWarehouseSearch(e.target.value)}
+                        className="bg-transparent text-[10px] font-bold text-gray-700 focus:outline-none w-full"
+                      />
+                      <button
+                        onClick={() => {
+                          setScannerTarget('warehouse');
+                          setShowScanner(true);
+                        }}
+                        className="p-1 rounded-lg hover:bg-gray-50 text-gray-400 hover:text-blue-600 transition-all"
+                        title="Scan Barcode"
+                      >
+                        <Barcode size={14} />
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
+                )}
+              </div>
             </div>
-          )}
+            {activeTab === 'master' && (
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  id="excel-upload"
+                  accept=".xlsx, .xls, .csv"
+                  className="hidden"
+                  onChange={handleExcelUpload}
+                  disabled={isUploading}
+                />
+                <input
+                  type="file"
+                  id="zip-upload"
+                  accept=".zip"
+                  className="hidden"
+                  onChange={handleZipUpload}
+                  disabled={isUploading}
+                />
+                {can('INVENTORY', 'CREATE', 'MASTER') && (
+                  <button
+                    onClick={() => setShowBulkUploadModal(true)}
+                    disabled={isUploading}
+                    className="bg-emerald-50 text-emerald-600 p-3 rounded-xl border border-emerald-100 shadow-sm hover:bg-emerald-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                    title="Bulk Upload Excel"
+                  >
+                    {isUploading ? <Loader2 size={24} className="animate-spin" /> : <FileText size={24} />}
+                    <span className="hidden md:block">Bulk Upload</span>
+                  </button>
+                )}
+                {can('INVENTORY', 'CREATE', 'MASTER') && (
+                  <button
+                    onClick={() => setShowZipImportModal(true)}
+                    disabled={isUploading}
+                    className="bg-orange-50 text-orange-600 p-3 rounded-xl border border-orange-100 shadow-sm hover:bg-orange-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                    title="Import ZIP (Excel + Images)"
+                  >
+                    {isUploading ? <Loader2 size={24} className="animate-spin" /> : <Package size={24} />}
+                    <span className="hidden md:block">Zip Import</span>
+                  </button>
+                )}
+                {can('INVENTORY', 'CREATE', 'MASTER') && storeFilterId && !isRegistryView && (
+                  <button
+                    onClick={() => setIsRegistryView(true)}
+                    className="bg-indigo-50 text-indigo-600 p-3 rounded-xl border border-indigo-100 shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                    title="Import from Main Master"
+                  >
+                    <Grid size={24} />
+                    <span className="hidden md:block text-[11px] uppercase tracking-widest font-black">Import</span>
+                  </button>
+                )}
+                {can('INVENTORY', 'CREATE', 'MASTER') && (
+                  <button
+                    onClick={() => { setIsCreateView(true); setModalTab('info'); }}
+                    className="bg-emerald-600 text-white p-3 rounded-xl shadow-lg hover:bg-emerald-700 transition-colors"
+                    title="Add New Registry Item"
+                  >
+                    <Plus size={24} />
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Main tab navigation removed for sidebar dropdown */}
 
