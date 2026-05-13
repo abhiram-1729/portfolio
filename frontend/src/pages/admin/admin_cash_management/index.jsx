@@ -5,7 +5,7 @@ import toast from 'react-hot-toast';
 import { 
   Search, Calendar, Eye, Plus, Loader2, X, Sun, Moon, ArrowLeft, 
   Smartphone, BookOpen, User, Coins, Package, Printer, Shield, 
-  CheckCircle2, Info, AlertTriangle, Clock, ArrowRight, Vault, Building2, Zap, ShoppingCart, Pencil, AlertCircle, Download, FileText
+  CheckCircle2, Info, AlertTriangle, Clock, ArrowRight, Vault, Building2, Zap, ShoppingCart, Pencil, AlertCircle, Download, FileText, ChevronLeft
 } from 'lucide-react';
 import { exportReportToExcel, generateReportPDF } from '../adminreports/ReportUtils';
 
@@ -68,6 +68,7 @@ export default function AdminCashManagementContent() {
   const [ledgerFilter, setLedgerFilter] = useState('ALL');
   const [viewingAssignFloat, setViewingAssignFloat] = useState(false);
   const [storeLoading, setStoreLoading] = useState(true);
+  const [stores, setStores] = useState([]);
 
   const user = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -243,6 +244,18 @@ export default function AdminCashManagementContent() {
       setLedgerLoading(false);
     }
   };
+
+  useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const { data } = await adminAPI.getStores();
+        if (data?.success || Array.isArray(data)) {
+          setStores(data?.data || data);
+        }
+      } catch (err) {}
+    };
+    loadStores();
+  }, []);
 
   useEffect(() => {
     // Clear data to avoid showing stale state from previous selection
@@ -769,19 +782,45 @@ export default function AdminCashManagementContent() {
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-700 bg-gray-50/30 min-h-screen">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              {isGlobalRole && searchParams.get('storeId') && (
+              {searchParams.get('storeId') && stores.length > 1 && (
                 <button
                   onClick={() => setSearchParams({})}
-                  className="w-12 h-12 rounded-2xl bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-200 hover:shadow-lg hover:shadow-emerald-500/10 transition-all flex items-center justify-center group"
-                  title="Back to all branches"
+                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                  title="Back to All Branches"
                 >
-                  <ArrowLeft size={22} className="group-hover:-translate-x-1 transition-transform" />
+                  <ChevronLeft size={20} />
                 </button>
               )}
               <div>
-                <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-                  <Coins className="text-emerald-500" size={32} /> Cash Management
-                </h1>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                    <Coins className="text-emerald-500" size={32} /> Cash Management
+                  </h1>
+                  {stores.length > 1 && (
+                    <select
+                      value={searchParams.get('storeId') || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSearchParams({ storeId: e.target.value });
+                        } else {
+                          setSearchParams({});
+                        }
+                      }}
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.35rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1.1rem'
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
                 <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Daily Reconciliation & Safe Control</p>
               </div>
             </div>

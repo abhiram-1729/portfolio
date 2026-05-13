@@ -33,19 +33,21 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-4">
-              <button
-                onClick={() => {
-                  if (hasStore && stores.length > 1) {
-                    setSearchParams({});
-                  } else {
-                    navigate('/admin/reports');
-                  }
-                }}
-                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                title={hasStore && stores.length > 1 ? "Back to Branch Selection" : "Back to Reports Hub"}
-              >
-                <ChevronLeft size={20} />
-              </button>
+              {stores.length > 1 && (
+                <button
+                  onClick={() => {
+                    if (hasStore) {
+                      setSearchParams({});
+                    } else {
+                      navigate('/admin/reports');
+                    }
+                  }}
+                  className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                  title={hasStore ? "Back to Branch Selection" : "Back to Reports Hub"}
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
               <div className="flex items-center gap-3">
                  <div className="p-2 rounded-xl bg-emerald-600 text-white shadow-lg shadow-emerald-200"><Icon size={20} strokeWidth={2.5} /></div>
                  <h1 className="text-2xl font-black text-gray-900 tracking-tighter uppercase">{title} <span className="text-emerald-600">REPORT</span></h1>
