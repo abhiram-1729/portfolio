@@ -214,13 +214,13 @@ const PurchaseOrdersSection = ({ can }) => {
                 <tbody className="divide-y divide-gray-50">
                   {pos.filter(po => 
                     !search || 
-                    po.poNumber.toString().includes(search) || 
+                    po.displayId.toString().includes(search) || 
                     po.vendor?.vendorName.toLowerCase().includes(search.toLowerCase()) ||
                     po.displayId?.toLowerCase().includes(search.toLowerCase())
                   ).map(po => (
                     <tr key={po.id} className="hover:bg-gray-50/50 transition-all group">
                       <td className="py-3 px-6 whitespace-nowrap">
-                        <span className="text-sm font-black text-gray-900">PO #{po.poNumber}</span>
+                        <span className="text-sm font-black text-gray-900">PO #{po.displayId}</span>
                       </td>
                       <td className="py-3 px-6 whitespace-nowrap">
                         <span className="inline-flex px-2 py-0.5 rounded-md bg-gray-50 text-[8px] font-black text-gray-400 uppercase tracking-widest border border-gray-100">

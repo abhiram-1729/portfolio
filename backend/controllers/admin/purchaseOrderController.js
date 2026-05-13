@@ -289,7 +289,7 @@ export const deletePO = async (req, res) => {
       storeId: po.storeId || req.user.storeId,
       action: 'PO_DELETED',
       details: `Deleted Purchase Order ${po.displayId}`,
-      metadata: { poId: id, poNumber: po.poNumber }
+      metadata: { poId: id, poNumber: po.displayId }
     });
 
     res.json({ message: 'Purchase Order deleted successfully' });

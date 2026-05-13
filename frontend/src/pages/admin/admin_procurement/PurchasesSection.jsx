@@ -204,7 +204,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
       items: mappedItems.map(i => calculateItemValues(i))
     }));
 
-    toast.success(`Loaded items from PO #${po.poNumber}`);
+    toast.success(`Loaded items from PO #${po.displayId}`);
   };
 
   const calculateItemValues = (item) => {
@@ -526,7 +526,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                           <div className="flex flex-col gap-0.5">
                             <span className="text-[11px] font-black text-gray-900 leading-none">#{p.invoiceNumber}</span>
                             {p.displayId && <span className="text-[8px] font-black text-emerald-600 uppercase tracking-tighter leading-none">{p.displayId}</span>}
-                            {p.po && <span className="text-[7px] font-black text-blue-500 uppercase tracking-tighter mt-0.5">PO: {p.po.displayId || p.po.poNumber}</span>}
+                            {p.po && <span className="text-[7px] font-black text-blue-500 uppercase tracking-tighter mt-0.5">PO: {p.po.displayId || p.po.displayId}</span>}
                           </div>
                         </td>
                         <td className="px-4 py-3">
@@ -643,7 +643,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                   className="w-full bg-emerald-50/50 rounded-xl px-4 py-3 text-sm font-bold border border-emerald-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
                   <option value="">{form.vendorId ? 'No PO Linked' : 'Select Vendor First'}</option>
                   {form.vendorId && purchaseOrders.filter(po => po.vendorId === form.vendorId).map(po => (
-                    <option key={po.id} value={po.id}>PO #{po.poNumber} ({po.vendor?.vendorName})</option>
+                    <option key={po.id} value={po.id}>PO #{po.displayId} ({po.vendor?.vendorName})</option>
                   ))}
                 </select>
               </div>
