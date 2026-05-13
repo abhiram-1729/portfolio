@@ -1,4 +1,4 @@
--- CreateEnum
+﻿-- CreateEnum
 CREATE TYPE "TransferStatus" AS ENUM ('DRAFT', 'IN_TRANSIT', 'RECEIVED', 'CANCELLED');
 
 -- CreateEnum

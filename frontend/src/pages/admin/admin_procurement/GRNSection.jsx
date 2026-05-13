@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Truck, X, ChevronRight, Loader2, Trash2, History, PackageCheck, Edit3, FileText
+  Truck, X, ChevronRight, Loader2, Trash2, History, PackageCheck, Edit3, FileText, Upload, Paperclip, File, Trash
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
+import { adminAPI } from '../../../services/adminService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
@@ -17,6 +18,9 @@ const GRNSection = ({ can, storeId }) => {
   const [submitting, setSubmitting] = useState(false);
   const [editGRN, setEditGRN] = useState(null);
   const [selectedReport, setSelectedReport] = useState(null);
+  const [attachments, setAttachments] = useState([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = React.useRef(null);
 
   const loadData = useCallback(async () => {
     try {
@@ -64,6 +68,31 @@ const GRNSection = ({ can, storeId }) => {
     } catch { toast.error('Failed to load PO details'); }
   };
 
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folder', 'grn_attachments');
+
+    try {
+      setUploading(true);
+      const { data } = await adminAPI.uploadProductImage(formData);
+      setAttachments(prev => [...prev, { name: file.name, url: data.url }]);
+      toast.success('File uploaded successfully');
+    } catch (err) {
+      toast.error('Failed to upload file');
+    } finally {
+      setUploading(false);
+      e.target.value = null;
+    }
+  };
+
+  const removeAttachment = (index) => {
+    setAttachments(prev => prev.filter((_, i) => i !== index));
+  };
+
   const handleSubmitGRN = async () => {
     const items = grnItems.filter(i => parseInt(i.receivedQty) > 0);
     if (items.length === 0) return toast.error('Enter received quantities');
@@ -80,7 +109,8 @@ const GRNSection = ({ can, storeId }) => {
             damagedQty: parseInt(i.damagedQty) || 0,
             missingQty: Math.max(0, i.balance - (parseInt(i.receivedQty) || 0) - (parseInt(i.damagedQty) || 0)),
             expiryStatus: i.expiryStatus
-          }))
+          })),
+          attachments: attachments.map(a => a.url)
         });
         toast.success('Goods receipt updated');
       } else {
@@ -95,13 +125,15 @@ const GRNSection = ({ can, storeId }) => {
             damagedQty: parseInt(i.damagedQty) || 0,
             missingQty: Math.max(0, i.balance - (parseInt(i.receivedQty) || 0) - (parseInt(i.damagedQty) || 0)),
             expiryStatus: i.expiryStatus
-          }))
+          })),
+          attachments: attachments.map(a => a.url)
         });
         toast.success('Goods received successfully');
       }
       setSelectedPO(null);
       setPODetail(null);
       setEditGRN(null);
+      setAttachments([]);
       loadData();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Error processing GRN');
@@ -123,6 +155,7 @@ const GRNSection = ({ can, storeId }) => {
       damagedQty: item.damagedQty || 0,
       expiryStatus: item.expiryStatus || 'SAFE'
     })));
+    setAttachments((grn.attachments || []).map(url => ({ name: url.split('/').pop(), url })));
     setView('receive');
   };
 
@@ -418,15 +451,53 @@ const GRNSection = ({ can, storeId }) => {
                 />
               </div>
               <div className="space-y-4">
-                <label className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Attachments</label>
+                <div className="flex items-center justify-between">
+                  <label className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Attachments</label>
+                  {uploading && <Loader2 className="animate-spin text-emerald-600" size={14} />}
+                </div>
+                
+                <input 
+                  type="file" 
+                  ref={fileInputRef} 
+                  className="hidden" 
+                  onChange={handleFileUpload}
+                  accept="image/*,.pdf,.doc,.docx"
+                />
+
                 <div className="flex flex-wrap gap-3">
                   {['Invoice', 'Challan', 'Photos'].map(label => (
-                    <button key={label} className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-sm">
-                      <Truck size={14} className="opacity-40" />
+                    <button 
+                      key={label} 
+                      onClick={() => fileInputRef.current.click()}
+                      disabled={uploading}
+                      className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:border-emerald-500 hover:text-emerald-600 transition-all shadow-sm disabled:opacity-50"
+                    >
+                      <Upload size={14} className="opacity-40" />
                       {label}
                     </button>
                   ))}
                 </div>
+
+                {attachments.length > 0 && (
+                  <div className="grid grid-cols-1 gap-2 mt-4">
+                    {attachments.map((file, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 border border-gray-100 rounded-xl group">
+                        <div className="flex items-center gap-3 overflow-hidden">
+                          <div className="p-2 bg-white rounded-lg text-emerald-600">
+                            <File size={14} />
+                          </div>
+                          <span className="text-[10px] font-black text-gray-900 truncate uppercase tracking-tight">{file.name}</span>
+                        </div>
+                        <button 
+                          onClick={() => removeAttachment(idx)}
+                          className="p-2 text-gray-300 hover:text-rose-500 transition-all"
+                        >
+                          <Trash size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -749,23 +820,21 @@ const GRNSection = ({ can, storeId }) => {
           <div className="space-y-3">
             <h3 className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Attachments</h3>
             <div className="flex flex-wrap gap-3">
-              {selectedReport.challanId ? (
-                <>
-                  <button 
-                    onClick={() => toast.success(`Opening Document: ${selectedReport.challanId}.pdf`)}
+              {selectedReport.attachments && selectedReport.attachments.length > 0 ? (
+                selectedReport.attachments.map((url, idx) => (
+                  <a 
+                    key={idx}
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     className="flex items-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all active:scale-95"
                   >
                     <FileText size={16} className="text-emerald-600" />
-                    <span className="text-[10px] font-black uppercase tracking-tight">Delivery_Challan.pdf</span>
-                  </button>
-                  <button 
-                    onClick={() => toast.success(`Opening Document: Invoice-${selectedReport.displayId}_GRN.pdf`)}
-                    className="flex items-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all active:scale-95"
-                  >
-                    <FileText size={16} className="text-blue-600" />
-                    <span className="text-[10px] font-black uppercase tracking-tight">Invoice-{selectedReport.displayId}_GRN.pdf</span>
-                  </button>
-                </>
+                    <span className="text-[10px] font-black uppercase tracking-tight truncate max-w-[150px]">
+                      {url.split('/').pop() || `Attachment ${idx + 1}`}
+                    </span>
+                  </a>
+                ))
               ) : (
                 <div className="px-4 py-2 bg-gray-50 rounded-xl text-[10px] font-bold text-gray-400 uppercase tracking-widest border border-gray-100">
                   No attachments available

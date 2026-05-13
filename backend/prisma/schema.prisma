@@ -1426,6 +1426,7 @@ model GoodsReceipt {
   createdAt DateTime           @default(now())
   displayId String?            @unique
   challanId String?
+  attachments String[]
   tenant    Tenant             @relation(fields: [tenantId], references: [id])
   store     Store?             @relation(fields: [storeId], references: [id])
   po        PurchaseOrder      @relation(fields: [poId], references: [id])
