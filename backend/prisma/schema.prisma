@@ -670,7 +670,9 @@ model BusinessSettings {
   // Delivery Logistics
   deliverySlabs          Json? // Array of { minOrderValue, fee }
   deliverySlots          Json? // Array of { id, name, startTime, endTime, capacity }
+  deliveryRadius         Float?  @default(20)
   deliveryRadiusEnforced Boolean @default(true)
+  surcharges            Json?   // { rain: { active, fee }, peak: { active, fee }, ... }
 
   updatedAt    DateTime @updatedAt
   tenantId     String   @default("VK001")

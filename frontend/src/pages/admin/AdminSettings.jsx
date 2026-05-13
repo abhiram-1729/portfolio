@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt, Truck } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import { getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '../../services/expenseService';
@@ -7,6 +8,7 @@ import { useUserStore } from '../../store/userStore';
 import AdminLateEntryConfig from './AdminLateEntryConfig';
 
 export default function AdminSettings() {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState({
     businessName: '',
     gstNo: '',
@@ -73,9 +75,7 @@ export default function AdminSettings() {
   const [assetCategorySearch, setAssetCategorySearch] = useState('');
   const [expenseCategorySearch, setExpenseCategorySearch] = useState('');
   
-  // Delivery Logistics State
-  const [newSlab, setNewSlab] = useState({ minOrderValue: '', fee: '' });
-  const [newDeliverySlot, setNewDeliverySlot] = useState({ name: '', startTime: '09:00', endTime: '21:00', capacity: 10 });
+
 
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -198,41 +198,6 @@ export default function AdminSettings() {
     } finally {
       setSaving(false);
     }
-  };
-
-  const handleAddSlab = () => {
-    if (!newSlab.minOrderValue || !newSlab.fee) return toast.error('Enter both values');
-    setSettings({
-      ...settings,
-      deliverySlabs: [...(settings.deliverySlabs || []), { 
-        minOrderValue: Number(newSlab.minOrderValue), 
-        fee: Number(newSlab.fee) 
-      }]
-    });
-    setNewSlab({ minOrderValue: '', fee: '' });
-  };
-
-  const handleDeleteSlab = (idx) => {
-    const updated = settings.deliverySlabs.filter((_, i) => i !== idx);
-    setSettings({...settings, deliverySlabs: updated});
-  };
-
-  const handleAddDeliverySlot = () => {
-    if (!newDeliverySlot.name) return toast.error('Enter slot name');
-    const newSlot = { 
-      ...newDeliverySlot, 
-      id: Math.random().toString(36).substr(2, 9) 
-    };
-    setSettings({
-      ...settings,
-      deliverySlots: [...(settings.deliverySlots || []), newSlot]
-    });
-    setNewDeliverySlot({ name: '', startTime: '09:00', endTime: '21:00', capacity: 10 });
-  };
-
-  const handleDeleteDeliverySlot = (id) => {
-    const updated = settings.deliverySlots.filter(s => s.id !== id);
-    setSettings({...settings, deliverySlots: updated});
   };
 
   const handleSaveUnit = async (e) => {
@@ -546,9 +511,9 @@ export default function AdminSettings() {
       title: 'Delivery Logistics',
       icon: Truck,
       items: [
-        { label: 'Delivery Fee Slabs', action: () => setActiveModal('DELIVERY') },
-        { label: 'Time Slots Management', action: () => setActiveModal('DELIVERY') },
-        { label: 'Radius Enforcement', action: () => setActiveModal('DELIVERY') }
+        { label: 'Delivery Fee Slabs', action: () => navigate('/admin/delivery-logistics') },
+        { label: 'Time Slots Management', action: () => navigate('/admin/delivery-logistics') },
+        { label: 'Radius Enforcement', action: () => navigate('/admin/delivery-logistics') }
       ]
     }
   ];
@@ -961,160 +926,7 @@ export default function AdminSettings() {
     );
   }
 
-  if (activeModal === 'DELIVERY') {
-    return (
-      <div className="space-y-8 pb-20 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-6 duration-700">
-        {renderHeader('Delivery Logistics', 'Fee Slabs, Time Slots & Radius Control', Truck, 'text-emerald-600 bg-emerald-100')}
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Fee Slabs Section */}
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-            <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-black text-gray-900 tracking-tight">Delivery Fee Slabs</h3>
-                <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">Automatic pricing based on order value</p>
-              </div>
-              <Truck size={24} className="text-emerald-600 opacity-20" />
-            </div>
-            
-            <div className="p-8 space-y-6">
-              <div className="flex gap-4">
-                <div className="flex-1 space-y-2">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Min Order Value (₹)</label>
-                  <input type="number" placeholder="0" value={newSlab.minOrderValue} onChange={e => setNewSlab({...newSlab, minOrderValue: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-black focus:bg-white outline-none transition-all" />
-                </div>
-                <div className="flex-1 space-y-2">
-                  <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Delivery Fee (₹)</label>
-                  <input type="number" placeholder="50" value={newSlab.fee} onChange={e => setNewSlab({...newSlab, fee: e.target.value})}
-                    className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-black focus:bg-white outline-none transition-all" />
-                </div>
-                <button onClick={handleAddSlab} className="mt-6 px-6 bg-emerald-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-emerald-700 active:scale-95 transition-all">Add</button>
-              </div>
-
-              <div className="space-y-3">
-                {settings.deliverySlabs?.map((slab, idx) => (
-                  <div key={idx} className="flex items-center justify-between p-5 bg-emerald-50/50 border border-emerald-100 rounded-2xl group">
-                    <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-emerald-600 font-black shadow-sm">₹</div>
-                      <div>
-                        <p className="text-xs font-black text-gray-900 uppercase tracking-tight">Order ≥ ₹{slab.minOrderValue}</p>
-                        <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-0.5">Fee: ₹{slab.fee}</p>
-                      </div>
-                    </div>
-                    <button onClick={() => handleDeleteSlab(idx)} className="p-2 text-rose-300 hover:text-rose-600 hover:bg-white rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                ))}
-                {(!settings.deliverySlabs || settings.deliverySlabs.length === 0) && (
-                  <div className="py-12 text-center border-2 border-dashed border-gray-100 rounded-3xl">
-                    <p className="text-xs font-black text-gray-300 uppercase tracking-widest italic">No slabs defined. Default ₹0.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Time Slots Section */}
-          <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-xl overflow-hidden">
-             <div className="p-8 border-b border-gray-50 flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-black text-gray-900 tracking-tight">Delivery Time Slots</h3>
-                <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">Available slots for customer selection</p>
-              </div>
-              <Clock size={24} className="text-blue-600 opacity-20" />
-            </div>
-
-            <div className="p-8 space-y-8">
-               <div className="space-y-4">
-                 <div className="grid grid-cols-2 gap-4">
-                   <div className="col-span-2 space-y-2">
-                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Slot Identifier</label>
-                     <input type="text" placeholder="Morning Delivery (9AM - 12PM)" value={newDeliverySlot.name} onChange={e => setNewDeliverySlot({...newDeliverySlot, name: e.target.value})}
-                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-black focus:bg-white outline-none transition-all" />
-                   </div>
-                   <div className="space-y-2">
-                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">Start Time</label>
-                     <input type="time" value={newDeliverySlot.startTime} onChange={e => setNewDeliverySlot({...newDeliverySlot, startTime: e.target.value})}
-                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-black focus:bg-white outline-none transition-all" />
-                   </div>
-                   <div className="space-y-2">
-                     <label className="text-[9px] font-black text-gray-400 uppercase tracking-widest ml-1">End Time</label>
-                     <input type="time" value={newDeliverySlot.endTime} onChange={e => setNewDeliverySlot({...newDeliverySlot, endTime: e.target.value})}
-                       className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-5 py-4 text-sm font-black focus:bg-white outline-none transition-all" />
-                   </div>
-                 </div>
-                 <button onClick={handleAddDeliverySlot} className="w-full py-4 bg-slate-900 text-white rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-blue-600 active:scale-95 transition-all">Establish Time Slot</button>
-               </div>
-
-               <div className="grid grid-cols-1 gap-3">
-                 {settings.deliverySlots?.map((slot) => (
-                    <div key={slot.id} className="flex items-center justify-between p-5 bg-blue-50/50 border border-blue-100 rounded-2xl group">
-                       <div className="flex items-center gap-4">
-                         <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center text-blue-600 shadow-sm"><Clock size={18} /></div>
-                         <div>
-                            <p className="text-xs font-black text-gray-900 uppercase tracking-tight">{slot.name}</p>
-                            <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mt-0.5">{slot.startTime} - {slot.endTime}</p>
-                         </div>
-                       </div>
-                       <button onClick={() => handleDeleteDeliverySlot(slot.id)} className="p-2 text-rose-300 hover:text-rose-600 hover:bg-white rounded-xl transition-all opacity-0 group-hover:opacity-100">
-                         <Trash2 size={18} />
-                       </button>
-                    </div>
-                 ))}
-               </div>
-            </div>
-          </div>
-
-          {/* Radius Enforcement Section */}
-          <div className="lg:col-span-2 bg-slate-900 rounded-[2.5rem] p-8 md:p-12 shadow-2xl relative overflow-hidden">
-             <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-               <div className="space-y-4 text-center md:text-left">
-                 <div className="flex items-center gap-3 justify-center md:justify-start">
-                   <MapPin size={24} className="text-emerald-400" />
-                   <h3 className="text-2xl font-black text-white tracking-tight">Geofencing & Radius Control</h3>
-                 </div>
-                 <p className="text-sm text-slate-400 font-medium max-w-md leading-relaxed">
-                   Enforce order delivery within the authorized village radius (default 500m). 
-                   When enabled, agents cannot place delivery orders outside the target village boundaries.
-                 </p>
-               </div>
-               
-               <button 
-                 onClick={() => setSettings({...settings, deliveryRadiusEnforced: !settings.deliveryRadiusEnforced})}
-                 className={`px-12 py-6 rounded-3xl border-2 transition-all flex flex-col items-center gap-2 group min-w-[240px] ${
-                   settings.deliveryRadiusEnforced 
-                    ? 'bg-emerald-500/10 border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/20' 
-                    : 'bg-rose-500/10 border-rose-500/50 text-rose-400 hover:bg-rose-500/20'
-                 }`}
-               >
-                 <div className={`w-3 h-3 rounded-full ${settings.deliveryRadiusEnforced ? 'bg-emerald-400 animate-pulse' : 'bg-rose-400'} mb-1`}></div>
-                 <span className="text-xs font-black uppercase tracking-[0.2em]">{settings.deliveryRadiusEnforced ? 'Protection Active' : 'Protection Disabled'}</span>
-                 <span className="text-[10px] font-bold text-slate-500 uppercase">Click to {settings.deliveryRadiusEnforced ? 'Disable' : 'Enable'}</span>
-               </button>
-             </div>
-             
-             {/* Background Decoration */}
-             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-500/5 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl"></div>
-             <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full translate-y-1/2 -translate-x-1/2 blur-3xl"></div>
-          </div>
-        </div>
-
-        {/* Action Bar */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 w-full max-w-lg px-6 z-50">
-           <button 
-             onClick={handleUpdateSettings} 
-             disabled={saving}
-             className="w-full bg-slate-900 text-white font-black py-6 rounded-3xl shadow-2xl shadow-slate-900/40 hover:bg-emerald-600 transition-all text-sm uppercase tracking-[0.2em] flex items-center justify-center gap-4 active:scale-95 disabled:bg-slate-400"
-           >
-             {saving ? <Loader2 size={24} className="animate-spin" /> : <Save size={24} />}
-             {saving ? 'Syncing Logistics...' : 'Authorize Delivery Rules'}
-           </button>
-        </div>
-      </div>
-    );
-  }
 
   if (activeModal === 'BUSINESS') {
     return (

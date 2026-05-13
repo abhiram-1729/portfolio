@@ -117,6 +117,15 @@ export default function Sidebar({ isOpen, onClose }) {
       })
     },
     {
+      name: 'Delivery Logistics',
+      path: '/admin/delivery-logistics',
+      icon: Truck,
+      color: 'text-indigo-600',
+      bg: 'bg-indigo-50',
+      module: 'ADMIN',
+      isAdmin: true
+    },
+    {
       name: 'Settings',
       path: '/admin/settings',
       icon: Settings,

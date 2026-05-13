@@ -53,6 +53,7 @@ import OrderDetail from './pages/OrderDetail';
 import AgentAttendance from './pages/AgentAttendance';
 import AdminAttendance from './pages/admin/AdminAttendance';
 import CreateExpense from './pages/CreateExpense';
+import AdminDeliveryLogistics from './pages/admin/AdminDeliveryLogistics';
 
 // Admin Reports
 import OverviewReport from './pages/admin/adminreports/OverviewReport';
@@ -206,6 +207,7 @@ export default function App() {
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="routes" element={<AdminRoutes />} />
+          <Route path="delivery-logistics" element={<AdminDeliveryLogistics />} />
           <Route path="targets" element={<AdminTargets />} />
           <Route path="assets" element={<AdminAssets />} />
           <Route path="expenses" element={<AdminExpenses />} />

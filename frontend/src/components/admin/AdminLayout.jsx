@@ -141,6 +141,7 @@ export default function AdminLayout() {
         { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
         { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
         { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES', section: 'ROUTES' },
+        { to: '/admin/delivery-logistics', icon: Truck, label: 'Delivery Logistics', module: 'ADMIN' },
       ]
     },
     { to: '/admin/stores', icon: Store, label: 'Stores' },
