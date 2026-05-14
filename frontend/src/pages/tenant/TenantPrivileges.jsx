@@ -21,7 +21,8 @@ const DASHBOARD_WIDGETS = [
 
 const MODULES = [
   { key: 'DASHBOARD', label: 'Dashboard', desc: 'Main overview & metrics' },
-  { key: 'STAFF', label: 'Staff Management', desc: 'Admin, Agents & Field Force' },
+  { key: 'STAFF_ADMIN', label: 'Admin Management', desc: 'System Admins & Supervisors' },
+  { key: 'STAFF_AGENT', label: 'Agent Management', desc: 'Sales Agents & Field Force' },
   { key: 'VEHICLES', label: 'Fleet Management', desc: 'Vehicles & Assets' },
   { key: 'SALES', label: 'Sales', desc: 'Order management' },
   { key: 'TARGETS', label: 'Targets', desc: 'VGE incentives' },
@@ -586,6 +587,17 @@ export default function TenantPrivileges() {
           : [];
       }
 
+      // Clear sub-sections if READ permission is removed
+      if (!nextPerms.includes('READ')) {
+        if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
+        if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
+        if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
+        if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
+        if (moduleKey === 'SETTINGS') updated.SETTINGS_TARGET_SECTIONS = [];
+      }
+
       return updated;
     });
   };
@@ -594,10 +606,25 @@ export default function TenantPrivileges() {
     setFormPerms(prev => {
       const current = prev[moduleKey] || [];
       const allSelected = ACTIONS.every(a => current.includes(a.key));
-      return {
+      const nextPerms = allSelected ? [] : ACTIONS.map(a => a.key);
+      
+      let updated = {
         ...prev,
-        [moduleKey]: allSelected ? [] : ACTIONS.map(a => a.key)
+        [moduleKey]: nextPerms
       };
+
+      if (allSelected) {
+        if (moduleKey === 'DASHBOARD') updated.DASHBOARD_WIDGETS = [];
+        if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
+        if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
+        if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
+        if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
+        if (moduleKey === 'SETTINGS') updated.SETTINGS_TARGET_SECTIONS = [];
+      }
+
+      return updated;
     });
   };
 

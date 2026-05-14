@@ -457,6 +457,9 @@ export default function AdminSettings() {
 
   const hasPermission = (sectionKey) => {
     if (!currentUser?.customRoleId) return true;
+    if (sectionKey === 'EXPENSE_SETTINGS') {
+      return can('EXPENSES', 'READ', 'SETTINGS') || can('EXPENSES', 'UPDATE', 'SETTINGS');
+    }
     const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS || [];
     return targetSections.includes(sectionKey);
   };
@@ -476,9 +479,9 @@ export default function AdminSettings() {
       title: 'Expense Management',
       icon: Receipt,
       items: [
-        { label: 'Categories', action: () => setActiveModal('EXPENSES') },
-        { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES') }
-      ]
+        { label: 'Categories', action: () => setActiveModal('EXPENSES'), key: 'EXPENSE_SETTINGS' },
+        { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES'), key: 'EXPENSE_SETTINGS' }
+      ].filter(item => hasPermission(item.key))
     },
     { 
       title: 'Payment Settings', 

@@ -430,7 +430,10 @@ export default function AdminUsers({ type }) {
     <>
       {/* Mobile Card View */}
       <div className="md:hidden space-y-4 mb-8">
-        {groupUsers.map((user) => (
+        {groupUsers.map((user) => {
+          const isTargetAdmin = user.role === 'ADMIN' || user.customRole?.portalType === 'ADMIN' || user.customRole?.portalType === 'SUPERVISOR';
+          const targetModule = isTargetAdmin ? 'STAFF_ADMIN' : 'STAFF_AGENT';
+          return (
           <div
             key={user.id}
             className={`bg-white p-5 rounded-3xl border border-gray-100 shadow-sm flex flex-col gap-4 relative overflow-hidden transition-all ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 grayscale opacity-80' : ''}`}
@@ -454,7 +457,7 @@ export default function AdminUsers({ type }) {
               </div>
 
               <div className="flex items-center gap-1">
-                {can('STAFF', 'UPDATE') && (
+                {can(targetModule, 'UPDATE') && (
                   <button onClick={() => {
                     const { password, ...userWithoutPass } = user;
                     setEditingUser({ ...userWithoutPass, password: '' });
@@ -464,7 +467,7 @@ export default function AdminUsers({ type }) {
                     <Pencil size={15} />
                   </button>
                 )}
-                {can('STAFF', 'TOGGLE_STATUS') && (
+                {can(targetModule, 'TOGGLE_STATUS') && (
                   <button
                     onClick={() => handleToggleStatus(user)}
                     className={cn(
@@ -478,7 +481,7 @@ export default function AdminUsers({ type }) {
                     )} />
                   </button>
                 )}
-                {can('STAFF', 'DELETE') && (
+                {can(targetModule, 'DELETE') && (
                   <button onClick={() => handleDeleteUser(user.id)}
                     disabled={deletingId === user.id}
                     className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50">
@@ -509,7 +512,6 @@ export default function AdminUsers({ type }) {
                   <div className="flex flex-col gap-1">
                     <span className="text-[9px] font-black uppercase text-gray-400 tracking-widest">Vehicle</span>
                     <span className="text-xs font-black text-blue-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'No Truck'}</span>
-                    <span className="text-xs font-black text-emerald-600 flex items-center gap-1.5"><Truck size={10} /> {user.assignedVehicle?.vehicleNumber || 'No Truck'}</span>
                   </div>
                 </div>
                 <div className="mt-1">
@@ -521,7 +523,8 @@ export default function AdminUsers({ type }) {
               </>
             )}
           </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Desktop Table View */}
@@ -539,7 +542,10 @@ export default function AdminUsers({ type }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-50">
-            {groupUsers.map((user) => (
+            {groupUsers.map((user) => {
+              const isTargetAdmin = user.role === 'ADMIN' || user.customRole?.portalType === 'ADMIN' || user.customRole?.portalType === 'SUPERVISOR';
+              const targetModule = isTargetAdmin ? 'STAFF_ADMIN' : 'STAFF_AGENT';
+              return (
               <tr
                 key={user.id}
                 className={`hover:bg-gray-50/30 transition-colors group ${user.status === 'SUSPENDED' ? 'bg-gray-50/50 opacity-80 grayscale-[0.5]' : ''}`}
@@ -603,7 +609,7 @@ export default function AdminUsers({ type }) {
                 )}
                 <td className="px-3 py-2 text-center border-r border-gray-50 group-hover:border-transparent">
                   <div className="flex items-center justify-center">
-                    {can('STAFF', 'TOGGLE_STATUS') ? (
+                    {can(targetModule, 'TOGGLE_STATUS') ? (
                       <button
                         onClick={() => handleToggleStatus(user)}
                         className={cn(
@@ -628,7 +634,7 @@ export default function AdminUsers({ type }) {
                 </td>
                 <td className="px-3 py-2">
                   <div className="flex items-center justify-end gap-1">
-                    {can('STAFF', 'UPDATE') && (
+                    {can(targetModule, 'UPDATE') && (
                       <button
                         onClick={() => {
                           const { password, ...userWithoutPass } = user;
@@ -641,7 +647,7 @@ export default function AdminUsers({ type }) {
                         <Pencil size={13} />
                       </button>
                     )}
-                    {can('STAFF', 'DELETE') && (
+                    {can(targetModule, 'DELETE') && (
                       <button
                         onClick={() => handleDeleteUser(user.id)}
                         title="Permanent Removal"
@@ -654,7 +660,8 @@ export default function AdminUsers({ type }) {
                   </div>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -1583,19 +1590,23 @@ export default function AdminUsers({ type }) {
                 All Members
               </button>
 
+              {can('STAFF_ADMIN', 'READ') && (
               <button
                 onClick={() => setActiveTab('admin')}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'admin' ? 'bg-rose-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
               >
                 Admins
               </button>
+              )}
 
+              {can('STAFF_AGENT', 'READ') && (
               <button
                 onClick={() => setActiveTab('agent')}
                 className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all shadow-sm ${activeTab === 'agent' ? 'bg-blue-600 text-white' : 'bg-white text-gray-400 hover:text-gray-600'}`}
               >
                 Agents
               </button>
+              )}
 
               {relevantCustomRoles.map(role => (
                 <button
@@ -1676,28 +1687,40 @@ export default function AdminUsers({ type }) {
               >
                 <Printer size={18} />
               </button>
-              <button
-                onClick={() => {
-                  setNewUser({
-                    name: '',
-                    email: '',
-                    password: '',
-                    mobile: '',
-                    role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
-                    vgeType: 'EMPLOYEE',
-                    storeId: storeFilterId || currentUser?.storeId || '',
-                    dailyTarget: 10000,
-                    baseSalary: 12000,
-                  });
-                  setAddStep(1);
-                  setShowAddModal(true);
-                }}
-                className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
-              >
-                <Plus size={18} />
-                <span className="hidden md:inline">Hire Member</span>
-                <span className="md:hidden">Add</span>
-              </button>
+              {(() => {
+                const canHire = activeTab === 'all'
+                  ? (can('STAFF_ADMIN', 'CREATE') || can('STAFF_AGENT', 'CREATE'))
+                  : activeTab === 'admin' || (activeTab !== 'agent' && customRoles.find(r => r.id === activeTab)?.portalType === 'ADMIN')
+                    ? can('STAFF_ADMIN', 'CREATE')
+                    : can('STAFF_AGENT', 'CREATE');
+                
+                if (!canHire) return null;
+                
+                return (
+                  <button
+                    onClick={() => {
+                      setNewUser({
+                        name: '',
+                        email: '',
+                        password: '',
+                        mobile: '',
+                        role: activeTab === 'admin' ? 'ADMIN' : 'SALES_AGENT',
+                        vgeType: 'EMPLOYEE',
+                        storeId: storeFilterId || currentUser?.storeId || '',
+                        dailyTarget: 10000,
+                        baseSalary: 12000,
+                      });
+                      setAddStep(1);
+                      setShowAddModal(true);
+                    }}
+                    className="bg-emerald-600 text-white flex items-center gap-2 px-6 py-3 rounded-xl shadow-lg shadow-emerald-600/10 hover:bg-emerald-700 transition-all font-bold text-xs uppercase tracking-widest active:scale-95"
+                  >
+                    <Plus size={18} />
+                    <span className="hidden md:inline">Hire Member</span>
+                    <span className="md:hidden">Add</span>
+                  </button>
+                );
+              })()}
             </div>
           </div>
         )}

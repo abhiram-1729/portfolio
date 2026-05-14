@@ -650,7 +650,7 @@ export default function AdminExpenses() {
                                 <Download size={16} /> Export Excel
                             </button>
                         )}
-                        {can('EXPENSES', 'CREATE') && (
+                        {can('EXPENSES', 'CREATE', 'MONITORING') && (
                             <button onClick={() => setShowAddExpense(true)}
                                 className="bg-emerald-600 text-white px-4 py-2 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 shadow-lg shadow-emerald-50 active:scale-[0.98] transition-all flex items-center gap-2">
                                 <Plus size={16} strokeWidth={3} /> Log Direct Expense
@@ -687,7 +687,7 @@ export default function AdminExpenses() {
                         <div className="flex items-center gap-3 bg-slate-900 text-white px-5 py-3 rounded-2xl shadow-lg">
                             <span className="text-xs font-black">{selected.length} selected</span>
                             <div className="flex gap-2 ml-auto">
-                                {can('EXPENSES', 'UPDATE') && (
+                                {can('EXPENSES', 'UPDATE', 'APPROVAL') && (
                                     <>
                                         <button onClick={() => handleBulkAction('APPROVED')}
                                             className="px-4 py-1.5 bg-emerald-500 rounded-xl text-[10px] font-black uppercase hover:bg-emerald-400 transition-all">Approve All</button>
@@ -808,7 +808,7 @@ export default function AdminExpenses() {
                                                 </td>
                                                 <td className="sticky right-0 bg-white group-hover:bg-gray-50/50 z-10 px-4 py-3 border-b border-gray-50 whitespace-nowrap">
                                                     <div className="flex items-center justify-end gap-1">
-                                                        {can('EXPENSES', 'UPDATE') && exp.status === 'PENDING' && (
+                                                        {can('EXPENSES', 'UPDATE', 'APPROVAL') && exp.status === 'PENDING' && (
                                                             <>
                                                                 <button onClick={() => {
                                                                     setActionModal({ expenseId: exp.id, action: 'APPROVED', expense: exp });
@@ -827,7 +827,7 @@ export default function AdminExpenses() {
                                                                 </button>
                                                             </>
                                                         )}
-                                                        {can('EXPENSES', 'UPDATE') && exp.status === 'APPROVED' && (
+                                                        {can('EXPENSES', 'UPDATE', 'APPROVAL') && exp.status === 'APPROVED' && (
                                                             <button onClick={() => setActionModal({ expenseId: exp.id, action: 'PAID', expense: exp })}
                                                                 className="p-1 bg-blue-50 text-blue-600 rounded-md hover:bg-blue-600 hover:text-white transition-all border border-blue-100">
                                                                 <ShieldCheck size={10} />
