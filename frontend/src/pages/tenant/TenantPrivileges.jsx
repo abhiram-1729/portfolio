@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Plus, Pencil, Trash2, Users, X, Loader2, Check,
-  ChevronRight, ChevronDown, Key, Save, AlertTriangle, CheckCircle2, XCircle,
+  ChevronRight, ChevronDown, Key, Save, AlertTriangle, CheckCircle2, XCircle, Search,
   Truck, ShoppingCart, PieChart, Receipt, Target, Eye, EyeOff, LayoutGrid, Coins, Grid, MapPin,
   Package, Wallet, BarChart, ClipboardList, BarChart3, Settings
 } from 'lucide-react';
@@ -285,6 +285,9 @@ export default function TenantPrivileges() {
   const [fetchingUsers, setFetchingUsers] = useState(false);
   const [headerEditing, setHeaderEditing] = useState(false);
   const [openSections, setOpenSections] = useState(['core']);
+  const [allUsers, setAllUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const toggleAccordion = (key) => {
     setOpenSections(prev =>
@@ -342,6 +345,12 @@ export default function TenantPrivileges() {
     try {
       const res = await adminAPI.getUsers({ roleId });
       setRoleUsers(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+      
+      // Also fetch all users to allow assigning new ones
+      const allRes = await adminAPI.getUsers();
+      const everyUser = Array.isArray(allRes.data) ? allRes.data : (allRes.data?.data || []);
+      // Filter out users already in this role
+      setAllUsers(everyUser.filter(u => u.customRoleId !== roleId));
     } catch (err) {
       console.error('Failed to fetch role users:', err);
     } finally {
@@ -349,20 +358,38 @@ export default function TenantPrivileges() {
     }
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you absolutely sure? This will PERMANENTLY DELETE ${userName} and all their historical data (orders, attendance, cash transfers, etc). This cannot be undone.`)) {
+  const handleAssignUser = async (userId) => {
+    if (!selectedRole) return;
+    setSaving(true);
+    try {
+      await adminAPI.updateUser(userId, { customRoleId: selectedRole.id });
+      toast.success('User assigned to role');
+      fetchRoleUsers(selectedRole.id);
+      fetchRoles();
+      setSearchQuery('');
+      setIsAssigning(false);
+    } catch (err) {
+      toast.error('Failed to assign user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveFromRole = async (userId, userName) => {
+    if (!window.confirm(`Remove "${userName}" from this role?\n\nThis will only revoke their custom role access. Their account, orders, attendance, and all historical data remain fully intact.`)) {
       return;
     }
 
     try {
-      await adminAPI.deleteUser(userId);
-      toast.success(`${userName} permanently deleted`);
+      // Only strip the custom role — do NOT delete the user account
+      await adminAPI.updateUser(userId, { customRoleId: null });
+      toast.success(`${userName} removed from role. Account preserved.`);
       // Refresh list
       if (selectedRole) fetchRoleUsers(selectedRole.id);
-      fetchRoles(); // Refresh counts
+      fetchRoles(); // Refresh user counts
     } catch (err) {
-      console.error('Failed to delete user:', err);
-      toast.error(err.response?.data?.message || 'Failed to delete user');
+      console.error('Failed to remove user from role:', err);
+      toast.error(err.response?.data?.message || 'Failed to remove user from role');
     }
   };
 
@@ -1177,10 +1204,61 @@ export default function TenantPrivileges() {
               </div>
             ) : (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
                     <Users size={14} className="text-emerald-600" /> Active Users for {formName}
                   </h3>
+                  
+                  <div className="relative">
+                    {!isAssigning ? (
+                      <button 
+                        onClick={() => setIsAssigning(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all"
+                      >
+                        <Plus size={14} strokeWidth={3} />
+                        Assign New User
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                          <input 
+                            autoFocus
+                            placeholder="Search Name/Mobile..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-2 focus:ring-emerald-500/10 outline-none min-w-[240px]"
+                          />
+                          {searchQuery && (
+                            <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 max-h-[200px] overflow-y-auto">
+                              {allUsers
+                                .filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.mobile.includes(searchQuery))
+                                .map(u => (
+                                  <button
+                                    key={u.id}
+                                    onClick={() => handleAssignUser(u.id)}
+                                    className="w-full px-4 py-3 flex flex-col text-left hover:bg-emerald-50 transition-colors border-b border-gray-50 last:border-0"
+                                  >
+                                    <span className="text-[11px] font-black text-gray-900 uppercase">{u.name}</span>
+                                    <span className="text-[9px] font-bold text-gray-400">{u.mobile} • {u.role}</span>
+                                  </button>
+                                ))
+                              }
+                              {allUsers.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.mobile.includes(searchQuery)).length === 0 && (
+                                <div className="px-4 py-6 text-center text-[10px] font-bold text-gray-400 uppercase">No users found</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <button 
+                          onClick={() => { setIsAssigning(false); setSearchQuery(''); }}
+                          className="p-2 text-gray-400 hover:text-rose-600 rounded-xl"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {fetchingUsers ? (
@@ -1207,10 +1285,11 @@ export default function TenantPrivileges() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDeleteUser(user.id, user.name)}
-                          className="p-3 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"
+                          title="Remove from role (account stays intact)"
+                          onClick={() => handleRemoveFromRole(user.id, user.name)}
+                          className="p-3 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-2xl transition-all"
                         >
-                          <Trash2 size={18} strokeWidth={2.5} />
+                          <XCircle size={18} strokeWidth={2.5} />
                         </button>
                       </div>
                     ))}
