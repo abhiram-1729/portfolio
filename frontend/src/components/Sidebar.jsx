@@ -201,8 +201,11 @@ export default function Sidebar({ isOpen, onClose }) {
     // If it's a basic agent role WITH a custom role, still allow core modules unless explicitly handled above
     if (isBasicAgentRole && !item.isAdmin) return true;
 
-    // ADMIN/TENANT_OWNER Bypass - They see everything administrative
-    if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+    // Global Bypass for Owners and Super Admins
+    if (user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+
+    // Global Bypass for Admins WITHOUT custom roles
+    if (user?.role === 'ADMIN' && !user?.customRoleId) return true;
 
     // Granular checks for top-level modules - PRIORITIZE SECTION VISIBILITY OVER MODULE READ
     if (item.module === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {
@@ -223,7 +226,12 @@ export default function Sidebar({ isOpen, onClose }) {
     }
     if (item.module === 'CASH') {
       const sections = user?.permissions?.CASH_SECTIONS;
-      if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
+      if (sections) {
+        const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+        const hasAnyValidSection = validCashKeys.some(k => (sections[k] || []).includes('READ'));
+        if (hasAnyValidSection) return true;
+        return false; // Hide completely if they have granular config but none are active
+      }
       if (user?.permissions?.CASH_TARGET_SECTIONS?.length > 0) return true;
     }
     if (item.module === 'SETTINGS' && user?.permissions?.SETTINGS_TARGET_SECTIONS) {

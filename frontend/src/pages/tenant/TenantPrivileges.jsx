@@ -58,11 +58,17 @@ const INVENTORY_SECTIONS = [
 ];
 
 const CASH_SECTIONS_LIST = [
-  { key: 'STORE_SAFE', label: 'Store Safe', desc: 'Safe management & transfers' },
+  { key: 'CASH_OPENING', label: 'Store Opening', desc: 'Opening counter & register balance' },
+  { key: 'AGENT_CASH', label: 'Agent Cash', desc: 'Agent collection & tracking' },
+  { key: 'SAFE_CONTROL', label: 'Safe Control', desc: 'Safe management & transfers' },
+  { key: 'POS_HISTORY', label: 'POS History', desc: 'POS transaction logs' },
+  { key: 'SHIFT_DEPOSITS', label: 'Shift Deposits', desc: 'Deposit shift cash' },
+  { key: 'STORE_CLOSURE', label: 'Store Closure', desc: 'End of day closing ops' },
+  { key: 'FLOAT_ASSIGNMENT', label: 'Assign Float', desc: 'Assign register float' },
+  { key: 'SHIFT_SAFEKEEPING', label: 'Shift Safekeeping', desc: "Today's shift tracking" },
   { key: 'RECONCILIATION', label: 'Daily Reconciliation', desc: 'End of day cash audit' },
   { key: 'LIVE_CASH', label: 'Live Cash Status', desc: 'Real-time register balances' },
-  { key: 'AUDIT_LEDGER', label: 'Audit Ledger', desc: 'Transaction history logs' },
-  { key: 'SHIFT_DEPOSIT', label: 'Shift Deposit', desc: 'Bank deposit tracking' }
+  { key: 'AUDIT_LEDGER', label: 'Audit Ledger', desc: 'Transaction history logs' }
 ];
 
 const EXPENSE_SECTIONS_LIST = [
@@ -472,13 +478,18 @@ export default function TenantPrivileges() {
         ? current.filter(a => a !== actionKey)
         : [...current, actionKey];
 
+      const updatedSections = { ...sections, [sectionKey]: nextPerms };
+
+      // Auto-manage top-level CASH:READ based on whether ANY section has READ
+      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+      const anyHasRead = validCashKeys.some(k => (updatedSections[k] || []).includes('READ'));
+
       return {
         ...prev,
-        CASH_SECTIONS: {
-          ...sections,
-          [sectionKey]: nextPerms
-        },
-        CASH: (prev.CASH || []).includes('READ') ? prev.CASH : [...(prev.CASH || []), 'READ']
+        CASH_SECTIONS: updatedSections,
+        CASH: anyHasRead
+          ? ((prev.CASH || []).includes('READ') ? prev.CASH : [...(prev.CASH || []), 'READ'])
+          : (prev.CASH || []).filter(a => a !== 'READ')
       };
     });
   };
@@ -488,14 +499,18 @@ export default function TenantPrivileges() {
       const sections = prev.CASH_SECTIONS || {};
       const current = sections[sectionKey] || [];
       const allSelected = ACTIONS.every(a => current.includes(a.key));
+      const updatedSections = { ...sections, [sectionKey]: allSelected ? [] : ACTIONS.map(a => a.key) };
+
+      // Auto-manage top-level CASH:READ based on whether ANY section has READ
+      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+      const anyHasRead = validCashKeys.some(k => (updatedSections[k] || []).includes('READ'));
 
       return {
         ...prev,
-        CASH_SECTIONS: {
-          ...sections,
-          [sectionKey]: allSelected ? [] : ACTIONS.map(a => a.key)
-        },
-        CASH: (prev.CASH || []).includes('READ') ? prev.CASH : [...(prev.CASH || []), 'READ']
+        CASH_SECTIONS: updatedSections,
+        CASH: anyHasRead
+          ? ((prev.CASH || []).includes('READ') ? prev.CASH : [...(prev.CASH || []), 'READ'])
+          : (prev.CASH || []).filter(a => a !== 'READ')
       };
     });
   };

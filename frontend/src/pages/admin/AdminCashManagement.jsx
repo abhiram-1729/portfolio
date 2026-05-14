@@ -16,7 +16,7 @@ export default function AdminCashManagement() {
   const storeId = searchParams.get('storeId');
   const user = useUserStore(s => s.user);
   const location = useLocation();
-  const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN' || (user?.role === 'ADMIN' && !user?.customRoleId) || user?.portalType === 'ADMIN';
+  const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN' || (user?.role === 'ADMIN' && !user?.customRoleId);
 
   // If global role and no store selected, show branch overview
   if (isGlobalRole && !storeId) {

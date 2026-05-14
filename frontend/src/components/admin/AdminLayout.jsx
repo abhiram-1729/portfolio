@@ -221,10 +221,13 @@ export default function AdminLayout() {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter(sub => {
         const requiredModule = sub.module || item.module;
-        // Global Bypass for Admins
-        if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+        // Global Bypass for Owners and Super Admins
+        if (user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
 
-        if (!requiredModule || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+        // Global Bypass for Admins WITHOUT custom roles
+        if (user?.role === 'ADMIN' && !user?.customRoleId) return true;
+
+        if (!requiredModule) return true;
 
         // 1. Prioritize Section-Level Gating (REPORTS bypass module READ)
         if (sub.section) {
@@ -271,10 +274,13 @@ export default function AdminLayout() {
     return item;
   }).filter(item => {
     if (item.subItems) return item.subItems.length > 0;
-    // Global Bypass for Admins
-    if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+    // Global Bypass for Owners and Super Admins
+    if (user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
 
-    if (!item.module || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    // Global Bypass for Admins WITHOUT custom roles
+    if (user?.role === 'ADMIN' && !user?.customRoleId) return true;
+
+    if (!item.module) return true;
 
     let hasModuleRead = false;
     if (item.module === 'STAFF_VIRTUAL') {
@@ -290,7 +296,10 @@ export default function AdminLayout() {
     if (item.module === 'CASH') {
       const sections = user?.permissions?.CASH_SECTIONS;
       if (sections) {
-        return Object.values(sections).some(perms => (perms || []).includes('READ'));
+        const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+        const hasAnyValidSection = validCashKeys.some(k => (sections[k] || []).includes('READ'));
+        if (hasAnyValidSection) return true;
+        return false; // Hide completely if they have granular config but none are active
       }
       if (user?.permissions?.CASH_TARGET_SECTIONS) {
         return user.permissions.CASH_TARGET_SECTIONS.length > 0;
@@ -351,7 +360,9 @@ export default function AdminLayout() {
   const isAuthorizedRoute = () => {
     if (location.pathname.startsWith('/admin/privileges')) return true; // Explicitly allow privileges if in Admin portal
     if (location.pathname.startsWith('/admin/stores')) return true; // Explicitly allow stores
-    if (!currentModule || ['TENANT_OWNER', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role)) return true;
+    if (!currentModule) return true;
+    if (['TENANT_OWNER', 'SUPER_ADMIN'].includes(user?.role)) return true;
+    if (user?.role === 'ADMIN' && !user?.customRoleId) return true;
 
     if (location.pathname.startsWith('/admin/reports')) {
       if (user?.permissions?.REPORT_TARGET_SECTIONS?.length > 0) return true;
