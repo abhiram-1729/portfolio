@@ -23,8 +23,14 @@ export const getSalesHistory = async (req, res) => {
     // Filter by store using the direct storeId column
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       whereClause.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      whereClause.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        whereClause.storeId = req.user.storeId;
+      }
     }
 
     const sales = await prisma.order.findMany({

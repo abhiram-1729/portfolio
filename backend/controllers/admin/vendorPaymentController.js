@@ -129,8 +129,14 @@ export const getPayments = async (req, res) => {
     if (vendorId) where.vendorId = vendorId;
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      where.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        where.storeId = req.user.storeId;
+      }
     }
 
     const payments = await prisma.vendorPayment.findMany({

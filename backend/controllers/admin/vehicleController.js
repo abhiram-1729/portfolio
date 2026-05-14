@@ -10,8 +10,14 @@ export const getVehicles = async (req, res) => {
 
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
-      where.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        where.storeId = req.user.storeId;
+      }
     }
 
     const vehicles = await prisma.vehicle.findMany({

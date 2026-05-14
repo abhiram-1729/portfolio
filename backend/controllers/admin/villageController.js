@@ -45,8 +45,14 @@ export const getVillages = async (req, res, next) => {
         
         if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
             where.storeId = queryStoreId;
-        } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
-            where.storeId = req.user.storeId;
+        } else if (req.user.storeId) {
+            const isGlobal = 
+                ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+                req.user.customRole?.portalType === 'ADMIN';
+                
+            if (!isGlobal) {
+                where.storeId = req.user.storeId;
+            }
         }
 
         try {

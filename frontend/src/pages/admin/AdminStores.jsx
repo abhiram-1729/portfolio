@@ -18,6 +18,7 @@ export default function AdminStores() {
     try {
       setLoading(true);
       const res = await adminAPI.getStores();
+      console.log('[AdminStores] API Response:', res.data);
       if (res.data?.success) {
         setStores(res.data.data);
       }
@@ -90,6 +91,8 @@ export default function AdminStores() {
     store.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     store.code.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  console.log('[AdminStores] Render - Stores Count:', stores.length, 'Filtered Count:', filteredStores.length, 'Search Term:', searchTerm);
 
   return (
     <div className="max-w-7xl mx-auto space-y-6 p-4">

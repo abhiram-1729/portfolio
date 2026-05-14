@@ -11,8 +11,14 @@ export const getUsers = async (req, res) => {
     
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       filter.storeId = storeId;
-    } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
-      filter.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        filter.storeId = req.user.storeId;
+      }
     }
 
     if (role) {

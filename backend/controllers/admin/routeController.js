@@ -208,8 +208,14 @@ export const getAdminRoutes = async (req, res, next) => {
         
         if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
             where.storeId = queryStoreId;
-        } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
-            where.storeId = req.user.storeId;
+        } else if (req.user.storeId) {
+            const isGlobal = 
+                ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+                req.user.customRole?.portalType === 'ADMIN';
+                
+            if (!isGlobal) {
+                where.storeId = req.user.storeId;
+            }
         }
 
         const routes = await prisma.route.findMany({
@@ -235,8 +241,14 @@ export const getRouteAssignments = async (req, res, next) => {
         // Filter assignments by vehicle's store
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
             where.vehicle = { storeId };
-        } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
-            where.vehicle = { storeId: req.user.storeId };
+        } else if (req.user.storeId) {
+            const isGlobal = 
+                ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+                req.user.customRole?.portalType === 'ADMIN';
+                
+            if (!isGlobal) {
+                where.vehicle = { storeId: req.user.storeId };
+            }
         }
 
         const assignments = await prisma.routeAssignment.findMany({

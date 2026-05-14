@@ -604,7 +604,7 @@ export default function AdminLayout() {
                 </button>
 
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 z-50">
+                  <div className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 z-50 origin-top-right">
                     <div className="p-4 border-b border-gray-50 bg-gray-50/50">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p>
                       <p className="text-xs font-black text-gray-900 truncate">{user?.email || user?.name}</p>

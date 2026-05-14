@@ -105,7 +105,7 @@ model User {
   tenantId             String                  @default("VK001")
   vgeType              String                  @default("EMPLOYEE")
   storeId              String?
-  displayId            String?                 @unique
+  displayId            String?
   attendanceEnabled    Boolean                 @default(true)
   customRoleId         String?
   tenant               Tenant                  @relation(fields: [tenantId], references: [id])
@@ -159,6 +159,7 @@ model User {
   shiftId   String?
   shift     Shift?         @relation(fields: [shiftId], references: [id])
 
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([assignedVehicleId])
   @@index([role])
@@ -282,7 +283,7 @@ model Product {
   minStockAlert      Int?                     @default(0)
   purchasePrice      Float?                   @default(0)
   skuCode            String?
-  displayId          String?                  @unique
+  displayId          String?
   stock              Int                      @default(0)
   store              Store?                   @relation(fields: [storeId], references: [id])
   tenant             Tenant                   @relation(fields: [tenantId], references: [id])
@@ -305,6 +306,7 @@ model Product {
   procurementLedger  ProcurementStockLedger[]
   orderReturns       OrderReturn[]
 
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([status])
   @@index([categoryId])
@@ -390,7 +392,7 @@ model Order {
   villageName  String?
   tenantId     String        @default("VK001")
   storeId      String?
-  displayId    String?       @unique
+  displayId    String?
   cashAmount   Float?        @default(0)
   upiAmount    Float?        @default(0)
   tenant       Tenant        @relation(fields: [tenantId], references: [id])
@@ -404,6 +406,7 @@ model Order {
   returns      OrderReturn[]
   payment      Payment?
 
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([userId])
   @@index([agentId])
@@ -467,7 +470,7 @@ model Vehicle {
   vehicleName       String?
   tenantId          String                  @default("VK001")
   storeId           String?
-  displayId         String?                 @unique
+  displayId         String?
   tenant            Tenant                  @relation(fields: [tenantId], references: [id])
   store             Store?                  @relation(fields: [storeId], references: [id])
   assignedUsers     User[]                  @relation("UserVehicle")
@@ -492,6 +495,7 @@ model Vehicle {
   assetAssignments  AssetAssignment[]
 
   @@unique([tenantId, vehicleNumber])
+  @@unique([tenantId, displayId])
   @@index([tenantId])
 }
 
@@ -631,7 +635,7 @@ model MaintenanceLog {
   details      String?
   amount       Float
   mechanicName String?
-  billImage    String?
+  billImage   String?
 
   createdAt DateTime @default(now())
   tenantId  String   @default("VK001")
@@ -919,13 +923,14 @@ model Expense {
   updatedAt   DateTime           @updatedAt
   tenantId    String             @default("VK001")
   storeId     String?
-  displayId   String?            @unique
+  displayId   String?
   user        User               @relation(fields: [userId], references: [id])
   vehicle     Vehicle?           @relation(fields: [vehicleId], references: [id])
   store       Store?             @relation(fields: [storeId], references: [id])
   // subCategory          ExpenseSubCategory? @relation(fields: [expenseSubCategoryId], references: [id])
   // @@index([expenseSubCategoryId])
 
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([userId])
   @@index([vehicleId])
@@ -1390,7 +1395,7 @@ model Store {
   tenantId               String                   @default("VK001")
   name                   String
   logo                   String?
-  code                   String                   @unique
+  code                   String
   address                String?
   contactEmail           String?
   contactPhone           String?
@@ -1458,6 +1463,7 @@ model Store {
   lateEntries            LateEntry[]
   customers              Customer[]
 
+  @@unique([tenantId, code])
   @@index([tenantId])
 }
 
@@ -1531,7 +1537,7 @@ model Vendor {
   status           VendorStatus        @default(ACTIVE)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  displayId        String?             @unique
+  displayId        String?
   tenant           Tenant              @relation(fields: [tenantId], references: [id])
   store            Store?              @relation(fields: [storeId], references: [id])
   itemMappings     VendorItemMapping[]
@@ -1541,6 +1547,7 @@ model Vendor {
   payments         VendorPayment[]
 
   @@unique([tenantId, mobile])
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([storeId])
   @@index([status])
@@ -1569,7 +1576,7 @@ model PurchaseOrder {
   id               String              @id @default(cuid())
   tenantId         String              @default("VK001")
   storeId          String?
-  poNumber         Int                 @unique @default(autoincrement())
+  poNumber         Int                 @default(autoincrement())
   vendorId         String
   poDate           DateTime            @default(now())
   expectedDelivery DateTime?
@@ -1578,7 +1585,7 @@ model PurchaseOrder {
   totalAmount      Float               @default(0)
   createdAt        DateTime            @default(now())
   updatedAt        DateTime            @updatedAt
-  displayId        String?             @unique
+  displayId        String?
   tenant           Tenant              @relation(fields: [tenantId], references: [id])
   store            Store?              @relation(fields: [storeId], references: [id])
   vendor           Vendor              @relation(fields: [vendorId], references: [id])
@@ -1586,6 +1593,8 @@ model PurchaseOrder {
   goodsReceipts    GoodsReceipt[]
   purchaseInvoices PurchaseInvoice[]
 
+  @@unique([tenantId, poNumber])
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([storeId])
   @@index([vendorId])
@@ -1619,12 +1628,13 @@ model GoodsReceipt {
   status    GRNStatus          @default(PARTIAL)
   remarks   String?
   createdAt DateTime           @default(now())
-  displayId String?            @unique
+  displayId String?
   tenant    Tenant             @relation(fields: [tenantId], references: [id])
   store     Store?             @relation(fields: [storeId], references: [id])
   po        PurchaseOrder      @relation(fields: [poId], references: [id])
   items     GoodsReceiptItem[]
 
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([storeId])
   @@index([poId])
@@ -1661,7 +1671,7 @@ model PurchaseInvoice {
   paidAmount         Float                     @default(0)
   createdAt          DateTime                  @default(now())
   updatedAt          DateTime                  @updatedAt
-  displayId          String?                   @unique
+  displayId          String?
   tenant             Tenant                    @relation(fields: [tenantId], references: [id])
   store              Store?                    @relation(fields: [storeId], references: [id])
   vendor             Vendor                    @relation(fields: [vendorId], references: [id])
@@ -1670,6 +1680,7 @@ model PurchaseInvoice {
   paymentAllocations VendorPaymentAllocation[]
 
   @@unique([tenantId, invoiceNumber])
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([storeId])
   @@index([vendorId])
@@ -1764,7 +1775,7 @@ model VendorPayment {
   remarks     String?
   createdAt   DateTime                  @default(now())
   updatedAt   DateTime                  @updatedAt
-  displayId   String?                   @unique
+  displayId   String?
   tenant      Tenant                    @relation(fields: [tenantId], references: [id])
   store       Store?                    @relation(fields: [storeId], references: [id])
   vendor      Vendor                    @relation(fields: [vendorId], references: [id])
@@ -1852,7 +1863,7 @@ model BankDeposit {
 
 model DamageEntry {
   id                  String               @id @default(cuid())
-  displayId           String?              @unique
+  displayId           String?
   tenantId            String               @default("VK001")
   storeId             String?
   vehicleId           String?
@@ -1883,6 +1894,7 @@ model DamageEntry {
   product             Product              @relation(fields: [productId], references: [id])
   deduction           DamageDeduction?
 
+  @@unique([tenantId, displayId])
   @@index([tenantId])
   @@index([storeId])
   @@index([vehicleId])
@@ -2442,7 +2454,7 @@ model Customer {
   tenantId      String          @default("VK001")
   storeId       String?
   name          String
-  mobile        String          @unique
+  mobile        String
   address       String?
   villageId     String?
   village       Village?        @relation(fields: [villageId], references: [id])
@@ -2457,6 +2469,7 @@ model Customer {
   store  Store?  @relation(fields: [storeId], references: [id])
   orders Order[]
 
+  @@unique([tenantId, mobile])
   @@index([tenantId])
   @@index([storeId])
   @@index([villageId])

@@ -38,6 +38,7 @@ export const protect = async (req, res, next) => {
             }
 
             // Set Tenant Context
+            console.log(`[Auth] ${req.method} ${req.originalUrl} - User: ${req.user.id}, Tenant: ${req.user.tenantId}, Role: ${req.user.role}`);
             tenantContext.run({ tenantId: req.user.tenantId }, () => {
               next();
             });

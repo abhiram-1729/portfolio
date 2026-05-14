@@ -10,7 +10,10 @@ export const getAdminStores = async (req, res, next) => {
         user.role === 'TENANT_OWNER' || 
         user.role === 'SUPER_ADMIN' || 
         (user.role === 'ADMIN' && !user.customRoleId) ||
-        user.portalType === 'ADMIN';
+        user.customRole?.portalType === 'ADMIN';
+
+    console.log('[getAdminStores] User:', { id: user.id, role: user.role, tenantId: user.tenantId, storeId: user.storeId });
+    console.log('[getAdminStores] isGlobal:', isGlobal);
 
     const where = {
         tenantId: user.tenantId
@@ -20,6 +23,8 @@ export const getAdminStores = async (req, res, next) => {
     if (!isGlobal && user.storeId) {
         where.id = user.storeId;
     }
+
+    console.log('[getAdminStores] Query where:', JSON.stringify(where, null, 2));
 
     const stores = await prisma.store.findMany({
       where,
@@ -32,6 +37,8 @@ export const getAdminStores = async (req, res, next) => {
         }
       }
     });
+
+    console.log(`[getAdminStores] Found ${stores.length} stores`);
 
     res.json({ success: true, data: stores });
   } catch (error) {

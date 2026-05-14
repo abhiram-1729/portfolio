@@ -21,8 +21,14 @@ export const getActivityLogs = async (req, res, next) => {
         };
 
         // If user has a store assigned and is not a tenant owner, restrict to their store
-        if (req.user.role !== 'TENANT_OWNER' && req.user.storeId) {
-            where.storeId = req.user.storeId;
+        if (req.user.storeId) {
+            const isGlobal = 
+                ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+                req.user.customRole?.portalType === 'ADMIN';
+                
+            if (!isGlobal) {
+                where.storeId = req.user.storeId;
+            }
         }
 
         const [logs, total] = await Promise.all([

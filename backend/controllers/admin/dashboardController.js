@@ -23,11 +23,16 @@ export const getDashboardStats = async (req, res) => {
       vehicleFilter.storeId = storeId;
       userFilter.storeId = storeId;
       orderFilter.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      // Regular Admins are restricted. Tenant Owners see everything if no specific store is picked.
-      vehicleFilter.storeId = req.user.storeId;
-      userFilter.storeId = req.user.storeId;
-      orderFilter.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        vehicleFilter.storeId = req.user.storeId;
+        userFilter.storeId = req.user.storeId;
+        orderFilter.storeId = req.user.storeId;
+      }
     }
 
     // 1. Core Counts & Metrics

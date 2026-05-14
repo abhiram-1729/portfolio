@@ -25,8 +25,14 @@ export const getInventoryInitData = async (req, res) => {
     const productWhere = { tenantId };
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       productWhere.OR = [{ storeId: storeId }, { storeId: null }];
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      productWhere.OR = [{ storeId: req.user.storeId }, { storeId: null }];
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        productWhere.OR = [{ storeId: req.user.storeId }, { storeId: null }];
+      }
     }
 
     // Parallel fetching for performance
@@ -138,8 +144,14 @@ export const getItems = async (req, res) => {
       // Show everything for the tenant, no storeId filter
     } else if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      where.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        where.storeId = req.user.storeId;
+      }
     }
 
     const items = await prisma.product.findMany({
@@ -1636,8 +1648,14 @@ export const getRefillRequests = async (req, res) => {
 
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      where.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        where.storeId = req.user.storeId;
+      }
     }
 
     const requests = await prisma.refillRequest.findMany({
@@ -2090,8 +2108,14 @@ export const getAuditHistory = async (req, res) => {
 
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
-      where.storeId = req.user.storeId;
+    } else if (req.user.storeId) {
+      const isGlobal = 
+        ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
+        req.user.customRole?.portalType === 'ADMIN';
+        
+      if (!isGlobal) {
+        where.storeId = req.user.storeId;
+      }
     }
 
     const audits = await prisma.stockAudit.findMany({

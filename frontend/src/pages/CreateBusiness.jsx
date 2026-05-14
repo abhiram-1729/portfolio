@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 import { storeAPI } from '../services/api';
 import adminAPI from '../services/adminService';
+import { useUserStore } from '../store/userStore';
 import logo from '../assets/VillagKart_Logo.png';
 
 const steps = [
@@ -37,38 +38,45 @@ const steps = [
 ];
 
 export default function CreateBusiness() {
+  const { currentUser, isLoaded } = useUserStore();
   const navigate = useNavigate();
   const location = useLocation();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [editStoreId, setEditStoreId] = useState(null);
+  
   const [formData, setFormData] = useState({
     // Step 1: Nature
-    nature: '', // Product, Service, Both
+    nature: currentUser?.tenant?.nature || 'Both',
+    type: currentUser?.tenant?.type || 'Private Limited',
+    
     // Step 2: Basic Info
-    name: '',
-    type: '', // Individual, Company, Partnership
-    category: '',
-    subcategory: '',
+    name: currentUser?.tenant?.name || '',
+    category: 'FMCG',
+    subcategory: 'Grocery',
     description: '',
+    
     // Step 3: Contact
     contactName: '',
-    contactMobile: '',
-    contactEmail: '',
+    contactMobile: currentUser?.mobile || '',
+    contactEmail: currentUser?.email || '',
     role: 'Owner',
     whatsapp: '',
+    
     // Step 4: Address
-    address: '',
+    address: currentUser?.tenant?.address || '',
     area: '',
     city: '',
     state: 'AP',
     pincode: '',
+    
     // Step 5: Branch / Hub Config
     displayName: 'Main Hub',
     code: 'HUB-01',
     stateCode: 'AP',
     hubCode: 'HUB',
     branchAddress: '',
+    
     // Step 6: Operations
     workingDays: [],
     openingTime: '09:00',
@@ -148,6 +156,20 @@ export default function CreateBusiness() {
       }));
     }
   }, [location.state]);
+
+  useEffect(() => {
+    if (isLoaded && currentUser?.tenant && !editStoreId && !location.state?.editStore) {
+      setFormData(prev => ({
+        ...prev,
+        nature: currentUser.tenant.nature || prev.nature,
+        type: currentUser.tenant.type || prev.type,
+        name: currentUser.tenant.name || prev.name,
+        contactEmail: currentUser.email || prev.contactEmail,
+        contactMobile: currentUser.mobile || prev.contactMobile,
+        address: currentUser.tenant.address || prev.address,
+      }));
+    }
+  }, [isLoaded, currentUser, editStoreId, location.state]);
 
   const validateCurrentStep = () => {
     if (currentStep === 1) {
