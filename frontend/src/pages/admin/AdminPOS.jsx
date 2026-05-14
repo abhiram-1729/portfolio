@@ -127,7 +127,12 @@ export default function AdminPOS() {
     const fetchSettings = async () => {
       try {
         const { data } = await adminAPI.getSettings();
-        if (data?.success) setSettings(data.data);
+        if (data?.success) {
+          setSettings(data.data);
+          if (data.data.deliverySlabs) {
+            useCartStore.getState().setDeliverySlabs(data.data.deliverySlabs);
+          }
+        }
       } catch (err) {
         console.warn('Failed to load settings');
       }
@@ -610,7 +615,16 @@ export default function AdminPOS() {
     pdf.text(`Total GST (Incl.)`, totalsX, rightY);
     pdf.setTextColor(...darkText);
     pdf.text(`Rs.${totalTax.toFixed(0)}`, colX.amount, rightY, { align: 'right' });
-    rightY += 4;
+    rightY += 7;
+
+    if (order.deliveryCharge > 0) {
+      pdf.setTextColor(...grayText);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('Delivery Fee', totalsX, rightY);
+      pdf.setTextColor(...darkText);
+      pdf.text(`Rs.${order.deliveryCharge.toFixed(0)}`, colX.amount, rightY, { align: 'right' });
+      rightY += 7;
+    }
 
     pdf.setDrawColor(...lightLine);
     pdf.line(totalsX, rightY, pageWidth - margin, rightY);
@@ -621,10 +635,28 @@ export default function AdminPOS() {
     pdf.setTextColor(255, 255, 255);
     pdf.setFontSize(10);
     pdf.setFont('helvetica', 'bold');
-    pdf.text('TOTAL', totalsX, rightY + 3);
+    pdf.text('GRAND TOTAL', totalsX, rightY + 3);
     pdf.setFontSize(14);
     pdf.text(`Rs.${order.totalAmount?.toFixed(0)}`, colX.amount, rightY + 4, { align: 'right' });
     rightY += 15;
+
+    // Fulfillment Scheduling (New Section)
+    if (order.deliveryDate || order.deliverySlot) {
+      const scheduleY = startY + 22;
+      pdf.setFillColor(239, 246, 255); // light blue
+      pdf.roundedRect(margin, scheduleY, badgeWidth, 18, 3, 3, 'F');
+      pdf.setDrawColor(191, 219, 254);
+      pdf.roundedRect(margin, scheduleY, badgeWidth, 18, 3, 3, 'S');
+      pdf.setTextColor(30, 64, 175);
+      pdf.setFontSize(8);
+      pdf.setFont('helvetica', 'bold');
+      pdf.text('DELIVERY SCHEDULE', margin + 5, scheduleY + 7);
+      pdf.setTextColor(30, 58, 138);
+      pdf.setFontSize(9);
+      pdf.setFont('helvetica', 'bold');
+      const dateText = order.deliveryDate ? new Date(order.deliveryDate).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : 'TBD';
+      pdf.text(`${dateText} | ${order.deliverySlot || 'Standard Slot'}`, margin + 5, scheduleY + 13);
+    }
 
     // Payment Status Badge
     const badgeWidth = (totalsX - margin) - 15;

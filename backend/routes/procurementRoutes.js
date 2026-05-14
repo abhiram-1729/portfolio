@@ -6,6 +6,9 @@ import * as grnCtr from '../controllers/admin/grnController.js';
 import * as purchaseCtr from '../controllers/admin/purchaseController.js';
 import * as paymentCtr from '../controllers/admin/vendorPaymentController.js';
 import * as reportCtr from '../controllers/admin/procurementReportController.js';
+import * as reqCtr from '../controllers/admin/requisitionController.js';
+import * as transCtr from '../controllers/admin/transferController.js';
+import * as woCtr from '../controllers/admin/workOrderController.js';
 
 const router = express.Router();
 
@@ -44,6 +47,7 @@ router.route('/grn')
 router.route('/grn/:id')
   .put(grnCtr.updateGRN)
   .delete(grnCtr.deleteGRN);
+router.put('/grn/item/:itemId/qc', grnCtr.updateQCStatus);
 
 // ─── PURCHASE INVOICES ─────────────────────────────────────
 router.route('/purchases')
@@ -71,5 +75,31 @@ router.get('/reports/outstanding', reportCtr.getOutstandingPayables);
 router.get('/reports/aging', reportCtr.getAgingReport);
 router.get('/reports/profitability', reportCtr.getProfitabilityReport);
 router.get('/reports/stock-ledger', reportCtr.getStockLedger);
+
+// ─── PURCHASE REQUISITIONS ─────────────────────────────────────
+router.route('/requisitions')
+  .get(reqCtr.getRequisitions)
+  .post(reqCtr.createRequisition);
+router.route('/requisitions/:id')
+  .get(reqCtr.getRequisitionById)
+  .put(reqCtr.updateRequisitionStatus)
+  .delete(reqCtr.deleteRequisition);
+
+// ─── STOCK TRANSFERS ─────────────────────────────────────
+router.route('/transfers')
+  .get(transCtr.getTransfers)
+  .post(transCtr.createTransfer);
+router.route('/transfers/:id')
+  .get(transCtr.getTransferById);
+router.put('/transfers/:id/dispatch', transCtr.dispatchTransfer);
+router.put('/transfers/:id/receive', transCtr.receiveTransfer);
+
+// ─── WORK ORDERS (Manufacturing) ─────────────────────────────────────
+router.route('/work-orders')
+  .get(woCtr.getWorkOrders)
+  .post(woCtr.createWorkOrder);
+router.route('/work-orders/:id')
+  .get(woCtr.getWorkOrderById);
+router.put('/work-orders/:id/complete', woCtr.completeWorkOrder);
 
 export default router;

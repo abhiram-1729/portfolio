@@ -219,7 +219,7 @@ export const getPurchases = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         vendor: { select: { vendorName: true, mobile: true } },
-        po: { select: { poNumber: true, displayId: true } },
+        po: { select: { displayId: true } },
         items: {
           include: { product: { select: { name: true } } }
         },
@@ -242,7 +242,7 @@ export const getPurchaseById = async (req, res) => {
       where: { id },
       include: {
         vendor: true,
-        po: { select: { poNumber: true } },
+        po: { select: { displayId: true } },
         items: {
           include: { product: { select: { id: true, name: true, price: true, purchasePrice: true } } }
         },

@@ -6,7 +6,7 @@ import { logActivity } from '../../utils/activityLogger.js';
 // Get all users
 export const getUsers = async (req, res) => {
   try {
-    const { storeId, role } = req.query;
+    const { storeId, role, roleId } = req.query;
     const filter = { tenantId: req.user.tenantId };
     
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
@@ -17,6 +17,11 @@ export const getUsers = async (req, res) => {
 
     if (role) {
       filter.role = role;
+    }
+
+    // Filter by custom role assignment (used by Role Privileges → Assigned Users tab)
+    if (roleId && roleId !== 'undefined' && roleId !== 'null') {
+      filter.customRoleId = roleId;
     }
 
     const users = await prisma.user.findMany({

@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
 import {
   Users, ClipboardList, Truck, Receipt, BookOpen,
-  CreditCard, BarChart3, Link2, Building2, ChevronRight, ChevronLeft, RotateCcw
+  CreditCard, BarChart3, Link2, Building2, ChevronRight, ChevronLeft, RotateCcw,
+  ShoppingCart, ShieldCheck, Settings2
 } from 'lucide-react';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useUserStore } from '../../store/userStore';
@@ -17,12 +18,20 @@ import PurchasesSection from './admin_procurement/PurchasesSection';
 import StockLedgerSection from './admin_procurement/StockLedgerSection';
 import PaymentsSection from './admin_procurement/PaymentsSection';
 import ReportsSection from './admin_procurement/ReportsSection';
+import RequisitionSection from './admin_procurement/RequisitionSection';
+import TransferSection from './admin_procurement/TransferSection';
+import QCSection from './admin_procurement/QCSection';
+import WorkOrderSection from './admin_procurement/WorkOrderSection';
 
 const TABS = [
   { key: 'vendors', label: 'Vendors', icon: Users, section: 'VENDORS' },
   { key: 'mapping', label: 'Item Mapping', icon: Link2, section: 'MAPPING' },
+  { key: 'requisition', label: 'Requisitions', icon: ShoppingCart, section: 'REQUISITION' },
   { key: 'po', label: 'Purchase Orders', icon: ClipboardList, section: 'PO' },
   { key: 'grn', label: 'Goods Receipt', icon: Truck, section: 'GRN' },
+  { key: 'qc', label: 'Quality Control', icon: ShieldCheck, section: 'QC' },
+  { key: 'transfers', label: 'Transfers', icon: RotateCcw, section: 'TRANSFERS' },
+  { key: 'workorders', label: 'Work Orders', icon: Settings2, section: 'WORKORDERS' },
   { key: 'purchases', label: 'Purchases', icon: Receipt, section: 'PURCHASES' },
   { key: 'ledger', label: 'Stock Ledger', icon: BookOpen, section: 'LEDGER' },
   { key: 'payments', label: 'Payments', icon: CreditCard, section: 'PAYMENTS' },
@@ -238,8 +247,12 @@ export default function AdminProcurement() {
           <div key={storeId} className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-500 overflow-hidden">
             {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
+            {activeTab === 'requisition' && canViewSection('REQUISITION') && <RequisitionSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
+            {activeTab === 'qc' && canViewSection('QC') && <QCSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
+            {activeTab === 'transfers' && canViewSection('TRANSFERS') && <TransferSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
+            {activeTab === 'workorders' && canViewSection('WORKORDERS') && <WorkOrderSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'ledger' && canViewSection('LEDGER') && <StockLedgerSection setHeaderExtra={setHeaderExtra} storeId={storeId} />}
             {activeTab === 'payments' && canViewSection('PAYMENTS') && <PaymentsSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}

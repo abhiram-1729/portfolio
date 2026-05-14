@@ -260,7 +260,12 @@ export const getAllExpenses = async (req, res, next) => {
 
         res.json(mappedExpenses);
     } catch (error) {
-        next(error);
+        console.error('[getAllExpenses Error]', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Database error in getAllExpenses', 
+            error: error.message 
+        });
     }
 };
 

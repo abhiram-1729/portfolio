@@ -79,6 +79,13 @@ model Tenant {
   leaveBalances            LeaveBalance[]
   shifts                   Shift[]
   customers                Customer[]
+  promotions               Promotion[]
+  purchaseRequisitions     PurchaseRequisition[]
+  purchaseRequisitionItems PurchaseRequisitionItem[]
+  stockTransfers           StockTransfer[]
+  stockTransferItems       StockTransferItem[]
+  workOrders               WorkOrder[]
+  workOrderItems           WorkOrderItem[]
 }
 
 enum TenantStatus {
@@ -283,6 +290,10 @@ model Product {
   skuCode            String?
   displayId          String?                  @unique
   stock              Int                      @default(0)
+  isRawStock         Boolean                  @default(false)
+  rawStockRatio      Float?                   @default(1)
+  comboItems         Json?
+  isCombo            Boolean                  @default(false)
   store              Store?                   @relation(fields: [storeId], references: [id])
   tenant             Tenant                   @relation(fields: [tenantId], references: [id])
   category           Category                 @relation(fields: [categoryId], references: [id])
@@ -303,6 +314,9 @@ model Product {
   damageEntries      DamageEntry[]
   procurementLedger  ProcurementStockLedger[]
   orderReturns       OrderReturn[]
+  requisitionItems   PurchaseRequisitionItem[]
+  transferItems      StockTransferItem[]
+  workOrderItems     WorkOrderItem[]
 
   @@index([tenantId])
   @@index([status])
@@ -391,17 +405,24 @@ model Order {
   storeId      String?
   displayId    String?       @unique
   cashAmount   Float?        @default(0)
-  upiAmount    Float?        @default(0)
-  tenant       Tenant        @relation(fields: [tenantId], references: [id])
-  user         User?         @relation(fields: [userId], references: [id])
-  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
-  route        Route?        @relation(fields: [routeId], references: [id])
-  store        Store?        @relation(fields: [storeId], references: [id])
-  customerId   String?
-  customer     Customer?     @relation(fields: [customerId], references: [id])
-  items        OrderItem[]
-  returns      OrderReturn[]
-  payment      Payment?
+  upiAmount          Float?        @default(0)
+  customerId         String?
+  deliveryCharge     Float         @default(0)
+  deliverySlot       String?
+  deliveryDate       DateTime?
+  appliedPromotionId String?
+  discountAmount     Float         @default(0)
+  salesChannel       SalesChannel  @default(POS)
+  appliedPromotion   Promotion?    @relation(fields: [appliedPromotionId], references: [id])
+  tenant             Tenant        @relation(fields: [tenantId], references: [id])
+  user               User?         @relation(fields: [userId], references: [id])
+  vehicle            Vehicle?      @relation(fields: [vehicleId], references: [id])
+  route              Route?        @relation(fields: [routeId], references: [id])
+  store              Store?        @relation(fields: [storeId], references: [id])
+  customer           Customer?     @relation(fields: [customerId], references: [id])
+  items              OrderItem[]
+  returns            OrderReturn[]
+  payment            Payment?
 
   @@index([tenantId])
   @@index([userId])
@@ -426,10 +447,12 @@ model OrderItem {
   gst          Float?  @default(0)
   tenantId     String  @default("VK001")
   storeId      String?
-  order        Order   @relation(fields: [orderId], references: [id])
-  product      Product @relation(fields: [productId], references: [id])
-  tenant       Tenant  @relation(fields: [tenantId], references: [id])
-  store        Store?  @relation(fields: [storeId], references: [id])
+  promotionId  String?
+  order        Order      @relation(fields: [orderId], references: [id])
+  product      Product    @relation(fields: [productId], references: [id])
+  tenant       Tenant     @relation(fields: [tenantId], references: [id])
+  store        Store?     @relation(fields: [storeId], references: [id])
+  promotion    Promotion? @relation(fields: [promotionId], references: [id])
 
   @@index([tenantId])
   @@index([storeId])
@@ -806,12 +829,17 @@ model BusinessSettings {
   address      String?
   taxRates     String   @default("0,5,12,18")
   shifts       Json? // Array of { id, name, startTime, endTime, isActive }
-  shiftMode    String   @default("STANDARD")
-  updatedAt    DateTime @updatedAt
-  tenantId     String   @default("VK001")
-  storeId      String?  @unique
-  tenant       Tenant   @relation(fields: [tenantId], references: [id])
-  store        Store?   @relation(fields: [storeId], references: [id])
+  shiftMode              String   @default("STANDARD")
+  deliveryRadius         Float?   @default(20)
+  deliveryRadiusEnforced Boolean  @default(true)
+  deliverySlabs          Json?
+  deliverySlots          Json?
+  surcharges             Json?
+  updatedAt              DateTime @updatedAt
+  tenantId               String   @default("VK001")
+  storeId                String?  @unique
+  tenant                 Tenant   @relation(fields: [tenantId], references: [id])
+  store                  Store?   @relation(fields: [storeId], references: [id])
 
   @@unique([tenantId, storeId])
   @@index([tenantId])
@@ -1453,6 +1481,9 @@ model Store {
   lateConfigs            LateEntryConfig[]
   lateEntries            LateEntry[]
   customers              Customer[]
+  promotions             Promotion[]
+  purchaseRequisitions   PurchaseRequisition[]
+  workOrders             WorkOrder[]
 
   @@index([tenantId])
 }
@@ -1631,11 +1662,16 @@ model GoodsReceiptItem {
   tenantId    String       @default("VK001")
   grnId       String
   productId   String
-  orderedQty  Int
-  receivedQty Int
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  grn         GoodsReceipt @relation(fields: [grnId], references: [id], onDelete: Cascade)
-  product     Product      @relation(fields: [productId], references: [id])
+  orderedQty   Int
+  receivedQty  Int
+  qcRemarks    String?
+  qcStatus     QCStatus     @default(PENDING)
+  damagedQty   Int          @default(0)
+  missingQty   Int          @default(0)
+  expiryStatus String?
+  tenant       Tenant       @relation(fields: [tenantId], references: [id])
+  grn          GoodsReceipt @relation(fields: [grnId], references: [id], onDelete: Cascade)
+  product      Product      @relation(fields: [productId], references: [id])
 
   @@index([tenantId])
   @@index([grnId])
@@ -2465,4 +2501,199 @@ enum CustomerSegment {
   ROUTE_WISE
   HIGH_VALUE
   ONLINE
+}
+
+model Promotion {
+  id                 String        @id @default(cuid())
+  tenantId           String        @default("VK001")
+  storeId            String?
+  name               String
+  description        String?
+  code               String?       @unique
+  type               PromotionType
+  discountType       DiscountType?
+  discountValue      Float?
+  minOrderAmount     Float?        @default(0)
+  maxDiscount        Float?
+  startDate          DateTime?
+  endDate            DateTime?
+  usageLimit         Int?
+  usedCount          Int           @default(0)
+  userUsageLimit     Int?
+  isActive           Boolean       @default(true)
+  targetProductIds   String[]
+  targetCategoryIds  String[]
+  targetRouteIds     String[]
+  targetVillageNames String[]
+  buyQuantity        Int?
+  getQuantity        Int?
+  comboProducts      Json?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  tenant             Tenant        @relation(fields: [tenantId], references: [id])
+  store              Store?        @relation(fields: [storeId], references: [id])
+  appliedToOrders    Order[]
+  appliedToItems     OrderItem[]
+
+  @@index([tenantId])
+  @@index([code])
+  @@index([type])
+  @@index([isActive])
+}
+
+model PurchaseRequisition {
+  id        String                    @id @default(cuid())
+  tenantId  String                    @default("VK001")
+  storeId   String?
+  reqNumber Int                       @unique @default(autoincrement())
+  reqDate   DateTime                  @default(now())
+  status    RequisitionStatus         @default(PENDING)
+  priority  String                    @default("NORMAL")
+  remarks   String?
+  createdAt DateTime                  @default(now())
+  updatedAt DateTime                  @updatedAt
+  items     PurchaseRequisitionItem[]
+  tenant    Tenant                    @relation(fields: [tenantId], references: [id])
+  store     Store?                    @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([status])
+}
+
+model PurchaseRequisitionItem {
+  id            String              @id @default(cuid())
+  tenantId      String              @default("VK001")
+  requisitionId String
+  productId     String
+  quantity      Int
+  requisition   PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+  product       Product             @relation(fields: [productId], references: [id])
+  tenant        Tenant              @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([requisitionId])
+  @@index([productId])
+}
+
+model StockTransfer {
+  id              String              @id @default(cuid())
+  tenantId        String              @default("VK001")
+  transferNumber  Int                 @unique @default(autoincrement())
+  fromStoreId     String?
+  toStoreId       String?
+  fromWarehouseId String?
+  toWarehouseId   String?
+  transferDate    DateTime            @default(now())
+  status          TransferStatus      @default(DRAFT)
+  remarks         String?
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  items           StockTransferItem[]
+  tenant          Tenant              @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([status])
+}
+
+model StockTransferItem {
+  id         String        @id @default(cuid())
+  tenantId   String        @default("VK001")
+  transferId String
+  productId  String
+  quantity   Int
+  transfer   StockTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  product    Product       @relation(fields: [productId], references: [id])
+  tenant     Tenant        @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([transferId])
+  @@index([productId])
+}
+
+model WorkOrder {
+  id          String          @id @default(cuid())
+  tenantId    String          @default("VK001")
+  storeId     String?
+  orderNumber Int             @unique @default(autoincrement())
+  orderDate   DateTime        @default(now())
+  status      WorkOrderStatus @default(PENDING)
+  remarks     String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+  items       WorkOrderItem[]
+  tenant      Tenant          @relation(fields: [tenantId], references: [id])
+  store       Store?          @relation(fields: [storeId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([status])
+}
+
+model WorkOrderItem {
+  id          String    @id @default(cuid())
+  tenantId    String    @default("VK001")
+  workOrderId String
+  productId   String
+  type        String
+  quantity    Int
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  product     Product   @relation(fields: [productId], references: [id])
+  tenant      Tenant    @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([productId])
+}
+
+enum PromotionType {
+  COUPON
+  COMBO
+  BOGO
+  ROUTE_BASED
+  VILLAGE_BASED
+  FESTIVAL
+  FLAT_DISCOUNT
+  PERCENTAGE_DISCOUNT
+}
+
+enum DiscountType {
+  PERCENTAGE
+  FLAT_AMOUNT
+  FIXED_PRICE
+}
+
+enum TransferStatus {
+  DRAFT
+  IN_TRANSIT
+  RECEIVED
+  CANCELLED
+}
+
+enum RequisitionStatus {
+  PENDING
+  APPROVED
+  PO_CREATED
+  REJECTED
+}
+
+enum WorkOrderStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum QCStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum SalesChannel {
+  POS
+  VEHICLE
+  ONLINE
+  WHATSAPP
+  APP
 }

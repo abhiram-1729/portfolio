@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
   Shield, Plus, Pencil, Trash2, Users, X, Loader2, Check,
-  ChevronRight, ChevronDown, Key, Save, AlertTriangle, CheckCircle2, XCircle,
+  ChevronRight, ChevronDown, Key, Save, AlertTriangle, CheckCircle2, XCircle, Search,
   Truck, ShoppingCart, PieChart, Receipt, Target, Eye, EyeOff, LayoutGrid, Coins, Grid, MapPin,
   Package, Wallet, BarChart, ClipboardList, BarChart3, Settings
 } from 'lucide-react';
@@ -10,18 +10,29 @@ import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
 const DASHBOARD_WIDGETS = [
-  { key: 'activeVehicles', label: 'Active Vehicles', desc: 'Real-time fleet tracking', icon: Truck },
-  { key: 'activeUsers', label: 'Active Users', desc: 'Current online staff', icon: Users },
-  { key: 'totalOrders', label: 'Total Orders Today', desc: 'Daily transaction count', icon: ShoppingCart },
-  { key: 'totalSales', label: 'Total Sales Today', desc: 'Daily revenue analytics', icon: Coins },
-  { key: 'paymentSplit', label: 'Payment Split', desc: 'Cash vs Digital breakdown', icon: PieChart },
-  { key: 'cashStatus', label: 'Cash Reconciliation', desc: 'Safe & register audit', icon: Receipt },
-  { key: 'topPerformers', label: 'Top Performers (VGE)', desc: 'Agent leaderboard', icon: Target },
+  { key: 'totalSales', label: 'Revenue Today', desc: 'Gross Intake', icon: Coins },
+  { key: 'grossMargin', label: 'Gross Margin', desc: 'Net Efficiency', icon: PieChart },
+  { key: 'totalOrders', label: 'Orders Today', desc: 'Trans. Volume', icon: ShoppingCart },
+  { key: 'activeVehicles', label: 'Active Fleet', desc: 'Deployment', icon: Truck },
+  { key: 'stockValuation', label: 'Stock Valuation', desc: 'Assets Value', icon: Package },
+  { key: 'pendingLogistics', label: 'Pending Logistics', desc: 'Fulfillment', icon: Truck },
+  { key: 'criticalAlerts', label: 'Critical Alerts', desc: 'Safety Stock', icon: Target },
+  { key: 'refillRequests', label: 'Refill Requests', desc: 'Fleet Resupply', icon: Truck },
+  { key: 'fleetMap', label: 'Fleet Geo-Intelligence', desc: 'Map & Live Agents', icon: MapPin },
+  { key: 'orderChannels', label: 'Order Channels', desc: 'Pie Chart', icon: PieChart },
+  { key: 'paymentSplit', label: 'Revenue Split', desc: 'Pie Chart', icon: PieChart },
+  { key: 'productVelocity', label: 'Product Velocity', desc: 'Bar Chart', icon: BarChart },
+  { key: 'operationalCriticals', label: 'Operational Criticals', desc: 'Inventory Health & Route Coverage', icon: Target },
+  { key: 'treasuryAnalytics', label: 'Treasury Analytics', desc: 'Vendor Liabilities & Damage', icon: Wallet },
+  { key: 'cashStatus', label: 'Operational Recon Feed', desc: 'Cash Stats', icon: Receipt },
+  { key: 'topPerformers', label: 'Elite Performance', desc: 'Agent Leaderboard', icon: Users },
+  { key: 'liveSales', label: 'Live Sales Stream', desc: 'Recent Orders', icon: ShoppingCart },
 ];
 
 const MODULES = [
   { key: 'DASHBOARD', label: 'Dashboard', desc: 'Main overview & metrics' },
-  { key: 'STAFF', label: 'Staff Management', desc: 'Admin, Agents & Field Force' },
+  { key: 'STAFF_ADMIN', label: 'Admin Management', desc: 'System Admins & Supervisors' },
+  { key: 'STAFF_AGENT', label: 'Agent Management', desc: 'Sales Agents & Field Force' },
   { key: 'VEHICLES', label: 'Fleet Management', desc: 'Vehicles & Assets' },
   { key: 'SALES', label: 'Sales', desc: 'Order management' },
   { key: 'TARGETS', label: 'Targets', desc: 'VGE incentives' },
@@ -277,6 +288,9 @@ export default function TenantPrivileges() {
   const [fetchingUsers, setFetchingUsers] = useState(false);
   const [headerEditing, setHeaderEditing] = useState(false);
   const [openSections, setOpenSections] = useState(['core']);
+  const [allUsers, setAllUsers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isAssigning, setIsAssigning] = useState(false);
 
   const toggleAccordion = (key) => {
     setOpenSections(prev =>
@@ -334,6 +348,12 @@ export default function TenantPrivileges() {
     try {
       const res = await adminAPI.getUsers({ roleId });
       setRoleUsers(Array.isArray(res.data) ? res.data : (res.data?.data || []));
+      
+      // Also fetch all users to allow assigning new ones
+      const allRes = await adminAPI.getUsers();
+      const everyUser = Array.isArray(allRes.data) ? allRes.data : (allRes.data?.data || []);
+      // Filter out users already in this role
+      setAllUsers(everyUser.filter(u => u.customRoleId !== roleId));
     } catch (err) {
       console.error('Failed to fetch role users:', err);
     } finally {
@@ -341,20 +361,38 @@ export default function TenantPrivileges() {
     }
   };
 
-  const handleDeleteUser = async (userId, userName) => {
-    if (!window.confirm(`Are you absolutely sure? This will PERMANENTLY DELETE ${userName} and all their historical data (orders, attendance, cash transfers, etc). This cannot be undone.`)) {
+  const handleAssignUser = async (userId) => {
+    if (!selectedRole) return;
+    setSaving(true);
+    try {
+      await adminAPI.updateUser(userId, { customRoleId: selectedRole.id });
+      toast.success('User assigned to role');
+      fetchRoleUsers(selectedRole.id);
+      fetchRoles();
+      setSearchQuery('');
+      setIsAssigning(false);
+    } catch (err) {
+      toast.error('Failed to assign user');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleRemoveFromRole = async (userId, userName) => {
+    if (!window.confirm(`Remove "${userName}" from this role?\n\nThis will only revoke their custom role access. Their account, orders, attendance, and all historical data remain fully intact.`)) {
       return;
     }
 
     try {
-      await adminAPI.deleteUser(userId);
-      toast.success(`${userName} permanently deleted`);
+      // Only strip the custom role — do NOT delete the user account
+      await adminAPI.updateUser(userId, { customRoleId: null });
+      toast.success(`${userName} removed from role. Account preserved.`);
       // Refresh list
       if (selectedRole) fetchRoleUsers(selectedRole.id);
-      fetchRoles(); // Refresh counts
+      fetchRoles(); // Refresh user counts
     } catch (err) {
-      console.error('Failed to delete user:', err);
-      toast.error(err.response?.data?.message || 'Failed to delete user');
+      console.error('Failed to remove user from role:', err);
+      toast.error(err.response?.data?.message || 'Failed to remove user from role');
     }
   };
 
@@ -589,6 +627,17 @@ export default function TenantPrivileges() {
           : [];
       }
 
+      // Clear sub-sections if READ permission is removed
+      if (!nextPerms.includes('READ')) {
+        if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
+        if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
+        if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
+        if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
+        if (moduleKey === 'SETTINGS') updated.SETTINGS_TARGET_SECTIONS = [];
+      }
+
       return updated;
     });
   };
@@ -597,10 +646,25 @@ export default function TenantPrivileges() {
     setFormPerms(prev => {
       const current = prev[moduleKey] || [];
       const allSelected = ACTIONS.every(a => current.includes(a.key));
-      return {
+      const nextPerms = allSelected ? [] : ACTIONS.map(a => a.key);
+      
+      let updated = {
         ...prev,
-        [moduleKey]: allSelected ? [] : ACTIONS.map(a => a.key)
+        [moduleKey]: nextPerms
       };
+
+      if (allSelected) {
+        if (moduleKey === 'DASHBOARD') updated.DASHBOARD_WIDGETS = [];
+        if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
+        if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
+        if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
+        if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
+        if (moduleKey === 'SETTINGS') updated.SETTINGS_TARGET_SECTIONS = [];
+      }
+
+      return updated;
     });
   };
 
@@ -1100,25 +1164,104 @@ export default function TenantPrivileges() {
                     isOpen={openSections.includes('settings')}
                     onToggle={() => toggleAccordion('settings')}
                   >
-                    <PermissionTable
-                      modules={SETTINGS_SECTIONS}
-                      isGranular={true}
-                      sectionKey="SETTINGS_TARGET_SECTIONS"
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                      customToggle={(key, action) => toggleSettingsSection(key)}
-                      customToggleAll={(key) => toggleSettingsSection(key)}
-                    />
+                    <div className="space-y-4">
+                      {/* SETTINGS module-level toggles */}
+                      <PermissionTable
+                        modules={[{ key: 'SETTINGS', label: 'Settings', desc: 'System configuration access' }]}
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                      />
+
+                      {/* Granular section access */}
+                      {(formPerms.SETTINGS || []).includes('READ') && (
+                        <div className="pt-6 border-t border-gray-50">
+                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Accessible Setting Sections</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {SETTINGS_SECTIONS.map(section => {
+                              const isChecked = (formPerms.SETTINGS_TARGET_SECTIONS || []).includes(section.key);
+                              return (
+                                <button
+                                  key={section.key}
+                                  onClick={() => toggleSettingsSection(section.key)}
+                                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
+                                >
+                                  <div className="flex flex-col min-w-0">
+                                    <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
+                                    <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
+                                  </div>
+                                  <div className="ml-auto">
+                                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
+                                      {isChecked && <Check size={12} strokeWidth={4} />}
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </CollapsibleSection>
                 </div>
               </div>
             ) : (
               <div className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
                     <Users size={14} className="text-emerald-600" /> Active Users for {formName}
                   </h3>
+                  
+                  <div className="relative">
+                    {!isAssigning ? (
+                      <button 
+                        onClick={() => setIsAssigning(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all"
+                      >
+                        <Plus size={14} strokeWidth={3} />
+                        Assign New User
+                      </button>
+                    ) : (
+                      <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
+                        <div className="relative">
+                          <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
+                          <input 
+                            autoFocus
+                            placeholder="Search Name/Mobile..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="pl-9 pr-4 py-2 bg-gray-50 border border-gray-100 rounded-xl text-xs font-bold focus:bg-white focus:ring-2 focus:ring-emerald-500/10 outline-none min-w-[240px]"
+                          />
+                          {searchQuery && (
+                            <div className="absolute left-0 right-0 top-full mt-2 bg-white border border-gray-100 rounded-2xl shadow-xl z-50 max-h-[200px] overflow-y-auto">
+                              {allUsers
+                                .filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.mobile.includes(searchQuery))
+                                .map(u => (
+                                  <button
+                                    key={u.id}
+                                    onClick={() => handleAssignUser(u.id)}
+                                    className="w-full px-4 py-3 flex flex-col text-left hover:bg-emerald-50 transition-colors border-b border-gray-50 last:border-0"
+                                  >
+                                    <span className="text-[11px] font-black text-gray-900 uppercase">{u.name}</span>
+                                    <span className="text-[9px] font-bold text-gray-400">{u.mobile} • {u.role}</span>
+                                  </button>
+                                ))
+                              }
+                              {allUsers.filter(u => u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.mobile.includes(searchQuery)).length === 0 && (
+                                <div className="px-4 py-6 text-center text-[10px] font-bold text-gray-400 uppercase">No users found</div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                        <button 
+                          onClick={() => { setIsAssigning(false); setSearchQuery(''); }}
+                          className="p-2 text-gray-400 hover:text-rose-600 rounded-xl"
+                        >
+                          <X size={18} />
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {fetchingUsers ? (
@@ -1145,10 +1288,11 @@ export default function TenantPrivileges() {
                           </div>
                         </div>
                         <button
-                          onClick={() => handleDeleteUser(user.id, user.name)}
-                          className="p-3 text-rose-300 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all"
+                          title="Remove from role (account stays intact)"
+                          onClick={() => handleRemoveFromRole(user.id, user.name)}
+                          className="p-3 text-amber-400 hover:text-amber-600 hover:bg-amber-50 rounded-2xl transition-all"
                         >
-                          <Trash2 size={18} strokeWidth={2.5} />
+                          <XCircle size={18} strokeWidth={2.5} />
                         </button>
                       </div>
                     ))}

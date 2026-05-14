@@ -1621,19 +1621,23 @@ export default function AdminUsers({ type }) {
                   All Members
                 </button>
 
+                {can('STAFF_ADMIN', 'READ') && (
                 <button
                   onClick={() => setActiveTab('admin')}
                   className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'admin' ? 'bg-rose-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
                 >
                   Admins
                 </button>
+                )}
 
+                {can('STAFF_AGENT', 'READ') && (
                 <button
                   onClick={() => setActiveTab('agent')}
                   className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'agent' ? 'bg-blue-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
                 >
                   Agents
                 </button>
+                )}
 
                 {relevantCustomRoles.map(role => (
                   <button

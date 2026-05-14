@@ -7,7 +7,7 @@ import { logActivity } from '../../utils/activityLogger.js';
 export const createGRN = async (req, res) => {
   try {
     const tenantId = req.user?.tenantId || getTenantId();
-    const { poId, items, remarks } = req.body;
+    const { poId, items, remarks, challanId } = req.body;
 
     if (!poId || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'PO ID and items are required' });
@@ -32,7 +32,7 @@ export const createGRN = async (req, res) => {
         storeId
       });
 
-      // 1. Create the GRN and Items
+      // 1. Create the GRN and Items (All items start as QC_PENDING)
       const grn = await tx.goodsReceipt.create({
         data: {
           tenantId,
@@ -40,68 +40,31 @@ export const createGRN = async (req, res) => {
           displayId,
           poId,
           remarks: remarks || null,
+          challanId: challanId || null,
           items: {
             create: items.map(item => ({
               tenantId,
               productId: item.productId,
               orderedQty: parseInt(item.orderedQty),
-              receivedQty: parseInt(item.receivedQty)
+              receivedQty: parseInt(item.receivedQty),
+              damagedQty: parseInt(item.damagedQty) || 0,
+              missingQty: parseInt(item.missingQty) || 0,
+              expiryStatus: item.expiryStatus || 'SAFE',
+              qcStatus: 'PENDING'
             }))
           }
         }
       });
 
-      // 2. High-Performance Bulk Updates
-      const stockMap = new Map();
+      // 2. Update PO Items receivedQty (Mark as building-received, but not yet saleable)
       for (const item of items) {
-        const q = parseInt(item.receivedQty);
-        if (q <= 0) continue;
-        stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + q);
-      }
-
-      const entries = Array.from(stockMap.entries());
-      if (entries.length > 0) {
-        let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
-        if (!warehouse) {
-          warehouse = await tx.warehouse.create({
-            data: { tenantId, name: 'Main Warehouse', location: 'Default' }
+        const qty = parseInt(item.receivedQty);
+        if (qty > 0) {
+          await tx.purchaseOrderItem.updateMany({
+            where: { poId, productId: item.productId },
+            data: { receivedQty: { increment: qty } }
           });
         }
-
-        // A. Update PO Items (Sequential because we need to match PO item IDs)
-        // Note: For extreme performance we could use a single SQL update with CASE, 
-        // but PO items are usually few per product.
-        for (const item of items) {
-          const qty = parseInt(item.receivedQty);
-          if (qty > 0) {
-            await tx.purchaseOrderItem.updateMany({
-              where: { poId, productId: item.productId },
-              data: { receivedQty: { increment: qty } }
-            });
-          }
-        }
-
-        // B. Bulk Update Product Master Stock
-        const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
-        await tx.$executeRaw`
-          UPDATE "Product"
-          SET stock = "Product".stock + v.qty
-          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
-          WHERE "Product".id = v.id
-        `;
-
-        // C. Bulk Upsert Warehouse Inventory
-        const wiValues = entries.map(([pId, qty]) => {
-          const tempId = `grnwi_${Math.random().toString(36).substring(2, 11)}`;
-          return Prisma.sql`(${tempId}, ${tenantId}, ${warehouse.id}, ${pId}, ${qty}::int)`;
-        });
-
-        await tx.$executeRaw`
-          INSERT INTO "WarehouseInventory" (id, "tenantId", "warehouseId", "productId", quantity)
-          VALUES ${Prisma.join(wiValues)}
-          ON CONFLICT ("warehouseId", "productId")
-          DO UPDATE SET quantity = "WarehouseInventory".quantity + EXCLUDED.quantity
-        `;
       }
 
       // 3. Finalize Status
@@ -126,15 +89,15 @@ export const createGRN = async (req, res) => {
       timeout: 120000
     });
 
-    res.status(201).json({ message: 'Goods received successfully' });
+    res.status(201).json({ message: 'Goods received successfully. Awaiting QC approval before stock is updated.' });
 
     logActivity({
       userId: req.user.id,
       tenantId: req.user.tenantId,
       storeId: storeId || req.user.storeId,
       action: 'GRN_CREATED',
-      details: `Received stock for PO ${po.displayId || po.poNumber || poId}. Total unique items: ${items.length}`,
-      metadata: { poId, itemCount: items.length, status: 'COMPLETE' }
+      details: `Received stock for PO ${po.displayId || poId}. Items marked as QC_PENDING.`,
+      metadata: { poId, itemCount: items.length }
     });
   } catch (error) {
     console.error('❌ Create GRN Error:', error);
@@ -160,10 +123,13 @@ export const getGRNs = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         po: {
-          select: { poNumber: true, vendor: { select: { vendorName: true } } }
+          select: { displayId: true, vendor: { select: { vendorName: true } } }
         },
+        store: { select: { name: true } },
         items: {
-          include: { product: { select: { name: true } } }
+          include: { 
+            product: { select: { name: true, skuCode: true, brand: true, category: true } } 
+          }
         }
       }
     });
@@ -178,116 +144,148 @@ export const getGRNs = async (req, res) => {
 export const updateGRN = async (req, res) => {
   try {
     const { id } = req.params;
-    const { items, remarks } = req.body;
+    const { items, remarks, challanId } = req.body;
     const tenantId = req.user.tenantId;
 
-    const grn = await prisma.goodsReceipt.findUnique({
+    const existingGRN = await prisma.goodsReceipt.findUnique({
       where: { id },
-      include: { items: true, po: true }
+      include: { items: true }
     });
 
-    if (!grn) return res.status(404).json({ message: 'GRN not found' });
-    if (grn.po.status === 'CLOSED') return res.status(400).json({ message: 'Cannot edit GRN of a closed PO' });
+    if (!existingGRN) return res.status(404).json({ message: 'GRN not found' });
 
     await prisma.$transaction(async (tx) => {
-      // 1. Revert existing GRN effects
-      for (const item of grn.items) {
-        const qty = item.receivedQty;
-        // Decrement receivedQty in PO
-        const poItems = await tx.purchaseOrderItem.findMany({
-          where: { poId: grn.poId, productId: item.productId }
-        });
-        for (const pi of poItems) {
-          await tx.purchaseOrderItem.update({
-            where: { id: pi.id },
-            data: { receivedQty: { decrement: qty } }
-          });
+      // 1. Update main GRN fields
+      await tx.goodsReceipt.update({
+        where: { id },
+        data: { 
+          remarks: remarks || existingGRN.remarks,
+          challanId: challanId || existingGRN.challanId
         }
+      });
 
-        // Decrement stock in Warehouse
-        const wi = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
-        });
-        if (wi) {
-          await tx.warehouseInventory.update({
-            where: { id: wi.id },
-            data: { quantity: { decrement: qty } }
-          });
-        }
-        
-        // Decrement product stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: qty } }
-        });
-      }
-
-      // 2. Delete old GRN items
-      await tx.goodsReceiptItem.deleteMany({ where: { grnId: id } });
-
-      // 3. Apply new GRN effects
+      // 2. Update Items and PO quantities
       for (const item of items) {
-        const qty = parseInt(item.receivedQty) || 0;
-        if (qty <= 0) continue;
+        const existingItem = existingGRN.items.find(i => i.productId === item.productId);
+        const diff = parseInt(item.receivedQty) - (existingItem ? existingItem.receivedQty : 0);
 
-        await tx.goodsReceiptItem.create({
-          data: {
+        if (existingItem) {
+          await tx.goodsReceiptItem.update({
+            where: { id: existingItem.id },
+            data: {
+              receivedQty: parseInt(item.receivedQty),
+              damagedQty: parseInt(item.damagedQty) || 0,
+              missingQty: parseInt(item.missingQty) || 0,
+              expiryStatus: item.expiryStatus || 'SAFE'
+            }
+          });
+        }
+
+        // Update PO receivedQty
+        if (diff !== 0) {
+          await tx.purchaseOrderItem.updateMany({
+            where: { poId: existingGRN.poId, productId: item.productId },
+            data: { receivedQty: { increment: diff } }
+          });
+        }
+      }
+    });
+
+    res.json({ message: 'Goods receipt updated successfully' });
+  } catch (error) {
+    console.error('❌ Update GRN Error:', error);
+    res.status(500).json({ message: 'Error updating goods receipt', error: error.message });
+  }
+};
+
+// ─── UPDATE QC STATUS ─────────────────────────────────────
+export const updateQCStatus = async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { status, remarks } = req.body;
+    const tenantId = req.user.tenantId;
+
+    if (!['APPROVED', 'REJECTED'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid QC status' });
+    }
+
+    const grnItem = await prisma.goodsReceiptItem.findUnique({
+      where: { id: itemId },
+      include: { grn: true }
+    });
+
+    if (!grnItem) return res.status(404).json({ message: 'GRN Item not found' });
+    if (grnItem.qcStatus !== 'PENDING') {
+      return res.status(400).json({ message: `QC already processed for this item (${grnItem.qcStatus})` });
+    }
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Update QC Status
+      await tx.goodsReceiptItem.update({
+        where: { id: itemId },
+        data: { 
+          qcStatus: status,
+          qcRemarks: remarks || null
+        }
+      });
+
+      // 2. If Approved, increment saleable stock
+      if (status === 'APPROVED') {
+        const qty = grnItem.receivedQty;
+        const productId = grnItem.productId;
+
+        // A. Update Warehouse Inventory
+        let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
+        if (!warehouse) {
+          warehouse = await tx.warehouse.create({
+            data: { tenantId, name: 'Main Warehouse', location: 'Default' }
+          });
+        }
+
+        await tx.warehouseInventory.upsert({
+          where: { warehouseId_productId: { warehouseId: warehouse.id, productId } },
+          update: { quantity: { increment: qty } },
+          create: {
             tenantId,
-            grnId: id,
-            productId: item.productId,
-            orderedQty: item.orderedQty || 0,
-            receivedQty: qty
+            warehouseId: warehouse.id,
+            productId,
+            quantity: qty
           }
         });
 
-        // Increment receivedQty in PO
-        const poItems = await tx.purchaseOrderItem.findMany({
-          where: { poId: grn.poId, productId: item.productId }
-        });
-        for (const pi of poItems) {
-          await tx.purchaseOrderItem.update({
-            where: { id: pi.id },
-            data: { receivedQty: { increment: qty } }
-          });
-        }
-
-        // Increment stock in Warehouse
-        const wi = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
-        });
-        if (wi) {
-          await tx.warehouseInventory.update({
-            where: { id: wi.id },
-            data: { quantity: { increment: qty } }
-          });
-        }
-
-        // Increment product stock
+        // B. Update Product Master Stock
         await tx.product.update({
-          where: { id: item.productId },
+          where: { id: productId },
           data: { stock: { increment: qty } }
         });
-      }
 
-      // 4. Update GRN metadata
-      await tx.goodsReceipt.update({
-        where: { id },
-        data: { remarks: remarks !== undefined ? remarks : grn.remarks }
-      });
+        // C. Log to Procurement Stock Ledger
+        await tx.procurementStockLedger.create({
+          data: {
+            tenantId,
+            productId,
+            type: 'PURCHASE',
+            quantity: qty,
+            reference: grnItem.grnId,
+            refType: 'GRN',
+            remarks: `QC Approved for GRN ${grnItem.grn.displayId}`
+          }
+        });
+      }
     });
 
     logActivity({
       userId: req.user.id,
       tenantId: req.user.tenantId,
-      action: 'GRN_UPDATED',
-      details: `Updated Goods Receipt #${grn.displayId}`,
-      metadata: { grnId: id }
+      action: 'QC_UPDATED',
+      details: `QC ${status} for item in GRN ${grnItem.grn.displayId}`,
+      metadata: { itemId, status }
     });
 
-    res.json({ message: 'GRN updated successfully' });
+    res.json({ message: `QC status updated to ${status}` });
   } catch (error) {
-    console.error('❌ Update GRN Error:', error);
-    res.status(500).json({ message: 'Error updating GRN', error: error.message });
+    console.error('❌ Update QC Status Error:', error);
+    res.status(500).json({ message: 'Error updating QC status', error: error.message });
   }
 };
 
@@ -305,37 +303,34 @@ export const deleteGRN = async (req, res) => {
     if (!grn) return res.status(404).json({ message: 'GRN not found' });
 
     await prisma.$transaction(async (tx) => {
-      // 1. Revert Stock & PO item receivedQty
+      // 1. Revert Stock (Only for already APPROVED items) & PO item receivedQty
       for (const item of grn.items) {
         const qty = item.receivedQty;
 
         // Decrement PO item receivedQty
-        const poItems = await tx.purchaseOrderItem.findMany({
-          where: { poId: grn.poId, productId: item.productId }
+        await tx.purchaseOrderItem.updateMany({
+          where: { poId: grn.poId, productId: item.productId },
+          data: { receivedQty: { decrement: qty } }
         });
-        for (const pi of poItems) {
-          await tx.purchaseOrderItem.update({
-            where: { id: pi.id },
-            data: { receivedQty: { decrement: qty } }
+
+        if (item.qcStatus === 'APPROVED') {
+          // Decrement warehouse inventory
+          const existingWI = await tx.warehouseInventory.findFirst({
+            where: { productId: item.productId, tenantId }
+          });
+          if (existingWI) {
+            await tx.warehouseInventory.update({
+              where: { id: existingWI.id },
+              data: { quantity: { decrement: qty } }
+            });
+          }
+
+          // Decrement product stock
+          await tx.product.update({
+            where: { id: item.productId },
+            data: { stock: { decrement: qty } }
           });
         }
-
-        // Decrement warehouse inventory
-        const existingWI = await tx.warehouseInventory.findFirst({
-          where: { productId: item.productId, tenantId }
-        });
-        if (existingWI) {
-          await tx.warehouseInventory.update({
-            where: { id: existingWI.id },
-            data: { quantity: { decrement: qty } }
-          });
-        }
-
-        // Decrement product stock
-        await tx.product.update({
-          where: { id: item.productId },
-          data: { stock: { decrement: qty } }
-        });
       }
 
       // 2. Update PO status back to ORDERED if it was DELIVERED
@@ -355,7 +350,7 @@ export const deleteGRN = async (req, res) => {
       userId: req.user.id,
       tenantId: req.user.tenantId,
       action: 'GRN_DELETED',
-      details: `Deleted Goods Receipt ${grn.displayId} for PO ${grn.po?.poNumber}`,
+      details: `Deleted Goods Receipt ${grn.displayId}`,
       metadata: { grnId: id, poId: grn.poId }
     });
 

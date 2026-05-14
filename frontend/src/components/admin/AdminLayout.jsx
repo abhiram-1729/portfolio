@@ -100,7 +100,11 @@ export default function AdminLayout() {
   const appendParams = (path) => {
     if (!activeStoreId || path.startsWith('/admin/cash')) return path;
     const separator = path.includes('?') ? '&' : '?';
-    return `${path}${separator}storeId=${activeStoreId}&storeName=${activeStoreName || ''}`;
+    let url = `${path}${separator}storeId=${activeStoreId}`;
+    if (activeStoreName) {
+      url += `&storeName=${encodeURIComponent(activeStoreName)}`;
+    }
+    return url;
   };
 
   React.useEffect(() => {
@@ -141,9 +145,10 @@ export default function AdminLayout() {
       label: 'Operation',
       icon: Users,
       subItems: [
-        { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
-        { to: '/admin/routes', icon: Navigation, label: 'Routes', module: 'ROUTES' },
+        { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF_VIRTUAL' },
         { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
+        { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES', section: 'ROUTES' },
+        { to: '/admin/delivery-logistics', icon: Truck, label: 'Delivery Logistics', module: 'ADMIN' },
       ]
     },
     // { to: '/admin/stores', icon: Store, label: 'Stores' },
@@ -169,7 +174,7 @@ export default function AdminLayout() {
       ]
     },
     { to: '/admin/activity-logs', icon: HistoryIcon, label: 'Activity Logs', module: 'ADMIN' },
-    { to: '/admin/attendance', icon: Clock, label: 'Attendance', module: 'STAFF' },
+    { to: '/admin/attendance', icon: Clock, label: 'Attendance', module: 'HR' },
     {
       label: 'Reports',
       icon: BarChart3,
@@ -249,7 +254,14 @@ export default function AdminLayout() {
         }
 
         // 2. Fallback to Module-level READ check
-        const hasModuleRead = (user?.permissions?.[requiredModule] || []).includes('READ');
+        let hasModuleRead = false;
+        if (requiredModule === 'STAFF_VIRTUAL') {
+          const hasAdmin = (user?.permissions?.['STAFF_ADMIN'] || []).includes('READ');
+          const hasAgent = (user?.permissions?.['STAFF_AGENT'] || []).includes('READ');
+          hasModuleRead = hasAdmin || hasAgent;
+        } else {
+          hasModuleRead = (user?.permissions?.[requiredModule] || []).includes('READ');
+        }
         if (!hasModuleRead) return false;
 
         return true;
@@ -264,7 +276,14 @@ export default function AdminLayout() {
 
     if (!item.module || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
-    const hasModuleRead = (user?.permissions?.[item.module] || []).includes('READ');
+    let hasModuleRead = false;
+    if (item.module === 'STAFF_VIRTUAL') {
+      const hasAdmin = (user?.permissions?.['STAFF_ADMIN'] || []).includes('READ');
+      const hasAgent = (user?.permissions?.['STAFF_AGENT'] || []).includes('READ');
+      hasModuleRead = hasAdmin || hasAgent;
+    } else {
+      hasModuleRead = (user?.permissions?.[item.module] || []).includes('READ');
+    }
     if (!hasModuleRead) return false;
 
     // Granular checks for top-level modules
@@ -296,13 +315,19 @@ export default function AdminLayout() {
         return user.permissions.INVENTORY_TARGET_SECTIONS.length > 0;
       }
     }
+    if (item.module === 'EXPENSES') {
+      const sections = user?.permissions?.EXPENSE_SECTIONS;
+      if (sections) {
+        return Object.values(sections).some(perms => (perms || []).includes('READ'));
+      }
+    }
 
     return true;
   });
 
   const getRequiredModule = (pathname) => {
     if (pathname === '/admin') return 'DASHBOARD';
-    if (pathname.startsWith('/admin/users')) return 'STAFF';
+    if (pathname.startsWith('/admin/users')) return 'STAFF_VIRTUAL';
     if (pathname.startsWith('/admin/vehicles')) return 'VEHICLES';
     if (pathname.startsWith('/admin/routes')) return 'ROUTES';
     if (pathname.startsWith('/admin/sales')) return 'SALES';
@@ -379,8 +404,19 @@ export default function AdminLayout() {
       if (user?.permissions?.CASH_TARGET_SECTIONS?.length > 0) return true;
     }
 
-    const perms = user?.permissions?.[currentModule] || [];
-    const hasModuleRead = perms.includes('READ');
+    if (location.pathname.startsWith('/admin/expenses')) {
+      const sections = user?.permissions?.EXPENSE_SECTIONS;
+      if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
+    }
+
+    let hasModuleRead = false;
+    if (currentModule === 'STAFF_VIRTUAL') {
+      const hasAdmin = (user?.permissions?.['STAFF_ADMIN'] || []).includes('READ');
+      const hasAgent = (user?.permissions?.['STAFF_AGENT'] || []).includes('READ');
+      hasModuleRead = hasAdmin || hasAgent;
+    } else {
+      hasModuleRead = (user?.permissions?.[currentModule] || []).includes('READ');
+    }
     if (!hasModuleRead) return false;
 
     return true;

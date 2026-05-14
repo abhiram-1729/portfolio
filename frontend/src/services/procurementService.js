@@ -49,6 +49,26 @@ export const procurementAPI = {
   getAgingReport: (params) => api.get('/procurement/reports/aging', { params }),
   getProfitabilityReport: (params) => api.get('/procurement/reports/profitability', { params }),
   getStockLedger: (params) => api.get('/procurement/reports/stock-ledger', { params }),
+
+  // ─── REQUISITIONS ─────────────────────────────────────
+  getRequisitions: (params) => api.get('/procurement/requisitions', { params }),
+  createRequisition: (data) => api.post('/procurement/requisitions', data),
+  getRequisitionById: (id) => api.get(`/procurement/requisitions/${id}`),
+  updateRequisitionStatus: (id, data) => api.put(`/procurement/requisitions/${id}`, data),
+  deleteRequisition: (id) => api.delete(`/procurement/requisitions/${id}`),
+
+  // ─── STOCK TRANSFERS ─────────────────────────────────────
+  getTransfers: (params) => api.get('/procurement/transfers', { params }),
+  createTransfer: (data) => api.post('/procurement/transfers', data),
+  getTransferById: (id) => api.get(`/procurement/transfers/${id}`),
+  dispatchTransfer: (id, data) => api.put(`/procurement/transfers/${id}/dispatch`, data),
+  receiveTransfer: (id, data) => api.put(`/procurement/transfers/${id}/receive`, data),
+
+  // ─── WORK ORDERS (CONVERSIONS) ─────────────────────────────────────
+  getWorkOrders: (params) => api.get('/procurement/work-orders', { params }),
+  createWorkOrder: (data) => api.post('/procurement/work-orders', data),
+  getWorkOrderById: (id) => api.get(`/procurement/work-orders/${id}`),
+  completeWorkOrder: (id, data) => api.put(`/procurement/work-orders/${id}/complete`, data),
 };
 
 export default procurementAPI;

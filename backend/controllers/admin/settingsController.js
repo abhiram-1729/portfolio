@@ -1,4 +1,5 @@
 import prisma from '../../utils/prisma.js';
+import { logActivity } from '../../utils/activityLogger.js';
 
 // Get current business settings
 export const getSettings = async (req, res) => {
@@ -42,34 +43,48 @@ export const getSettings = async (req, res) => {
 // Update business settings
 export const updateSettings = async (req, res) => {
   try {
-    const { businessName, gstNo, contactNo, email, address, taxRates, shifts, storeId: bodyStoreId } = req.body;
+    const { 
+      businessName, gstNo, contactNo, email, address, taxRates, shifts, 
+      deliverySlabs, deliverySlots, deliveryRadiusEnforced, deliveryRadius, surcharges,
+      storeId: bodyStoreId 
+    } = req.body;
     const tenantId = req.user.tenantId;
     const storeId = bodyStoreId || req.user.storeId || null;
+
+    const dataToUpdate = {};
+    const fields = [
+      'businessName', 'gstNo', 'contactNo', 'email', 'address', 'taxRates', 
+      'shifts', 'shiftMode', 'deliverySlabs', 'deliverySlots', 
+      'deliveryRadiusEnforced', 'deliveryRadius', 'surcharges'
+    ];
+
+    fields.forEach(field => {
+      if (req.body[field] !== undefined) {
+        dataToUpdate[field] = req.body[field];
+      }
+    });
 
     const settings = await prisma.businessSettings.upsert({
       where: { tenantId_storeId: { tenantId, storeId } },
       update: {
-        businessName,
-        gstNo,
-        contactNo,
-        email,
-        address,
-        taxRates,
-        shifts: shifts || [],
-        shiftMode: req.body.shiftMode || 'STANDARD'
+        ...dataToUpdate,
+        updatedAt: new Date()
       },
       create: {
-        businessName,
-        gstNo,
-        contactNo,
-        email,
-        address,
-        taxRates,
-        shifts: shifts || [],
-        shiftMode: req.body.shiftMode || 'STANDARD',
+        ...dataToUpdate,
         tenantId,
         storeId: storeId || null
       }
+    });
+
+    // Log the activity
+    await logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: storeId,
+      action: 'SETTINGS_UPDATED',
+      details: `Business settings updated for ${storeId ? 'Store' : 'Organization'}`,
+      metadata: { fieldsUpdated: Object.keys(dataToUpdate) }
     });
 
     res.json({ success: true, data: settings, message: 'Settings updated successfully' });

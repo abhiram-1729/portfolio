@@ -3,7 +3,7 @@ import { persist } from 'zustand/middleware';
 
 export const checkIsFree = (val) => val === true || val === 'true' || val === 1 || val === '1';
 
-const calculateTotals = (items) => {
+const calculateTotals = (items, deliverySlabs = [], promotion = null) => {
   // Subtotal of non-free items
   const subtotalRaw = items.reduce((sum, i) => {
     if (!checkIsFree(i.isFree)) return sum + Number(i.price || 0) * i.quantity;
@@ -15,22 +15,46 @@ const calculateTotals = (items) => {
 
   // Grand total calculation:
   // isFree items are 0 ONLY if subtotal >= minShopAmount
-  // Otherwise, they are charged at their regular price.
-  const totalAmount = items.reduce((sum, i) => {
+  const itemsTotal = items.reduce((sum, i) => {
     const isFreeInCart = checkIsFree(i.isFree);
     const threshold = Number(i.minShopAmount || 0);
     
     if (isFreeInCart && subtotal >= threshold) {
-      return sum; // Free!
+      return sum;
     }
-    // Regular price (either it's not a free item, or threshold not met)
     return sum + Number(i.price || 0) * i.quantity;
   }, 0);
 
+  // Delivery Charge Calculation
+  let deliveryCharge = 0;
+  if (deliverySlabs && Array.isArray(deliverySlabs) && items.length > 0) {
+    const slabs = [...deliverySlabs].sort((a, b) => b.minOrderValue - a.minOrderValue);
+    const matchedSlab = slabs.find(slab => itemsTotal >= slab.minOrderValue);
+    if (matchedSlab) {
+      deliveryCharge = Number(matchedSlab.fee || 0);
+    }
+  }
+
+  // Promotion Discount Calculation
+  let promotionDiscount = 0;
+  if (promotion) {
+    if (promotion.discountType === 'PERCENTAGE') {
+      promotionDiscount = (itemsTotal * promotion.discountValue) / 100;
+      if (promotion.maxDiscount && promotionDiscount > promotion.maxDiscount) {
+        promotionDiscount = promotion.maxDiscount;
+      }
+    } else if (promotion.discountType === 'FLAT_AMOUNT') {
+      promotionDiscount = promotion.discountValue;
+    }
+  }
+
+  const totalAmount = itemsTotal + deliveryCharge - promotionDiscount;
   const totalItems = items.reduce((sum, i) => sum + i.quantity, 0);
 
   return { 
-    totalAmount: Math.round(totalAmount), 
+    totalAmount: Math.round(Math.max(0, totalAmount)), 
+    deliveryCharge,
+    promotionDiscount: Math.round(promotionDiscount),
     totalItems 
   };
 };
@@ -42,7 +66,21 @@ export const useCartStore = create(
       customerMobile: '',
       customerName: '',
       totalAmount: 0,
+      deliveryCharge: 0,
+      promotionDiscount: 0,
+      appliedPromotion: null,
       totalItems: 0,
+      deliverySlabs: [],
+
+      setDeliverySlabs: (slabs) => set((state) => ({ 
+        deliverySlabs: slabs,
+        ...calculateTotals(state.items, slabs, state.appliedPromotion)
+      })),
+
+      setAppliedPromotion: (promotion) => set((state) => ({
+        appliedPromotion: promotion,
+        ...calculateTotals(state.items, state.deliverySlabs, promotion)
+      })),
 
       setCustomerMobile: (mobile) => set({ customerMobile: mobile }),
       setCustomerName: (name) => set({ customerName: name }),
@@ -94,12 +132,12 @@ export const useCartStore = create(
             },
           ];
         }
-        set({ items: newItems, ...calculateTotals(newItems) });
+        set({ items: newItems, ...calculateTotals(newItems, get().deliverySlabs, get().appliedPromotion) });
       },
 
       removeItem: (productId) => {
         const newItems = get().items.filter((i) => i.productId !== productId);
-        set({ items: newItems, ...calculateTotals(newItems) });
+        set({ items: newItems, ...calculateTotals(newItems, get().deliverySlabs, get().appliedPromotion) });
       },
 
       updateQuantity: (productId, quantity) => {
@@ -117,10 +155,19 @@ export const useCartStore = create(
         const newItems = items.map((i) =>
           i.productId === productId ? { ...i, quantity } : i
         );
-        set({ items: newItems, ...calculateTotals(newItems) });
+        set({ items: newItems, ...calculateTotals(newItems, get().deliverySlabs, get().appliedPromotion) });
       },
 
-      clearCart: () => set({ items: [], customerName: '', customerMobile: '', totalAmount: 0, totalItems: 0 }),
+      clearCart: () => set({ 
+        items: [], 
+        customerName: '', 
+        customerMobile: '', 
+        totalAmount: 0, 
+        deliveryCharge: 0,
+        promotionDiscount: 0,
+        appliedPromotion: null,
+        totalItems: 0 
+      }),
       
       cartOwnerId: null,
       setCartOwner: (id) => set({ cartOwnerId: id }),
