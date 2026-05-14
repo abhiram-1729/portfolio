@@ -96,12 +96,12 @@ export default function AdminInventory() {
   const [sales, setSales] = useState([]);
   const [users, setUsers] = useState([]);
 
-  const storeIdParam = searchParams.get('storeId');
-  const storeFilterId = storeIdParam || (!isGlobalRole ? currentUser?.storeId : (stores.length === 1 ? stores[0].id : null));
   const location = useLocation();
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
   const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN';
+  const storeIdParam = searchParams.get('storeId');
+  const storeFilterId = storeIdParam || (!isGlobalRole ? currentUser?.storeId : (stores.length === 1 ? stores[0].id : null));
   const [showScanner, setShowScanner] = useState(false);
   const [showRegistryModal, setShowRegistryModal] = useState(false); // Deprecated but keeping state for now if needed elsewhere
   const [isRegistryView, setIsRegistryView] = useState(false);
@@ -804,7 +804,7 @@ export default function AdminInventory() {
       isFree: item.isFree || false,
       minShopAmount: item.minShopAmount?.toString() || '0',
       barcode: item.barcode || '',
-      stock: item.stock?.toString() || '0',
+      stock: (item.stock ?? item.totalStock ?? 0).toString(),
       storeId: item.storeId || ''
     });
     setEditPreviewUrl(item.image || null);

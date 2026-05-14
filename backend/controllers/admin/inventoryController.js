@@ -37,7 +37,8 @@ export const getInventoryInitData = async (req, res) => {
           category: { select: { name: true } },
           subCategory: { select: { name: true } },
           unit: { select: { name: true, type: true } },
-          WarehouseInventory: { select: { quantity: true } }
+          WarehouseInventory: { select: { quantity: true } },
+          vehicleStocks: { select: { quantity: true } }
         }
       }),
       prisma.category.findMany({ where: { tenantId } }),
@@ -67,10 +68,17 @@ export const getInventoryInitData = async (req, res) => {
 
     // 1. Process items to sum warehouse quantity
     const processedItems = products.map(item => {
-      const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+      const warehouseQty = item.WarehouseInventory?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      const vehicleQty = item.vehicleStocks?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+      const effectiveWarehouseQty = warehouseQty > 0 ? warehouseQty : (item.stock ?? 0);
+      const totalQty = effectiveWarehouseQty + vehicleQty;
+
       return {
         ...item,
-        stock: warehouseQty > 0 ? warehouseQty : (item.stock || 0)
+        warehouseStock: effectiveWarehouseQty,
+        vehicleStock: vehicleQty,
+        totalStock: totalQty,
+        stock: effectiveWarehouseQty
       };
     });
 
@@ -154,15 +162,16 @@ export const getItems = async (req, res) => {
     const processedItems = items.map(item => {
       const warehouseQty = item.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
       const vehicleQty = item.vehicleStocks.reduce((acc, curr) => acc + curr.quantity, 0);
-      const totalQty = warehouseQty + vehicleQty;
+      const effectiveWarehouseQty = warehouseQty > 0 ? warehouseQty : (item.stock ?? 0);
+      const totalQty = effectiveWarehouseQty + vehicleQty;
       
       return {
         ...item,
-        warehouseStock: warehouseQty,
+        warehouseStock: effectiveWarehouseQty,
         vehicleStock: vehicleQty,
         totalStock: totalQty,
         storeName: item.store?.name || 'Global Registry',
-        stock: warehouseQty // Keep 'stock' as warehouseQty for backward compatibility where needed
+        stock: effectiveWarehouseQty // Keep 'stock' as effectiveWarehouseQty for backward compatibility where needed
       };
     });
 
