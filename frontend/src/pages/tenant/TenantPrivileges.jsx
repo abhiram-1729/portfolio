@@ -10,13 +10,23 @@ import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
 
 const DASHBOARD_WIDGETS = [
-  { key: 'activeVehicles', label: 'Active Vehicles', desc: 'Real-time fleet tracking', icon: Truck },
-  { key: 'activeUsers', label: 'Active Users', desc: 'Current online staff', icon: Users },
-  { key: 'totalOrders', label: 'Total Orders Today', desc: 'Daily transaction count', icon: ShoppingCart },
-  { key: 'totalSales', label: 'Total Sales Today', desc: 'Daily revenue analytics', icon: Coins },
-  { key: 'paymentSplit', label: 'Payment Split', desc: 'Cash vs Digital breakdown', icon: PieChart },
-  { key: 'cashStatus', label: 'Cash Reconciliation', desc: 'Safe & register audit', icon: Receipt },
-  { key: 'topPerformers', label: 'Top Performers (VGE)', desc: 'Agent leaderboard', icon: Target },
+  { key: 'totalSales', label: 'Revenue Today', desc: 'Gross Intake', icon: Coins },
+  { key: 'grossMargin', label: 'Gross Margin', desc: 'Net Efficiency', icon: PieChart },
+  { key: 'totalOrders', label: 'Orders Today', desc: 'Trans. Volume', icon: ShoppingCart },
+  { key: 'activeVehicles', label: 'Active Fleet', desc: 'Deployment', icon: Truck },
+  { key: 'stockValuation', label: 'Stock Valuation', desc: 'Assets Value', icon: Package },
+  { key: 'pendingLogistics', label: 'Pending Logistics', desc: 'Fulfillment', icon: Truck },
+  { key: 'criticalAlerts', label: 'Critical Alerts', desc: 'Safety Stock', icon: Target },
+  { key: 'refillRequests', label: 'Refill Requests', desc: 'Fleet Resupply', icon: Truck },
+  { key: 'fleetMap', label: 'Fleet Geo-Intelligence', desc: 'Map & Live Agents', icon: MapPin },
+  { key: 'orderChannels', label: 'Order Channels', desc: 'Pie Chart', icon: PieChart },
+  { key: 'paymentSplit', label: 'Revenue Split', desc: 'Pie Chart', icon: PieChart },
+  { key: 'productVelocity', label: 'Product Velocity', desc: 'Bar Chart', icon: BarChart },
+  { key: 'operationalCriticals', label: 'Operational Criticals', desc: 'Inventory Health & Route Coverage', icon: Target },
+  { key: 'treasuryAnalytics', label: 'Treasury Analytics', desc: 'Vendor Liabilities & Damage', icon: Wallet },
+  { key: 'cashStatus', label: 'Operational Recon Feed', desc: 'Cash Stats', icon: Receipt },
+  { key: 'topPerformers', label: 'Elite Performance', desc: 'Agent Leaderboard', icon: Users },
+  { key: 'liveSales', label: 'Live Sales Stream', desc: 'Recent Orders', icon: ShoppingCart },
 ];
 
 const MODULES = [

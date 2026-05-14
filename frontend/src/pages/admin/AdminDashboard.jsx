@@ -60,7 +60,7 @@ const mapStyles = [
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 export default function AdminDashboard() {
-  const { user: currentUser } = useUserStore();
+  const { user: currentUser, refreshUserProfile } = useUserStore();
   const [stats, setStats] = useState(null);
   const [cashStats, setCashStats] = useState([]);
   const [vgeStats, setVgeStats] = useState([]);
@@ -107,6 +107,8 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
+    // Always refresh permissions from server before rendering widgets
+    refreshUserProfile();
     fetchData();
     const interval = setInterval(fetchData, 60000);
     return () => clearInterval(interval);
@@ -122,6 +124,19 @@ export default function AdminDashboard() {
   }
 
   const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN' || currentUser?.portalType === 'SUPERVISOR';
+  
+  const canViewWidget = (key) => {
+    let widgets = currentUser?.permissions?.DASHBOARD_WIDGETS;
+    // If no widget config exists at all, show everything (TENANT_OWNER / legacy users)
+    if (widgets === undefined || widgets === null) return true;
+    // Handle case where Prisma JSON is deserialized as a string
+    if (typeof widgets === 'string') {
+      try { widgets = JSON.parse(widgets); } catch { return false; }
+    }
+    if (!Array.isArray(widgets)) return false;
+    // If widget config exists, ALWAYS enforce it — even for admin roles
+    return widgets.includes(key);
+  };
   
   if (!storeIdParam && isGlobalRole && stores.length > 1) {
     const staffByStore = users.reduce((acc, u) => {
@@ -228,15 +243,15 @@ export default function AdminDashboard() {
       {/* Primary KPI Command Grid */}
       <div className="grid grid-cols-12 gap-6">
         {[
-          { label: 'Revenue Today', value: `₹${stats?.totalSales?.toLocaleString() || 0}`, icon: IndianRupee, color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+12.5%', detail: 'Gross Intake' },
-          { label: 'Gross Margin', value: `${stats?.grossMargin || 0}%`, icon: TrendingUp, color: 'text-blue-600', bg: 'bg-blue-50', trend: `₹${stats?.grossProfit?.toLocaleString()}`, detail: 'Net Efficiency' },
-          { label: 'Orders Today', value: stats?.ordersToday || 0, icon: ShoppingCart, color: 'text-orange-600', bg: 'bg-orange-50', trend: 'Processed', detail: 'Trans. Volume' },
-          { label: 'Active Fleet', value: stats?.activeVehicles || 0, icon: Truck, color: 'text-indigo-600', bg: 'bg-indigo-50', trend: 'In-Transit', detail: 'Deployment' },
-          { label: 'Stock Valuation', value: `₹${(metrics.totalStockValue || 0).toLocaleString()}`, icon: Package, color: 'text-teal-600', bg: 'bg-teal-50', trend: 'Estimated', detail: 'Assets Value' },
-          { label: 'Pending Logistics', value: stats?.pendingOrders || 0, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50', trend: 'Awaiting', detail: 'Fulfillment' },
-          { label: 'Critical Alerts', value: stats?.inventoryAlerts || 0, icon: Target, color: 'text-rose-600', bg: 'bg-rose-50', trend: 'Response Required', detail: 'Safety Stock' },
-          { label: 'Refill Requests', value: stats?.pendingRefills || 0, icon: Box, color: 'text-purple-600', bg: 'bg-purple-50', trend: 'Pending', detail: 'Fleet Resupply' }
-        ].map((kpi, idx) => (
+          { key: 'totalSales',       label: 'Revenue Today',    value: `₹${stats?.totalSales?.toLocaleString() || 0}`,       icon: IndianRupee,  color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+12.5%',           detail: 'Gross Intake'    },
+          { key: 'grossMargin',      label: 'Gross Margin',     value: `${stats?.grossMargin || 0}%`,                         icon: TrendingUp,   color: 'text-blue-600',    bg: 'bg-blue-50',    trend: `₹${stats?.grossProfit?.toLocaleString()}`, detail: 'Net Efficiency'  },
+          { key: 'totalOrders',      label: 'Orders Today',     value: stats?.ordersToday || 0,                               icon: ShoppingCart, color: 'text-orange-600',  bg: 'bg-orange-50',  trend: 'Processed',         detail: 'Trans. Volume'   },
+          { key: 'activeVehicles',   label: 'Active Fleet',     value: stats?.activeVehicles || 0,                            icon: Truck,        color: 'text-indigo-600',  bg: 'bg-indigo-50',  trend: 'In-Transit',        detail: 'Deployment'      },
+          { key: 'stockValuation',   label: 'Stock Valuation',  value: `₹${(metrics.totalStockValue || 0).toLocaleString()}`, icon: Package,      color: 'text-teal-600',    bg: 'bg-teal-50',    trend: 'Estimated',         detail: 'Assets Value'    },
+          { key: 'pendingLogistics', label: 'Pending Logistics',value: stats?.pendingOrders || 0,                             icon: Clock,        color: 'text-amber-600',   bg: 'bg-amber-50',   trend: 'Awaiting',          detail: 'Fulfillment'     },
+          { key: 'criticalAlerts',   label: 'Critical Alerts',  value: stats?.inventoryAlerts || 0,                          icon: Target,       color: 'text-rose-600',    bg: 'bg-rose-50',    trend: 'Response Required', detail: 'Safety Stock'    },
+          { key: 'refillRequests',   label: 'Refill Requests',  value: stats?.pendingRefills || 0,                            icon: Box,          color: 'text-purple-600',  bg: 'bg-purple-50',  trend: 'Pending',           detail: 'Fleet Resupply'  }
+        ].map((kpi, idx) => canViewWidget(kpi.key) ? (
           <div key={idx} className="col-span-12 sm:col-span-6 lg:col-span-3 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative">
             <div className="absolute -right-2 -bottom-2 text-gray-50 opacity-10 group-hover:scale-110 transition-transform">
               <kpi.icon size={100} strokeWidth={1} />
@@ -255,7 +270,7 @@ export default function AdminDashboard() {
               <h3 className="text-2xl font-black text-gray-900 tracking-tighter">{kpi.value}</h3>
             </div>
           </div>
-        ))}
+        ) : null)}
       </div>
 
       {/* Main Insights Grid */}
@@ -265,7 +280,10 @@ export default function AdminDashboard() {
         <div className="col-span-12 lg:col-span-8 space-y-8">
           
           {/* Real-time Fleet Intelligence */}
+          {(canViewWidget('fleetMap') || canViewWidget('orderChannels') || canViewWidget('paymentSplit')) && (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+            {canViewWidget('fleetMap') && (
+              <>
             <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white">
               <div>
                 <h3 className="text-lg font-black text-gray-900 flex items-center gap-3 tracking-tighter uppercase">
@@ -307,9 +325,13 @@ export default function AdminDashboard() {
                 </div>
               )}
             </div>
+              </>
+            )}
             
             {/* Visual Distribution Analytics */}
-            <div className="p-8 grid grid-cols-2 gap-12 items-center bg-white">
+            {(canViewWidget('orderChannels') || canViewWidget('paymentSplit')) && (
+            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center bg-white">
+              {canViewWidget('orderChannels') && (
               <div className="flex items-center gap-8">
                 <div className="w-32 h-32">
                   <ResponsiveContainer width="100%" height="100%">
@@ -339,7 +361,9 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               </div>
-              <div className="flex items-center gap-8 border-l border-gray-100 pl-12">
+              )}
+              {canViewWidget('paymentSplit') && (
+              <div className={`flex items-center gap-8 ${canViewWidget('orderChannels') ? 'border-l border-gray-100 pl-12' : ''}`}>
                 <div className="w-32 h-32">
                   <ResponsiveContainer width="100%" height="100%">
                     <PieChart>
@@ -368,11 +392,15 @@ export default function AdminDashboard() {
                   ))}
                 </div>
               </div>
+              )}
             </div>
+            )}
           </div>
+          )}
 
           <div className="grid grid-cols-2 gap-8">
             {/* Velocity Bar Chart */}
+            {canViewWidget('productVelocity') && (
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
               <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-50">
                 <div>
@@ -402,8 +430,10 @@ export default function AdminDashboard() {
                 </ResponsiveContainer>
               </div>
             </div>
+            )}
 
             {/* Critical Alert Hub */}
+            {canViewWidget('operationalCriticals') && (
             <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col">
               <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-50">
                 <div>
@@ -444,6 +474,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         </div>
 
@@ -451,11 +482,13 @@ export default function AdminDashboard() {
         <div className="col-span-12 lg:col-span-4 space-y-8">
           
           {/* Enterprise Treasury Analytics */}
+          {(canViewWidget('treasuryAnalytics') || canViewWidget('cashStatus')) && (
           <div className="bg-gray-900 p-8 rounded-3xl text-white shadow-2xl relative overflow-hidden">
             <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full" />
             <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full" />
             
             <div className="relative z-10 space-y-10">
+              {canViewWidget('treasuryAnalytics') && (
               <div>
                 <div className="flex items-center justify-between mb-6">
                   <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-2">
@@ -481,7 +514,9 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+              )}
 
+              {canViewWidget('cashStatus') && (
               <div className="space-y-5">
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400/40 pb-3 border-b border-white/5">Operational Recon Feed</h4>
                 {cashStats.slice(0, 4).map(summary => (
@@ -500,10 +535,13 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
+              )}
             </div>
           </div>
+          )}
 
           {/* Performance Stream */}
+          {canViewWidget('topPerformers') && (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
             <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white/50 backdrop-blur-xl">
               <h3 className="text-sm font-black text-gray-900 flex items-center gap-3 uppercase tracking-widest">
@@ -541,8 +579,10 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
+          )}
 
           {/* Live Events Stream */}
+          {canViewWidget('liveSales') && (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[400px]">
             <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white">
               <h3 className="text-xs font-black text-gray-900 flex items-center gap-3 uppercase tracking-widest">
@@ -570,6 +610,7 @@ export default function AdminDashboard() {
               ))}
             </div>
           </div>
+          )}
 
         </div>
       </div>
