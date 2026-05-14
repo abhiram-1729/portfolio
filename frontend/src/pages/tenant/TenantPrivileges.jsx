@@ -1134,16 +1134,44 @@ export default function TenantPrivileges() {
                     isOpen={openSections.includes('settings')}
                     onToggle={() => toggleAccordion('settings')}
                   >
-                    <PermissionTable
-                      modules={SETTINGS_SECTIONS}
-                      isGranular={true}
-                      sectionKey="SETTINGS_TARGET_SECTIONS"
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                      customToggle={(key, action) => toggleSettingsSection(key)}
-                      customToggleAll={(key) => toggleSettingsSection(key)}
-                    />
+                    <div className="space-y-4">
+                      {/* SETTINGS module-level toggles */}
+                      <PermissionTable
+                        modules={[{ key: 'SETTINGS', label: 'Settings', desc: 'System configuration access' }]}
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                      />
+
+                      {/* Granular section access */}
+                      {(formPerms.SETTINGS || []).includes('READ') && (
+                        <div className="pt-6 border-t border-gray-50">
+                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Accessible Setting Sections</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                            {SETTINGS_SECTIONS.map(section => {
+                              const isChecked = (formPerms.SETTINGS_TARGET_SECTIONS || []).includes(section.key);
+                              return (
+                                <button
+                                  key={section.key}
+                                  onClick={() => toggleSettingsSection(section.key)}
+                                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
+                                >
+                                  <div className="flex flex-col min-w-0">
+                                    <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
+                                    <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
+                                  </div>
+                                  <div className="ml-auto">
+                                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
+                                      {isChecked && <Check size={12} strokeWidth={4} />}
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
                   </CollapsibleSection>
                 </div>
               </div>

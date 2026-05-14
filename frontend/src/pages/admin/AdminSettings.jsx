@@ -456,16 +456,23 @@ export default function AdminSettings() {
   };
 
   const hasPermission = (sectionKey) => {
-    if (!currentUser?.customRoleId) return true;
+    // No restriction key = always show (generic sections visible to anyone with SETTINGS access)
+    if (!sectionKey) return true;
     if (sectionKey === 'EXPENSE_SETTINGS') {
       return can('EXPENSES', 'READ', 'SETTINGS') || can('EXPENSES', 'UPDATE', 'SETTINGS');
     }
-    const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS || [];
+    const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS;
+    // No widget config exists at all → show everything (TENANT_OWNER / no customRole)
+    if (targetSections === undefined || targetSections === null) return true;
+    // Config exists → enforce it
     return targetSections.includes(sectionKey);
   };
 
+  const hasSectionAccess = (sectionKey) => hasPermission(sectionKey);
+
   const sections = [
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Inventory Management', 
       icon: Package, 
       items: [
@@ -476,23 +483,26 @@ export default function AdminSettings() {
       ]
     },
     {
+      sectionKey: 'EXPENSE_SETTINGS',
       title: 'Expense Management',
       icon: Receipt,
       items: [
-        { label: 'Categories', action: () => setActiveModal('EXPENSES'), key: 'EXPENSE_SETTINGS' },
-        { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES'), key: 'EXPENSE_SETTINGS' }
-      ].filter(item => hasPermission(item.key))
+        { label: 'Categories', action: () => setActiveModal('EXPENSES') },
+        { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES') }
+      ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Payment Settings', 
       icon: CreditCard, 
       items: [
-        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
-        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
-        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' }
-      ].filter(item => hasPermission(item.key))
+        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon') },
+        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon') },
+        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon') }
+      ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Business Profile', 
       icon: Store, 
       items: [
@@ -501,6 +511,7 @@ export default function AdminSettings() {
       ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Tax Settings', 
       icon: Receipt, 
       items: [
@@ -509,15 +520,17 @@ export default function AdminSettings() {
       ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Invoice Format', 
       icon: FileText, 
       items: [
-        { label: 'Header/Footer Text', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
-        { label: 'Upload Logo', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
-        { label: 'Sequential Numbering', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' }
-      ].filter(item => hasPermission(item.key))
+        { label: 'Header/Footer Text', action: () => toast.error('Coming soon') },
+        { label: 'Upload Logo', action: () => toast.error('Coming soon') },
+        { label: 'Sequential Numbering', action: () => toast.error('Coming soon') }
+      ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Notifications', 
       icon: Bell, 
       items: [
@@ -526,6 +539,7 @@ export default function AdminSettings() {
       ]
     },
     {
+      sectionKey: 'POS_CONFIG',
       title: 'Shift Management',
       icon: Clock,
       items: [
@@ -534,6 +548,7 @@ export default function AdminSettings() {
       ]
     },
     {
+      sectionKey: 'POS_CONFIG',
       title: 'Delivery Logistics',
       icon: Truck,
       items: [
@@ -543,6 +558,7 @@ export default function AdminSettings() {
       ]
     },
     {
+      sectionKey: 'POS_CONFIG',
       title: 'Marketing & Offers',
       icon: Tag,
       items: [
@@ -550,8 +566,17 @@ export default function AdminSettings() {
         { label: 'BOGO & Combo Deals', action: () => navigate('/admin/promotions') },
         { label: 'Targeted Campaigns', action: () => navigate('/admin/promotions') }
       ]
+    },
+    {
+      sectionKey: 'POS_TERMINAL',
+      title: 'POS Terminal Access',
+      icon: CreditCard,
+      items: [
+        { label: 'Open POS Interface', action: () => navigate('/pos') },
+        { label: 'Launch Billing Station', action: () => window.open('/pos', '_blank') }
+      ]
     }
-  ];
+  ].filter(s => hasSectionAccess(s.sectionKey));
 
   if (loading) {
     return (
