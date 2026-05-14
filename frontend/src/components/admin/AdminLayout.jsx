@@ -40,9 +40,15 @@ import {
   RotateCcw,
   FileText,
   Zap,
-  ShoppingBag
+  ShoppingBag,
+  Lightbulb,
+  Edit3,
+  Camera,
+  Check,
+  Loader2
 } from 'lucide-react';
 
+import { toast } from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
 import { useNotificationStore } from '../../store/notificationStore';
 import NotificationPopover from './NotificationPopover';
@@ -55,7 +61,7 @@ function cn(...inputs) {
 }
 
 export default function AdminLayout() {
-  const { clearUser, user, refreshUserProfile } = useUserStore();
+  const { clearUser, user, refreshUserProfile, updateUserProfile, updateBusinessProfile } = useUserStore();
   const unreadCount = useNotificationStore(s => s.unreadCount);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
@@ -64,6 +70,56 @@ export default function AdminLayout() {
   const userDropdownRef = React.useRef(null);
   const [lastOpenedMenu, setLastOpenedMenu] = React.useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  // --- Premium Profile Customization State ---
+  const [isEditProfileOpen, setIsEditProfileOpen] = React.useState(false);
+  const [profileName, setProfileName] = React.useState('');
+  const [avatarFile, setAvatarFile] = React.useState(null);
+  const [avatarPreview, setAvatarPreview] = React.useState(null);
+  const [isSavingProfile, setIsSavingProfile] = React.useState(false);
+
+  const handleOpenEditProfile = (e) => {
+    if (e) e.stopPropagation();
+    setProfileName(user?.name || '');
+    setAvatarPreview(user?.avatar || null);
+    setAvatarFile(null);
+    setIsEditProfileOpen(true);
+    setIsUserDropdownOpen(false);
+  };
+
+  const handleAvatarChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setAvatarFile(file);
+      setAvatarPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    if (!profileName.trim()) {
+      toast.error('Please enter a valid display name');
+      return;
+    }
+
+    try {
+      setIsSavingProfile(true);
+      const formData = new FormData();
+      formData.append('name', profileName.trim());
+      if (avatarFile) {
+        formData.append('avatar', avatarFile);
+      }
+
+      await updateUserProfile(formData);
+      toast.success('Profile customized successfully!');
+      setIsEditProfileOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update customized profile');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
 
   React.useEffect(() => {
     refreshUserProfile();
@@ -96,6 +152,56 @@ export default function AdminLayout() {
   const activeStoreName = searchParams.get('storeName');
 
   const displayStoreName = activeStoreName || user?.storeName || user?.tenantName || 'VillagKart';
+  const displayStoreLogo = user?.storeLogo || user?.tenantLogo || null;
+
+  // --- Premium Business Brand Customization State ---
+  const [isEditBusinessOpen, setIsEditBusinessOpen] = React.useState(false);
+  const [businessNameInput, setBusinessNameInput] = React.useState('');
+  const [businessLogoFile, setBusinessLogoFile] = React.useState(null);
+  const [businessLogoPreview, setBusinessLogoPreview] = React.useState(null);
+  const [isSavingBusiness, setIsSavingBusiness] = React.useState(false);
+
+  const handleOpenEditBusiness = (e) => {
+    if (e) e.stopPropagation();
+    setBusinessNameInput(displayStoreName);
+    setBusinessLogoPreview(displayStoreLogo);
+    setBusinessLogoFile(null);
+    setIsEditBusinessOpen(true);
+  };
+
+  const handleBusinessLogoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setBusinessLogoFile(file);
+      setBusinessLogoPreview(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSaveBusiness = async (e) => {
+    e.preventDefault();
+    if (!businessNameInput.trim()) {
+      toast.error('Please enter a valid business/store name');
+      return;
+    }
+
+    try {
+      setIsSavingBusiness(true);
+      const formData = new FormData();
+      formData.append('businessName', businessNameInput.trim());
+      if (businessLogoFile) {
+        formData.append('logo', businessLogoFile);
+      }
+
+      await updateBusinessProfile(formData);
+      toast.success('Business brand customized successfully!');
+      setIsEditBusinessOpen(false);
+    } catch (err) {
+      console.error(err);
+      toast.error('Failed to update business brand profile');
+    } finally {
+      setIsSavingBusiness(false);
+    }
+  };
 
   const appendParams = (path) => {
     if (!activeStoreId || path.startsWith('/admin/cash')) return path;
@@ -137,6 +243,7 @@ export default function AdminLayout() {
 
   const rawNavItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
+    { to: '/admin/onboarding', icon: Lightbulb, label: 'Onboarding & Help' },
     {
       label: 'Operation',
       icon: Users,
@@ -146,7 +253,7 @@ export default function AdminLayout() {
         { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
       ]
     },
-    // { to: '/admin/stores', icon: Store, label: 'Stores' },
+    { to: '/admin/stores', icon: Store, label: 'Stores' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
@@ -209,6 +316,7 @@ export default function AdminLayout() {
         { to: '/admin/procurement?tab=reports', icon: BarChart3, label: 'Reports', section: 'REPORTS' },
       ]
     },
+
     // { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
   ];
 
@@ -406,10 +514,23 @@ export default function AdminLayout() {
               >
                 <Menu size={20} className={cn("transition-transform duration-300", !isSidebarCollapsed && "rotate-180")} />
               </button>
-              <div className="flex items-center gap-3">
-                <img src={logo} alt="VillagKart" className="h-10 w-auto" />
+              <div className="flex items-center gap-3 group relative">
+                {displayStoreLogo ? (
+                  <img src={displayStoreLogo} alt={displayStoreName} className="h-10 w-10 rounded-xl object-cover shadow-sm" />
+                ) : (
+                  <img src={logo} alt={displayStoreName} className="h-10 w-auto" />
+                )}
                 <div className={cn("flex flex-col transition-all duration-300", isSidebarCollapsed ? "opacity-0 invisible w-0" : "opacity-100 visible")}>
-                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1 truncate max-w-[120px]">{displayStoreName}</span>
+                    <button
+                      onClick={handleOpenEditBusiness}
+                      className="opacity-0 group-hover:opacity-100 transition-opacity p-0.5 text-gray-400 hover:text-emerald-600 pb-1"
+                      title="Customize Brand Name & Logo"
+                    >
+                      <Edit3 size={10} strokeWidth={2.5} />
+                    </button>
+                  </div>
                   <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
                 </div>
               </div>
@@ -447,7 +568,14 @@ export default function AdminLayout() {
               <div className="h-8 w-px bg-gray-100 mx-1 hidden sm:block" />
 
               {/* User Dropdown */}
-              <div className="relative" ref={userDropdownRef}>
+              <div className="relative flex items-center gap-1.5" ref={userDropdownRef}>
+                <button
+                  onClick={handleOpenEditProfile}
+                  title="Customize Profile"
+                  className="p-2 bg-gray-100 text-gray-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-xl transition-all shadow-sm flex items-center justify-center"
+                >
+                  <Edit3 size={15} strokeWidth={2.5} />
+                </button>
                 <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className={cn(
@@ -455,9 +583,13 @@ export default function AdminLayout() {
                     isUserDropdownOpen ? "bg-emerald-50" : "hover:bg-gray-50"
                   )}
                 >
-                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-black text-[10px] shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform border border-emerald-500/20">
-                    {user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'VK'}
-                  </div>
+                  {user?.avatar ? (
+                    <img src={user.avatar} alt={user.name || 'User'} className="w-9 h-9 rounded-xl object-cover border border-emerald-500/20 shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform shrink-0" />
+                  ) : (
+                    <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-black text-[10px] shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform border border-emerald-500/20 shrink-0">
+                      {user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'VK'}
+                    </div>
+                  )}
                   <div className="hidden md:flex flex-col items-start pr-2">
                     <span className="text-xs font-black text-gray-900 leading-none mb-1 uppercase tracking-tight">{user?.name}</span>
                     <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">{user?.role?.replace('_', ' ')}</span>
@@ -472,13 +604,21 @@ export default function AdminLayout() {
                 </button>
 
                 {isUserDropdownOpen && (
-                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200 z-50">
                     <div className="p-4 border-b border-gray-50 bg-gray-50/50">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p>
                       <p className="text-xs font-black text-gray-900 truncate">{user?.email || user?.name}</p>
                     </div>
 
                     <div className="p-2">
+                      <button
+                        onClick={handleOpenEditProfile}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all"
+                      >
+                        <Edit3 size={18} />
+                        <span>Customize Profile</span>
+                      </button>
+
                       {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
                         <button
                           onClick={() => { navigate('/admin/settings'); setIsUserDropdownOpen(false); }}
@@ -514,15 +654,28 @@ export default function AdminLayout() {
           {/* Sidebar Header: Store Info */}
           <div className="p-6">
             <div className="flex flex-col gap-4">
-              <div className={cn("flex items-center gap-3", isSidebarCollapsed && "justify-center")}>
-                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
-                  <Store size={20} strokeWidth={2.5} />
-                </div>
+              <div className={cn("flex items-center gap-3 group relative", isSidebarCollapsed && "justify-center")}>
+                {displayStoreLogo ? (
+                  <img src={displayStoreLogo} alt={displayStoreName} className="w-10 h-10 rounded-xl object-cover shadow-md shrink-0" />
+                ) : (
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
+                    <Store size={20} strokeWidth={2.5} />
+                  </div>
+                )}
                 {!isSidebarCollapsed && (
-                  <div className="min-w-0 animate-in fade-in duration-300">
-                    <h2 className="text-base font-black text-gray-900 leading-tight truncate">
-                      {displayStoreName}
-                    </h2>
+                  <div className="min-w-0 animate-in fade-in duration-300 flex-1 relative">
+                    <div className="flex items-center justify-between gap-1">
+                      <h2 className="text-base font-black text-gray-900 leading-tight truncate" title={displayStoreName}>
+                        {displayStoreName}
+                      </h2>
+                      <button
+                        onClick={handleOpenEditBusiness}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-emerald-600 shrink-0"
+                        title="Customize Brand Name & Logo"
+                      >
+                        <Edit3 size={12} strokeWidth={2.5} />
+                      </button>
+                    </div>
                     <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Admin Portal</p>
                   </div>
                 )}
@@ -703,15 +856,28 @@ export default function AdminLayout() {
 
           {/* Sidebar Footer: Admin Profile Data */}
           <div className="p-4 border-t border-gray-50 bg-gray-50/30">
-            <div className={cn("flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 shadow-sm mb-3 transition-all", isSidebarCollapsed && "justify-center p-2")}>
-              <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50 shrink-0">
-                {user?.name?.charAt(0) || 'A'}
-              </div>
+            <div className={cn("flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 shadow-sm mb-3 transition-all relative group", isSidebarCollapsed && "justify-center p-2")}>
+              {user?.avatar ? (
+                <img src={user.avatar} alt={user.name || 'User'} className="w-9 h-9 rounded-xl object-cover border border-emerald-100 shrink-0" />
+              ) : (
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50 shrink-0">
+                  {user?.name?.charAt(0) || 'A'}
+                </div>
+              )}
               {!isSidebarCollapsed && (
-                <div className="flex flex-col min-w-0 animate-in fade-in duration-300">
+                <div className="flex flex-col min-w-0 animate-in fade-in duration-300 pr-5">
                   <span className="text-[11px] font-black text-gray-900 truncate tracking-tight">{user?.name}</span>
                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
                 </div>
+              )}
+              {!isSidebarCollapsed && (
+                <button
+                  onClick={handleOpenEditProfile}
+                  title="Customize Profile"
+                  className="absolute right-2 p-1.5 rounded-lg bg-gray-50 border border-gray-200 text-gray-600 hover:text-emerald-700 hover:bg-emerald-50 hover:border-emerald-200 opacity-100 transition-all shadow-2xs flex items-center justify-center shrink-0"
+                >
+                  <Edit3 size={13} strokeWidth={2.5} />
+                </button>
               )}
             </div>
             <button
@@ -858,6 +1024,166 @@ export default function AdminLayout() {
                 );
               })}
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- Premium Customize Profile Modal --- */}
+      {isEditProfileOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 text-white relative">
+              <button 
+                onClick={() => setIsEditProfileOpen(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <X size={16} />
+              </button>
+              <h3 className="text-lg font-black tracking-tight">Customize Profile</h3>
+              <p className="text-emerald-100 text-xs mt-0.5 font-medium">Personalize your administrator display text and photo</p>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="p-6 space-y-6">
+              {/* Avatar Selection */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative group cursor-pointer">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Preview" className="w-24 h-24 rounded-2xl object-cover border-4 border-emerald-50 shadow-md" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-2xl border-4 border-emerald-100/50 shadow-md">
+                      {profileName?.charAt(0) || user?.name?.charAt(0) || 'A'}
+                    </div>
+                  )}
+                  <label className="absolute inset-0 bg-gray-950/40 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white gap-1 transition-all cursor-pointer backdrop-blur-[2px]">
+                    <Camera size={20} />
+                    <span className="text-[9px] font-black uppercase tracking-wider">Change</span>
+                    <input type="file" accept="image/*" onChange={handleAvatarChange} className="hidden" />
+                  </label>
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Click photo to update</span>
+              </div>
+
+              {/* Display Name Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">Display Name</label>
+                <input
+                  type="text"
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  placeholder="e.g. Abhiram"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  required
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditProfileOpen(false)}
+                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingProfile}
+                  className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSavingProfile ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Saving...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} strokeWidth={3} />
+                      <span>Save Changes</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* --- Premium Customize Business Brand Modal --- */}
+      {isEditBusinessOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 text-white relative">
+              <button 
+                onClick={() => setIsEditBusinessOpen(false)}
+                className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
+              >
+                <X size={16} />
+              </button>
+              <h3 className="text-lg font-black tracking-tight">Customize Business Brand</h3>
+              <p className="text-emerald-100 text-xs mt-0.5 font-medium">Personalize your brand organization logo image and display title</p>
+            </div>
+
+            <form onSubmit={handleSaveBusiness} className="p-6 space-y-6">
+              {/* Brand Logo Selection */}
+              <div className="flex flex-col items-center gap-3">
+                <div className="relative group cursor-pointer">
+                  {businessLogoPreview ? (
+                    <img src={businessLogoPreview} alt="Preview" className="w-24 h-24 rounded-2xl object-cover border-4 border-emerald-50 shadow-md" />
+                  ) : (
+                    <div className="w-24 h-24 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black border-4 border-emerald-100/50 shadow-md">
+                      <Store size={36} strokeWidth={2.5} />
+                    </div>
+                  )}
+                  <label className="absolute inset-0 bg-gray-950/40 rounded-2xl opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center text-white gap-1 transition-all cursor-pointer backdrop-blur-[2px]">
+                    <Camera size={20} />
+                    <span className="text-[9px] font-black uppercase tracking-wider">Change</span>
+                    <input type="file" accept="image/*" onChange={handleBusinessLogoChange} className="hidden" />
+                  </label>
+                </div>
+                <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Click image to upload custom logo</span>
+              </div>
+
+              {/* Display Name Input */}
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest block ml-1">Business/Store Title</label>
+                <input
+                  type="text"
+                  value={businessNameInput}
+                  onChange={(e) => setBusinessNameInput(e.target.value)}
+                  placeholder="e.g. sindher's Business"
+                  className="w-full px-4 py-3 rounded-xl bg-gray-50 border border-gray-200 text-gray-900 font-bold text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                  required
+                />
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsEditBusinessOpen(false)}
+                  className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 font-black text-xs uppercase tracking-widest hover:bg-gray-50 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingBusiness}
+                  className="flex-1 py-3 rounded-xl bg-emerald-600 text-white font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {isSavingBusiness ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" />
+                      <span>Saving Brand...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check size={16} strokeWidth={3} />
+                      <span>Save Brand</span>
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

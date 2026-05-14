@@ -90,6 +90,7 @@ enum TenantStatus {
 model User {
   id                   String                  @id @default(cuid())
   name                 String?
+  avatar               String?
   email                String                  @unique
   password             String
   mobile               String?                 @unique
@@ -1388,10 +1389,13 @@ model Store {
   id                     String                   @id @default(cuid())
   tenantId               String                   @default("VK001")
   name                   String
+  logo                   String?
   code                   String                   @unique
   address                String?
   contactEmail           String?
   contactPhone           String?
+  nature                 String?                  @default("Both")
+  type                   String?                  @default("Private Limited")
   status                 String                   @default("ACTIVE")
   createdAt              DateTime                 @default(now())
   updatedAt              DateTime                 @updatedAt

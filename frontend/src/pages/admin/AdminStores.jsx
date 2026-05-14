@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Store, Plus, Search, Edit2, Trash2, MapPin, Users, Truck, Loader2, Briefcase, BarChart3, ChevronRight, LayoutDashboard } from 'lucide-react';
+import { Store, Plus, Search, Edit2, Trash2, MapPin, Users, Truck, Loader2, Briefcase, BarChart3, ChevronRight, LayoutDashboard, Eye, CheckCircle2, Phone, Mail, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
@@ -9,6 +9,7 @@ export default function AdminStores() {
   const [loading, setLoading] = useState(true);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [selectedViewStore, setSelectedViewStore] = useState(null);
   const [formData, setFormData] = useState({ id: '', name: '', code: '', stateCode: '', hubCode: '', address: '', contactEmail: '', contactPhone: '', status: 'ACTIVE' });
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
@@ -98,7 +99,7 @@ export default function AdminStores() {
           <p className="text-sm font-medium text-slate-500">Manage multiple branches and distribution centers for your business.</p>
         </div>
         <button
-          onClick={() => handleOpenModal()}
+          onClick={() => navigate('/create-business')}
           className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-2xl font-black shadow-lg shadow-emerald-600/30 active:scale-95 transition-all w-fit"
         >
           <Plus size={20} className="stroke-[3px]" />
@@ -209,17 +210,17 @@ export default function AdminStores() {
                     </td>
                     <td className="px-8 py-6">
                       <div className="flex items-center justify-end gap-2">
-                        {/* <button
-                          onClick={() => navigate(`/admin?storeId=${store.id}&storeName=${encodeURIComponent(store.name)}`)}
-                          className="w-9 h-9 flex items-center justify-center bg-emerald-600 text-white rounded-lg shadow-lg shadow-emerald-600/20 active:scale-90 transition-all"
-                          title="Open Dashboard"
-                        >
-                          <LayoutDashboard size={18} />
-                        </button> */}
                         <button
-                          onClick={() => handleOpenModal(store)}
+                          onClick={() => setSelectedViewStore(store)}
+                          className="w-9 h-9 flex items-center justify-center bg-emerald-50 text-emerald-600 hover:bg-emerald-100 rounded-lg transition-all border border-emerald-100/50 shadow-sm"
+                          title="View Setup Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={() => navigate('/create-business', { state: { editStore: store } })}
                           className="w-9 h-9 flex items-center justify-center bg-slate-50 text-slate-600 hover:bg-emerald-50 hover:text-emerald-600 rounded-lg transition-all border border-slate-100"
-                          title="Edit Store"
+                          title="Edit Store Parameters"
                         >
                           <Edit2 size={16} />
                         </button>
@@ -304,6 +305,29 @@ export default function AdminStores() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-4">Contact Phone</label>
+                  <input
+                    type="text"
+                    value={formData.contactPhone || ''}
+                    onChange={(e) => setFormData({ ...formData, contactPhone: e.target.value.replace(/\D/g, '').slice(0, 10) })}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-base font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                    placeholder="1234567890"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-4">Contact Email</label>
+                  <input
+                    type="email"
+                    value={formData.contactEmail || ''}
+                    onChange={(e) => setFormData({ ...formData, contactEmail: e.target.value })}
+                    className="w-full bg-slate-50 border-none rounded-2xl px-6 py-4 text-base font-bold text-slate-900 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all"
+                    placeholder="admin@villagkart.com"
+                  />
+                </div>
+              </div>
+
               <div className="space-y-2">
                 <label className="text-[11px] font-black uppercase tracking-widest text-slate-400 ml-4">Full Address</label>
                 <textarea
@@ -330,6 +354,116 @@ export default function AdminStores() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {selectedViewStore && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[3rem] p-8 md:p-10 w-full max-w-3xl shadow-2xl relative max-h-[90vh] overflow-y-auto border border-slate-100">
+            <div className="flex items-center justify-between pb-6 border-b border-slate-100 mb-8">
+              <div className="flex items-center gap-4">
+                <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                  <Store size={28} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 tracking-tight">{selectedViewStore.name}</h2>
+                  <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-2.5 py-0.5 rounded-full uppercase tracking-widest border border-emerald-100/50">
+                    ID Code: {selectedViewStore.code}
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedViewStore(null)}
+                className="w-10 h-10 rounded-full bg-slate-50 text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition-all font-bold text-sm"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-8">
+              {/* Table section displaying configured properties */}
+              <div>
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">Enterprise Configuration Properties</h3>
+                <div className="border border-slate-100 rounded-3xl overflow-hidden shadow-sm">
+                  <table className="w-full border-collapse text-left text-xs">
+                    <tbody className="divide-y divide-slate-50">
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Nature of Business</th>
+                        <td className="py-3.5 px-5 font-black text-slate-900">{selectedViewStore.nature || 'Product Selling & Retail Operations'}</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Business Type</th>
+                        <td className="py-3.5 px-5 font-black text-slate-800">{selectedViewStore.type || 'Private Limited'}</td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Hub Identifiers</th>
+                        <td className="py-3.5 px-5 font-black text-emerald-700">
+                          State: <span className="font-bold text-slate-600">{selectedViewStore.stateCode || 'AP'}</span> | Hub Code: <span className="font-bold text-slate-600">{selectedViewStore.hubCode || 'HUB'}</span>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Primary Contact</th>
+                        <td className="py-3.5 px-5 font-bold text-slate-800">
+                          <div className="flex items-center gap-4 flex-wrap">
+                            <span className="flex items-center gap-1"><Phone size={12} className="text-slate-400" /> {selectedViewStore.contactPhone || '+91 1234567890'}</span>
+                            <span className="flex items-center gap-1"><Mail size={12} className="text-slate-400" /> {selectedViewStore.contactEmail || 'admin@villagkart.com'}</span>
+                          </div>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Physical Address</th>
+                        <td className="py-3.5 px-5 font-bold text-slate-700 leading-normal">
+                          {selectedViewStore.address || 'Standard Registered Village Enterprise Route Base'}
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Operations Status</th>
+                        <td className="py-3.5 px-5">
+                          <span className={`inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider px-2.5 py-0.5 rounded-md ${selectedViewStore.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-100 text-slate-500'}`}>
+                            <CheckCircle2 size={10} /> {selectedViewStore.status} ROUTE
+                          </span>
+                        </td>
+                      </tr>
+                      <tr className="hover:bg-slate-50/50 transition-colors">
+                        <th className="w-1/3 py-3.5 px-5 font-bold text-slate-500 bg-slate-50/30">Subscribed Tier</th>
+                        <td className="py-3.5 px-5 font-black text-emerald-950 flex items-center gap-1.5">
+                          <ShieldCheck size={14} className="text-emerald-500" /> Enterprise Standard Dashboard Plan
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {/* Performance Footprint Grid */}
+              <div>
+                <h3 className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-4 px-1">Active Performance & Allocations</h3>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center">
+                    <span className="text-xl font-black text-slate-900 block">{selectedViewStore._count?.users || 0}</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 block">Staff Assigned</span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-slate-50/80 border border-slate-100 text-center">
+                    <span className="text-xl font-black text-slate-900 block">{selectedViewStore._count?.vehicles || 0}</span>
+                    <span className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-0.5 block">Fleet Assets</span>
+                  </div>
+                  <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-100 text-center">
+                    <span className="text-xl font-black text-emerald-700 block">Active</span>
+                    <span className="text-[9px] font-bold text-emerald-500 uppercase tracking-widest mt-0.5 block">Sync Status</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-8 pt-6 border-t border-slate-100 flex justify-end">
+              <button
+                onClick={() => setSelectedViewStore(null)}
+                className="px-8 py-3 bg-slate-900 text-white font-bold rounded-xl text-xs hover:bg-slate-800 transition-all active:scale-95"
+              >
+                Close View
+              </button>
+            </div>
           </div>
         </div>
       )}

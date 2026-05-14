@@ -44,7 +44,7 @@ export const getAdminStores = async (req, res, next) => {
 // @access  Private (Admin)
 export const createAdminStore = async (req, res, next) => {
   try {
-    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode } = req.body;
+    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode, nature, type } = req.body;
 
     const existingStore = await prisma.store.findFirst({
       where: {
@@ -72,6 +72,8 @@ export const createAdminStore = async (req, res, next) => {
         address,
         contactEmail,
         contactPhone,
+        nature: nature || 'Both',
+        type: type || 'Private Limited',
         status: status || 'ACTIVE',
         tenantId: req.user.tenantId,
         creator: { connect: { id: req.user.id } }
@@ -90,7 +92,7 @@ export const createAdminStore = async (req, res, next) => {
 export const updateAdminStore = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode } = req.body;
+    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode, nature, type } = req.body;
 
     const store = await prisma.store.findUnique({
       where: { id }
@@ -110,6 +112,8 @@ export const updateAdminStore = async (req, res, next) => {
         address,
         contactEmail,
         contactPhone,
+        ...(nature && { nature }),
+        ...(type && { type }),
         status
       }
     });

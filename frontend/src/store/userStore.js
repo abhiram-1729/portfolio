@@ -37,6 +37,34 @@ export const useUserStore = create(
         }
       },
 
+      updateUserProfile: async (formData) => {
+        try {
+          const { data } = await authAPI.updateProfile(formData);
+          if (data.success) {
+            set((state) => ({
+              user: state.user ? { ...state.user, name: data.data.name, avatar: data.data.avatar } : data.data
+            }));
+            return data;
+          }
+        } catch (error) {
+          console.error('Failed to update user profile:', error);
+          throw error;
+        }
+      },
+
+      updateBusinessProfile: async (formData) => {
+        try {
+          const { data } = await authAPI.updateBusinessProfile(formData);
+          if (data.success) {
+            await get().refreshUserProfile();
+            return data;
+          }
+        } catch (error) {
+          console.error('Failed to update business profile:', error);
+          throw error;
+        }
+      },
+
       can: (module, action, section) => {
         const user = get().user;
         if (!user) return false;

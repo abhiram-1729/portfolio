@@ -69,6 +69,12 @@ export const authAPI = {
   register: (data) => api.post('/auth/register', data),
   logout: () => api.post('/auth/logout'),
   me: () => api.get('/auth/me'),
+  updateProfile: (formData) => api.put('/auth/me', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  updateBusinessProfile: (formData) => api.put('/auth/business', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   updatePassword: (data) => api.put('/auth/password', data),
   uploadMyDocument: (formData) => api.post('/auth/me/documents', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }

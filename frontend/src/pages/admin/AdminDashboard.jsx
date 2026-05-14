@@ -22,7 +22,10 @@ import {
   UserCheck,
   Clock,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  Sparkles,
+  PlayCircle,
+  X
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
@@ -31,7 +34,7 @@ import { getAdminReconciliation } from '../../services/cashService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   PieChart, Pie, Cell, ResponsiveContainer, 
   BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, 
@@ -70,6 +73,13 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('storeId');
+  const navigate = useNavigate();
+  const [showPrompt, setShowPrompt] = useState(!localStorage.getItem('hideAdminOnboardingPrompt'));
+
+  const dismissPrompt = () => {
+    localStorage.setItem('hideAdminOnboardingPrompt', 'true');
+    setShowPrompt(false);
+  };
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
@@ -188,6 +198,50 @@ export default function AdminDashboard() {
 
   return (
     <motion.div initial="hidden" animate="visible" variants={containerVariants} className="max-w-[1600px] mx-auto px-6 py-8 space-y-8">
+      
+      {/* Highly Spottable Professional Guidance Banner */}
+      <AnimatePresence>
+        {showPrompt && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
+            className="bg-emerald-600 text-white rounded-2xl p-4 md:p-5 shadow-lg shadow-emerald-600/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
+                <Sparkles size={20} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-sm font-black tracking-tight">Command Center Guidance</h3>
+                  <span className="text-[9px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">Pro Tip</span>
+                </div>
+                <p className="text-xs text-emerald-50/90 font-medium mt-0.5 max-w-xl leading-relaxed">
+                  Master multi-node operational audits, active fleet distributions, and instant dispatch controls directly in our guidance dashboard.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
+              <button 
+                onClick={() => navigate('/admin/onboarding')}
+                className="flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
+              >
+                <PlayCircle size={14} className="text-emerald-600" />
+                Launch Onboarding
+              </button>
+              <button 
+                onClick={dismissPrompt}
+                className="p-2 text-emerald-200 hover:text-white rounded-lg transition-colors"
+                title="Dismiss guidance prompt"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-gray-100">

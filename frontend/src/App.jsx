@@ -148,14 +148,14 @@ export default function App() {
         <Route path="/login" element={token ? <Navigate to="/" replace /> : <Login />} />
         <Route path="/register" element={token ? <Navigate to="/" replace /> : <Register />} />
         <Route path="/home" element={<LandingPage />} />
-        <Route path="/create-business" element={<TenantRoute><CreateBusiness /></TenantRoute>} />
+        <Route path="/create-business" element={<AdminRoute><CreateBusiness /></AdminRoute>} />
         
         <Route path="/" element={
           !token ? <Navigate to="/home" replace /> : 
           (user?.portalType === 'ADMIN' || user?.role === 'ADMIN') ? <Navigate to="/admin" replace /> :
           (user?.portalType === 'SUPERVISOR') ? <Navigate to="/admin" replace /> : 
           (user?.portalType === 'HELPER') ? <PrivateRoute><AgentLayout /></PrivateRoute> :
-          user?.role === 'TENANT_OWNER' ? <Navigate to="/tenant" replace /> :
+          user?.role === 'TENANT_OWNER' ? <Navigate to="/admin" replace /> :
           <PrivateRoute><AgentLayout /></PrivateRoute>
         }>
           <Route index element={<SalesEntry />} />
@@ -220,6 +220,7 @@ export default function App() {
           <Route path="privileges" element={<TenantPrivileges />} />
           <Route path="stores" element={<AdminStores />} />
           <Route path="admins" element={<AdminUsers type="admin" />} />
+          <Route path="onboarding" element={<TenantOnboarding />} />
         </Route>
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
           <Route index element={<TenantDashboard />} />

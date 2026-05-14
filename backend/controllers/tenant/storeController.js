@@ -32,7 +32,7 @@ export const getStores = async (req, res) => {
 // @access  Private (Tenant Owner)
 export const createStore = async (req, res) => {
   try {
-    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode } = req.body;
+    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode, nature, type } = req.body;
 
     // Check for existing stores with same critical attributes
     const existingStore = await prisma.store.findFirst({
@@ -69,6 +69,8 @@ export const createStore = async (req, res) => {
         address,
         contactEmail,
         contactPhone,
+        nature: nature || 'Both',
+        type: type || 'Private Limited',
         status: status || 'ACTIVE',
         tenantId: req.user.tenantId
       }
@@ -87,7 +89,7 @@ export const createStore = async (req, res) => {
 export const updateStore = async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode } = req.body;
+    const { name, code, address, contactEmail, contactPhone, status, stateCode, hubCode, nature, type } = req.body;
 
     // Check if store exists
     const store = await prisma.store.findUnique({
@@ -140,6 +142,8 @@ export const updateStore = async (req, res) => {
         address,
         contactEmail,
         contactPhone,
+        ...(nature && { nature }),
+        ...(type && { type }),
         status
       }
     });

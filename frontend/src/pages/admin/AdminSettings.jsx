@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt } from 'lucide-react';
+import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt, Camera } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import { getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '../../services/expenseService';
 import toast from 'react-hot-toast';

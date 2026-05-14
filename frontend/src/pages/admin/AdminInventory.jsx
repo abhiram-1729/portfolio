@@ -1609,8 +1609,8 @@ export default function AdminInventory() {
       setShowScanner={setShowScanner}
       generateBarcode={generateBarcode}
       calculateFinalPrice={calculateFinalPrice}
-      previewUrl={previewUrl}
-      handleFileChange={handleFileChange}
+      editPreviewUrl={editPreviewUrl}
+      handleEditFileChange={(e) => handleFileChange(e, true)}
       handleUpdateItem={handleUpdateItem}
       isSubmitting={isSubmitting}
       taxRates={taxRates}

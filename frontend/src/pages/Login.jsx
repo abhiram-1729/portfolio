@@ -28,9 +28,7 @@ export default function Login() {
       setUser(data, data.token);
       toast.success(`Welcome back, ${data.name || 'Agent'}!`);
 
-      if (data.role === 'TENANT_OWNER') {
-        navigate('/tenant');
-      } else if (data.role === 'ADMIN') {
+      if (data.role === 'TENANT_OWNER' || data.role === 'ADMIN') {
         navigate('/admin');
       } else {
         navigate('/');

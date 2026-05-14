@@ -24,7 +24,7 @@ const MIGRATIONS_DIR = path.join(process.cwd(), 'prisma', 'migrations');
 
 async function getClient() {
   const client = new Client({
-    connectionString: process.env.DATABASE_URL,
+    connectionString: process.env.DIRECT_URL || process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false }
   });
   await client.connect();
@@ -163,15 +163,16 @@ async function apply(specificName) {
     
     let pending;
     if (specificName) {
-      if (applied.some(a => a.migration_name === specificName)) {
-        console.log(`✅ Migration "${specificName}" is already applied.`);
+      const actualName = specificName.replace('--force', '').trim();
+      if (!specificName.includes('--force') && applied.some(a => a.migration_name === actualName)) {
+        console.log(`✅ Migration "${actualName}" is already applied. Pass --force to re-apply.`);
         return;
       }
-      if (!local.includes(specificName)) {
-        console.error(`❌ Migration "${specificName}" not found locally.`);
+      if (!local.includes(actualName)) {
+        console.error(`❌ Migration "${actualName}" not found locally.`);
         process.exit(1);
       }
-      pending = [specificName];
+      pending = [actualName];
     } else {
       pending = local.filter(m => !applied.some(a => a.migration_name === m));
     }
@@ -192,12 +193,16 @@ async function apply(specificName) {
       try {
         await client.query('BEGIN');
         
-        // Split by semicolons and execute each statement
-        // (PgBouncer handles individual statements fine)
-        const statements = sql
+        // Strip SQL comment lines before splitting
+        const cleanedSql = sql
+          .split('\n')
+          .filter(line => !line.trim().startsWith('--'))
+          .join('\n');
+
+        const statements = cleanedSql
           .split(';')
           .map(s => s.trim())
-          .filter(s => s.length > 0 && !s.startsWith('--'));
+          .filter(s => s.length > 0);
 
         for (const stmt of statements) {
           try {
@@ -250,7 +255,7 @@ switch (command) {
     create(args[0]);
     break;
   case 'apply':
-    apply(args[0]);
+    apply(args.join(' '));
     break;
   case 'status':
   default:

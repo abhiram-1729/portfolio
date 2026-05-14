@@ -48,9 +48,12 @@ export const loginUser = async (req, res, next) => {
                 id: user.id,
                 tenantId: user.tenantId,
                 tenantName: user.tenant?.name,
+                tenantLogo: user.tenant?.logo || null,
                 storeId: user.storeId,
                 storeName: user.store?.name,
+                storeLogo: user.store?.logo || null,
                 name: user.name,
+                avatar: user.avatar,
                 email: user.email,
                 mobile: user.mobile,
                 role: user.role,
@@ -157,7 +160,7 @@ export const getUserProfile = async (req, res, next) => {
             where: { id: req.user.id },
             include: {
                 tenant: { select: { name: true, logo: true } },
-                store: { select: { name: true, code: true } },
+                store: { select: { name: true, code: true, logo: true } },
                 assignedVehicle: true,
                 customRole: true,
                 documents: true
@@ -168,7 +171,9 @@ export const getUserProfile = async (req, res, next) => {
             res.json({
                 ...user,
                 tenantName: user.tenant?.name,
+                tenantLogo: user.tenant?.logo || null,
                 storeName: user.store?.name,
+                storeLogo: user.store?.logo || null,
                 customRoleName: user.customRole?.name || null,
                 permissions: user.customRole?.permissions || null,
                 portalType: user.customRole?.portalType || null,
@@ -256,5 +261,138 @@ export const uploadMyDocument = async (req, res, next) => {
         res.status(201).json({ message: 'Document uploaded successfully', document });
     } catch (error) {
         next(error);
+    }
+};
+
+// @desc    Update user profile (name, avatar)
+// @route   PUT /api/auth/me
+// @access  Private
+export const updateUserProfile = async (req, res, next) => {
+    try {
+        console.log('[updateUserProfile] Request received. Body:', req.body, 'File present:', !!req.file);
+        if (!req.user || !req.user.id) {
+            console.error('[updateUserProfile] req.user is missing or invalid');
+            return res.status(401).json({ message: 'User reference missing from session request' });
+        }
+
+        const { name } = req.body;
+        const updateData = { updatedAt: new Date() };
+
+        if (name !== undefined && name.trim() !== '') {
+            updateData.name = name.trim();
+        }
+
+        if (req.file) {
+            console.log(`[updateUserProfile] Uploading avatar: ${req.file.originalname} (${req.file.mimetype})`);
+            try {
+                const avatarUrl = await uploadToSupabase(
+                    req.file.buffer,
+                    req.file.originalname,
+                    req.file.mimetype,
+                    'users',
+                    'avatars'
+                );
+                console.log('[updateUserProfile] Avatar uploaded successfully to URL:', avatarUrl);
+                if (avatarUrl) {
+                    updateData.avatar = avatarUrl;
+                }
+            } catch (uploadErr) {
+                console.error('[updateUserProfile] Upload failed:', uploadErr.message);
+                // Keep processing name even if file upload triggers a non-fatal storage block
+            }
+        }
+
+        console.log('[updateUserProfile] Executing DB update for user ID:', req.user.id, 'with data:', updateData);
+        const updatedUser = await prisma.user.update({
+            where: { id: req.user.id },
+            data: updateData,
+            select: {
+                id: true,
+                name: true,
+                avatar: true,
+                email: true,
+                mobile: true,
+                role: true,
+            }
+        });
+
+        console.log('[updateUserProfile] Update successful:', updatedUser);
+        res.json({ success: true, data: updatedUser, message: 'Profile updated successfully' });
+    } catch (error) {
+        console.error('[updateUserProfile Final Error]:', error);
+        res.status(500).json({ success: false, message: error.message || 'Internal server error updating profile' });
+    }
+};
+
+// @desc    Update business profile (store/tenant name and logo)
+// @route   PUT /api/auth/business
+// @access  Private
+export const updateBusinessProfile = async (req, res, next) => {
+    try {
+        console.log('[updateBusinessProfile] Request received. Body:', req.body, 'File present:', !!req.file);
+        const user = await prisma.user.findUnique({
+            where: { id: req.user.id },
+            include: { store: true, tenant: true }
+        });
+
+        if (!user) {
+            return res.status(404).json({ success: false, message: 'User reference missing' });
+        }
+
+        const { businessName } = req.body;
+        let logoUrl = null;
+
+        if (req.file) {
+            console.log(`[updateBusinessProfile] Uploading logo: ${req.file.originalname}`);
+            try {
+                logoUrl = await uploadToSupabase(
+                    req.file.buffer,
+                    req.file.originalname,
+                    req.file.mimetype,
+                    'business',
+                    'logos'
+                );
+                console.log('[updateBusinessProfile] Logo uploaded successfully:', logoUrl);
+            } catch (err) {
+                console.error('[updateBusinessProfile] Logo upload failed:', err.message);
+            }
+        }
+
+        let updatedData = null;
+
+        if (user.storeId) {
+            const updatePayload = { updatedAt: new Date() };
+            if (businessName !== undefined && businessName.trim() !== '') {
+                updatePayload.name = businessName.trim();
+            }
+            if (logoUrl) {
+                updatePayload.logo = logoUrl;
+            }
+            updatedData = await prisma.store.update({
+                where: { id: user.storeId },
+                data: updatePayload
+            });
+        } else if (user.tenantId) {
+            const updatePayload = { updatedAt: new Date() };
+            if (businessName !== undefined && businessName.trim() !== '') {
+                updatePayload.name = businessName.trim();
+            }
+            if (logoUrl) {
+                updatePayload.logo = logoUrl;
+            }
+            updatedData = await prisma.tenant.update({
+                where: { id: user.tenantId },
+                data: updatePayload
+            });
+        }
+
+        res.json({
+            success: true,
+            data: updatedData,
+            message: 'Business profile customized successfully'
+        });
+    } catch (error) {
+        console.error('[updateBusinessProfile Error]:', error);
+        res.status(500).json({ success: false, message: error.message || 'Internal server error updating business profile' });
     }
 };
