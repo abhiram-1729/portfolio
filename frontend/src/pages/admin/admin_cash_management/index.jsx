@@ -5,8 +5,9 @@ import toast from 'react-hot-toast';
 import { 
   Search, Calendar, Eye, Plus, Loader2, X, Sun, Moon, ArrowLeft, 
   Smartphone, BookOpen, User, Coins, Package, Printer, Shield, 
-  CheckCircle2, Info, AlertTriangle, Clock, ArrowRight, Vault, Building2, Zap, ShoppingCart, Pencil, AlertCircle
+  CheckCircle2, Info, AlertTriangle, Clock, ArrowRight, Vault, Building2, Zap, ShoppingCart, Pencil, AlertCircle, Download, FileText, ChevronLeft
 } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from '../adminreports/ReportUtils';
 
 // Shared Components
 const style = document.createElement('style');
@@ -26,7 +27,7 @@ import ShiftSelector from './ShiftSelector';
 import DenominationGrid from './DenominationGrid';
 import ShiftBreakdownView from './ShiftBreakdownView';
 import StoreSafeHeader from './StoreSafeHeader';
-import SimulatorTools from './SimulatorTools';
+
 import DailyReconciliationTab from './DailyReconciliationTab';
 import LiveCashTab from './LiveCashTab';
 import AuditLedgerTab from './AuditLedgerTab';
@@ -42,6 +43,7 @@ import {
   UnapprovedWarningModal, ViewAgentDenomsModal, EditDepositModal, 
   ImagePreviewModal 
 } from './AgentModals';
+import AssignFloatView from './AssignFloatView';
 
 // Services
 import { 
@@ -64,12 +66,17 @@ export default function AdminCashManagementContent() {
   const [previewImage, setPreviewImage] = useState(null);
   const [viewingOrder, setViewingOrder] = useState(null);
   const [ledgerFilter, setLedgerFilter] = useState('ALL');
+  const [viewingAssignFloat, setViewingAssignFloat] = useState(false);
+  const [storeLoading, setStoreLoading] = useState(true);
+  const [stores, setStores] = useState([]);
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const storeFilterId = searchParams.get('storeId');
-  const location = useLocation();
   const user = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN' || (user?.role === 'ADMIN' && !user?.customRoleId) || user?.portalType === 'ADMIN';
+  const storeFilterId = searchParams.get('storeId') || (!isGlobalRole ? user?.storeId : null);
+  const isTenantRoute = location.pathname.includes('/tenant/');
 
   // Assignment Modal
   const [showAssignModal, setShowAssignModal] = useState(false);
@@ -148,6 +155,7 @@ export default function AdminCashManagementContent() {
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
   const canViewCashSection = (sectionKey) => {
+    if (isGlobalRole) return true;
     if (can('CASH', 'READ', sectionKey)) return true;
     // Fallback for legacy roles
     return user?.permissions?.CASH_TARGET_SECTIONS?.includes(sectionKey);
@@ -195,7 +203,7 @@ export default function AdminCashManagementContent() {
   const fetchSummaries = async () => {
     setLoading(true);
     try {
-      const data = await getAdminReconciliation(date);
+      const data = await getAdminReconciliation(date, storeFilterId);
       setSummaries(data);
     } catch (error) {
       toast.error('Failed to fetch cash summaries');
@@ -206,7 +214,7 @@ export default function AdminCashManagementContent() {
 
   const fetchVehicles = async () => {
     try {
-      const { data } = await adminAPI.getVehicles();
+      const { data } = await adminAPI.getVehicles({ storeId: storeFilterId });
       setVehicles(data);
     } catch (error) {
       console.error('Error fetching vehicles:', error);
@@ -214,18 +222,21 @@ export default function AdminCashManagementContent() {
   };
 
   const fetchStoreRegister = async () => {
+    setStoreLoading(true);
     try {
-      const data = await getStoreCashRegister(date);
+      const data = await getStoreCashRegister(date, storeFilterId);
       setStoreRegisterData(data);
     } catch (error) {
       setStoreRegisterData(null);
+    } finally {
+      setStoreLoading(false);
     }
   };
 
   const fetchLedger = async () => {
     setLedgerLoading(true);
     try {
-      const data = await getStoreCashLedger(date);
+      const data = await getStoreCashLedger(date, storeFilterId);
       setLedgerData(data);
     } catch (error) {
       setLedgerData(null);
@@ -235,14 +246,32 @@ export default function AdminCashManagementContent() {
   };
 
   useEffect(() => {
+    const loadStores = async () => {
+      try {
+        const { data } = await adminAPI.getStores();
+        if (data?.success || Array.isArray(data)) {
+          setStores(data?.data || data);
+        }
+      } catch (err) {}
+    };
+    loadStores();
+  }, []);
+
+  useEffect(() => {
+    // Clear data to avoid showing stale state from previous selection
+    setSummaries([]);
+    setVehicles([]);
+    setStoreRegisterData(null);
+    setLedgerData(null);
+    
     fetchSummaries();
     fetchVehicles();
     fetchStoreRegister();
-  }, [date]);
+  }, [date, storeFilterId]);
 
   useEffect(() => {
     if (activeTab === 'ledger') fetchLedger();
-  }, [date, activeTab]);
+  }, [date, activeTab, storeFilterId]);
 
   useEffect(() => {
     if (availableTabs.length > 0 && !availableTabs.some(t => t.key === activeTab)) {
@@ -279,7 +308,7 @@ export default function AdminCashManagementContent() {
       if (amount > safe) return toast.error(`Limit Exceeded (Max: ₹${Math.max(0, safe).toFixed(2)})`);
     }
     try {
-      await createSafeMovement({ date, amount, type: safeMovementData.type, description: safeMovementData.description, denominations: safeMovementData.denominations });
+      await createSafeMovement({ date, amount, type: safeMovementData.type, description: safeMovementData.description, denominations: safeMovementData.denominations, storeId: storeFilterId });
       toast.success(safeMovementData.type === 'DEPOSIT' ? 'Moved to Safe' : 'Moved to Available');
       setShowSafeMovementModal(false);
       setSafeMovementData({ amount: '', type: 'DEPOSIT', description: '', denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } });
@@ -299,9 +328,19 @@ export default function AdminCashManagementContent() {
     if (requestedAmount > availableSafeBalance) return toast.error(`Insufficient balance (Available: ₹${availableSafeBalance.toFixed(2)})`);
     setIsSubmitting(true);
     try {
-      await adminSubmitOpeningCash({ vehicleId: assignmentData.vehicleId, userId: agent.id, totalOpeningCash: requestedAmount, denominations: assignmentData.isNoService ? {} : assignmentData.denominations, shift: assignmentData.shift, isNoService: assignmentData.isNoService || false, date });
+      await adminSubmitOpeningCash({ 
+        vehicleId: assignmentData.vehicleId, 
+        userId: agent.id, 
+        totalOpeningCash: requestedAmount, 
+        denominations: assignmentData.isNoService ? {} : assignmentData.denominations, 
+        shift: assignmentData.shift, 
+        isNoService: assignmentData.isNoService || false, 
+        date,
+        storeId: storeFilterId 
+      });
       toast.success('Float assigned');
       setShowAssignModal(false);
+      setViewingAssignFloat(false);
       setAssignmentData({ vehicleId: '', shift: 1, amount: 0, isNoService: false, denominations: { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 } });
       fetchSummaries(); fetchStoreRegister();
     } catch (error) { toast.error(error.response?.data?.message || 'Failed'); } finally { setIsSubmitting(false); }
@@ -311,7 +350,7 @@ export default function AdminCashManagementContent() {
     if (storeDenomData.amount <= 0) return toast.error('Enter valid denominations');
     setIsSubmitting(true);
     try {
-      await openStoreCashRegister({ date, openingCash: storeDenomData.amount, denominations: storeDenomData.denominations });
+      await openStoreCashRegister({ date, openingCash: storeDenomData.amount, denominations: storeDenomData.denominations, storeId: storeFilterId });
       toast.success('Register opened'); setShowOpenStoreModal(false); fetchStoreRegister();
     } catch (err) { toast.error('Failed'); } finally { setIsSubmitting(false); }
   };
@@ -323,9 +362,9 @@ export default function AdminCashManagementContent() {
     setIsSubmitting(true);
     try {
       if (storeRegisterData?.storeRegister?.status === 'CLOSED') {
-        await updateStoreCashRegister({ date, actualClosingCash: storeDenomData.amount, denominations: storeDenomData.denominations, remarks: storeDenomData.remarks, isClosingUpdate: true });
+        await updateStoreCashRegister({ date, actualClosingCash: storeDenomData.amount, denominations: storeDenomData.denominations, remarks: storeDenomData.remarks, isClosingUpdate: true, storeId: storeFilterId });
       } else {
-        await closeStoreCashRegister({ date, actualClosingCash: storeDenomData.amount, denominations: storeDenomData.denominations, remarks: storeDenomData.remarks });
+        await closeStoreCashRegister({ date, actualClosingCash: storeDenomData.amount, denominations: storeDenomData.denominations, remarks: storeDenomData.remarks, storeId: storeFilterId });
       }
       toast.success('Safe closed'); setShowCloseStoreModal(false); fetchStoreRegister();
     } catch (err) { toast.error('Failed'); } finally { setIsSubmitting(false); }
@@ -353,7 +392,7 @@ export default function AdminCashManagementContent() {
   const handleConfirmDeposit = async () => {
     setIsSubmitting(true);
     try {
-      await createStoreDeposit({ date, shift: depositConfirmData.shift, amount: depositConfirmData.amount, denominations: depositConfirmData.denominations, description: depositConfirmData.description });
+      await createStoreDeposit({ date, shift: depositConfirmData.shift, amount: depositConfirmData.amount, denominations: depositConfirmData.denominations, description: depositConfirmData.description, storeId: storeFilterId });
       toast.success('Deposited'); setShowDepositConfirmModal(false); fetchStoreRegister();
     } catch (err) { toast.error('Failed'); } finally { setIsSubmitting(false); }
   };
@@ -364,7 +403,7 @@ export default function AdminCashManagementContent() {
     if (bankData.amount > (storeRegisterData?.liveMetrics?.safeBalance || 0)) return toast.error('Exceeds safe balance');
     setIsSubmitting(true);
     try {
-      await addBankDeposit({ date, ...bankData });
+      await addBankDeposit({ date, ...bankData, storeId: storeFilterId });
       toast.success('Transferred'); setShowBankModal(false); fetchStoreRegister();
     } catch (err) { toast.error('Failed'); } finally { setIsSubmitting(false); }
   };
@@ -372,7 +411,7 @@ export default function AdminCashManagementContent() {
   const handleUpdateStoreRegister = async () => {
     setIsSubmitting(true);
     try {
-      await updateStoreCashRegister({ date, openingCash: storeDenomData.amount, denominations: storeDenomData.denominations });
+      await updateStoreCashRegister({ date, openingCash: storeDenomData.amount, denominations: storeDenomData.denominations, storeId: storeFilterId });
       toast.success('Updated'); setShowEditStoreModal(false); fetchStoreRegister();
     } catch (err) { toast.error('Failed'); } finally { setIsSubmitting(false); }
   };
@@ -397,7 +436,7 @@ export default function AdminCashManagementContent() {
   const handleReviewClosing = async (vehicleId, date, shift, status, additionalData = {}) => {
     setIsSubmitting(true);
     try {
-      await adminReviewClosing({ vehicleId, date, shift, status, ...additionalData });
+      await adminReviewClosing({ vehicleId, date, shift, status, ...additionalData, storeId: storeFilterId });
       toast.success(`Closing ${status.toLowerCase()}`);
       setIsReviewEditing(null); fetchSummaries(); fetchStoreRegister(); setViewingSummary(null);
     } catch (error) { toast.error('Failed to review'); } finally { setIsSubmitting(false); }
@@ -424,7 +463,7 @@ export default function AdminCashManagementContent() {
     if (difference > available) return toast.error('Insufficient safe balance');
     setIsSubmitting(true);
     try {
-      await adminUpdateReconciliation({ vehicleId: editingSummary.vehicleId, date: editingSummary.date, openingCash: editData.isNoService ? 0 : editData.openingCash, remark: editData.remark, denominations: editData.isNoService ? {} : editData.denominations, shift: 1, isNoService: editData.isNoService || false });
+      await adminUpdateReconciliation({ vehicleId: editingSummary.vehicleId, date: editingSummary.date, openingCash: editData.isNoService ? 0 : editData.openingCash, remark: editData.remark, denominations: editData.isNoService ? {} : editData.denominations, shift: 1, isNoService: editData.isNoService || false, storeId: storeFilterId });
       toast.success('Updated'); setShowEditModal(false); fetchSummaries(); fetchStoreRegister();
     } catch (error) { toast.error('Failed'); } finally { setIsSubmitting(false); }
   };
@@ -435,6 +474,18 @@ export default function AdminCashManagementContent() {
       await adminDeleteReconciliation(deletingSummary.vehicleId, deletingSummary.date);
       toast.success('Deleted'); setShowDeleteModal(false); fetchSummaries(); fetchStoreRegister();
     } catch (error) { toast.error('Failed'); } finally { setIsDeleting(false); }
+  };
+
+  const handleExportExcel = () => {
+    exportReportToExcel('cash-reconciliation', filteredSummaries);
+  };
+
+  const handleExportPDF = () => {
+    generateReportPDF('cash-reconciliation', filteredSummaries);
+  };
+
+  const handlePrint = () => {
+    generateReportPDF('cash-reconciliation', filteredSummaries, true);
   };
 
   const filteredSummaries = summaries.filter(s => {
@@ -552,20 +603,6 @@ export default function AdminCashManagementContent() {
     printWindow.document.close();
   };
 
-  const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN';
-  const isTenantRoute = location.pathname.includes('/tenant/');
-
-  if (isGlobalRole && isTenantRoute && !storeFilterId) {
-    return (
-      <StoreSelector
-        title="Cash Management"
-        description="Please select a store branch to manage its assigned daily shifts and cash reconciliations."
-        onSelect={(id) => {
-          setSearchParams({ storeId: id });
-        }}
-      />
-    );
-  }
 
   if (viewingSummary) {
     return (
@@ -579,6 +616,21 @@ export default function AdminCashManagementContent() {
           handleDenominationChange={handleDenominationChange} handleReviewClosing={handleReviewClosing}
           isSubmitting={isSubmitting}
           can={can}
+        />
+      </div>
+    );
+  }
+
+  if (viewingAssignFloat) {
+    return (
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <AssignFloatView 
+          onClose={() => setViewingAssignFloat(false)}
+          assignmentData={assignmentData} setAssignmentData={setAssignmentData}
+          vehicles={vehicles} summaries={summaries}
+          handleDenominationChange={handleDenominationChange}
+          handleAssignFloat={handleAssignFloat}
+          isSubmitting={isSubmitting}
         />
       </div>
     );
@@ -729,11 +781,48 @@ export default function AdminCashManagementContent() {
       ) : (
         <div className="p-4 sm:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-700 bg-gray-50/30 min-h-screen">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div>
-              <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-                <Coins className="text-emerald-500" size={32} /> Cash Management
-              </h1>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Daily Reconciliation & Safe Control</p>
+            <div className="flex items-center gap-4">
+              {searchParams.get('storeId') && stores.length > 1 && (
+                <button
+                  onClick={() => setSearchParams({})}
+                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                  title="Back to All Branches"
+                >
+                  <ChevronLeft size={20} />
+                </button>
+              )}
+              <div>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
+                    <Coins className="text-emerald-500" size={32} /> Cash Management
+                  </h1>
+                  {stores.length > 1 && (
+                    <select
+                      value={searchParams.get('storeId') || ''}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          setSearchParams({ storeId: e.target.value });
+                        } else {
+                          setSearchParams({});
+                        }
+                      }}
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                      style={{
+                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                        backgroundPosition: 'right 0.35rem center',
+                        backgroundRepeat: 'no-repeat',
+                        backgroundSize: '1.1rem'
+                      }}
+                    >
+                      <option value="">All Branches</option>
+                      {stores.map(s => (
+                        <option key={s.id} value={s.id}>{s.name}</option>
+                      ))}
+                    </select>
+                  )}
+                </div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Daily Reconciliation & Safe Control</p>
+              </div>
             </div>
             <div className="flex items-center gap-3">
               <div className="relative group">
@@ -744,15 +833,38 @@ export default function AdminCashManagementContent() {
                 />
               </div>
               {can('CASH', 'CREATE', 'RECONCILIATION') && (
-                <button 
-                  onClick={() => {
-                    if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') return toast.error('Initialize Safe first');
-                    setShowAssignModal(true);
-                  }}
-                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
-                >
-                  <Plus size={18} strokeWidth={3} /> Assign Float
-                </button>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={handleExportPDF}
+                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+                    title="Export PDF"
+                  >
+                    <FileText size={18} />
+                  </button>
+                  <button
+                    onClick={handlePrint}
+                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+                    title="Print Report"
+                  >
+                    <Printer size={18} />
+                  </button>
+                  <button
+                    onClick={handleExportExcel}
+                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
+                    title="Export Excel"
+                  >
+                    <Download size={18} />
+                  </button>
+                  <button 
+                    onClick={() => {
+                      if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') return toast.error('Initialize Safe first');
+                      setViewingAssignFloat(true);
+                    }}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                  >
+                    <Plus size={18} strokeWidth={3} /> Assign Float
+                  </button>
+                </div>
               )}
             </div>
           </div>
@@ -760,6 +872,7 @@ export default function AdminCashManagementContent() {
           {canViewCashSection('STORE_SAFE') || canViewCashSection('SHIFT_DEPOSIT') || canViewCashSection('LIVE_CASH') ? (
             <StoreSafeHeader 
               storeRegisterData={storeRegisterData} summaries={summaries} user={user}
+              storeLoading={storeLoading}
               setShowOpenStoreModal={setShowOpenStoreModal} setShowDepositModal={setShowDepositModal}
               setShowSafeMovementModal={setShowSafeMovementModal} setShowBankModal={setShowBankModal}
               setShowCloseStoreModal={setShowCloseStoreModal} setShowEditStoreModal={setShowEditStoreModal}
@@ -771,8 +884,6 @@ export default function AdminCashManagementContent() {
               canViewCashSection={canViewCashSection}
             />
           ) : null}
-
-          <SimulatorTools resetStoreCashRegister={resetStoreCashRegister} fetchStoreRegister={fetchStoreRegister} date={date} setDate={setDate} toast={toast} />
 
           {availableTabs.length > 0 && (
             <div className="space-y-6">
@@ -823,7 +934,6 @@ export default function AdminCashManagementContent() {
       <SafeMovementModal show={showSafeMovementModal} setShow={setShowSafeMovementModal} safeMovementData={safeMovementData} setSafeMovementData={setSafeMovementData} handleDenominationChange={handleDenominationChange} handleSafeMovement={handleSafeMovement} isSubmitting={isSubmitting} storeRegisterData={storeRegisterData} />
       <BankDepositModal show={showBankModal} setShow={setShowBankModal} bankData={bankData} setBankData={setBankData} storeRegisterData={storeRegisterData} user={user} handleCreateBankDeposit={handleCreateBankDeposit} isSubmitting={isSubmitting} setPreviewImage={setPreviewImage} adminAPI={adminAPI} toast={toast} />
       <DepositConfirmModal show={showDepositConfirmModal} setShow={setShowDepositConfirmModal} depositConfirmData={depositConfirmData} handleConfirmDeposit={handleConfirmDeposit} isSubmitting={isSubmitting} />
-      <AssignFloatModal show={showAssignModal} setShow={setShowAssignModal} assignmentData={assignmentData} setAssignmentData={setAssignmentData} vehicles={vehicles} summaries={summaries} handleDenominationChange={handleDenominationChange} handleAssignFloat={handleAssignFloat} isSubmitting={isSubmitting} />
       <EditReconciliationModal show={showEditModal} setShow={setShowEditModal} editData={editData} setEditData={setEditData} editingSummary={editingSummary} handleDenominationChange={handleDenominationChange} handleUpdateReconciliation={handleUpdateReconciliation} isSubmitting={isSubmitting} />
       <DeleteModal show={showDeleteModal} setShow={setShowDeleteModal} deletingSummary={deletingSummary} handleDelete={handleDeleteReconciliation} isDeleting={isDeleting} />
       <UnapprovedWarningModal show={showUnapprovedWarning} setShow={setShowUnapprovedWarning} unapprovedInfo={unapprovedInfo} depositData={depositData} setDepositData={setDepositData} handleInitiateDeposit={handleInitiateDeposit} isSubmitting={isSubmitting} toast={toast} />

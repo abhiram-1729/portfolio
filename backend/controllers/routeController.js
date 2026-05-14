@@ -149,6 +149,12 @@ export const markCoverage = async (req, res, next) => {
         const activeShift = shifts.find(s => s.id === shiftId || s.name === shiftName || s.name.toUpperCase() === slot);
 
         const effectiveShiftName = activeShift ? activeShift.name : slot;
+        
+        if (!effectiveShiftName || typeof effectiveShiftName !== 'string') {
+            console.error('[MarkCoverage] Invalid Shift Name:', { effectiveShiftName, slot, shiftId, shiftName });
+            res.status(400);
+            throw new Error('Valid shift name or slot is required');
+        }
 
         // Upsert DailyCoverage record
         const existing = await prisma.dailyCoverage.findUnique({
@@ -166,7 +172,7 @@ export const markCoverage = async (req, res, next) => {
         const eveningDone = effectiveShiftName.toUpperCase() === 'EVENING' || !!shiftStatus['Evening'];
 
         // Calculate overall status
-        const allDone = shifts.every(s => shiftStatus[s.name]);
+        const allDone = shifts && shifts.length > 0 ? shifts.every(s => shiftStatus[s.name]) : true;
         const coverageStatus = allDone ? 'BOTH_DONE' : (Object.keys(shiftStatus).length > 0 ? 'PARTIAL' : 'PENDING');
 
         const coverage = await prisma.dailyCoverage.upsert({
@@ -341,20 +347,20 @@ export const locationCheckIn = async (req, res, next) => {
             );
 
             if (shiftConfig && shiftConfig.startTime) {
-                // threshold = start time + 2.5 hours (matching legacy 8:00 -> 10:30 window)
+                // threshold = start time + 60 minutes (1 hour grace period)
                 const [sHour, sMin] = shiftConfig.startTime.split(':').map(Number);
                 const thresholdTime = new Date(now);
                 thresholdTime.setHours(sHour, sMin, 0, 0);
-                thresholdTime.setMinutes(thresholdTime.getMinutes() + 150); // + 2.5 hours
+                thresholdTime.setMinutes(thresholdTime.getMinutes() + 60); // + 60 minutes
 
                 if (now <= thresholdTime) {
                     status = "ON_TIME";
                 }
             }
         } else {
-            // Legacy fallback if no active shift found
+            // Legacy fallback: within 1 hour of typical 8:00 AM start
             const hour = now.getHours();
-            status = (hour >= 6 && (hour < 10 || (hour === 10 && now.getMinutes() <= 30))) ? "ON_TIME" : "LATE";
+            status = (hour >= 6 && hour <= 9) ? "ON_TIME" : "LATE";
         }
 
         // Validate location match

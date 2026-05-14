@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Store, Plus, Search, Edit2, Trash2, MapPin, Users, Truck, Loader2, Link, Briefcase, BarChart3, ChevronRight, LayoutDashboard } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import adminAPI from '../../services/adminService';
 import toast from 'react-hot-toast';
+import { useUserStore } from '../../store/userStore';
 
 export default function TenantStores() {
   const [stores, setStores] = useState([]);
@@ -12,6 +13,11 @@ export default function TenantStores() {
   const [formData, setFormData] = useState({ id: '', name: '', code: '', stateCode: '', hubCode: '', address: '', contactEmail: '', contactPhone: '', status: 'ACTIVE' });
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+  const location = useLocation();
+  const user = useUserStore(s => s.user);
+  
+  const isAdminPortal = location.pathname.startsWith('/admin');
+  const routePrefix = isAdminPortal ? '/admin' : '/tenant';
 
   const fetchStores = async () => {
     try {
@@ -216,19 +222,19 @@ export default function TenantStores() {
 
                 <div className="mt-4 pt-4 border-t border-slate-100/50">
                   <div className="grid grid-cols-2 gap-2">
-                    <button onClick={() => navigate(`/tenant/admins?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
+                    <button onClick={() => navigate(`${routePrefix}/admins?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
                       <div className="flex items-center gap-2"><Briefcase size={14} className="text-emerald-600" /><span className="text-[10px] font-bold">Manage Admins</span></div>
                       <ChevronRight size={12} className="text-slate-400 group-hover/btn:text-emerald-600" />
                     </button>
-                    <button onClick={() => navigate(`/tenant/users?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
+                    <button onClick={() => navigate(`${routePrefix}/users?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
                       <div className="flex items-center gap-2"><Users size={14} className="text-blue-600" /><span className="text-[10px] font-bold">View Staff</span></div>
                       <ChevronRight size={12} className="text-slate-400 group-hover/btn:text-emerald-600" />
                     </button>
-                    <button onClick={() => navigate(`/tenant/vehicles?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
+                    <button onClick={() => navigate(`${routePrefix}/vehicles?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
                       <div className="flex items-center gap-2"><Truck size={14} className="text-orange-600" /><span className="text-[10px] font-bold">Fleet Tracking</span></div>
                       <ChevronRight size={12} className="text-slate-400 group-hover/btn:text-emerald-600" />
                     </button>
-                    <button onClick={() => navigate(`/tenant/reports?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
+                    <button onClick={() => navigate(`${routePrefix}/reports?storeId=${store.id}`)} className="flex items-center justify-between p-2.5 bg-slate-50 hover:bg-emerald-50 text-slate-600 hover:text-emerald-700 rounded-xl transition-colors group/btn">
                       <div className="flex items-center gap-2"><BarChart3 size={14} className="text-indigo-600" /><span className="text-[10px] font-bold">Analytics</span></div>
                       <ChevronRight size={12} className="text-slate-400 group-hover/btn:text-emerald-600" />
                     </button>

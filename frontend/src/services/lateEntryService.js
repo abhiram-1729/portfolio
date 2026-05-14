@@ -23,6 +23,11 @@ const lateEntryService = {
     return response.data;
   },
 
+  updateRecord: async (id, updateData) => {
+    const response = await api.patch(`/late-entry/${id}`, updateData);
+    return response.data;
+  },
+
   // Exceptions
   requestException: async (exceptionData) => {
     const response = await api.post('/late-entry/exception', exceptionData);
@@ -46,8 +51,8 @@ const lateEntryService = {
     return response.data;
   },
 
-  getTopOffenders: async () => {
-    const response = await api.get('/late-entry/analytics/top-offenders');
+  getTopOffenders: async (params) => {
+    const response = await api.get('/late-entry/analytics/top-offenders', { params });
     return response.data;
   }
 };

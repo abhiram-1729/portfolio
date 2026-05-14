@@ -15,7 +15,12 @@ import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
+import * as adminStoreCtr from '../controllers/admin/storeController.js';
 import * as mediaCtr from '../controllers/admin/mediaController.js';
+import * as vehicleTripCtr from '../controllers/admin/vehicleTripController.js';
+import * as fuelCtr from '../controllers/admin/fuelController.js';
+import * as maintenanceCtr from '../controllers/admin/maintenanceController.js';
+import * as vehDmgCtr from '../controllers/admin/vehicleDamageController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
@@ -43,6 +48,11 @@ router.route('/users')
 router.route('/users/:id')
   .put(userCtr.updateUser)
   .delete(userCtr.deactivateUser);
+router.post('/users/:userId/documents', uploadMiddleware.single('document'), userCtr.uploadUserDocument);
+router.put('/users/documents/:documentId', userCtr.updateUserDocumentStatus);
+router.route('/users/shifts')
+  .get(userCtr.getShifts)
+  .post(userCtr.createShift);
 
 // Vehicles
 router.route('/vehicles')
@@ -67,9 +77,23 @@ router.route('/vehicles/:id')
   )
   .delete(vehicleCtr.deleteVehicle);
 router.put('/vehicles/:id/assign', vehicleCtr.assignDriver);
+router.post('/vehicles/:id/handover', vehicleCtr.executeVehicleHandover);
+router.get('/vehicles/:id/stock', vehicleCtr.getVehicleStock);
 router.get('/vehicles/:id/sales', vehicleCtr.getVehicleSales);
 
+// Vehicle Operations
+router.get('/vehicles/ops/trips', vehicleTripCtr.getTrips);
+router.post('/vehicles/ops/trips/start', vehicleTripCtr.startTrip);
+router.put('/vehicles/ops/trips/:id/end', vehicleTripCtr.endTrip);
+
+router.get('/vehicles/ops/fuel', fuelCtr.getFuelLogs);
+router.post('/vehicles/ops/fuel', uploadMiddleware.single('billImage'), fuelCtr.addFuelLog);
+
+router.get('/vehicles/ops/maintenance', maintenanceCtr.getMaintenanceLogs);
+router.post('/vehicles/ops/maintenance', uploadMiddleware.single('billImage'), maintenanceCtr.addMaintenanceLog);
+
 // Inventory (Item Master & Stocking)
+router.get('/inventory/init', inventoryCtr.getInventoryInitData);
 router.route('/inventory/items')
   .get(inventoryCtr.getItems)
   .post(
@@ -77,6 +101,7 @@ router.route('/inventory/items')
     inventoryCtr.createItem
   );
 router.post('/inventory/items/bulk', inventoryCtr.bulkCreateItems);
+router.post('/inventory/items/bulk-import', inventoryCtr.bulkImportItems);
 router.post('/inventory/items/bulk-delete', inventoryCtr.bulkDeleteItems);
 router.post('/inventory/items/zip-import', zipUpload.single('zipFile'), inventoryCtr.importZipInventory);
 router.route('/inventory/items/:id')
@@ -98,6 +123,7 @@ router.put('/inventory/refills/:id/reject', inventoryCtr.rejectRefillRequest);
 
 // Sales History
 router.get('/sales', salesCtr.getSalesHistory);
+router.post('/sales', salesCtr.createManualSale);
 
 // Reports
 router.get('/reports/daily', reportCtr.getDailyReport);
@@ -114,6 +140,7 @@ router.get('/reports/category-wise', reportCtr.getCategoryWiseReport);
 router.get('/reports/returns', reportCtr.getReturnReport);
 router.get('/reports/sessions', reportCtr.getSessionReport);
 router.get('/reports/vehicle-all', reportCtr.getAllVehiclePerformance);
+router.get('/reports/day-detailed', reportCtr.getDayDetailedSales);
 
 // Activity Logs
 router.get('/activities', activityCtr.getActivityLogs);
@@ -195,5 +222,26 @@ router.put('/assets/issues/:id', assetCtr.updateIssueStatus);
 router.get('/assets/requests', assetCtr.getAssetRequests);
 router.put('/assets/requests/:id', assetCtr.updateAssetRequestStatus);
 router.get('/assets/reports', assetCtr.getAssetReports);
+
+// Module 14 Enterprise Asset Extensions
+router.put('/assets/vehicle-mapping', assetCtr.updateAssetVehicleMapping);
+router.get('/assets/depreciation', assetCtr.getDepreciationSchedules);
+router.post('/assets/depreciation', assetCtr.saveDepreciationSchedule);
+router.get('/assets/audits', assetCtr.getAssetAudits);
+router.post('/assets/audits', assetCtr.createAssetAudit);
+
+// Organization Stores (Admin specific)
+router.route('/stores')
+  .get(adminStoreCtr.getAdminStores)
+  .post(adminStoreCtr.createAdminStore);
+router.route('/stores/:id')
+  .put(adminStoreCtr.updateAdminStore)
+  .delete(adminStoreCtr.deleteAdminStore);
+
+// Vehicle Damage CRUD (Separate from general damage flow)
+router.get('/vehicle-damages', vehDmgCtr.getVehicleDamages);
+router.post('/vehicle-damages', uploadMiddleware.array('images', 5), vehDmgCtr.createVehicleDamage);
+router.put('/vehicle-damages/:id', uploadMiddleware.array('images', 5), vehDmgCtr.updateVehicleDamage);
+router.delete('/vehicle-damages/:id', vehDmgCtr.deleteVehicleDamage);
 
 export default router;

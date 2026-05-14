@@ -49,6 +49,7 @@ export const useUserStore = create(
 
         // If a specific section is provided, check its granular permissions
         if (section) {
+          if (section === 'MAIN_MASTER') return true;
           const sectionPerms = user.permissions?.[`${module}_SECTIONS`]?.[section] || [];
           return sectionPerms.includes(action);
         }

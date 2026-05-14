@@ -26,6 +26,7 @@ import villageActivityRoutes from './routes/villageActivityRoutes.js';
 import locationRoutes from './routes/locationRoutes.js';
 import refillRoutes from './routes/refillRoutes.js';
 import lateEntryRoutes from './routes/lateEntryRoutes.js';
+import customerRoutes from './routes/customerRoutes.js';
 import { errorHandler } from './middleware/errorMiddleware.js';
 
 dotenv.config();
@@ -79,6 +80,7 @@ apiRouter.use('/village-activities', villageActivityRoutes);
 apiRouter.use('/location', locationRoutes);
 apiRouter.use('/refills', refillRoutes);
 apiRouter.use('/late-entry', lateEntryRoutes);
+apiRouter.use('/customers', customerRoutes);
 
 // Mount the apiRouter both WITH and WITHOUT /api prefix
 // This ensures compatibility with proxies that might or might not strip the prefix
@@ -106,4 +108,6 @@ apiRouter.get('/', (req, res) => {
 app.use(errorHandler);
 
 export default app;
-// lslsl
+// Force nodemon restart
+
+// restart2

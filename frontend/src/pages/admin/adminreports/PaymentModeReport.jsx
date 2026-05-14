@@ -17,7 +17,7 @@ export default function PaymentModeReport() {
     setIsLoading(true);
     try {
       const res = await adminAPI.getPaymentReport({ storeId });
-      setReportData(res.data);
+      setReportData(res.data.paymentSplits || {});
     } catch (error) {
       toast.error('Failed to load payment mode data');
     } finally {

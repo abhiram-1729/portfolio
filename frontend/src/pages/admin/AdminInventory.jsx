@@ -1,5 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2, Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode, RefreshCw, Camera, PlusCircle, CheckCircle2, AlertCircle, ClipboardList } from 'lucide-react';
+import {
+  Plus, Minus, Package, Truck, ArrowDownCircle, ArrowUpCircle, Search, Filter, X, Loader2,
+  Pencil, Trash2, Gift, FileText, CheckSquare, Square, ArrowLeft, Grid, Check, Barcode,
+  RefreshCw, ScanBarcode, ClipboardList, CheckCircle, Camera, PlusCircle, CheckCircle2, AlertCircle,
+  Building2, ArrowRight, ChevronLeft
+} from 'lucide-react';
 import { BrowserMultiFormatReader, BarcodeFormat } from '@zxing/browser';
 import { DecodeHintType } from '@zxing/library';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
@@ -22,6 +27,9 @@ import RefillsSection from './admin_inventory/RefillsSection';
 import OpeningStockSection from './admin_inventory/OpeningStockSection';
 import CreateItemView from './admin_inventory/CreateItemView';
 import EditItemView from './admin_inventory/EditItemView';
+import TripManagementSection from './admin_inventory/TripManagementSection';
+import FuelLogsSection from './admin_inventory/FuelLogsSection';
+import MaintenanceSection from './admin_inventory/MaintenanceSection';
 
 export default function AdminInventory() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -39,6 +47,9 @@ export default function AdminInventory() {
     params.set('sub', sub);
     setSearchParams(params);
   }, [searchParams, setSearchParams]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [trackingSearch, setTrackingSearch] = useState('');
   const [masterSearch, setMasterSearch] = useState('');
   const [warehouseSearch, setWarehouseSearch] = useState('');
   const [auditSearch, setAuditSearch] = useState('');
@@ -48,7 +59,7 @@ export default function AdminInventory() {
   const [opsSearch, setOpsSearch] = useState('');
   const [returnSearch, setReturnSearch] = useState('');
   const [openingSearch, setOpeningSearch] = useState('');
-
+  const [refillSearch, setRefillSearch] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [masterCategory, setMasterCategory] = useState('ALL');
   const [warehouseCategory, setWarehouseCategory] = useState('ALL');
@@ -82,13 +93,23 @@ export default function AdminInventory() {
   const [viewingAgentId, setViewingAgentId] = useState(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
+  const [sales, setSales] = useState([]);
+  const [users, setUsers] = useState([]);
 
-  const storeFilterId = searchParams.get('storeId');
   const location = useLocation();
-  const isTenantRoute = location.pathname.includes('/tenant/');
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
+  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN';
+  const storeIdParam = searchParams.get('storeId');
+  const storeFilterId = storeIdParam || (!isGlobalRole ? currentUser?.storeId : (stores.length === 1 ? stores[0].id : null));
   const [showScanner, setShowScanner] = useState(false);
+  const [showRegistryModal, setShowRegistryModal] = useState(false); // Deprecated but keeping state for now if needed elsewhere
+  const [isRegistryView, setIsRegistryView] = useState(false);
+  const [registryItems, setRegistryItems] = useState([]);
+  const [loadingRegistry, setLoadingRegistry] = useState(false);
+  const [selectedRegistryIds, setSelectedRegistryIds] = useState([]);
+  const [registrySearch, setRegistrySearch] = useState('');
+  const [registryQuantities, setRegistryQuantities] = useState({}); // { [productId]: quantity }
   const [scannerTarget, setScannerTarget] = useState('create');
 
   // States for stock actions
@@ -102,6 +123,7 @@ export default function AdminInventory() {
   const [loadingVehicles, setLoadingVehicles] = useState(false);
 
   const [allVehiclesStock, setAllVehiclesStock] = useState({}); // { [vehicleId]: inventoryList }
+  const [loadingTracking, setLoadingTracking] = useState(false);
   const [intakeItems, setIntakeItems] = useState([]); // Draft list for bulk stock intake
   const [intakeQuantities, setIntakeQuantities] = useState({}); // { productId: quantity }
   const [quickIntake, setQuickIntake] = useState({ productId: '', quantity: '' });
@@ -171,48 +193,87 @@ export default function AdminInventory() {
     minShopAmount: '0',
     status: 'ACTIVE',
     barcode: '',
-    skuCode: ''
+    skuCode: '',
+    stock: ''
   });
+
+  useEffect(() => {
+    setViewingAgentId(null);
+  }, [subTab]);
 
   const fetchData = async () => {
     try {
+      setLoading(true);
       setLoadingMaster(true);
       setLoadingInventory(true);
       setLoadingRefills(true);
       setLoadingAudit(true);
       setLoadingVehicles(true);
 
-      const [iRes, vRes, sRes, cRes, uRes, subRes, storeRes, aRes, stockRes] = await Promise.all([
-        adminAPI.getItems({ storeId: storeFilterId }).finally(() => setLoadingMaster(false)),
-        adminAPI.getVehicles({ storeId: storeFilterId }).finally(() => setLoadingVehicles(false)),
-        adminAPI.getSettings(),
-        adminAPI.getCategories(),
-        adminAPI.getUnits(),
-        adminAPI.getSubCategories(),
+      // Clear states to avoid showing old data from previous store selection (glitch fix)
+      setItems([]);
+      setVehicles([]);
+      setAuditHistory([]);
+      setWarehouseStock([]);
+      setSales([]);
+      setUsers([]);
+      setRegistryItems([]);
+      setRefillRequests([]);
+      setRefillSearch('');
+      setAllVehiclesStock({});
+      setIntakeItems([]);
+      setVehicleInventory([]);
+
+      // 1. Primary Mega-Fetch (Consolidated from newexpenses)
+      const { data: initData } = await adminAPI.getInventoryInit({ 
+        storeId: activeTab === 'main_master' ? undefined : storeFilterId 
+      });
+      
+      if (initData?.success) {
+        setItems(initData.items || []);
+        setVehicles(initData.vehicles || []);
+        setCategories(initData.categories || []);
+        setSubCategories(initData.subCategories || []);
+        setUnits(initData.units || []);
+        setRefillRequests(initData.refillRequests || []);
+        setAllVehiclesStock(initData.vehicleStock || {});
+
+        const settings = initData.settings?.find(s => s.storeId === storeFilterId) || initData.settings?.[0];
+        if (settings?.taxRates) {
+          setTaxRates(settings.taxRates.split(',').map(r => r.trim()));
+        } else {
+          setTaxRates(['0', '5', '12', '18']); // Default fallback
+        }
+      }
+
+      // 2. Secondary Fetches (Settled so one failure doesn't crash the page)
+      const results = await Promise.allSettled([
+        adminAPI.getAuditHistory({ storeId: storeFilterId }),
+        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }) : Promise.resolve({ data: [] }),
         adminAPI.getStores(),
-        adminAPI.getAuditHistory({ storeId: storeFilterId }).finally(() => setLoadingAudit(false)),
-        activeTab === 'inventory' ? procurementAPI.getStockReport({ storeId: storeFilterId }).finally(() => setLoadingInventory(false)) : Promise.resolve({ data: [] })
+        adminAPI.getSales().catch(() => ({ data: [] })),
+        adminAPI.getUsers().catch(() => ({ data: [] }))
       ]);
 
-      // Handle refills separately if it exists in another call or similar
-      // For now we assume refills come from another source or are part of these responses
-      setLoadingRefills(false);
-
-      setItems(iRes.data);
-      setVehicles(vRes.data);
-      setAuditHistory(aRes.data || []);
-      setCategories(cRes.data || []);
-      setSubCategories(subRes.data || []);
-      setUnits(uRes.data || []);
-      setWarehouseStock(stockRes.data || []);
-      if (sRes.data?.success && sRes.data?.data?.taxRates) {
-        setTaxRates(sRes.data.data.taxRates.split(',').map(r => r.trim()));
+      // Process settled results
+      if (results[0].status === 'fulfilled') setAuditHistory(results[0].value.data || []);
+      if (results[1].status === 'fulfilled') setWarehouseStock(results[1].value.data || []);
+      if (results[2].status === 'fulfilled' && results[2].value.data?.success) {
+        const fetchedStores = results[2].value.data.data;
+        setStores(fetchedStores);
+        // Auto-select if only one store exists (HEAD logic)
+        if (fetchedStores.length === 1 && !storeFilterId) {
+          const params = new URLSearchParams(searchParams);
+          params.set('storeId', fetchedStores[0].id);
+          setSearchParams(params);
+        }
       }
-      if (storeRes.data?.success) {
-        setStores(storeRes.data.data);
-      }
+      if (results[3].status === 'fulfilled') setSales(results[3].value.data || []);
+      if (results[4].status === 'fulfilled') setUsers(results[4].value.data || []);
     } catch (error) {
-      toast.error('Failed to fetch inventory data');
+      console.error('❌ fetchData Error:', error);
+      const msg = error.response?.data?.message || 'Failed to fetch inventory data';
+      toast.error(msg);
     } finally {
       setLoading(false);
       setLoadingMaster(false);
@@ -227,9 +288,70 @@ export default function AdminInventory() {
     fetchData();
   }, [storeFilterId, activeTab]);
 
+  const fetchRegistry = async () => {
+    try {
+      setLoadingRegistry(true);
+      // Clear previous registry items
+      setRegistryItems([]);
+      const res = await adminAPI.getItems({ all: 'true' });
+      // Filter out items already in this store
+      const currentItemNames = new Set(items.map(i => i.name.toLowerCase()));
+      const available = res.data.filter(item => !currentItemNames.has(item.name.toLowerCase()));
+      setRegistryItems(available);
+    } catch (error) {
+      toast.error('Failed to fetch registry items');
+    } finally {
+      setLoadingRegistry(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isRegistryView) {
+      fetchRegistry();
+    }
+  }, [isRegistryView]);
+
+  const handleBulkImport = async () => {
+    const transfers = selectedRegistryIds.map(id => ({
+      productId: id,
+      quantity: registryQuantities[id] || 0
+    })).filter(t => t.quantity > 0);
+
+    if (transfers.length === 0) {
+      toast.error('Please specify sync quantities for selected products');
+      return;
+    }
+
+    try {
+      setIsUploading(true);
+      const res = await adminAPI.bulkImportItems({
+        transfers,
+        targetStoreId: storeFilterId
+      });
+
+      if (res.data.success) {
+        toast.success(res.data.message);
+        setIsRegistryView(false);
+        setSelectedRegistryIds([]);
+        setRegistryQuantities({});
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Import error:', error);
+      toast.error(error.response?.data?.message || 'Failed to sync products');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [masterSearch, warehouseSearch, auditSearch, masterCategory, masterSubCategory, masterStatus, masterFreeOnly, activeTab, subTab]);
+  }, [
+    masterSearch, warehouseSearch, auditSearch, opsSearch, returnSearch,
+    intakeSearch, vehicleSearch, trackingSearch, openingSearch,
+    masterCategory, masterSubCategory, masterStatus, masterFreeOnly,
+    activeTab, subTab
+  ]);
 
   const handleQuantityChange = React.useCallback((id, val) => {
     setStockQuantities(prev => ({ ...prev, [id]: val }));
@@ -318,23 +440,35 @@ export default function AdminInventory() {
     });
   }, [stockQuantities, vehicleInventoryMap]);
 
+  const hasInvalidRegistryQuantities = React.useMemo(() => {
+    return Object.entries(registryQuantities).some(([pid, qty]) => {
+      const prod = registryItems.find(p => p.id === pid);
+      return prod && (parseInt(qty) || 0) > (prod.stock || 0);
+    });
+  }, [registryQuantities, registryItems]);
+
   const groupedRefills = React.useMemo(() => {
     const groups = {};
     (refillRequests || []).forEach(req => {
-      // Use both name and ID for more reliable grouping if ID is missing from old records
-      const userId = req.user?.id || req.user?.name || 'unknown';
-      if (!groups[userId]) {
-        groups[userId] = {
+      const uId = req.user?.id || req.user?.name || 'unknown';
+      const vId = req.vehicleId || req.vehicle?.id || 'unknown';
+      const groupKey = `${uId}_${vId}`;
+
+      if (!groups[groupKey]) {
+        groups[groupKey] = {
           user: req.user,
           vehicle: req.vehicle,
           requests: [],
-          latestDate: new Date(req.createdAt)
+          latestDate: new Date(req.createdAt),
+          vehicleId: vId,
+          userId: uId,
+          id: groupKey
         };
       }
-      groups[userId].requests.push(req);
+      groups[groupKey].requests.push(req);
       const reqDate = new Date(req.createdAt);
-      if (reqDate > groups[userId].latestDate) {
-        groups[userId].latestDate = reqDate;
+      if (reqDate > groups[groupKey].latestDate) {
+        groups[groupKey].latestDate = reqDate;
       }
     });
 
@@ -344,11 +478,11 @@ export default function AdminInventory() {
     });
 
     return Object.values(groups).sort((a, b) => b.latestDate - a.latestDate);
-  }, [refillRequests]);
+  }, [refillRequests, vehicles, users]);
 
   const activeRefillGroup = React.useMemo(() => {
     if (!viewingAgentId) return null;
-    return groupedRefills.find(g => (g.user?.id || g.user?.name || 'unknown') === viewingAgentId);
+    return groupedRefills.find(g => g.id === viewingAgentId);
   }, [groupedRefills, viewingAgentId]);
 
   useEffect(() => {
@@ -378,23 +512,38 @@ export default function AdminInventory() {
     }
   };
 
-  const loadAllVehiclesStock = async () => {
+  const loadAllVehiclesStock = async (force = false) => {
     if (vehicles.length === 0) return;
-    try {
-      // Fetch sequentially to prevent connection pool exhaustion (500 errors)
-      const stockRes = [];
-      for (const v of vehicles) {
-        const res = await adminAPI.getVehicleInventory(v.id);
-        stockRes.push({ id: v.id, data: res.data });
-      }
+    
+    // Skip if we already have data from the Mega-Fetch (unless forced)
+    if (!force && Object.keys(allVehiclesStock).length > 0) return;
 
+    try {
+      // Use Promise.allSettled for much faster parallel fetching than the previous sequential loop
+      const results = await Promise.allSettled(vehicles.map(v => adminAPI.getVehicleInventory(v.id)));
+      
       const stockMap = {};
-      stockRes.forEach(r => {
-        stockMap[r.id] = r.data;
+      results.forEach((res, idx) => {
+        if (res.status === 'fulfilled') {
+          stockMap[vehicles[idx].id] = res.value.data;
+        }
       });
-      setAllVehiclesStock(stockMap);
+      
+      setAllVehiclesStock(prev => ({ ...prev, ...stockMap }));
     } catch (err) {
+      console.error('❌ loadAllVehiclesStock Error:', err);
       toast.error('Failed to load tracking data for all vehicles');
+    } finally {
+      setLoadingTracking(false);
+    }
+  };
+
+  const refreshSingleVehicleStock = async (vId) => {
+    try {
+      const res = await adminAPI.getVehicleInventory(vId);
+      setAllVehiclesStock(prev => ({ ...prev, [vId]: res.data }));
+    } catch (err) {
+      console.error(`Failed to refresh stock for vehicle ${vId}:`, err);
     }
   };
 
@@ -620,7 +769,9 @@ export default function AdminInventory() {
         isFree: false,
         minShopAmount: '0',
         status: 'ACTIVE',
-        barcode: ''
+        barcode: '',
+        skuCode: '',
+        stock: ''
       });
       fetchData();
     } catch (error) {
@@ -652,7 +803,9 @@ export default function AdminInventory() {
       gst: item.gst?.toString() || '0',
       isFree: item.isFree || false,
       minShopAmount: item.minShopAmount?.toString() || '0',
-      barcode: item.barcode || ''
+      barcode: item.barcode || '',
+      stock: (item.stock ?? item.totalStock ?? 0).toString(),
+      storeId: item.storeId || ''
     });
     setEditPreviewUrl(item.image || null);
     setIsEditView(true);
@@ -683,11 +836,7 @@ export default function AdminInventory() {
         }
       });
 
-      // Enforce storeId isolation during update
-      const currentStoreId = storeFilterId || currentUser.storeId;
-      if (currentStoreId) {
-        formData.append('storeId', currentStoreId);
-      }
+      // Store ID is already included in editItem state
 
       if (selectedEditFile) {
         formData.append('image', selectedEditFile);
@@ -815,7 +964,9 @@ export default function AdminInventory() {
       setStockQuantities({});
       setShowLoadConfirmModal(false);
     } catch (error) {
-      toast.error('Failed to load stock');
+      console.error('❌ Load Error:', error);
+      const msg = error.response?.data?.message || 'Failed to load stock';
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -854,7 +1005,9 @@ export default function AdminInventory() {
       setStockQuantities({});
       if (type === 'RETURN') fetchVehicleInventory(selectedVehicleId);
     } catch (error) {
-      toast.error(`Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`);
+      console.error(`❌ ${type} Error:`, error);
+      const msg = error.response?.data?.message || `Failed to ${type === 'LOAD' ? 'load' : 'return'} stock`;
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
@@ -881,7 +1034,10 @@ export default function AdminInventory() {
       setIsAuditMode(false);
       setAuditQuantities({});
       setAuditRemark('');
-      await loadAllVehiclesStock(); // Refresh tracking data
+
+      // OPTIMIZATION: Instead of full reload, refresh only the audited vehicle
+      await refreshSingleVehicleStock(viewingVehicleId);
+
       const aRes = await adminAPI.getAuditHistory({ storeId: storeFilterId });
       setAuditHistory(aRes.data || []);
     } catch (error) {
@@ -919,42 +1075,257 @@ export default function AdminInventory() {
   // Filter vehicles specifically for the selected store scope inside Inventory Tracking/Returns
   const activeVehicles = vehicles.filter(v => (!storeFilterId || v.storeId === storeFilterId));
 
-  const renderMaster = () => (
-    <MasterSection
-      masterSearch={masterSearch}
-      setMasterSearch={setMasterSearch}
-      setScannerTarget={setScannerTarget}
-      setShowScanner={setShowScanner}
-      masterFreeOnly={masterFreeOnly}
-      setMasterFreeOnly={setMasterFreeOnly}
-      showFilters={showFilters}
-      setShowFilters={setShowFilters}
-      selectedItems={selectedItems}
-      handleBulkDelete={handleBulkDelete}
-      isUploading={isUploading}
-      masterCategory={masterCategory}
-      setMasterCategory={setMasterCategory}
-      setMasterSubCategory={setMasterSubCategory}
-      categories={categories}
-      masterSubCategory={masterSubCategory}
-      subCategories={subCategories}
-      masterStatus={masterStatus}
-      setMasterStatus={setMasterStatus}
-      filteredItems={filteredItems}
-      paginatedItems={paginatedItems}
-      toggleSelectItem={toggleSelectItem}
-      handleToggleStatus={handleToggleStatus}
-      openEditModal={openEditModal}
-      handleDeleteItem={handleDeleteItem}
-      deletingId={deletingId}
-      can={can}
-      currentPage={currentPage}
-      setCurrentPage={setCurrentPage}
-      itemsPerPage={itemsPerPage}
-      totalPages={totalPages}
-      handleSelectAll={handleSelectAll}
-    />
-  );
+  const renderMaster = () => {
+    if (isRegistryView) {
+      return (
+        <div className="flex flex-col h-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+          {/* Registry Header */}
+          <div className="mb-6 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => { setIsRegistryView(false); setSelectedRegistryIds([]); }}
+                className="w-10 h-10 rounded-xl bg-gray-50 text-gray-400 flex items-center justify-center hover:bg-indigo-50 hover:text-indigo-600 transition-all border border-gray-100 shadow-sm"
+              >
+                <ChevronLeft size={20} />
+              </button>
+              <div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight leading-none mb-1">Global Product Registry</h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Select products from Main Master to import into this branch</p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 bg-white px-4 py-2.5 rounded-2xl border border-gray-100 shadow-sm focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all w-full max-w-md">
+              <Search size={16} className="text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search Registry..."
+                value={registrySearch}
+                onChange={(e) => setRegistrySearch(e.target.value)}
+                className="flex-1 bg-transparent border-none focus:outline-none text-[11px] font-black uppercase tracking-tight"
+              />
+            </div>
+          </div>
+
+          {/* Registry Table Content */}
+          <div className="flex-1 overflow-auto bg-white rounded-[2rem] border border-gray-100 shadow-sm relative no-scrollbar">
+            {loadingRegistry ? (
+              <div className="flex flex-col items-center justify-center h-64 gap-4">
+                <Loader2 size={40} className="animate-spin text-emerald-500" />
+                <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest animate-pulse">Syncing Global Catalog...</p>
+              </div>
+            ) : registryItems.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-64 text-center">
+                <div className="w-20 h-20 bg-gray-50 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-gray-100">
+                  <Package size={32} className="text-gray-200" />
+                </div>
+                <h4 className="text-sm font-black text-gray-400 uppercase tracking-widest">Everything is in sync</h4>
+                <p className="text-[10px] font-bold text-gray-300 mt-1">All products are already present in this branch</p>
+              </div>
+            ) : (
+              <div className="min-w-[800px] p-6 pb-32">
+                <table className="w-full border-separate border-spacing-y-2">
+                  <thead className="sticky top-0 bg-white/80 backdrop-blur-md z-10">
+                    <tr className="text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] border-b border-gray-50">
+                      <th className="px-6 py-4 text-left w-16">
+                        <button
+                          onClick={() => {
+                            const allOnPage = registryItems.filter(item =>
+                              item.name.toLowerCase().includes(registrySearch.toLowerCase()) ||
+                              (item.barcode && item.barcode.includes(registrySearch))
+                            ).map(i => i.id);
+
+                            if (selectedRegistryIds.length === allOnPage.length) setSelectedRegistryIds([]);
+                            else setSelectedRegistryIds(allOnPage);
+                          }}
+                          className={`w-5 h-5 rounded-md border-2 transition-colors flex items-center justify-center ${selectedRegistryIds.length > 0 ? 'bg-emerald-600 border-emerald-600' : 'border-emerald-200 hover:border-emerald-500'}`}
+                        >
+                          {selectedRegistryIds.length > 0 && <Check size={14} className="text-white" strokeWidth={4} />}
+                        </button>
+                      </th>
+                      <th className="px-4 py-4 text-left">Product / Category</th>
+                      <th className="px-4 py-4 text-left">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-gray-900 uppercase tracking-widest">Identity & Source</span>
+                          <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none">Barcode • ID • Origin</span>
+                        </div>
+                      </th>
+                      <th className="px-4 py-4 text-center">MRP</th>
+                      <th className="px-4 py-4 text-center">Selling</th>
+                      <th className="px-4 py-4 text-center">Available</th>
+                      <th className="px-4 py-4 text-center w-32">Sync Qty</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {registryItems
+                      .filter(item =>
+                        item.name.toLowerCase().includes(registrySearch.toLowerCase()) ||
+                        (item.barcode && item.barcode.includes(registrySearch))
+                      )
+                      .map(item => {
+                        const isSelected = selectedRegistryIds.includes(item.id);
+                        return (
+                          <tr
+                            key={item.id}
+                            onClick={() => {
+                              setSelectedRegistryIds(prev =>
+                                isSelected ? prev.filter(id => id !== item.id) : [...prev, item.id]
+                              );
+                            }}
+                            className={`group cursor-pointer transition-all ${isSelected ? 'bg-emerald-50/50' : 'hover:bg-gray-50'}`}
+                          >
+                            <td className="px-6 py-4 rounded-l-[1.5rem] border-y border-l border-gray-100 group-hover:border-emerald-100 transition-colors">
+                              <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${isSelected ? 'bg-emerald-600 border-emerald-600' : 'border-gray-200'}`}>
+                                {isSelected && <Check size={14} className="text-white" strokeWidth={4} />}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 border-y border-gray-100 group-hover:border-emerald-100">
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 overflow-hidden shrink-0">
+                                  {item.image ? (
+                                    <img src={item.image} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center text-gray-300">
+                                      <Package size={18} />
+                                    </div>
+                                  )}
+                                </div>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate leading-tight mb-0.5">{item.name}</span>
+                                  <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{item.category?.name || 'Uncategorized'}</span>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 border-y border-gray-100 group-hover:border-emerald-100">
+                              <div className="flex flex-col gap-2">
+                                {/* Store Badge */}
+                                <div className="flex items-center gap-1.5">
+                                  <div className="w-4 h-4 rounded-md bg-emerald-50 flex items-center justify-center border border-emerald-100">
+                                    <Building2 size={10} className="text-emerald-600" />
+                                  </div>
+                                  <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest bg-emerald-50/50 px-2 py-0.5 rounded-full border border-emerald-100/50">
+                                    {item.storeName || 'Global Registry'}
+                                  </span>
+                                </div>
+                                
+                                {/* Barcode & ID */}
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-1.5 text-gray-400">
+                                    <Barcode size={12} className="opacity-50" />
+                                    <span className="text-[10px] font-bold text-gray-600 tracking-tight">{item.barcode || 'NO-BARCODE'}</span>
+                                  </div>
+                                  <div className="ml-[18px]">
+                                    <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest leading-none">ID: {item.displayId || 'NEW'}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 border-y border-gray-100 group-hover:border-emerald-100 text-center">
+                              <span className="text-[11px] font-black text-gray-400 line-through">₹{item.mrp || 0}</span>
+                            </td>
+                            <td className="px-4 py-4 border-y border-gray-100 group-hover:border-emerald-100 text-center">
+                              <span className="text-[12px] font-black text-emerald-600">₹{item.price || 0}</span>
+                            </td>
+                            <td className="px-4 py-4 border-y border-gray-100 group-hover:border-emerald-100 text-center">
+                              <div className="flex flex-col items-center">
+                                <span className={`text-[11px] font-black ${item.stock > 0 ? 'text-gray-900' : 'text-rose-500'}`}>{item.stock || 0}</span>
+                                <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Source</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 border-y border-r border-gray-100 rounded-r-[1.5rem] group-hover:border-emerald-100 text-center" onClick={(e) => e.stopPropagation()}>
+                              <div className={`flex items-center gap-2 bg-white border-2 rounded-xl p-1 transition-all ${isSelected ? ( (registryQuantities[item.id] || 0) > (item.stock || 0) ? 'border-rose-500 ring-4 ring-rose-500/10' : 'border-emerald-500 ring-4 ring-emerald-500/10' ) : 'border-gray-100 group-hover:border-emerald-200'}`}>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  max={item.stock}
+                                  value={registryQuantities[item.id] || ''}
+                                  onChange={(e) => {
+                                    const val = parseInt(e.target.value) || 0;
+                                    setRegistryQuantities(prev => ({ ...prev, [item.id]: val }));
+                                    if (val > 0 && !isSelected) {
+                                      setSelectedRegistryIds(prev => [...prev, item.id]);
+                                    }
+                                  }}
+                                  placeholder="0"
+                                  className="w-full bg-transparent border-none text-center text-[11px] font-black focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                />
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    }
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* Sticky Footer for Registry - TRULY FIXED TO VIEWPORT */}
+          <div className={`fixed bottom-10 left-1/2 -translate-x-1/2 w-full max-w-sm px-6 z-[200] transition-all duration-500 ${selectedRegistryIds.length > 0 ? 'translate-y-0 opacity-100 scale-100' : 'translate-y-20 opacity-0 scale-95 pointer-events-none'}`}>
+            <div className="bg-white/90 backdrop-blur-2xl p-1.5 rounded-[2rem] border-4 border-white shadow-[0_20px_50px_-12px_rgba(16,185,129,0.4)]">
+              <button
+                onClick={handleBulkImport}
+                disabled={isUploading || hasInvalidRegistryQuantities}
+                className="w-full bg-emerald-600 text-white py-3 rounded-[1.5rem] shadow-md hover:bg-emerald-700 transition-all flex items-center justify-center gap-3 font-black text-[10px] uppercase tracking-[0.2em] group relative overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-emerald-600 via-emerald-400 to-emerald-600 opacity-0 group-hover:opacity-10 transition-opacity" />
+                {isUploading ? (
+                  <Loader2 size={18} className="animate-spin" />
+                ) : (
+                  <>
+                    <div className="w-8 h-8 bg-white/20 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <CheckCircle2 size={16} />
+                    </div>
+                    <div className="flex flex-col items-start text-left leading-tight">
+                      <span className="opacity-70 font-bold tracking-widest text-[8px]">READY TO SYNC</span>
+                      <span className="tracking-normal font-black">Import {selectedRegistryIds.length} Items</span>
+                    </div>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <MasterSection
+        masterSearch={masterSearch}
+        setMasterSearch={setMasterSearch}
+        setScannerTarget={setScannerTarget}
+        setShowScanner={setShowScanner}
+        masterFreeOnly={masterFreeOnly}
+        setMasterFreeOnly={setMasterFreeOnly}
+        showFilters={showFilters}
+        setShowFilters={setShowFilters}
+        selectedItems={selectedItems}
+        handleBulkDelete={handleBulkDelete}
+        isUploading={isUploading}
+        masterCategory={masterCategory}
+        setMasterCategory={setMasterCategory}
+        setMasterSubCategory={setMasterSubCategory}
+        categories={categories}
+        masterSubCategory={masterSubCategory}
+        subCategories={subCategories}
+        masterStatus={masterStatus}
+        setMasterStatus={setMasterStatus}
+        filteredItems={filteredItems}
+        paginatedItems={paginatedItems}
+        toggleSelectItem={toggleSelectItem}
+        handleToggleStatus={handleToggleStatus}
+        openEditModal={openEditModal}
+        handleDeleteItem={handleDeleteItem}
+        deletingId={deletingId}
+        can={can}
+        currentPage={currentPage}
+        setCurrentPage={setCurrentPage}
+        itemsPerPage={itemsPerPage}
+        totalPages={totalPages}
+        handleSelectAll={handleSelectAll}
+      />
+    );
+  };
 
   const renderLoading = () => (
     <LoadingSection
@@ -1022,6 +1393,7 @@ export default function AdminInventory() {
   const renderTracking = () => (
     <VehicleStockSection
       loadingVehicles={loadingVehicles}
+      loadingTracking={loadingTracking}
       viewingVehicleId={viewingVehicleId}
       setViewingVehicleId={setViewingVehicleId}
       vehicles={vehicles}
@@ -1184,7 +1556,8 @@ export default function AdminInventory() {
       isSubmitting={isSubmitting}
       loadingRefills={loadingRefills}
       groupedRefills={groupedRefills}
-      auditSearch={auditSearch}
+      refillSearch={refillSearch}
+      setRefillSearch={setRefillSearch}
       can={can}
     />
   );
@@ -1243,19 +1616,169 @@ export default function AdminInventory() {
       taxRates={taxRates}
     />
   );
+  const renderClassifiedInventory = () => {
+    if (storeIdParam || storeFilterId || activeTab === 'main_master' || !isGlobalRole || stores.length <= 1) return null;
 
+    const salesByStore = sales.reduce((acc, s) => {
+      if (s.storeId) {
+        acc[s.storeId] = (acc[s.storeId] || 0) + (s.totalAmount || 0);
+      }
+      return acc;
+    }, {});
+
+    const ordersByStore = sales.reduce((acc, s) => {
+      if (s.storeId) {
+        acc[s.storeId] = (acc[s.storeId] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    const personnelByStore = users.reduce((acc, u) => {
+      if (u.storeId && u.id !== currentUser?.id) {
+        acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+      }
+      return acc;
+    }, {});
+
+    return (
+      <div className="space-y-8 animate-in fade-in duration-500 max-w-6xl mx-auto px-4 py-8">
+        <div className="flex flex-col gap-1">
+          <h2 className="text-3xl font-black text-gray-900 tracking-tight">Organization Inventory</h2>
+          <p className="text-sm font-medium text-gray-500 uppercase tracking-widest italic">Global Stock Distribution & Branch Oversight</p>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 max-w-5xl">
+          {stores.map(store => {
+            const totalRevenue = salesByStore[store.id] || 0;
+            const totalOrders = ordersByStore[store.id] || 0;
+            const personnelCount = personnelByStore[store.id] || 0;
+
+            return (
+              <div 
+                key={store.id}
+                onClick={() => {
+                  const params = { storeId: store.id, tab: activeTab };
+                  if (subTab) params.sub = subTab;
+                  setSearchParams(params);
+                }}
+                className="group bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm hover:shadow-2xl hover:shadow-emerald-500/10 hover:border-emerald-100 transition-all cursor-pointer relative overflow-hidden"
+              >
+                <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.08] transition-opacity">
+                  <Package size={120} />
+                </div>
+
+                <div className="relative z-10 flex items-center justify-between gap-8">
+                  <div className="flex items-center gap-6">
+                    <div className="w-16 h-16 rounded-3xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-all duration-500 shrink-0">
+                      <Building2 size={32} strokeWidth={2.5} />
+                    </div>
+                    <div className="flex flex-col">
+                      <h3 className="text-xl font-black text-gray-900 tracking-tight group-hover:text-emerald-600 transition-colors">{store.name}</h3>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-[10px] font-black px-2.5 py-0.5 bg-emerald-50 text-emerald-600 rounded-md uppercase tracking-widest">
+                          {store.code || 'BRANCH'}
+                        </span>
+                        <span className="text-xs font-bold text-gray-400 uppercase tracking-tighter flex items-center gap-1.5">
+                          • <Package size={12} /> {store.address || 'Location Unspecified'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-12">
+                    <div className="hidden lg:flex flex-col items-end">
+                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Revenue & Sales</span>
+                      <span className="text-sm font-bold text-gray-900 mt-1">₹{totalRevenue.toLocaleString()} <span className="text-[10px] text-gray-400 ml-1">({totalOrders} Orders)</span></span>
+                    </div>
+                    <div className="hidden md:flex flex-col items-end border-l border-gray-100 pl-12">
+                      <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Team size</span>
+                      <span className="text-sm font-bold text-gray-900 mt-1">{personnelCount} Members</span>
+                    </div>
+                    <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center opacity-40 group-hover:opacity-100 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                      <ArrowRight size={24} strokeWidth={3} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const classifiedView = renderClassifiedInventory();
+  if (classifiedView) return classifiedView;
 
   return (
     <>
       {isCreateView && renderCreateItemView()}
       {isEditView && renderEditItemView()}
       {!isCreateView && !isEditView && (
-        <div className="space-y-6">
+    <div key={storeFilterId} className="space-y-6">
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-bold text-gray-900">
-                {activeTab === 'inventory' ? '' : 'Inventory Management'}
-              </h2>
+              <div className="flex items-center gap-3 flex-wrap">
+                {storeFilterId && stores.length > 1 && (
+                  <button
+                    onClick={() => {
+                      const params = { tab: activeTab };
+                      if (subTab) params.sub = subTab;
+                      setSearchParams(params);
+                    }}
+                    className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                    title="Back to Organizational Overview"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                )}
+                <h2 className="text-2xl font-bold text-gray-900">
+                  {(() => {
+                    const selectedStore = stores.find(s => s.id === storeFilterId);
+                    const storePrefix = selectedStore ? `${selectedStore.name} ` : '';
+                    let label = 'Inventory Management';
+                    if (activeTab === 'main_master') label = 'Main Master Registry';
+                    else if (activeTab === 'master') label = 'Master';
+                    else if (activeTab === 'inventory') label = 'Store Stock';
+                    else if (activeTab === 'damage') label = 'Damage';
+                    else if (activeTab === 'return') {
+                      if (subTab === 'loading') label = 'Loading';
+                      else if (subTab === 'return') label = 'Return';
+                      else if (subTab === 'tracking') label = 'Vehicle Stock';
+                      else if (subTab === 'refills') label = 'Refills';
+                      else if (subTab === 'audits') label = 'Audit History';
+                      else if (subTab === 'opening') label = 'Opening Stock';
+                      else if (subTab === 'trips') label = 'Trip Management';
+                      else if (subTab === 'fuel') label = 'Fuel Logs';
+                      else if (subTab === 'maintenance') label = 'Maintenance';
+                    }
+                    return activeTab === 'main_master' ? label : `${storePrefix}${label}`;
+                  })()}
+                </h2>
+                {stores.length > 1 && (
+                  <select
+                    value={storeFilterId || ''}
+                    onChange={(e) => {
+                      const params = { tab: activeTab };
+                      if (subTab) params.sub = subTab;
+                      if (e.target.value) params.storeId = e.target.value;
+                      setSearchParams(params);
+                    }}
+                    className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.35rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1.1rem'
+                    }}
+                  >
+                    <option value="">All Branches</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 {activeTab === 'inventory' ? (
                   <div className="flex items-center gap-3 w-full">
@@ -1282,33 +1805,6 @@ export default function AdminInventory() {
                   </div>
                 ) : (
                   <p className="text-sm text-gray-500">Track your items and vehicle stocks</p>
-                )}
-                {isTenantRoute && (
-                  <>
-                    <span className="text-gray-300">•</span>
-                    <select
-                      value={storeFilterId || ''}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setSearchParams({ storeId: e.target.value });
-                        } else {
-                          setSearchParams({});
-                        }
-                      }}
-                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 0.25rem center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1rem'
-                      }}
-                    >
-                      <option value="">All Branches</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  </>
                 )}
               </div>
             </div>
@@ -1352,6 +1848,16 @@ export default function AdminInventory() {
                     <span className="hidden md:block">Zip Import</span>
                   </button>
                 )}
+                {can('INVENTORY', 'CREATE', 'MASTER') && storeFilterId && !isRegistryView && (
+                  <button
+                    onClick={() => setIsRegistryView(true)}
+                    className="bg-indigo-50 text-indigo-600 p-3 rounded-xl border border-indigo-100 shadow-sm hover:bg-indigo-100 transition-colors flex items-center gap-2 font-bold text-sm"
+                    title="Import from Main Master"
+                  >
+                    <Grid size={24} />
+                    <span className="hidden md:block text-[11px] uppercase tracking-widest font-black">Import</span>
+                  </button>
+                )}
                 {can('INVENTORY', 'CREATE', 'MASTER') && (
                   <button
                     onClick={() => { setIsCreateView(true); setModalTab('info'); }}
@@ -1369,7 +1875,7 @@ export default function AdminInventory() {
 
           {/* Sub-tab navigation removed for sidebar dropdown */}
 
-          {activeTab === 'master' && renderMaster()}
+          {['master', 'main_master'].includes(activeTab) && renderMaster()}
           {activeTab === 'inventory' && renderInventory()}
           {activeTab === 'return' && (
             <>
@@ -1456,7 +1962,24 @@ export default function AdminInventory() {
               {subTab === 'refills' && renderRefills()}
               {subTab === 'audits' && renderAuditHistory()}
               {subTab === 'opening' && renderOpeningStock()}
+              {subTab === 'trips' && <TripManagementSection storeId={storeFilterId} vehicles={vehicles} />}
+              {subTab === 'fuel' && <FuelLogsSection storeId={storeFilterId} vehicles={vehicles} />}
+              {subTab === 'maintenance' && <MaintenanceSection storeId={storeFilterId} vehicles={vehicles} />}
             </>
+          )}
+
+          {activeTab === 'damage' && (
+            <div className="bg-white rounded-[2rem] border border-gray-100 p-12 text-center shadow-sm">
+              <AlertCircle size={64} className="mx-auto text-red-500 mb-6" />
+              <h3 className="text-2xl font-black text-gray-900 mb-2">Redirecting to Damage Management</h3>
+              <p className="text-gray-500 mb-8 max-w-md mx-auto">You will be redirected to the specialized Damage & Deductions module for this branch.</p>
+              <button
+                onClick={() => navigate(`/admin/damage?storeId=${storeFilterId}`)}
+                className="px-8 py-3 bg-red-600 text-white rounded-xl font-black uppercase tracking-widest shadow-lg shadow-red-500/20 hover:bg-red-700 transition-all"
+              >
+                Go to Damage Management
+              </button>
+            </div>
           )}
 
           {/* Bulk Upload Modal */}

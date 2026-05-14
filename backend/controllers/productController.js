@@ -35,6 +35,8 @@ export const getProducts = async (req, res, next) => {
                 brand: true,
                 variants: true,
                 unit: true,
+                WarehouseInventory: true, // Always include for stock sync
+                vehicleStocks: true, // Always include for total stock calculation
             },
         };
 
@@ -51,10 +53,10 @@ export const getProducts = async (req, res, next) => {
 
         // Filter by Warehouse
         if (warehouseId) {
-            query.where.OR = [
-                { WarehouseInventory: { some: { warehouseId, quantity: { gt: 0 } } } },
-                { isFree: true }
-            ];
+            query.where.WarehouseInventory = { 
+                some: { warehouseId, quantity: { gt: 0 } } 
+            };
+            // Override the include to only show this specific warehouse if requested
             query.include.WarehouseInventory = {
                 where: { warehouseId }
             };
@@ -62,14 +64,9 @@ export const getProducts = async (req, res, next) => {
 
         // Filter by Vehicle Stock
         if (vehicleId) {
-            query.where.OR = [
-                {
-                    vehicleStocks: {
-                        some: { vehicleId }
-                    }
-                },
-                { isFree: true }
-            ];
+            query.where.vehicleStocks = {
+                some: { vehicleId }
+            };
 
             query.include.vehicleStocks = {
                 where: { vehicleId }
@@ -77,15 +74,27 @@ export const getProducts = async (req, res, next) => {
         }
 
         const products = await prisma.product.findMany(query);
-        console.log(`[getProducts] Found ${products.length} products for vehicle ${vehicleId || 'NONE'}`);
+        console.log(`[getProducts] Found ${products.length} products. Source: ${vehicleId ? 'Vehicle' : (warehouseId ? 'Warehouse' : 'General')}`);
         
         // Flatten stock info for easier frontend consumption
-        const result = products.map(p => ({
-            ...p,
-            stock: vehicleId 
-                ? (p.vehicleStocks?.[0]?.quantity || 0) 
-                : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : null)
-        }));
+        const result = products.map(p => {
+            const warehouseQty = p.WarehouseInventory?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            // Note: vehicleStocks was only included if vehicleId was provided. 
+            // To get total vehicle stock, we need to include all vehicleStocks in the original query or handle it here.
+            // For now, if vehicleStocks is not available, we assume it's part of p.stock fallback.
+            const vehicleQty = p.vehicleStocks?.reduce((acc, curr) => acc + curr.quantity, 0) || 0;
+            const totalQty = warehouseQty + vehicleQty;
+
+            return {
+                ...p,
+                warehouseStock: warehouseQty,
+                vehicleStock: vehicleQty,
+                totalStock: totalQty,
+                stock: vehicleId 
+                    ? (p.vehicleStocks?.[0]?.quantity || 0) 
+                    : (warehouseId ? (p.WarehouseInventory?.[0]?.quantity || 0) : (warehouseQty > 0 ? warehouseQty : (p.stock ?? 0)))
+            };
+        });
 
         res.json(result);
     } catch (error) {
@@ -182,7 +191,8 @@ export const getVehicleAuditHistory = async (req, res, next) => {
                     include: {
                         product: {
                             include: {
-                                unit: true
+                                unit: true,
+                                category: true
                             }
                         }
                     }
@@ -191,7 +201,72 @@ export const getVehicleAuditHistory = async (req, res, next) => {
             orderBy: { createdAt: 'desc' }
         });
 
-        res.json(audits);
+        // Add "type" to audits for frontend labeling
+        const formattedAudits = audits.map(a => ({
+            ...a,
+            type: 'AUDIT'
+        }));
+
+        // Fetch transactions (LOAD and REFILL)
+        const transactions = await prisma.stockTransaction.findMany({
+            where: {
+                vehicleId,
+                tenantId: req.user.tenantId,
+                type: { in: ['LOAD', 'REFILL'] }
+            },
+            include: {
+                product: {
+                    include: {
+                        unit: true,
+                        category: true
+                    }
+                },
+                user: { select: { name: true } }
+            },
+            orderBy: { date: 'desc' }
+        });
+
+        // Group transactions by type and time (5 min window)
+        const groupedTransactions = [];
+        transactions.forEach(tx => {
+            const lastGroup = groupedTransactions[groupedTransactions.length - 1];
+            const txDate = new Date(tx.date);
+            
+            if (lastGroup && 
+                lastGroup.type === tx.type && 
+                Math.abs(new Date(lastGroup.createdAt) - txDate) < 5 * 60 * 1000) {
+                
+                lastGroup.items.push({
+                    id: tx.id,
+                    productId: tx.productId,
+                    product: tx.product,
+                    newQuantity: tx.quantity,
+                    oldQuantity: 0 // For transactions, we just show what was added
+                });
+            } else {
+                groupedTransactions.push({
+                    id: `tx-group-${tx.id}`,
+                    type: tx.type,
+                    createdAt: tx.date,
+                    user: tx.user,
+                    remark: tx.type === 'LOAD' ? 'Morning Stock Loading' : 'Stock Refill Approval',
+                    items: [{
+                        id: tx.id,
+                        productId: tx.productId,
+                        product: tx.product,
+                        newQuantity: tx.quantity,
+                        oldQuantity: 0
+                    }]
+                });
+            }
+        });
+
+        // Unify and sort
+        const combined = [...formattedAudits, ...groupedTransactions].sort((a, b) => 
+            new Date(b.createdAt) - new Date(a.createdAt)
+        );
+
+        res.json(combined);
     } catch (error) {
         next(error);
     }

@@ -7,9 +7,9 @@ import { logActivity } from '../../utils/activityLogger.js';
 // @access  Admin
 export const createRoute = async (req, res, next) => {
     try {
-        const { routeName, villages, cycles, storeId: bodyStoreId } = req.body;
+        const { routeName, villages, cycles, storeId: rawStoreId } = req.body;
         const tenantId = req.user.tenantId;
-        const storeId = (bodyStoreId && bodyStoreId !== 'null' && bodyStoreId !== '') ? bodyStoreId : req.user.storeId;
+        const storeId = (rawStoreId && rawStoreId !== 'null' && rawStoreId !== 'undefined' && rawStoreId !== '') ? rawStoreId : (req.user.storeId || null);
 
         if (!routeName || !villages || !cycles) {
             res.status(400);
@@ -61,6 +61,28 @@ export const assignRouteToVehicle = async (req, res, next) => {
             data: {
                 status: false
             }
+        });
+
+        // Deactivate previous active assignment for this user
+        await prisma.routeAssignment.updateMany({
+            where: {
+                userId,
+                status: true
+            },
+            data: {
+                status: false
+            }
+        });
+
+        // Sync the user's assigned vehicle to match this route assignment
+        await prisma.user.updateMany({
+            where: { assignedVehicleId: vehicleId },
+            data: { assignedVehicleId: null }
+        });
+
+        await prisma.user.update({
+            where: { id: userId },
+            data: { assignedVehicleId: vehicleId }
         });
 
         const assignment = await prisma.routeAssignment.create({
@@ -121,6 +143,18 @@ export const updateRouteAssignment = async (req, res, next) => {
             vehicleId = user?.assignedVehicleId || undefined;
         }
 
+        // Sync the user's assigned vehicle if both are present
+        if (vehicleId && userId) {
+            await prisma.user.updateMany({
+                where: { assignedVehicleId: vehicleId },
+                data: { assignedVehicleId: null }
+            });
+            await prisma.user.update({
+                where: { id: userId },
+                data: { assignedVehicleId: vehicleId }
+            });
+        }
+
         const assignment = await prisma.routeAssignment.update({
             where: { id },
             data: {
@@ -170,10 +204,13 @@ export const updateRouteAssignment = async (req, res, next) => {
 export const getAdminRoutes = async (req, res, next) => {
     try {
         const { storeId: queryStoreId } = req.query;
-        const storeId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') ? queryStoreId : req.user.storeId;
-
         const where = { tenantId: req.user.tenantId };
-        if (storeId) where.storeId = storeId;
+        
+        if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
+            where.storeId = queryStoreId;
+        } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
+            where.storeId = req.user.storeId;
+        }
 
         const routes = await prisma.route.findMany({
             where,
@@ -198,7 +235,7 @@ export const getRouteAssignments = async (req, res, next) => {
         // Filter assignments by vehicle's store
         if (storeId && storeId !== 'undefined' && storeId !== 'null') {
             where.vehicle = { storeId };
-        } else if (req.user.storeId) {
+        } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
             where.vehicle = { storeId: req.user.storeId };
         }
 

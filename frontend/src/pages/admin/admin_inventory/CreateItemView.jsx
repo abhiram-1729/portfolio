@@ -1,5 +1,5 @@
 import React from 'react';
-import { ArrowLeft, PlusCircle, Package, Camera, Info, Barcode, Grid, Plus, Trash2 } from 'lucide-react';
+import { ArrowLeft, PlusCircle, Package, Camera, Info, Barcode, Grid, Plus, Trash2, ScanBarcode } from 'lucide-react';
 
 const CreateItemView = ({
   setIsCreateView,
@@ -14,7 +14,9 @@ const CreateItemView = ({
   units,
   taxRates,
   handleCreateItem,
-  isUploading
+  isUploading,
+  setScannerTarget,
+  setShowScanner
 }) => {
   return (
     <div className="space-y-6 animate-in slide-in-from-right-4 duration-300">
@@ -98,6 +100,31 @@ const CreateItemView = ({
                         value={newItem.barcode}
                         onChange={(e) => setNewItem({ ...newItem, barcode: e.target.value })}
                       />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setScannerTarget('create');
+                          setShowScanner(true);
+                        }}
+                        className="p-2 m-1 bg-emerald-50 text-emerald-600 rounded-xl hover:bg-emerald-100 transition-colors"
+                        title="Scan Barcode with Camera"
+                      >
+                        <ScanBarcode size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest pl-1">Initial Stock</label>
+                    <div className="relative flex items-center bg-emerald-50/50 border border-emerald-100 rounded-2xl px-4 focus-within:bg-white focus-within:ring-4 focus-within:ring-emerald-500/10 transition-all">
+                      <Package size={16} className="text-emerald-500" />
+                      <input
+                        type="number"
+                        placeholder="0"
+                        className="w-full py-4 bg-transparent outline-none text-sm font-black text-emerald-700 ml-3"
+                        value={newItem.stock}
+                        onChange={(e) => setNewItem({ ...newItem, stock: e.target.value })}
+                      />
                     </div>
                   </div>
                 </div>
@@ -174,6 +201,16 @@ const CreateItemView = ({
                     onChange={(e) => setNewItem({ ...newItem, description: e.target.value })}
                   />
                 </div>
+
+                <div className="pt-4 flex justify-end">
+                  <button
+                    onClick={() => setModalTab('price')}
+                    className="flex items-center gap-2 px-6 py-3 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-100 transition-all border border-emerald-100 group"
+                  >
+                    Next: Pricing & Stock
+                    <ArrowLeft size={16} className="rotate-180 group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -221,29 +258,33 @@ const CreateItemView = ({
                     />
                   </div>
                 </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">GST Rate (%)</label>
-                  <select
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-sm font-bold text-gray-900 focus:outline-none"
-                    value={newItem.gst}
-                    onChange={(e) => setNewItem({ ...newItem, gst: e.target.value })}
-                  >
-                    {taxRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
-                  </select>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">GST Rate (%)</label>
+                    <select
+                      className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-sm font-bold text-gray-900 focus:outline-none"
+                      value={newItem.gst}
+                      onChange={(e) => setNewItem({ ...newItem, gst: e.target.value })}
+                    >
+                      {taxRates.map(rate => <option key={rate} value={rate}>{rate}%</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest pl-1">Tax Amount (₹)</label>
+                    <div className="relative flex items-center bg-emerald-50/30 border border-emerald-100 rounded-2xl px-4 h-[58px]">
+                      <span className="text-emerald-400 font-bold">₹</span>
+                      <span className="ml-2 text-sm font-black text-emerald-700">
+                        {(() => {
+                          const price = parseFloat(newItem.price) || 0;
+                          const gst = parseFloat(newItem.gst) || 0;
+                          return (price - (price / (1 + gst / 100))).toFixed(2);
+                        })()}
+                      </span>
+                      <span className="ml-auto text-[8px] font-black text-emerald-400 uppercase tracking-widest">Incl. GST</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 pt-4 border-t border-gray-50">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Initial Store Stock</label>
-                  <input
-                    type="number"
-                    placeholder="0"
-                    className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-sm font-bold text-gray-900"
-                    value={newItem.stock}
-                    onChange={(e) => setNewItem({ ...newItem, stock: e.target.value })}
-                  />
-                </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Low Stock Alert (Qty)</label>
                   <input

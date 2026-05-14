@@ -62,54 +62,79 @@ export const AssignFloatModal = ({
           </div>
 
           {assignmentData.vehicleId && (
-            <>
-              <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100/50 group cursor-pointer" onClick={() => setAssignmentData({ ...assignmentData, isNoService: !assignmentData.isNoService })}>
-                <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${assignmentData.isNoService ? 'bg-rose-500 text-white' : 'bg-white text-rose-300'}`}>
-                  <AlertTriangle size={20} />
-                </div>
-                <div className="flex-1">
-                  <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block mb-1">Vehicle Damage / Service</span>
-                  <span className="text-xs font-bold text-rose-900 opacity-70">Mark as "No Service"</span>
-                </div>
-                <input type="checkbox" checked={assignmentData.isNoService || false} readOnly className="w-5 h-5 rounded-lg border-rose-200 text-rose-500" />
-              </div>
+            (() => {
+              const existingSummary = summaries.find(s => s.vehicleId === assignmentData.vehicleId);
+              const shiftKey = `shift${assignmentData.shift}`;
+              const existingShiftData = existingSummary?.shiftDetails?.[shiftKey];
+              const isAlreadyAssigned = !!existingShiftData?.opening;
 
-              {!assignmentData.isNoService && (
-                <div className="space-y-2">
-                  <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Denominations</label>
-                  <div className="grid grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
-                    {denominationsList.map((denom) => (
-                      <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
-                        <span className="text-[10px] font-black text-gray-400">₹{denom}</span>
-                        <input
-                          type="number"
-                          placeholder="0"
-                          className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
-                          value={assignmentData.denominations[denom] || ''}
-                          onChange={(e) => handleDenominationChange(e.target.value, denom, 'assign')}
-                        />
+              return (
+                <>
+                  {isAlreadyAssigned && (
+                    <div className="p-4 bg-amber-50 rounded-2xl border border-amber-200 animate-in fade-in slide-in-from-top-2">
+                      <div className="flex items-center gap-3 text-amber-700 mb-2">
+                        <CheckCircle2 size={18} className="shrink-0" />
+                        <span className="text-[10px] font-black uppercase tracking-widest">Already Assigned</span>
                       </div>
-                    ))}
+                      <p className="text-xs font-bold text-amber-900/60 leading-relaxed">
+                        This vehicle was already assigned <span className="text-amber-700">₹{(existingShiftData.opening.totalOpeningCash || 0).toFixed(2)}</span> for Shift {assignmentData.shift} today.
+                      </p>
+                      <div className="mt-3 flex items-center gap-2">
+                         <span className="text-[9px] font-black text-amber-600 bg-amber-100 px-2 py-0.5 rounded-md uppercase tracking-tighter">Status: Active Shift</span>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-3 p-4 bg-rose-50 rounded-2xl border border-rose-100/50 group cursor-pointer" onClick={() => setAssignmentData({ ...assignmentData, isNoService: !assignmentData.isNoService })}>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-colors ${assignmentData.isNoService ? 'bg-rose-500 text-white' : 'bg-white text-rose-300'}`}>
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div className="flex-1">
+                      <span className="text-[10px] font-black text-rose-500 uppercase tracking-widest block mb-1">Vehicle Damage / Service</span>
+                      <span className="text-xs font-bold text-rose-900 opacity-70">Mark as "No Service"</span>
+                    </div>
+                    <input type="checkbox" checked={assignmentData.isNoService || false} readOnly className="w-5 h-5 rounded-lg border-rose-200 text-rose-500" />
                   </div>
-                </div>
-              )}
 
-              <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white ${assignmentData.isNoService ? 'bg-rose-600' : (assignmentData.shift === 1 ? 'bg-amber-600' : 'bg-indigo-600')}`}>
-                <div>
-                  <p className="text-[9px] font-black uppercase opacity-60">Total Value</p>
-                  <h4 className="text-2xl font-black">₹{assignmentData.isNoService ? '0.00' : (assignmentData.amount || 0).toFixed(2)}</h4>
-                </div>
-                {assignmentData.isNoService ? <AlertTriangle size={20} /> : assignmentData.shift === 1 ? <Sun size={20} /> : <Moon size={20} />}
-              </div>
+                  {!assignmentData.isNoService && (
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest pl-1">Denominations</label>
+                      <div className="grid grid-cols-3 gap-2 bg-gray-50/50 p-2 rounded-2xl border border-gray-100">
+                        {denominationsList.map((denom) => (
+                          <div key={denom} className="flex flex-col gap-1 bg-white p-2 rounded-xl border border-gray-100 shadow-sm">
+                            <span className="text-[10px] font-black text-gray-400">₹{denom}</span>
+                            <input
+                              type="number"
+                              placeholder="0"
+                              className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
+                              value={assignmentData.denominations[denom] || ''}
+                              onChange={(e) => handleDenominationChange(e.target.value, denom, 'assign')}
+                              onWheel={(e) => e.target.blur()}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="w-full bg-emerald-600 text-white font-black py-4 rounded-2xl hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-900/20"
-              >
-                {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={20} /> : 'Confirm Assignment'}
-              </button>
-            </>
+                  <div className={`flex items-center justify-between px-5 py-4 rounded-2xl shadow-lg text-white ${assignmentData.isNoService ? 'bg-rose-600' : (assignmentData.shift === 1 ? 'bg-amber-600' : 'bg-indigo-600')}`}>
+                    <div>
+                      <p className="text-[9px] font-black uppercase opacity-60">Total Value</p>
+                      <h4 className="text-2xl font-black">₹{assignmentData.isNoService ? '0.00' : (assignmentData.amount || 0).toFixed(2)}</h4>
+                    </div>
+                    {assignmentData.isNoService ? <AlertTriangle size={20} /> : assignmentData.shift === 1 ? <Sun size={20} /> : <Moon size={20} />}
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmitting}
+                    className={`w-full font-black py-4 rounded-2xl transition-all shadow-xl ${isAlreadyAssigned ? 'bg-amber-600 hover:bg-amber-700 shadow-amber-900/20' : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-900/20'}`}
+                  >
+                    {isSubmitting ? <Loader2 className="animate-spin mx-auto" size={20} /> : (isAlreadyAssigned ? 'Update Assignment' : 'Confirm Assignment')}
+                  </button>
+                </>
+              );
+            })()
           )}
         </form>
       </div>
@@ -151,6 +176,7 @@ export const EditReconciliationModal = ({
                     className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
                     value={editData.denominations[denom] || ''}
                     onChange={(e) => handleDenominationChange(e.target.value, denom, 'edit')}
+                    onWheel={(e) => e.target.blur()}
                   />
                 </div>
               ))}
@@ -304,6 +330,7 @@ export const EditDepositModal = ({ show, setShow, depositData, setDepositData, h
                   className="w-full bg-transparent border-none p-0 text-sm font-black text-gray-700 focus:ring-0 text-center"
                   value={depositData.denominations[denom] || ''}
                   onChange={(e) => handleDenominationChange(e.target.value, denom, 'deposit')}
+                  onWheel={(e) => e.target.blur()}
                 />
               </div>
             ))}

@@ -12,26 +12,26 @@ export const getStockReport = async (req, res) => {
     const products = await prisma.product.findMany({
       where: {
         tenantId: req.user.tenantId,
-        ...(storeId && storeId !== 'undefined' ? { storeId } : {}),
-        status: 'ACTIVE'
+        ...(storeId && storeId !== 'undefined' ? { storeId: storeId } : {})
       },
       include: {
         category: { select: { name: true } },
         unit: { select: { name: true, type: true } },
         WarehouseInventory: {
-          where: {
-            ...(storeId && storeId !== 'undefined' ? { storeId } : {})
-          },
           select: { quantity: true, warehouse: { select: { name: true } } }
+        },
+        vehicleStocks: {
+          select: { quantity: true }
         }
       }
     });
 
     // 2. Map products to a WarehouseInventory-like structure for frontend compatibility
-    // but ensure products with NO warehouse records yet (but have main stock) still show up.
     const report = products
       .map(p => {
         const warehouseQty = p.WarehouseInventory.reduce((acc, curr) => acc + curr.quantity, 0);
+        const vehicleQty = p.vehicleStocks.reduce((acc, curr) => acc + curr.quantity, 0);
+        
         // If it has warehouse records, use that quantity. 
         // If not, but it has main product stock, show that as being in the system.
         const finalQty = warehouseQty > 0 ? warehouseQty : (p.stock || 0);
@@ -39,14 +39,21 @@ export const getStockReport = async (req, res) => {
         return {
           id: p.WarehouseInventory[0]?.id || `virtual-${p.id}`,
           productId: p.id,
-          quantity: finalQty,
+          quantity: finalQty, // This is Store Stock
+          warehouseStock: finalQty,
+          vehicleStock: vehicleQty,
+          totalStock: finalQty + vehicleQty,
           storeId: p.storeId,
           tenantId: p.tenantId,
-          product: p, // Keep full product object for frontend
+          product: {
+            ...p,
+            warehouseStock: finalQty,
+            vehicleStock: vehicleQty,
+            totalStock: finalQty + vehicleQty
+          },
           warehouse: p.WarehouseInventory[0]?.warehouse || { name: 'Main Store' }
         };
-      })
-      .filter(item => item.quantity > 0); // Only show items that actually have stock
+      });
 
     res.json(report);
   } catch (error) {
@@ -274,12 +281,13 @@ export const getProfitabilityReport = async (req, res) => {
       if (endDate) purchaseWhere.invoiceDate.lte = new Date(endDate + 'T23:59:59.999Z');
     }
 
+    // Get total purchases for summary
     const purchases = await prisma.purchaseInvoice.aggregate({
       where: purchaseWhere,
       _sum: { totalAmount: true }
     });
 
-    // Get sales revenue
+    // Get sales and calculate COGS (Cost of Goods Sold)
     const salesWhere = { tenantId, status: { in: ['PAID', 'COMPLETED'] } };
     if (storeId && storeId !== 'undefined') salesWhere.storeId = storeId;
     if (startDate || endDate) {
@@ -288,14 +296,30 @@ export const getProfitabilityReport = async (req, res) => {
       if (endDate) salesWhere.createdAt.lte = new Date(endDate + 'T23:59:59.999Z');
     }
 
-    const sales = await prisma.order.aggregate({
+    const orders = await prisma.order.findMany({
       where: salesWhere,
-      _sum: { totalAmount: true }
+      include: {
+        items: {
+          include: {
+            product: { select: { landingPrice: true, purchasePrice: true } }
+          }
+        }
+      }
+    });
+
+    let totalSales = 0;
+    let totalCOGS = 0;
+
+    orders.forEach(order => {
+      totalSales += order.totalAmount || 0;
+      order.items.forEach(item => {
+        const cost = item.landingPrice || item.product?.landingPrice || item.product?.purchasePrice || 0;
+        totalCOGS += (item.quantity * cost);
+      });
     });
 
     const totalPurchases = purchases._sum.totalAmount || 0;
-    const totalSales = sales._sum.totalAmount || 0;
-    const grossProfit = totalSales - totalPurchases;
+    const grossProfit = totalSales - totalCOGS;
     const marginPercent = totalSales > 0 ? ((grossProfit / totalSales) * 100).toFixed(2) : 0;
 
     res.json({

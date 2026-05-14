@@ -78,7 +78,8 @@ export const getTrendsReport = async (req, res) => {
         const d = new Date();
         d.setDate(d.getDate() - i);
         const dateString = d.toLocaleDateString('en-IN', { month: 'short', day: 'numeric' });
-        dailyStatsMap.set(dateString, { date: dateString, revenue: 0, profit: 0, orders: 0 });
+        const rawDate = d.toISOString().split('T')[0];
+        dailyStatsMap.set(dateString, { date: dateString, rawDate, revenue: 0, profit: 0, orders: 0 });
     }
 
     // Aggregate the payload
@@ -107,6 +108,72 @@ export const getTrendsReport = async (req, res) => {
   } catch (error) {
     console.error('[ReportController] Trends Report Error:', error);
     res.status(500).json({ message: 'Error fetching trends', error: error.message });
+  }
+};
+
+export const getDayDetailedSales = async (req, res) => {
+  try {
+    const { date, storeId } = req.query;
+    if (!date) return res.status(400).json({ message: 'Date is required' });
+
+    const startDate = new Date(date);
+    startDate.setHours(0, 0, 0, 0);
+    const endDate = new Date(date);
+    endDate.setHours(23, 59, 59, 999);
+
+    const where = {
+      tenantId: req.user.tenantId,
+      createdAt: { gte: startDate, lte: endDate },
+      status: { not: 'CANCELLED' },
+    };
+
+    if (storeId && storeId !== 'undefined' && storeId !== 'null') {
+      where.storeId = storeId;
+    } else if (req.user.storeId) {
+      where.storeId = req.user.storeId;
+    }
+
+    const orderItems = await prisma.orderItem.findMany({
+      where: {
+        tenantId: req.user.tenantId,
+        order: where,
+      },
+      include: {
+        product: {
+          select: {
+            name: true,
+            skuCode: true,
+            displayId: true,
+            category: { select: { name: true } }
+          }
+        }
+      },
+    });
+
+    const productMap = {};
+    orderItems.forEach(item => {
+      const key = item.productId;
+      if (!productMap[key]) {
+        productMap[key] = {
+          productId: key,
+          name: item.product?.name || 'Unknown',
+          sku: item.product?.skuCode || item.product?.displayId || 'N/A',
+          category: item.product?.category?.name || 'Uncategorized',
+          quantity: 0,
+          revenue: 0,
+          profit: 0,
+        };
+      }
+      productMap[key].quantity += item.quantity;
+      productMap[key].revenue += item.price * item.quantity;
+      productMap[key].profit += (item.price - (item.landingPrice || 0)) * item.quantity;
+    });
+
+    const results = Object.values(productMap).sort((a, b) => b.revenue - a.revenue);
+    res.json(results);
+  } catch (error) {
+    console.error('[ReportController] Day Detailed Sales Error:', error);
+    res.status(500).json({ message: 'Error fetching detailed day sales', error: error.message });
   }
 };
 

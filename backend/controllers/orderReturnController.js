@@ -56,6 +56,13 @@ export const editOrderItem = async (req, res, next) => {
         res.status(400);
         throw new Error(`Insufficient stock. Available: ${stock?.quantity || 0}`);
       }
+    } else if (qtyDiff > 0 && !order.vehicleId) {
+      // POS sale — check Product.stock
+      const product = await prisma.product.findUnique({ where: { id: item.productId } });
+      if (product && product.stock < qtyDiff) {
+        res.status(400);
+        throw new Error(`Insufficient store stock. Available: ${product.stock}`);
+      }
     }
 
     const result = await prisma.$transaction(async (tx) => {
@@ -72,12 +79,28 @@ export const editOrderItem = async (req, res, next) => {
         include: { items: { include: { product: { select: { id: true, name: true, image: true } } } }, payment: true, returns: true }
       });
 
-      // Adjust vehicle stock if order was completed
+      // Adjust stock if order was completed
       if (order.status === 'COMPLETED' && order.vehicleId && qtyDiff !== 0) {
         await tx.vehicleStock.update({
           where: { vehicleId_productId: { vehicleId: order.vehicleId, productId: item.productId } },
           data: { quantity: { decrement: qtyDiff } }
         });
+      } else if (order.status === 'COMPLETED' && !order.vehicleId && qtyDiff !== 0) {
+        // POS sale — adjust Product.stock AND WarehouseInventory
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: qtyDiff } }
+        });
+
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { decrement: qtyDiff } }
+          });
+        }
       }
 
       // Update payment if exists
@@ -155,6 +178,22 @@ export const removeOrderItem = async (req, res, next) => {
           where: { vehicleId_productId: { vehicleId: order.vehicleId, productId: item.productId } },
           data: { quantity: { increment: item.quantity } }
         });
+      } else if (order.status === 'COMPLETED' && !order.vehicleId) {
+        // POS sale — restore Product.stock AND WarehouseInventory
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } }
+        });
+
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { increment: item.quantity } }
+          });
+        }
       }
 
       if (order.payment) {
@@ -260,12 +299,28 @@ export const returnOrderItems = async (req, res, next) => {
           }
         });
 
-        // Restore vehicle stock
+        // Restore stock
         if (order.vehicleId) {
           await tx.vehicleStock.update({
             where: { vehicleId_productId: { vehicleId: order.vehicleId, productId: op.orderItem.productId } },
             data: { quantity: { increment: op.returnQty } }
           });
+        } else {
+          // POS sale — restore Product.stock AND WarehouseInventory
+          await tx.product.update({
+            where: { id: op.orderItem.productId },
+            data: { stock: { increment: op.returnQty } }
+          });
+
+          const wi = await tx.warehouseInventory.findFirst({
+            where: { productId: op.orderItem.productId, tenantId }
+          });
+          if (wi) {
+            await tx.warehouseInventory.update({
+              where: { id: wi.id },
+              data: { quantity: { increment: op.returnQty } }
+            });
+          }
         }
       }
 
@@ -347,12 +402,32 @@ export const cancelOrder = async (req, res, next) => {
 
     const result = await prisma.$transaction(async (tx) => {
       // Restore all stock
-      if (order.vehicleId && order.status === 'COMPLETED') {
-        for (const item of order.items) {
-          await tx.vehicleStock.update({
-            where: { vehicleId_productId: { vehicleId: order.vehicleId, productId: item.productId } },
-            data: { quantity: { increment: item.quantity } }
-          });
+      if (order.status === 'COMPLETED') {
+        if (order.vehicleId) {
+          for (const item of order.items) {
+            await tx.vehicleStock.update({
+              where: { vehicleId_productId: { vehicleId: order.vehicleId, productId: item.productId } },
+              data: { quantity: { increment: item.quantity } }
+            });
+          }
+        } else {
+          // POS sale — restore Product.stock AND WarehouseInventory
+          for (const item of order.items) {
+            await tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { increment: item.quantity } }
+            });
+
+            const wi = await tx.warehouseInventory.findFirst({
+              where: { productId: item.productId, tenantId }
+            });
+            if (wi) {
+              await tx.warehouseInventory.update({
+                where: { id: wi.id },
+                data: { quantity: { increment: item.quantity } }
+              });
+            }
+          }
         }
       }
 

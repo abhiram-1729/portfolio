@@ -94,7 +94,13 @@ export const getPOs = async (req, res) => {
     const { status, vendorId, storeId } = req.query;
     const where = { tenantId: req.user.tenantId };
 
-    if (status) where.status = status;
+    if (status) {
+      if (status.includes(',')) {
+        where.status = { in: status.split(',') };
+      } else {
+        where.status = status;
+      }
+    }
     if (vendorId) where.vendorId = vendorId;
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
@@ -178,5 +184,117 @@ export const updatePOStatus = async (req, res) => {
     res.json({ message: `PO status updated to ${status}`, po });
   } catch (error) {
     res.status(500).json({ message: 'Error updating PO status', error: error.message });
+  }
+};
+
+// ─── UPDATE PO ─────────────────────────────────────
+export const updatePO = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items, poDate, expectedDelivery, remarks } = req.body;
+
+    const existingPO = await prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!existingPO) return res.status(404).json({ message: 'PO not found' });
+    if (['CLOSED', 'DELIVERED', 'CANCELLED'].includes(existingPO.status)) {
+      return res.status(400).json({ message: `Cannot update PO in ${existingPO.status} status` });
+    }
+
+    const totalAmount = items ? items.reduce((sum, item) => {
+      const q = parseInt(item.quantity) || 0;
+      const r = parseFloat(item.rate) || 0;
+      return sum + (q * r);
+    }, 0) : existingPO.totalAmount;
+
+    const po = await prisma.$transaction(async (tx) => {
+      // Delete old items if items are provided
+      if (items) {
+        await tx.purchaseOrderItem.deleteMany({ where: { poId: id } });
+      }
+
+      const parsedDate = poDate ? new Date(poDate) : null;
+      const isValidDate = parsedDate && !isNaN(parsedDate.getTime());
+      
+      const parsedExp = expectedDelivery ? new Date(expectedDelivery) : null;
+      const isValidExp = parsedExp && !isNaN(parsedExp.getTime());
+
+      return await tx.purchaseOrder.update({
+        where: { id },
+        data: {
+          poDate: isValidDate ? parsedDate : existingPO.poDate,
+          expectedDelivery: isValidExp ? parsedExp : (expectedDelivery === null ? null : existingPO.expectedDelivery),
+          remarks: remarks !== undefined ? remarks : existingPO.remarks,
+          totalAmount,
+          items: items ? {
+            create: items.map(item => ({
+              tenantId: existingPO.tenantId,
+              productId: item.productId,
+              quantity: parseInt(item.quantity) || 0,
+              rate: parseFloat(item.rate) || 0,
+              total: (parseInt(item.quantity) || 0) * (parseFloat(item.rate) || 0)
+            }))
+          } : undefined
+        },
+        include: {
+          vendor: { select: { vendorName: true } },
+          items: { include: { product: { select: { name: true } } } }
+        }
+      });
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: po.storeId || req.user.storeId,
+      action: 'PO_UPDATED',
+      details: `Updated Purchase Order ${po.displayId}`,
+      metadata: { poId: id }
+    });
+
+    res.json({ message: 'Purchase Order updated successfully', po });
+  } catch (error) {
+    console.error('❌ Update PO Error:', error);
+    res.status(500).json({ message: 'Error updating purchase order', error: error.message });
+  }
+};
+
+// ─── DELETE PO ─────────────────────────────────────
+export const deletePO = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const po = await prisma.purchaseOrder.findUnique({
+      where: { id },
+      include: { _count: { select: { goodsReceipts: true } } }
+    });
+
+    if (!po) return res.status(404).json({ message: 'PO not found' });
+    
+    // Safety check: Don't delete if goods have been received or if it's closed
+    if (po._count.goodsReceipts > 0) {
+      return res.status(400).json({ message: 'Cannot delete PO with associated Goods Receipts. Cancel it instead.' });
+    }
+
+    await prisma.$transaction([
+      prisma.purchaseOrderItem.deleteMany({ where: { poId: id } }),
+      prisma.purchaseOrder.delete({ where: { id } })
+    ]);
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: po.storeId || req.user.storeId,
+      action: 'PO_DELETED',
+      details: `Deleted Purchase Order ${po.displayId}`,
+      metadata: { poId: id, poNumber: po.poNumber }
+    });
+
+    res.json({ message: 'Purchase Order deleted successfully' });
+  } catch (error) {
+    console.error('❌ Delete PO Error:', error);
+    res.status(500).json({ message: 'Error deleting purchase order', error: error.message });
   }
 };

@@ -42,7 +42,7 @@ const StockLedgerSection = () => {
           {['', 'PURCHASE', 'SALE', 'TRANSFER_IN', 'TRANSFER_OUT', 'ADJUSTMENT'].map(t => (
             <button key={t} onClick={() => setTypeFilter(t)}
               className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
-                typeFilter === t ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-200'
+                typeFilter === t ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-emerald-200'
               }`}>{t || 'All Types'}</button>
           ))}
         </div>
@@ -87,8 +87,8 @@ const StockLedgerSection = () => {
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${typeColors[entry.type] || ''}`}>{entry.type.replace('_', ' ')}</span>
                   </td>
                   <td className="px-4 py-2 text-center">
-                    <span className={`text-xs font-black ${['PURCHASE', 'TRANSFER_IN'].includes(entry.type) ? 'text-emerald-600' : 'text-red-600'}`}>
-                      {['PURCHASE', 'TRANSFER_IN'].includes(entry.type) ? '+' : '-'}{entry.quantity}
+                    <span className={`text-xs font-black ${entry.quantity >= 0 ? 'text-emerald-600' : 'text-red-600'}`}>
+                      {entry.quantity >= 0 ? '+' : ''}{entry.quantity}
                     </span>
                   </td>
                   <td className="px-4 py-2 text-center text-xs font-bold text-gray-700">{entry.balanceAfter}</td>

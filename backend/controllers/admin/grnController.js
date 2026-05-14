@@ -32,7 +32,7 @@ export const createGRN = async (req, res) => {
         storeId
       });
 
-      // Create GRN
+      // 1. Create the GRN and Items
       const grn = await tx.goodsReceipt.create({
         data: {
           tenantId,
@@ -51,72 +51,79 @@ export const createGRN = async (req, res) => {
         }
       });
 
-      // Update PO item received quantities
+      // 2. High-Performance Bulk Updates
+      const stockMap = new Map();
       for (const item of items) {
-        const receivedQty = parseInt(item.receivedQty);
-        if (receivedQty > 0) {
-          await tx.purchaseOrderItem.updateMany({
-            where: { poId, productId: item.productId },
-            data: { receivedQty: { increment: receivedQty } }
-          });
+        const q = parseInt(item.receivedQty);
+        if (q <= 0) continue;
+        stockMap.set(item.productId, (stockMap.get(item.productId) || 0) + q);
+      }
 
-          // Update warehouse inventory
-          const existingWI = await tx.warehouseInventory.findFirst({
-            where: { productId: item.productId, tenantId }
+      const entries = Array.from(stockMap.entries());
+      if (entries.length > 0) {
+        let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
+        if (!warehouse) {
+          warehouse = await tx.warehouse.create({
+            data: { tenantId, name: 'Main Warehouse', location: 'Default' }
           });
+        }
 
-          if (existingWI) {
-            await tx.warehouseInventory.update({
-              where: { id: existingWI.id },
-              data: { quantity: { increment: receivedQty } }
-            });
-          } else {
-            // Find or create a default warehouse
-            let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
-            if (!warehouse) {
-              warehouse = await tx.warehouse.create({
-                data: { tenantId, name: 'Main Warehouse', location: 'Default' }
-              });
-            }
-            await tx.warehouseInventory.create({
-              data: {
-                tenantId,
-                warehouseId: warehouse.id,
-                productId: item.productId,
-                quantity: receivedQty
-              }
+        // A. Update PO Items (Sequential because we need to match PO item IDs)
+        // Note: For extreme performance we could use a single SQL update with CASE, 
+        // but PO items are usually few per product.
+        for (const item of items) {
+          const qty = parseInt(item.receivedQty);
+          if (qty > 0) {
+            await tx.purchaseOrderItem.updateMany({
+              where: { poId, productId: item.productId },
+              data: { receivedQty: { increment: qty } }
             });
           }
         }
+
+        // B. Bulk Update Product Master Stock
+        const productValues = entries.map(([pId, qty]) => Prisma.sql`(${pId}, ${qty}::int)`);
+        await tx.$executeRaw`
+          UPDATE "Product"
+          SET stock = "Product".stock + v.qty
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty)
+          WHERE "Product".id = v.id
+        `;
+
+        // C. Bulk Upsert Warehouse Inventory
+        const wiValues = entries.map(([pId, qty]) => {
+          const tempId = `grnwi_${Math.random().toString(36).substring(2, 11)}`;
+          return Prisma.sql`(${tempId}, ${tenantId}, ${warehouse.id}, ${pId}, ${qty}::int)`;
+        });
+
+        await tx.$executeRaw`
+          INSERT INTO "WarehouseInventory" (id, "tenantId", "warehouseId", "productId", quantity)
+          VALUES ${Prisma.join(wiValues)}
+          ON CONFLICT ("warehouseId", "productId")
+          DO UPDATE SET quantity = "WarehouseInventory".quantity + EXCLUDED.quantity
+        `;
       }
 
-      // Check if all items fully received
+      // 3. Finalize Status
       const updatedPOItems = await tx.purchaseOrderItem.findMany({ where: { poId } });
       const allFullyReceived = updatedPOItems.every(item => item.receivedQty >= item.quantity);
 
-      // Update GRN status
       await tx.goodsReceipt.update({
         where: { id: grn.id },
         data: { status: allFullyReceived ? 'COMPLETE' : 'PARTIAL' }
       });
 
-      // Update PO status
       if (allFullyReceived) {
         await tx.purchaseOrder.update({
           where: { id: poId },
           data: { status: 'DELIVERED' }
         });
-      } else {
-        // At least partially delivered
-        if (po.status === 'ORDERED' || po.status === 'APPROVED') {
-          // Keep as is or mark as partially delivered through the existing status
-        }
       }
 
       return grn;
     }, {
-      maxWait: 20000,
-      timeout: 60000
+      maxWait: 40000,
+      timeout: 120000
     });
 
     res.status(201).json({ message: 'Goods received successfully' });
@@ -164,5 +171,197 @@ export const getGRNs = async (req, res) => {
     res.json(grns);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching goods receipts', error: error.message });
+  }
+};
+
+// ─── UPDATE GRN ─────────────────────────────────────
+export const updateGRN = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { items, remarks } = req.body;
+    const tenantId = req.user.tenantId;
+
+    const grn = await prisma.goodsReceipt.findUnique({
+      where: { id },
+      include: { items: true, po: true }
+    });
+
+    if (!grn) return res.status(404).json({ message: 'GRN not found' });
+    if (grn.po.status === 'CLOSED') return res.status(400).json({ message: 'Cannot edit GRN of a closed PO' });
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Revert existing GRN effects
+      for (const item of grn.items) {
+        const qty = item.receivedQty;
+        // Decrement receivedQty in PO
+        const poItems = await tx.purchaseOrderItem.findMany({
+          where: { poId: grn.poId, productId: item.productId }
+        });
+        for (const pi of poItems) {
+          await tx.purchaseOrderItem.update({
+            where: { id: pi.id },
+            data: { receivedQty: { decrement: qty } }
+          });
+        }
+
+        // Decrement stock in Warehouse
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { decrement: qty } }
+          });
+        }
+        
+        // Decrement product stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: qty } }
+        });
+      }
+
+      // 2. Delete old GRN items
+      await tx.goodsReceiptItem.deleteMany({ where: { grnId: id } });
+
+      // 3. Apply new GRN effects
+      for (const item of items) {
+        const qty = parseInt(item.receivedQty) || 0;
+        if (qty <= 0) continue;
+
+        await tx.goodsReceiptItem.create({
+          data: {
+            tenantId,
+            grnId: id,
+            productId: item.productId,
+            orderedQty: item.orderedQty || 0,
+            receivedQty: qty
+          }
+        });
+
+        // Increment receivedQty in PO
+        const poItems = await tx.purchaseOrderItem.findMany({
+          where: { poId: grn.poId, productId: item.productId }
+        });
+        for (const pi of poItems) {
+          await tx.purchaseOrderItem.update({
+            where: { id: pi.id },
+            data: { receivedQty: { increment: qty } }
+          });
+        }
+
+        // Increment stock in Warehouse
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { increment: qty } }
+          });
+        }
+
+        // Increment product stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: qty } }
+        });
+      }
+
+      // 4. Update GRN metadata
+      await tx.goodsReceipt.update({
+        where: { id },
+        data: { remarks: remarks !== undefined ? remarks : grn.remarks }
+      });
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      action: 'GRN_UPDATED',
+      details: `Updated Goods Receipt #${grn.displayId}`,
+      metadata: { grnId: id }
+    });
+
+    res.json({ message: 'GRN updated successfully' });
+  } catch (error) {
+    console.error('❌ Update GRN Error:', error);
+    res.status(500).json({ message: 'Error updating GRN', error: error.message });
+  }
+};
+
+// ─── DELETE GRN ─────────────────────────────────────
+export const deleteGRN = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const tenantId = req.user.tenantId;
+
+    const grn = await prisma.goodsReceipt.findUnique({
+      where: { id },
+      include: { items: true, po: true }
+    });
+
+    if (!grn) return res.status(404).json({ message: 'GRN not found' });
+
+    await prisma.$transaction(async (tx) => {
+      // 1. Revert Stock & PO item receivedQty
+      for (const item of grn.items) {
+        const qty = item.receivedQty;
+
+        // Decrement PO item receivedQty
+        const poItems = await tx.purchaseOrderItem.findMany({
+          where: { poId: grn.poId, productId: item.productId }
+        });
+        for (const pi of poItems) {
+          await tx.purchaseOrderItem.update({
+            where: { id: pi.id },
+            data: { receivedQty: { decrement: qty } }
+          });
+        }
+
+        // Decrement warehouse inventory
+        const existingWI = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId }
+        });
+        if (existingWI) {
+          await tx.warehouseInventory.update({
+            where: { id: existingWI.id },
+            data: { quantity: { decrement: qty } }
+          });
+        }
+
+        // Decrement product stock
+        await tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: qty } }
+        });
+      }
+
+      // 2. Update PO status back to ORDERED if it was DELIVERED
+      if (grn.po.status === 'DELIVERED') {
+        await tx.purchaseOrder.update({
+          where: { id: grn.poId },
+          data: { status: 'ORDERED' }
+        });
+      }
+
+      // 3. Delete items and GRN
+      await tx.goodsReceiptItem.deleteMany({ where: { grnId: id } });
+      await tx.goodsReceipt.delete({ where: { id } });
+    });
+
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      action: 'GRN_DELETED',
+      details: `Deleted Goods Receipt ${grn.displayId} for PO ${grn.po?.poNumber}`,
+      metadata: { grnId: id, poId: grn.poId }
+    });
+
+    res.json({ message: 'Goods receipt deleted successfully' });
+  } catch (error) {
+    console.error('❌ Delete GRN Error:', error);
+    res.status(500).json({ message: 'Error deleting goods receipt', error: error.message });
   }
 };

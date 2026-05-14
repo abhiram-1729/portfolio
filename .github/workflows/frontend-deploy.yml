@@ -1,0 +1,40 @@
+name: Frontend Deploy
+
+on:
+  push:
+    branches:
+      - develop
+    paths:
+      - 'frontend/**'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy Frontend
+        uses: appleboy/ssh-action@v1.0.3
+
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            set -e
+
+            export PATH=$PATH:/home/ubuntu/n/bin
+
+            cd /opt/apps/villagkart/vgk_sales
+
+            git checkout develop
+
+            git pull origin develop
+
+            cd frontend
+
+            npm install
+
+            npm run build
+
+            sudo systemctl reload nginx

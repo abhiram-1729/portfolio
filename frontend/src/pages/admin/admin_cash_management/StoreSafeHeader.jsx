@@ -5,7 +5,7 @@ import {
 } from 'lucide-react';
 
 const StoreSafeHeader = ({ 
-  storeRegisterData, summaries, user, 
+  storeRegisterData, summaries, user, storeLoading,
   setShowOpenStoreModal, setShowDepositModal, setShowSafeMovementModal, 
   setShowBankModal, setShowCloseStoreModal, setShowEditStoreModal,
   setSafeMovementData, setBankData, setStoreDenomData,
@@ -13,6 +13,27 @@ const StoreSafeHeader = ({
   setEditingDeposit, setDepositData, setShowEditDepositModal,
   handleDeleteDeposit, toast, can, canViewCashSection
 }) => {
+  if (storeLoading) {
+    return (
+      <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden animate-pulse">
+        <div className="flex items-center justify-between gap-6">
+           <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/10" />
+              <div className="space-y-2">
+                <div className="h-4 w-32 bg-white/10 rounded" />
+                <div className="h-3 w-48 bg-white/10 rounded" />
+              </div>
+           </div>
+           <div className="h-10 w-40 bg-white/10 rounded-2xl" />
+        </div>
+        <div className="grid grid-cols-6 gap-4 mt-8">
+           {[...Array(6)].map((_, i) => (
+             <div key={i} className="h-20 bg-white/5 rounded-2xl" />
+           ))}
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden group">
       <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
@@ -33,7 +54,11 @@ const StoreSafeHeader = ({
                     <div className="flex flex-col gap-2">
                       <span className="flex items-center gap-2">
                         <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">Active • Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}</span>
+                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
+                          Active • Balance: ₹{storeRegisterData?.liveMetrics?.availableCash?.toLocaleString()} 
+                          <span className="text-white/20 mx-2">|</span>
+                          Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}
+                        </span>
                       </span>
 
                       {storeRegisterData.previousRegister && Math.abs(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash) > 0.01 && (
@@ -264,10 +289,6 @@ const StoreSafeHeader = ({
                   <p className="text-xl font-black text-white tabular-nums">
                     ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
                   </p>
-                  <div className="mt-2 pt-2 border-t border-emerald-800/50 flex items-center justify-between">
-                    <span className="text-[8px] font-bold text-emerald-500 uppercase">Total Cash</span>
-                    <span className="text-[10px] font-black text-emerald-300">₹{Math.abs(storeRegisterData?.liveMetrics?.totalStoreCash || 0).toFixed(2)}</span>
-                  </div>
                 </div>
               </div>
             )}

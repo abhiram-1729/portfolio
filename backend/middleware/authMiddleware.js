@@ -10,32 +10,54 @@ export const protect = async (req, res, next) => {
             token = req.headers.authorization.split(' ')[1];
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-            req.user = await prisma.user.findUnique({
-                where: { id: decoded.id },
-                select: { 
-                    id: true, 
-                    name: true, 
-                    email: true, 
-                    role: true, 
-                    assignedVehicleId: true, 
-                    tenantId: true, 
-                    storeId: true, 
-                    customRoleId: true, 
-                    customRole: { select: { permissions: true, name: true, portalType: true } } 
-                }
-            });
+            try {
+                req.user = await prisma.user.findUnique({
+                    where: { id: decoded.id },
+                    select: { 
+                        id: true, 
+                        name: true, 
+                        email: true, 
+                        role: true, 
+                        assignedVehicleId: true, 
+                        tenantId: true, 
+                        storeId: true, 
+                        customRoleId: true, 
+                        customRole: { select: { permissions: true, name: true, portalType: true } } 
+                    }
+                });
+            } catch (dbError) {
+                console.error('[AuthMiddleware Database Error]', dbError.message);
+                res.status(500);
+                return next(new Error('Database error during authentication'));
+            }
 
             if (!req.user) {
-              return res.status(401).json({ message: 'User not found' });
+              res.status(401);
+              return next(new Error('User not found'));
             }
 
             // Set Tenant Context
             tenantContext.run({ tenantId: req.user.tenantId }, () => {
               next();
             });
-            return; // Important: don't call next() again outside
+            return; 
         } catch (error) {
             console.error('[AuthMiddleware Error]', error.message);
+            
+            // If it's a database connection error, return 503 instead of 401
+            // This prevents the frontend from logging out the user when the DB is just busy
+            const isDbError = error.message.includes('Prisma') || 
+                              error.message.includes('connection') || 
+                              error.message.includes('Pool') ||
+                              error.message.includes('terminated');
+
+            if (isDbError) {
+              return res.status(503).json({ 
+                message: 'Database is busy, please wait...',
+                error: error.message 
+              });
+            }
+
             res.status(401);
             return next(new Error('Not authorized, token failed'));
         }

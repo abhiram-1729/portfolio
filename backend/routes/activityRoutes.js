@@ -4,7 +4,7 @@ import prisma from '../utils/prisma.js';
 
 const router = express.Router();
 
-// @desc    Get current user's activity logs
+// @desc    Get current user's activity logs gfhgfg
 // @route   GET /api/activities/my
 // @access  Private
 router.get('/my', protect, async (req, res, next) => {
@@ -46,10 +46,10 @@ router.get('/my', protect, async (req, res, next) => {
         });
     } catch (error) {
         console.error('[ActivityRoutes Error]', error);
-        res.status(500).json({ 
-          success: false, 
-          message: 'Error fetching activity logs',
-          error: error.message 
+        res.status(500).json({
+            success: false,
+            message: 'Error fetching activity logs',
+            error: error.message
         });
     }
 });

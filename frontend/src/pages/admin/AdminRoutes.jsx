@@ -21,7 +21,12 @@ import {
   Target,
   Hexagon,
   Circle as CircleIcon,
-  RotateCcw
+  RotateCcw,
+  FileText,
+  Download,
+  Navigation,
+  ShoppingBag,
+  Coins
 } from 'lucide-react';
 import { GoogleMap, useJsApiLoader, MarkerF, PolygonF, CircleF, InfoWindow } from '@react-google-maps/api';
 import * as turf from '@turf/turf';
@@ -31,6 +36,10 @@ import toast from 'react-hot-toast';
 import { useSearchParams, useLocation } from 'react-router-dom';
 import { useUserStore } from '../../store/userStore';
 import StoreSelector from './StoreSelector';
+import * as XLSX from 'xlsx';
+import { generateReportPDF } from './adminreports/ReportUtils';
+import VehicleSalesSection from './admin_vehicles/VehicleSalesSection';
+import RouteCollectionSection from './admin_vehicles/RouteCollectionSection';
 
 export default function AdminRoutes() {
   const [villages, setVillages] = useState([]);
@@ -38,12 +47,21 @@ export default function AdminRoutes() {
   const [assignments, setAssignments] = useState([]);
   const [vehicles, setVehicles] = useState([]);
   const [users, setUsers] = useState([]);
+  const [stores, setStores] = useState([]);
   const [loading, setLoading] = useState(true);
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
 
+  const isAdmin = currentUser?.role === 'ADMIN' || currentUser?.role === 'TENANT_OWNER';
+  
+  const [searchParams, setSearchParams] = useSearchParams();
+  const urlTab = searchParams.get('tab');
+  const storeId = searchParams.get('storeId');
+  const location = useLocation();
+
   const getInitialTab = () => {
-    if (!currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
+    if (urlTab && ['villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab)) return urlTab;
+    if (isAdmin || !currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
     const sections = currentUser.permissions.ROUTE_TARGET_SECTIONS;
     if (sections.includes('VILLAGES')) return 'villages';
     if (sections.includes('ROUTES')) return 'routes';
@@ -52,6 +70,21 @@ export default function AdminRoutes() {
   };
 
   const [activeTab, setActiveTab] = useState(getInitialTab());
+
+  useEffect(() => {
+    if (urlTab && ['villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab) && urlTab !== activeTab) {
+      setActiveTab(urlTab);
+    }
+  }, [urlTab]);
+
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    setSearchParams(prev => {
+      prev.set('tab', tab);
+      return prev;
+    });
+  };
+  
   const [villagePage, setVillagePage] = useState(1);
   const [routePage, setRoutePage] = useState(1);
   const [assignmentPage, setAssignmentPage] = useState(1);
@@ -92,27 +125,32 @@ export default function AdminRoutes() {
   const [routeForm, setRouteForm] = useState({ id: '', routeName: '', selectedVillages: [] });
   const [assignmentForm, setAssignmentForm] = useState({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' });
 
-  const [searchParams, setSearchParams] = useSearchParams();
-  const storeId = searchParams.get('storeId');
-  const location = useLocation();
 
   const fetchData = async () => {
     setIsVillagesLoading(true);
     setIsRoutesLoading(true);
     setIsAssignmentsLoading(true);
     try {
-      const [vRes, rRes, aRes, vehRes, uRes] = await Promise.all([
+      const [vRes, rRes, aRes, vehRes, uRes, sRes] = await Promise.all([
         routeService.getVillages({ storeId }),
         routeService.getAdminRoutes({ storeId }),
         routeService.getRouteAssignments({ storeId }),
         adminAPI.getVehicles({ storeId }),
-        adminAPI.getUsers({ storeId })
+        adminAPI.getUsers({ storeId }),
+        adminAPI.getStores()
       ]);
       setVillages(vRes);
       setRoutes(rRes);
       setAssignments(aRes);
       setVehicles(vehRes.data);
+      const fetchedStores = sRes.data?.success ? sRes.data.data : (sRes.data || []);
+      setStores(fetchedStores);
       setUsers(uRes.data.filter(u => u.role === 'SALES_AGENT' || u.role === 'SUPERVISOR'));
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeId) {
+        setSearchParams({ storeId: fetchedStores[0].id });
+      }
     } catch (error) {
       toast.error('Failed to fetch data');
       console.error(error);
@@ -132,22 +170,83 @@ export default function AdminRoutes() {
   useEffect(() => { setRoutePage(1); }, [routeSearchQuery, storeId]);
   useEffect(() => { setAssignmentPage(1); }, [assignmentSearchQuery, storeId]);
 
-  const filteredVillages = villages.filter(v => v.name.toLowerCase().includes(villageSearchQuery.toLowerCase()));
+  const filteredVillages = villages.filter(v => {
+    if (storeId && v.storeId !== storeId) return false;
+    return v.name.toLowerCase().includes(villageSearchQuery.toLowerCase());
+  });
   const totalVillagePages = Math.ceil(filteredVillages.length / ITEMS_PER_PAGE);
   const paginatedVillages = filteredVillages.slice((villagePage - 1) * ITEMS_PER_PAGE, villagePage * ITEMS_PER_PAGE);
 
-  const filteredRoutes = routes.filter(r => r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase()));
+  const filteredRoutes = routes.filter(r => {
+    if (storeId && r.storeId !== storeId) return false;
+    return r.routeName.toLowerCase().includes(routeSearchQuery.toLowerCase());
+  });
   const totalRoutePages = Math.ceil(filteredRoutes.length / ITEMS_PER_PAGE);
   const paginatedRoutes = filteredRoutes.slice((routePage - 1) * ITEMS_PER_PAGE, routePage * ITEMS_PER_PAGE);
 
   const q = assignmentSearchQuery.toLowerCase();
-  const filteredAssignments = assignments.filter(a =>
-    a.route?.routeName?.toLowerCase().includes(q) ||
-    a.user?.name?.toLowerCase().includes(q) ||
-    a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
-  );
+  const filteredAssignments = assignments.filter(a => {
+    // If storeId is set, only show assignments for vehicles in that store
+    if (storeId && a.vehicle?.storeId !== storeId) return false;
+    return (
+      a.route?.routeName?.toLowerCase().includes(q) ||
+      a.user?.name?.toLowerCase().includes(q) ||
+      a.vehicle?.vehicleNumber?.toLowerCase().includes(q)
+    );
+  });
   const totalAssignmentPages = Math.ceil(filteredAssignments.length / ITEMS_PER_PAGE);
   const paginatedAssignments = filteredAssignments.slice((assignmentPage - 1) * ITEMS_PER_PAGE, assignmentPage * ITEMS_PER_PAGE);
+
+  const handleExportPDF = () => {
+    const dataMap = {
+      'villages': filteredVillages,
+      'routes': filteredRoutes,
+      'assignments': filteredAssignments
+    };
+    const reportType = activeTab === 'routes' ? 'routes-list' : activeTab;
+    generateReportPDF(reportType, dataMap[activeTab]);
+  };
+
+  const handleExportExcel = () => {
+    try {
+      let exportData = [];
+      let filename = 'Export';
+      
+      if (activeTab === 'villages') {
+        exportData = filteredVillages.map(v => ({
+          'Village Name': v.name,
+          'Latitude': v.latitude || 'N/A',
+          'Longitude': v.longitude || 'N/A',
+          'Radius': `${v.radius || 500}m`,
+          'Type': v.isPolygon ? 'Polygon' : 'Circle'
+        }));
+        filename = 'Villages';
+      } else if (activeTab === 'routes') {
+        exportData = filteredRoutes.map(r => ({
+          'Route Name': r.routeName,
+          'Villages': r.villages?.join(', '),
+          'Store': r.store?.name || 'All'
+        }));
+        filename = 'Routes';
+      } else if (activeTab === 'assignments') {
+        exportData = filteredAssignments.map(a => ({
+          'Agent': a.user?.name,
+          'Vehicle': a.vehicle?.vehicleNumber,
+          'Route': a.route?.routeName,
+          'Schedule': Object.entries(a.schedule || {}).filter(([_, s]) => s.morning || s.evening).map(([d]) => d).join(', ')
+        }));
+        filename = 'Assignments';
+      }
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, filename);
+      XLSX.writeFile(wb, `${filename}_Export_${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast.success('Excel exported successfully');
+    } catch (error) {
+      toast.error('Failed to export Excel');
+    }
+  };
 
   // Helper for map interaction - now handled via GoogleMap props
 
@@ -216,7 +315,8 @@ export default function AdminRoutes() {
           longitude: villageForm.longitude ? parseFloat(villageForm.longitude) : null,
           radius: parseInt(villageForm.radius) || 500,
           isPolygon: villageForm.isPolygon,
-          boundary: villageForm.boundary
+          boundary: villageForm.boundary,
+          storeId: storeId || currentUser?.storeId
         });
         toast.success('Village created');
       }
@@ -264,10 +364,10 @@ export default function AdminRoutes() {
       };
 
       if (routeForm.id) {
-        await routeService.updateRoute(routeForm.id, payload);
+        await routeService.updateRoute(routeForm.id, { ...payload, storeId: storeId || currentUser?.storeId });
         toast.success('Route updated');
       } else {
-        await routeService.createRoute(payload);
+        await routeService.createRoute({ ...payload, storeId: storeId || currentUser?.storeId });
         toast.success('Route created');
       }
       setIsRouteEditorOpen(false);
@@ -291,10 +391,10 @@ export default function AdminRoutes() {
     setIsSubmitting(true);
     try {
       if (assignmentForm.id) {
-        await routeService.updateRouteAssignment(assignmentForm.id, assignmentForm);
+        await routeService.updateRouteAssignment(assignmentForm.id, { ...assignmentForm, storeId: storeId || currentUser?.storeId });
         toast.success('Assignment updated');
       } else {
-        await routeService.assignRoute(assignmentForm);
+        await routeService.assignRoute({ ...assignmentForm, storeId: storeId || currentUser?.storeId });
         toast.success('Assignment created');
       }
       setShowAssignModal(false);
@@ -307,69 +407,206 @@ export default function AdminRoutes() {
     }
   };
 
-  // Gatekeeper
-  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN';
-  const isTenantRoute = location.pathname.includes('/tenant/');
+  const renderClassifiedRoutes = () => {
+    if (!storeId && stores.length > 1) {
+      const personnelByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.id !== currentUser?.id) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
 
-  if (isGlobalRole && isTenantRoute && !storeId) {
-    return (
-      <StoreSelector
-        title="Route & Coverage"
-        description="Please select a store branch to manage its routes and agent assignments."
-        onSelect={(id) => {
-          setSearchParams({ storeId: id });
-        }}
-      />
-    );
-  }
+      return (
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Operations</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to manage its routes and coverage area</p>
+          </div>
+          {stores.map(store => {
+            const storeRoutes = routes.filter(r => r.storeId === store.id);
+            const personnelCount = personnelByStore[store.id] || 0;
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
+              >
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <MapPin size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                  <div className="hidden lg:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Coverage</span>
+                    <span className="text-sm font-bold text-gray-900">{villages.filter(v => v.storeId === store.id).length} Villages</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Active Routes</span>
+                    <span className="text-sm font-bold text-gray-900">{storeRoutes.length} Clusters</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Personnel</span>
+                    <span className="text-sm font-bold text-gray-900">{personnelCount} Members</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ChevronRight size={20} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <MapPin size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+;
+
+  const classifiedView = renderClassifiedRoutes();
+  if (classifiedView) return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
+        <p className="text-sm text-gray-500">Categorize your logistics by branch</p>
+      </div>
+      {classifiedView}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Header & Tabs */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-bold text-gray-900 tracking-tight">Route & Coverage</h2>
-          <div className="flex items-center gap-2">
-            <p className="text-sm text-gray-500">Manage villages, routes, and agent schedules</p>
-            {isTenantRoute && storeId && (
-              <>
-                <span className="text-gray-300">•</span>
-                <button
-                  onClick={() => setSearchParams({})}
-                  className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
-                >
-                  Change Store
-                </button>
-              </>
+      {/* Header & Tabs Container */}
+      <div className="flex flex-col gap-5 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-xs">
+        {/* Top Row: Title, Description & Actions */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+          {/* Left: Title & Subtitle */}
+          <div className="flex items-start gap-3">
+            {storeId && stores.length > 1 && (
+              <button
+                onClick={() => setSearchParams({})}
+                className="p-2.5 bg-gray-50 border border-gray-100/80 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/50 transition-all shadow-2xs active:scale-95 mt-0.5"
+                title="Back to All Branches"
+              >
+                <ChevronLeft size={18} strokeWidth={2.5} />
+              </button>
             )}
+            <div className="flex flex-col gap-1 text-left">
+              <div className="flex items-center gap-3">
+                <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none">Route & Coverage</h2>
+                {stores.length > 1 && (
+                  <select
+                    value={storeId || ''}
+                    onChange={(e) => {
+                      if (e.target.value) {
+                        setSearchParams({ storeId: e.target.value });
+                      } else {
+                        setSearchParams({});
+                      }
+                    }}
+                    className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2.5 pr-6 py-1 rounded-lg border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
+                    style={{
+                      backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                      backgroundPosition: 'right 0.35rem center',
+                      backgroundRepeat: 'no-repeat',
+                      backgroundSize: '1rem'
+                    }}
+                  >
+                    <option value="">All Branches</option>
+                    {stores.map(s => (
+                      <option key={s.id} value={s.id}>{s.name}</option>
+                    ))}
+                  </select>
+                )}
+              </div>
+              <p className="text-xs font-bold text-gray-400 tracking-wide">Manage villages, active routes, sales distribution, and collection cycles</p>
+            </div>
+          </div>
+
+          {/* Right: Export Control Actions */}
+          <div className="flex items-center gap-2 self-end lg:self-center shrink-0">
+            <button
+              onClick={handleExportPDF}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-100 rounded-xl text-rose-500 hover:bg-rose-50 hover:border-rose-100 transition-all shadow-2xs text-xs font-bold"
+              title="Export PDF Report"
+            >
+              <FileText size={15} strokeWidth={2.5} />
+              <span className="hidden sm:inline">PDF</span>
+            </button>
+            <button
+              onClick={handleExportExcel}
+              className="flex items-center gap-2 px-3 py-2 bg-white border border-gray-100 rounded-xl text-emerald-600 hover:bg-emerald-50 hover:border-emerald-100 transition-all shadow-2xs text-xs font-bold"
+              title="Export Excel Report"
+            >
+              <Download size={15} strokeWidth={2.5} />
+              <span className="hidden sm:inline">Excel</span>
+            </button>
           </div>
         </div>
 
-        <div className="flex items-center bg-gray-100 p-1 rounded-2xl w-fit overflow-x-auto">
-          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
-            <button
-              onClick={() => setActiveTab('villages')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'villages' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Villages
-            </button>
-          )}
-          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
-            <button
-              onClick={() => setActiveTab('routes')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'routes' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Routes
-            </button>
-          )}
-          {(!currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
-            <button
-              onClick={() => setActiveTab('assignments')}
-              className={`px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === 'assignments' ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
-            >
-              Assignments
-            </button>
-          )}
+        {/* Bottom Row: Fully Horizontally Scrollable Professional Tabs */}
+        <div className="pt-2 border-t border-gray-50">
+          <div className="w-full overflow-x-auto custom-scrollbar pb-1.5">
+            <div className="flex items-center gap-1.5 bg-gray-50/80 p-1.5 rounded-2xl w-fit min-w-max border border-gray-100/80 shadow-2xs">
+              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
+                <button
+                  onClick={() => handleTabChange('villages')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'villages' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                >
+                  <MapPin size={15} strokeWidth={2.5} />
+                  <span>Village</span>
+                </button>
+              )}
+              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
+                <button
+                  onClick={() => handleTabChange('routes')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'routes' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                >
+                  <Navigation size={15} strokeWidth={2.5} />
+                  <span>Routes</span>
+                </button>
+              )}
+              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
+                <button
+                  onClick={() => handleTabChange('assignments')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'assignments' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+                >
+                  <ClipboardList size={15} strokeWidth={2.5} />
+                  <span>Assignments</span>
+                </button>
+              )}
+              <button
+                onClick={() => handleTabChange('sales')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'sales' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+              >
+                <ShoppingBag size={15} strokeWidth={2.5} />
+                <span>Sales</span>
+              </button>
+              <button
+                onClick={() => handleTabChange('collections')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'collections' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+              >
+                <Coins size={15} strokeWidth={2.5} />
+                <span>Collections</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -622,14 +859,14 @@ export default function AdminRoutes() {
                         />
                       </div>
                     ) : (
-                      <div className="p-5 bg-indigo-50/50 rounded-3xl border border-indigo-100/50 space-y-3">
-                        <label className="text-[10px] font-black text-indigo-600 uppercase tracking-widest block">Polygon Points</label>
+                      <div className="p-5 bg-emerald-50/50 rounded-3xl border border-emerald-100/50 space-y-3">
+                        <label className="text-[10px] font-black text-emerald-600 uppercase tracking-widest block">Polygon Points</label>
                         <div className="max-h-[150px] overflow-y-auto space-y-2 custom-scrollbar pr-2">
                           {polygonPoints.length === 0 ? (
                             <p className="text-[10px] text-gray-400 italic">No points added yet. Click the map to draw your boundary.</p>
                           ) : (
                             polygonPoints.map((p, i) => (
-                              <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-indigo-50 shadow-sm">
+                              <div key={i} className="flex items-center justify-between bg-white p-2.5 rounded-xl border border-emerald-50 shadow-sm">
                                 <span className="text-[10px] font-bold text-gray-600">Point {i + 1}: {p.lat.toFixed(4)}, {p.lng.toFixed(4)}</span>
                                 <button
                                   type="button"
@@ -923,7 +1160,7 @@ export default function AdminRoutes() {
                           return acc;
                         }, []);
 
-                        const availableVillages = villages.filter(v => !assignedVillages.includes(v.name));
+                        const availableVillages = villages.filter(v => !assignedVillages.includes(v.name) && (storeId ? v.storeId === storeId : true));
 
                         if (availableVillages.length === 0) return <p className="text-[10px] text-gray-400 italic p-4 text-center">No villages available for clustering</p>;
 
@@ -1127,7 +1364,7 @@ export default function AdminRoutes() {
             {can('ROUTES', 'CREATE') && (
               <button
                 onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
-                className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-indigo-600/20 hover:bg-indigo-700 transition-all active:scale-[0.98]"
+                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
               >
                 <Plus size={16} strokeWidth={3} /> New Assignment
               </button>
@@ -1136,7 +1373,7 @@ export default function AdminRoutes() {
 
           {isAssignmentsLoading ? (
             <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm py-20 flex flex-col items-center justify-center gap-4">
-              <Loader2 className="animate-spin text-indigo-600" size={32} />
+              <Loader2 className="animate-spin text-emerald-600" size={32} />
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Compiling Assignments...</p>
             </div>
           ) : (
@@ -1162,7 +1399,7 @@ export default function AdminRoutes() {
                                 schedule: a.schedule || null
                               });
                               setShowAssignModal(true);
-                            }} className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"><Pencil size={15} /></button>
+                            }} className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><Pencil size={15} /></button>
                           )}
                           {can('ROUTES', 'DELETE') && (
                             <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15} /></button>
@@ -1179,7 +1416,7 @@ export default function AdminRoutes() {
                           <span className="text-sm font-black text-gray-800 leading-none">{a.user?.name}</span>
                         </div>
                       </div>
-                      <div className="bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100/50 space-y-2">
+                      <div className="bg-emerald-50/50 p-4 rounded-2xl border border-emerald-100/50 space-y-2">
                         {(() => {
                           const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                           const today = days[new Date().getDay()];
@@ -1187,12 +1424,12 @@ export default function AdminRoutes() {
                           return (
                             <>
                               <div className="flex items-center justify-between">
-                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Morning ({today})</span>
-                                <span className="text-xs font-black text-indigo-700">{todaySchedule.morning || 'OFF'}</span>
+                                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Today Morning ({today})</span>
+                                <span className="text-xs font-black text-emerald-700">{todaySchedule.morning || 'OFF'}</span>
                               </div>
-                              <div className="flex items-center justify-between pt-1 border-t border-indigo-100/30">
-                                <span className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">Today Evening ({today})</span>
-                                <span className="text-xs font-black text-indigo-700">{todaySchedule.evening || 'OFF'}</span>
+                              <div className="flex items-center justify-between pt-1 border-t border-emerald-100/30">
+                                <span className="text-[10px] font-black uppercase text-emerald-400 tracking-wider">Today Evening ({today})</span>
+                                <span className="text-xs font-black text-emerald-700">{todaySchedule.evening || 'OFF'}</span>
                               </div>
                             </>
                           );
@@ -1229,8 +1466,8 @@ export default function AdminRoutes() {
                           <td className="px-8 py-6">
                             <div className="flex flex-col gap-3">
                               <div className="flex items-center gap-3">
-                                <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100">
-                                  <MapPin size={14} className="fill-indigo-600/10" />
+                                <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100">
+                                  <MapPin size={14} className="fill-emerald-600/10" />
                                 </div>
                                 <span className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</span>
                               </div>
@@ -1249,7 +1486,7 @@ export default function AdminRoutes() {
                           </td>
                           <td className="px-8 py-6">
                             <div className="flex flex-col items-center gap-2">
-                              <div className="bg-indigo-50/50 p-3 rounded-2xl border border-indigo-100/30 w-full max-w-[200px]">
+                              <div className="bg-emerald-50/50 p-3 rounded-2xl border border-emerald-100/30 w-full max-w-[200px]">
                                 {(() => {
                                   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
                                   const today = days[new Date().getDay()];
@@ -1257,12 +1494,12 @@ export default function AdminRoutes() {
                                   return (
                                     <div className="space-y-1.5 grayscale-[0.3]">
                                       <div className="flex justify-between items-baseline">
-                                        <span className="text-[8px] font-black text-indigo-400 uppercase">{today} AM</span>
-                                        <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
+                                        <span className="text-[8px] font-black text-emerald-400 uppercase">{today} AM</span>
+                                        <span className="text-[10px] font-black text-emerald-800 uppercase truncate ml-2">{todaySchedule.morning || '--'}</span>
                                       </div>
-                                      <div className="flex justify-between items-baseline pt-1 border-t border-indigo-100/20">
-                                        <span className="text-[8px] font-black text-indigo-400 uppercase">{today} PM</span>
-                                        <span className="text-[10px] font-black text-indigo-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
+                                      <div className="flex justify-between items-baseline pt-1 border-t border-emerald-100/20">
+                                        <span className="text-[8px] font-black text-emerald-400 uppercase">{today} PM</span>
+                                        <span className="text-[10px] font-black text-emerald-800 uppercase truncate ml-2">{todaySchedule.evening || '--'}</span>
                                       </div>
                                     </div>
                                   );
@@ -1289,7 +1526,7 @@ export default function AdminRoutes() {
                                     schedule: a.schedule || null
                                   });
                                   setShowAssignModal(true);
-                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15} /></button>
+                                }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15} /></button>
                               )}
                               {can('ROUTES', 'DELETE') && (
                                 <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15} /></button>
@@ -1317,7 +1554,7 @@ export default function AdminRoutes() {
                 <button
                   onClick={() => setAssignmentPage(prev => Math.max(1, prev - 1))}
                   disabled={assignmentPage === 1}
-                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
                 >
                   <ChevronLeft size={16} />
                 </button>
@@ -1330,7 +1567,7 @@ export default function AdminRoutes() {
                         <button
                           key={pageNum}
                           onClick={() => setAssignmentPage(pageNum)}
-                          className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
+                          className={`w-9 h-9 rounded-xl text-[10px] font-black transition-all ${assignmentPage === pageNum ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50'}`}
                         >
                           {pageNum}
                         </button>
@@ -1345,7 +1582,7 @@ export default function AdminRoutes() {
                 <button
                   onClick={() => setAssignmentPage(prev => Math.min(totalAssignmentPages, prev + 1))}
                   disabled={assignmentPage === totalAssignmentPages}
-                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-indigo-600 hover:border-indigo-100 hover:bg-indigo-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
+                  className="p-2 rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 disabled:opacity-30 disabled:hover:bg-transparent disabled:hover:border-gray-100 disabled:hover:text-gray-400 transition-all"
                 >
                   <ChevronRight size={16} />
                 </button>
@@ -1355,13 +1592,27 @@ export default function AdminRoutes() {
         </div>
       )}
 
+      {/* --- SALES TAB --- */}
+      {activeTab === 'sales' && (
+        <div className="animate-fade-in">
+          <VehicleSalesSection storeId={storeId} />
+        </div>
+      )}
+
+      {/* --- COLLECTIONS TAB --- */}
+      {activeTab === 'collections' && (
+        <div className="animate-fade-in">
+          <RouteCollectionSection storeId={storeId} />
+        </div>
+      )}
+
       {/* --- MODALS --- */}
 
       {/* Assign Modal */}
       {showAssignModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-indigo-500" /> Assign Route</h3>
+            <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><LayoutGrid className="text-emerald-500" /> Assign Route</h3>
             <form onSubmit={handleSaveAssignment} className="space-y-4">
               <div className="space-y-1">
                 <label className="text-xs font-bold text-gray-400 uppercase ml-1">Route <span className="text-rose-500">*</span></label>
@@ -1385,7 +1636,7 @@ export default function AdminRoutes() {
                   });
                 }}>
                   <option value="">Select Agent</option>
-                  {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
+                  {users.filter(u => u.storeId === storeId || !u.storeId).map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                 </select>
               </div>
 
@@ -1409,19 +1660,19 @@ export default function AdminRoutes() {
                   <div className="space-y-4 pt-4 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <label className="text-xs font-bold text-gray-400 uppercase tracking-widest">Weekly Field Schedule <span className="text-rose-500">*</span></label>
-                      <span className="text-[10px] bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
+                      <span className="text-[10px] bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-black uppercase">Morning / Evening</span>
                     </div>
 
                     <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2 custom-scrollbar">
                       {daysOfWeek.map(day => (
-                        <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-indigo-100 transition-all">
+                        <div key={day} className="bg-gray-50 rounded-2xl p-3 border border-gray-100/50 flex flex-col gap-2 group hover:border-emerald-100 transition-all">
                           <div className="flex items-center justify-between">
                             <span className="text-xs font-black text-gray-900 uppercase tracking-tight">{day}</span>
                           </div>
 
                           <div className="grid grid-cols-2 gap-2">
                             <select
-                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500"
                               value={assignmentForm.schedule[day]?.morning || ''}
                               onChange={e => setAssignmentForm({
                                 ...assignmentForm,
@@ -1433,7 +1684,7 @@ export default function AdminRoutes() {
                             </select>
 
                             <select
-                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-indigo-500"
+                              className="w-full bg-white border border-gray-200 p-2 rounded-xl text-xs font-bold outline-none focus:border-emerald-500"
                               value={assignmentForm.schedule[day]?.evening || ''}
                               onChange={e => setAssignmentForm({
                                 ...assignmentForm,
@@ -1451,7 +1702,7 @@ export default function AdminRoutes() {
                 );
               })()}
 
-              <button type="submit" disabled={isSubmitting} className="w-full bg-indigo-600 text-white p-3 pt-4 pb-4 mt-4 rounded-xl font-bold">Assign</button>
+              <button type="submit" disabled={isSubmitting} className="w-full bg-emerald-600 text-white p-3 pt-4 pb-4 mt-4 rounded-xl font-bold">Assign</button>
               <button type="button" onClick={() => setShowAssignModal(false)} className="w-full bg-gray-100 text-gray-600 p-3 rounded-xl font-bold mt-2">Cancel</button>
             </form>
           </div>

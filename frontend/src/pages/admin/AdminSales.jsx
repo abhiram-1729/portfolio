@@ -1,6 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  FileDown, Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, ChevronLeft, 
+  Loader2, ArrowLeft, User, Smartphone, Shield, Coins, Package, Info, MapPin, Printer, Clock, 
+  CreditCard, Wallet, CalendarClock, Map, Building2, Tag, CheckCircle2, AlertCircle, RefreshCw, 
+  FileText, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Lock, Unlock, BarChart3,
+  FileSpreadsheet, Upload
+} from 'lucide-react';
 import { format } from 'date-fns';
-import { FileDown, Search, Filter, ShoppingCart, Calendar, Truck, Download, ChevronRight, ChevronLeft, Loader2, ArrowLeft, User, Smartphone, Shield, Coins, Package, Info, MapPin, Printer, Clock, CreditCard, Wallet, CalendarClock, Map, Building2, Tag, CheckCircle2, AlertCircle, RefreshCw, FileText, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Lock, Unlock, BarChart3 } from 'lucide-react';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
 import StoreSelector from './StoreSelector';
 import { useUserStore } from '../../store/userStore';
@@ -9,7 +15,9 @@ import { ordersAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 import { jsPDF } from 'jspdf';
-
+import { generateReportPDF } from './adminreports/ReportUtils';
+import ManualSaleDrawer from './ManualSaleDrawer';
+import CustomerManagement from './customers/CustomerManagement';
 export default function AdminSales() {
   // Add Print Styles
   useEffect(() => {
@@ -57,11 +65,18 @@ export default function AdminSales() {
 
   const [sales, setSales] = useState([]);
   const [stores, setStores] = useState([]);
+  const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterDate, setFilterDate] = useState('Today');
+  const [saleType, setSaleType] = useState('ALL'); // ALL, POS, AGENT
   const [currentPage, setCurrentPage] = useState(1);
   const [viewingOrder, setViewingOrder] = useState(null);
+  const [showCreateSale, setShowCreateSale] = useState(false);
+  const [showBulkUploadModal, setShowBulkUploadModal] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState('');
+  const [autoCreateProducts, setAutoCreateProducts] = useState(true);
   const ITEMS_PER_PAGE = 10;
 
   // ── Order Edit / Return / Cancel States ──
@@ -79,9 +94,12 @@ export default function AdminSales() {
   const [sessionData, setSessionData] = useState(null);
   const [sessionLoading, setSessionLoading] = useState(false);
 
-  // ── New Tab & Analytics States ──
-  const [activeTab, setActiveTab] = useState('All'); // 'All', 'Admins', 'Agent', 'Customer'
+  // ── Global & Sub-Tab States ──
+  const [activeTab, setActiveTab] = useState('sales'); // 'sales', 'customers', 'analytics'
+  const [roleTab, setRoleTab] = useState('All'); // 'All', 'Admins', 'Agent', 'Customer'
   const [viewMode, setViewMode] = useState('list'); // 'list' or 'analytics'
+  
+  // ── Analytics States ──
   const [analyticsData, setAnalyticsData] = useState({
     trends: [],
     topProducts: [],
@@ -89,7 +107,79 @@ export default function AdminSales() {
     topCustomers: []
   });
   const [loadingAnalytics, setLoadingAnalytics] = useState(false);
+  const [customerSearchQuery, setCustomerSearchQuery] = useState('');
 
+  // ── Customer Data Extraction (develop branch feature) ──
+  const customerData = useMemo(() => {
+    const customersMap = new globalThis.Map();
+
+    sales.forEach(sale => {
+      const mobile = sale.mobile || 'Walk-in';
+      const name = sale.customerName || 'Walk-in Customer';
+      const identifier = mobile === 'Walk-in' && name !== 'Walk-in Customer' ? name : mobile;
+
+      if (!customersMap.has(identifier)) {
+        customersMap.set(identifier, {
+          id: identifier,
+          mobile: sale.mobile || 'N/A',
+          name: name,
+          totalSpent: 0,
+          totalOrders: 0,
+          lastOrderDate: sale.createdAt,
+          itemsBought: {}
+        });
+      }
+
+      const cust = customersMap.get(identifier);
+      cust.totalSpent += sale.totalAmount || 0;
+      cust.totalOrders += 1;
+      
+      // Update last order date if this sale is more recent
+      if (new Date(sale.createdAt) > new Date(cust.lastOrderDate)) {
+        cust.lastOrderDate = sale.createdAt;
+      }
+
+      // Track items bought to find favorite product
+      sale.items?.forEach(item => {
+        const productName = item.product?.name || item.productName || 'Unknown Product';
+        if (!cust.itemsBought[productName]) {
+          cust.itemsBought[productName] = 0;
+        }
+        cust.itemsBought[productName] += item.quantity || 1;
+      });
+    });
+
+    return Array.from(customersMap.values()).map(cust => {
+      // Find favorite product
+      let favoriteProduct = 'N/A';
+      let maxQty = 0;
+      for (const [prod, qty] of Object.entries(cust.itemsBought)) {
+        if (qty > maxQty) {
+          maxQty = qty;
+          favoriteProduct = prod;
+        }
+      }
+      return { ...cust, favoriteProduct };
+    }).sort((a, b) => b.totalSpent - a.totalSpent);
+  }, [sales]);
+
+  // Analytics Metrics Memo
+  const customerAnalytics = useMemo(() => {
+    if (customerData.length === 0) return null;
+    
+    // Top 5 spenders
+    const topSpenders = [...customerData].sort((a, b) => b.totalSpent - a.totalSpent).slice(0, 5);
+    
+    // Most frequent buyers
+    const frequentBuyers = [...customerData].sort((a, b) => b.totalOrders - a.totalOrders).slice(0, 5);
+
+    return { topSpenders, frequentBuyers };
+  }, [customerData]);
+
+  const filteredCustomers = customerData.filter(c => 
+    c.name.toLowerCase().includes(customerSearchQuery.toLowerCase()) || 
+    c.mobile.includes(customerSearchQuery)
+  );
 
   const [searchParams, setSearchParams] = useSearchParams();
   const storeFilterId = searchParams.get('storeId');
@@ -105,15 +195,20 @@ export default function AdminSales() {
       if (filterDate === 'Today') {
         params.fromDate = new Date().toISOString().split('T')[0];
       }
-      // Add more filter logic if needed
 
-      const [salesRes, storesRes] = await Promise.all([
+      const [salesRes, storesRes, usersRes] = await Promise.all([
         adminAPI.getSales(params),
-        adminAPI.getStores()
+        adminAPI.getStores(),
+        adminAPI.getUsers()
       ]);
       setSales(salesRes.data);
-      if (storesRes.data?.success) {
-        setStores(storesRes.data.data);
+      const fetchedStores = storesRes.data?.success ? storesRes.data.data : (storesRes.data || []);
+      setStores(fetchedStores);
+      setUsers(usersRes.data || []);
+
+      // Auto-select if only one store exists
+      if (fetchedStores.length === 1 && !storeFilterId) {
+        setSearchParams({ storeId: fetchedStores[0].id });
       }
     } catch (error) {
       toast.error('Failed to fetch sales history');
@@ -132,7 +227,7 @@ export default function AdminSales() {
 
   // Aggregated Customer List for the "Customer" Tab
   const customerList = React.useMemo(() => {
-    if (activeTab !== 'Customer') return [];
+    if (roleTab !== 'Customer') return [];
     const customerMap = {};
     sales.forEach(s => {
       if (!s.mobile) return;
@@ -161,7 +256,7 @@ export default function AdminSales() {
       result = result.filter(c => c.name.toLowerCase().includes(q) || c.mobile.includes(q));
     }
     return result;
-  }, [sales, activeTab, searchQuery]);
+  }, [sales, roleTab, searchQuery]);
 
   const fetchAnalytics = async () => {
     setLoadingAnalytics(true);
@@ -340,16 +435,16 @@ export default function AdminSales() {
         'Total items': s.items?.length || 0,
         'Total Quantity': totalQty,
         'Sum of qty': totalQty,
-        'Invoice Amount': s.totalAmount.toFixed(2),
-        'Discount': totalDiscount.toFixed(2),
-        'Total bill': s.totalAmount.toFixed(2),
+        'Invoice Amount': s.totalAmount.toFixed(0),
+        'Discount': totalDiscount.toFixed(0),
+        'Total bill': s.totalAmount.toFixed(0),
         'Payment Mode': s.paymentMode || 'Cash',
         'Cash / UPI / Credit': s.paymentMode || 'Cash',
-        'Cash Amount': (s.cashAmount || 0).toFixed(2),
-        'UPI Amount': (s.upiAmount || 0).toFixed(2),
-        'Return Amount': returnAmt.toFixed(2),
-        'Net Amount': (s.totalAmount - returnAmt).toFixed(2),
-        'After return': (s.totalAmount - returnAmt).toFixed(2),
+        'Cash Amount': (s.cashAmount || 0).toFixed(0),
+        'UPI Amount': (s.upiAmount || 0).toFixed(0),
+        'Return Amount': returnAmt.toFixed(0),
+        'Net Amount': (s.totalAmount - returnAmt).toFixed(0),
+        'After return': (s.totalAmount - returnAmt).toFixed(0),
         'Sold By (Agent)': s.user?.name || s.userName,
         'VGE Name': s.user?.name || s.userName,
         'Order Status': s.status,
@@ -380,8 +475,8 @@ export default function AdminSales() {
       'Product': item.product?.name || item.productName,
       'Price': item.price,
       'Quantity': item.quantity,
-      'Item Discount': (item.discount || 0).toFixed(2),
-      'Item Total': (item.price * item.quantity).toFixed(2),
+      'Item Discount': (item.discount || 0).toFixed(0),
+      'Item Total': (item.price * item.quantity).toFixed(0),
       'Customer Mobile': viewingOrder.mobile || 'N/A',
       'Agent': viewingOrder.user?.name || viewingOrder.userName,
       'Payment Mode': viewingOrder.paymentMode,
@@ -397,9 +492,9 @@ export default function AdminSales() {
       'Product': 'TOTALS',
       'Price': '',
       'Quantity': totalQty,
-      'Item Discount': totalDiscount.toFixed(2),
-      'Item Total': viewingOrder.totalAmount.toFixed(2),
-      'Customer Mobile': `Net: ${(viewingOrder.totalAmount - returnAmt).toFixed(2)}`,
+      'Item Discount': totalDiscount.toFixed(0),
+      'Item Total': viewingOrder.totalAmount.toFixed(0),
+      'Customer Mobile': `Net: ${(viewingOrder.totalAmount - returnAmt).toFixed(0)}`,
       'Agent': '',
       'Payment Mode': '',
       'Status': '',
@@ -413,9 +508,17 @@ export default function AdminSales() {
     toast.success('Detailed order exported');
   };
 
+  const handleExportPDF = () => {
+    generateReportPDF('invoices', listToRender);
+  };
+
+  const handlePrintList = () => {
+    generateReportPDF('invoices', listToRender, true);
+  };
+
   const handleDownloadReport = (shouldPrint = false) => {
     if (shouldPrint) {
-      window.print();
+      handlePrintList();
       return;
     }
     exportHistoryToExcel();
@@ -499,10 +602,10 @@ export default function AdminSales() {
       doc.text("FINANCIAL SUMMARY", 25, y + 2);
 
       doc.setFontSize(9);
-      doc.text(`Total Bill: Rs. ${order.totalAmount.toFixed(2)}`, 110, y + 2);
+      doc.text(`Total Bill: Rs. ${order.totalAmount.toFixed(0)}`, 110, y + 2);
       doc.text(`Paid via: ${order.paymentMode}`, 110, y + 9);
       doc.setFont("helvetica", "normal");
-      doc.text(`Net After Returns: Rs. ${(order.totalAmount - returnAmt).toFixed(2)}`, 25, y + 9);
+      doc.text(`Net After Returns: Rs. ${(order.totalAmount - returnAmt).toFixed(0)}`, 25, y + 9);
 
       // Items Table
       y = 150;
@@ -531,8 +634,8 @@ export default function AdminSales() {
         doc.rect(20, y - 5, 170, 7, 'F');
         doc.text(item.product?.name || item.productName || 'Unknown', 25, y);
         doc.text(String(item.quantity), 120, y);
-        doc.text(item.price.toFixed(2), 145, y);
-        doc.text((item.price * item.quantity).toFixed(2), 185, y, { align: "right" });
+        doc.text(item.price.toFixed(0), 145, y);
+        doc.text((item.price * item.quantity).toFixed(0), 185, y, { align: "right" });
         y += 7;
       });
 
@@ -548,6 +651,342 @@ export default function AdminSales() {
       console.error('PDF Error:', error);
       toast.error('Failed to generate professional report');
     }
+  };
+
+  const handleDownloadSample = () => {
+    const ws = XLSX.utils.json_to_sheet([
+      {
+        "Invoice Group ID": "INV-001",
+        "Customer Name": "Rajesh Kumar",
+        "Mobile Number": "9876543210",
+        "Payment Mode": "CASH",
+        "Sale Date": format(new Date(), 'yyyy-MM-dd'),
+        "Village Name": "Rampur",
+        "Product Name": "Basmati Rice 1kg",
+        "Quantity": 2,
+        "Unit Price": 110,
+        "Discount": 0,
+        "Remark": "Bulk purchase delivery"
+      },
+      {
+        "Invoice Group ID": "INV-001",
+        "Customer Name": "Rajesh Kumar",
+        "Mobile Number": "9876543210",
+        "Payment Mode": "CASH",
+        "Sale Date": format(new Date(), 'yyyy-MM-dd'),
+        "Village Name": "Rampur",
+        "Product Name": "Toor Dal 1kg",
+        "Quantity": 1,
+        "Unit Price": 150,
+        "Discount": 5,
+        "Remark": "Bulk purchase delivery"
+      },
+      {
+        "Invoice Group ID": "INV-002",
+        "Customer Name": "Suresh Walk-in",
+        "Mobile Number": "9123456789",
+        "Payment Mode": "UPI",
+        "Sale Date": format(new Date(), 'yyyy-MM-dd'),
+        "Village Name": "Sitapur",
+        "Product Name": "Mustard Oil 1L",
+        "Quantity": 3,
+        "Unit Price": 180,
+        "Discount": 10,
+        "Remark": "Paid via PhonePe"
+      }
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "SalesBulkImport");
+    XLSX.writeFile(wb, "Sales_Bulk_Import_Template.xlsx");
+    toast.success('Sample template downloaded successfully');
+  };
+
+  const handleExcelUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    setUploadProgress('Reading Excel file structure...');
+    const reader = new FileReader();
+
+    reader.onload = async (evt) => {
+      try {
+        const bstr = evt.target.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsname = wb.SheetNames[0];
+        const ws = wb.Sheets[wsname];
+        const data = XLSX.utils.sheet_to_json(ws);
+
+        if (data.length === 0) {
+          toast.error('Uploaded Excel file contains no data rows');
+          setIsUploading(false);
+          setUploadProgress('');
+          e.target.value = '';
+          return;
+        }
+
+        setUploadProgress('Fetching product catalog for automated mapping...');
+        // Fetch all products to resolve product IDs accurately
+        const itemsRes = await adminAPI.getItems({ limit: 5000 });
+        let productsList = itemsRes.data?.data || itemsRes.data || [];
+
+        // Determine default store ID
+        const resolvedStoreId = storeFilterId || currentUser?.storeId || (stores.length > 0 ? stores[0].id : undefined);
+
+        // ── SELF-HEALING AUTO-CREATE PHASE ──
+        if (autoCreateProducts) {
+          const missingPayloads = [];
+          const seenNames = new Set(productsList.map(p => p.name.toLowerCase().trim()));
+          
+          data.forEach(row => {
+            const keys = Object.keys(row);
+            const findVal = (search) => {
+              const matchedKey = keys.find(k => k.toLowerCase().includes(search.toLowerCase()));
+              return matchedKey ? row[matchedKey] : undefined;
+            };
+            const productName = findVal('product name') || findVal('product') || findVal('item name') || findVal('item');
+            if (productName) {
+              const cleanName = productName.toString().trim();
+              const lowerName = cleanName.toLowerCase();
+              if (!seenNames.has(lowerName)) {
+                seenNames.add(lowerName);
+                const unitPrice = parseFloat(findVal('unit price') || findVal('price') || findVal('rate')) || 100;
+                const discount = parseFloat(findVal('discount')) || 0;
+                missingPayloads.push({
+                  name: cleanName,
+                  price: unitPrice,
+                  mrp: unitPrice,
+                  landingPrice: Math.round(unitPrice * 0.8),
+                  discount: discount,
+                  gst: 0,
+                  description: 'Auto-registered via Bulk Sales Spreadsheet',
+                  categoryName: 'General',
+                  subCategoryName: 'General Items',
+                  unitType: 'PCS',
+                  unitValue: 1
+                });
+              }
+            }
+          });
+
+          if (missingPayloads.length > 0) {
+            setUploadProgress(`Auto-registering ${missingPayloads.length} missing products into master inventory...`);
+            try {
+              await adminAPI.bulkCreateItems(missingPayloads);
+              // Refetch product catalog to obtain their newly assigned unique database IDs
+              const freshRes = await adminAPI.getItems({ limit: 5000 });
+              productsList = freshRes.data?.data || freshRes.data || [];
+            } catch (createErr) {
+              console.error('Auto-create products failed:', createErr);
+              toast.error('Failed to auto-create missing products. Continuing with available items.');
+            }
+          }
+        }
+
+        // Group rows into separate orders intelligently
+        const ordersGroups = [];
+        let currentGroup = null;
+
+        data.forEach((row, index) => {
+          const keys = Object.keys(row);
+          const findVal = (search) => {
+            const matchedKey = keys.find(k => k.toLowerCase().includes(search.toLowerCase()));
+            return matchedKey ? row[matchedKey] : undefined;
+          };
+
+          const invoiceGroupId = findVal('invoice group id') || findVal('invoice id') || findVal('group id');
+          const customerName = findVal('customer name') || findVal('customer') || 'Walk-in Customer';
+          const mobile = findVal('mobile number') || findVal('mobile') || findVal('phone') || '';
+          const pModeRaw = findVal('payment mode') || findVal('payment') || 'CASH';
+          let paymentMode = 'CASH';
+          if (pModeRaw.toString().toUpperCase().includes('UPI')) paymentMode = 'UPI';
+          if (pModeRaw.toString().toUpperCase().includes('SPLIT') || pModeRaw.toString().toUpperCase().includes('CASH_UPI')) paymentMode = 'CASH_UPI';
+
+          const saleDateStr = findVal('sale date') || findVal('date');
+          let saleDate = undefined;
+          if (saleDateStr) {
+            // Check if Excel serial date or string
+            if (typeof saleDateStr === 'number') {
+              const dateObj = new Date((saleDateStr - (25567 + 2)) * 86400 * 1000);
+              saleDate = format(dateObj, 'yyyy-MM-dd');
+            } else {
+              saleDate = new Date(saleDateStr).toISOString().split('T')[0];
+            }
+          }
+
+          const villageName = findVal('village name') || findVal('village') || findVal('location') || '';
+          const remark = findVal('remark') || findVal('notes') || '';
+
+          // Item fields
+          const productName = findVal('product name') || findVal('product') || findVal('item name') || findVal('item');
+          const qty = parseInt(findVal('quantity') || findVal('qty')) || 1;
+          const unitPrice = parseFloat(findVal('unit price') || findVal('price') || findVal('rate'));
+          const discount = parseFloat(findVal('discount')) || 0;
+
+          if (!productName) return; // Skip rows without products
+
+          // Resolve product object
+          const matchedProduct = productsList.find(p => p.name.toLowerCase().trim() === productName.toString().toLowerCase().trim() || (p.sku && p.sku.toLowerCase().trim() === productName.toString().toLowerCase().trim()));
+
+          const itemObj = {
+            productNameRaw: productName,
+            productId: matchedProduct ? matchedProduct.id : null,
+            quantity: qty,
+            price: !isNaN(unitPrice) ? unitPrice : (matchedProduct ? matchedProduct.price : 0),
+            discount: discount,
+            gst: matchedProduct ? (matchedProduct.taxPercent || matchedProduct.gst || 0) : 0
+          };
+
+          // Decide whether to merge into current group or start new group
+          let shouldMerge = false;
+          if (currentGroup) {
+            if (invoiceGroupId && currentGroup.invoiceGroupId === invoiceGroupId) {
+              shouldMerge = true;
+            } else if (!invoiceGroupId && !currentGroup.invoiceGroupId) {
+              // Merge if consecutive rows share identical customer credentials and dates
+              if (currentGroup.mobile === mobile && currentGroup.customerName === customerName) {
+                shouldMerge = true;
+              }
+            }
+          }
+
+          if (shouldMerge && currentGroup) {
+            currentGroup.items.push(itemObj);
+          } else {
+            // Push active group and create new
+            if (currentGroup) ordersGroups.push(currentGroup);
+            currentGroup = {
+              invoiceGroupId,
+              customerName,
+              mobile: mobile ? mobile.toString() : '',
+              paymentMode,
+              saleDate,
+              villageName,
+              remark,
+              storeId: resolvedStoreId,
+              items: [itemObj]
+            };
+          }
+
+          // Push the final group on last iteration
+          if (index === data.length - 1 && currentGroup) {
+            ordersGroups.push(currentGroup);
+          }
+        });
+
+        if (ordersGroups.length === 0) {
+          toast.error('No valid products or items mapped from the Excel sheet');
+          setIsUploading(false);
+          setUploadProgress('');
+          e.target.value = '';
+          return;
+        }
+
+        // Process orders concurrently in optimized batches for ultra-fast throughput
+        let successCount = 0;
+        let missingProducts = [];
+        const CONCURRENT_BATCH_SIZE = 15;
+
+        for (let i = 0; i < ordersGroups.length; i += CONCURRENT_BATCH_SIZE) {
+          const batchGroups = ordersGroups.slice(i, i + CONCURRENT_BATCH_SIZE);
+          setUploadProgress(`Optimized Batch Ingestion: Processing records ${i + 1} to ${Math.min(i + CONCURRENT_BATCH_SIZE, ordersGroups.length)} of ${ordersGroups.length}...`);
+
+          const batchPromises = batchGroups.map(async (grp, localIdx) => {
+            const absoluteIdx = i + localIdx;
+            const validItems = grp.items.filter(item => {
+              if (!item.productId) {
+                missingProducts.push(item.productNameRaw);
+                return false;
+              }
+              return true;
+            });
+
+            if (validItems.length === 0) {
+              console.warn(`Skipping order group for ${grp.customerName} because no products were successfully matched.`);
+              return { success: false, skipped: true };
+            }
+
+            const orderTotalAmt = validItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const payload = {
+              storeId: grp.storeId || undefined,
+              customerName: grp.customerName !== 'Walk-in Customer' ? grp.customerName : undefined,
+              mobile: grp.mobile || undefined,
+              paymentMode: grp.paymentMode,
+              saleDate: grp.saleDate || undefined,
+              villageName: grp.villageName || undefined,
+              remark: grp.remark || undefined,
+              cashAmount: grp.paymentMode === 'CASH' ? orderTotalAmt : (grp.paymentMode === 'CASH_UPI' ? orderTotalAmt / 2 : 0),
+              upiAmount: grp.paymentMode === 'UPI' ? orderTotalAmt : (grp.paymentMode === 'CASH_UPI' ? orderTotalAmt / 2 : 0),
+              items: validItems.map(vi => ({
+                productId: vi.productId,
+                quantity: vi.quantity,
+                price: vi.price,
+                discount: vi.discount,
+                gst: vi.gst
+              }))
+            };
+            let attempt = 0;
+            let success = false;
+            let serverMsg = '';
+
+            while (attempt < 4 && !success) {
+              try {
+                await adminAPI.createManualSale(payload);
+                success = true;
+                return { success: true, absoluteIdx };
+              } catch (err) {
+                serverMsg = err.response?.data?.message || err.response?.data?.detail || err.message;
+                if (serverMsg && serverMsg.toLowerCase().includes('deadlock')) {
+                  attempt++;
+                  if (attempt < 4) {
+                    await new Promise(r => setTimeout(r, 40 * attempt + Math.random() * 60));
+                  }
+                } else {
+                  console.error(`Row upload failed for order ${absoluteIdx + 1}:`, err.response?.data || err);
+                  return { success: false, absoluteIdx, serverMsg };
+                }
+              }
+            }
+            return { success: false, absoluteIdx, serverMsg };
+          });
+
+          const results = await Promise.all(batchPromises);
+          results.forEach(res => {
+            if (res.success) {
+              successCount++;
+            } else if (!res.skipped) {
+              toast.error(`Order ${res.absoluteIdx + 1} failed: ${res.serverMsg}`);
+            }
+          });
+        }
+
+        setIsUploading(false);
+        setUploadProgress('');
+        setShowBulkUploadModal(false);
+        e.target.value = ''; // Reset input
+
+        if (successCount > 0) {
+          toast.success(`Successfully recorded ${successCount} sales orders in bulk!`);
+          fetchSales();
+        } else {
+          toast.error('Bulk upload completed but zero rows could be fully finalized.');
+        }
+
+        if (missingProducts.length > 0) {
+          const uniqueMissing = [...new Set(missingProducts)];
+          toast.error(`Unrecognized products skipped: ${uniqueMissing.slice(0, 3).join(', ')}${uniqueMissing.length > 3 ? '...' : ''}`, { duration: 6000 });
+        }
+
+      } catch (err) {
+        console.error('Excel Parsing Error:', err);
+        toast.error('Encountered an exception parsing Excel binary layout');
+        setIsUploading(false);
+        setUploadProgress('');
+        e.target.value = '';
+      }
+    };
+
+    reader.readAsBinaryString(file);
   };
 
   if (loading) {
@@ -566,12 +1005,15 @@ export default function AdminSales() {
     if (storeFilterId && s.storeId !== storeFilterId) return false;
     
     // Tab filtering
-    if (activeTab === 'Admins') {
+    if (roleTab === 'Admins') {
       const adminRoles = ['ADMIN', 'SUPER_ADMIN', 'TENANT_OWNER'];
       if (!adminRoles.includes(s.user?.role)) return false;
-    } else if (activeTab === 'Agent') {
+    } else if (roleTab === 'Agent') {
       if (s.user?.role !== 'SALES_AGENT') return false;
     }
+    // Segmented Control Filter
+    if (saleType === 'POS' && s.orderType !== 'POS' && s.vehicleId) return false;
+    if (saleType === 'AGENT' && (s.orderType === 'POS' || !s.vehicleId)) return false;
 
     const query = searchQuery.toLowerCase();
     const invoiceStr = s.orderNumber ? `vk-${s.orderNumber}` : `vk-${Date.now().toString().slice(-6)}`;
@@ -581,47 +1023,169 @@ export default function AdminSales() {
 
   // Gatekeeper removed for Tenant Owners to allow "All Stores" sales view
 
-  const totalPages = Math.ceil((activeTab === 'Customer' ? customerList.length : listToRender.length) / ITEMS_PER_PAGE);
-  const paginatedData = (activeTab === 'Customer' ? customerList : listToRender).slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  const totalPages = Math.ceil((roleTab === 'Customer' ? customerList.length : listToRender.length) / ITEMS_PER_PAGE);
+  const paginatedData = (roleTab === 'Customer' ? customerList : listToRender).slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+
+
+
+  const renderClassifiedSales = () => {
+    if (!storeFilterId) {
+      const salesByStore = sales.reduce((acc, s) => {
+        if (s.storeId) {
+          acc[s.storeId] = (acc[s.storeId] || 0) + (s.totalAmount || 0);
+        }
+        return acc;
+      }, {});
+
+      const ordersByStore = sales.reduce((acc, s) => {
+        if (s.storeId) {
+          acc[s.storeId] = (acc[s.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      const personnelByStore = users.reduce((acc, u) => {
+        if (u.storeId && u.id !== currentUser?.id) {
+          acc[u.storeId] = (acc[u.storeId] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      return (
+        <div className="flex flex-col gap-4 pt-4 animate-in fade-in slide-in-from-bottom-6 max-w-5xl">
+          <div className="mb-2">
+            <h3 className="text-xl font-black tracking-tight text-gray-900">Branch Performance</h3>
+            <p className="text-[10px] font-bold text-gray-400 tracking-widest uppercase mt-1 italic">Select a branch to view detailed sales history and customer metrics</p>
+          </div>
+          {stores.map(store => {
+            const totalRevenue = salesByStore[store.id] || 0;
+            const totalOrders = ordersByStore[store.id] || 0;
+            const personnelCount = personnelByStore[store.id] || 0;
+            
+            return (
+              <button
+                key={store.id}
+                onClick={() => setSearchParams({ storeId: store.id })}
+                className="group w-full bg-white p-5 rounded-[1.5rem] border border-gray-100 shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex items-center justify-between gap-6 relative overflow-hidden"
+              >
+                <div className="absolute left-0 top-0 w-2 h-full bg-emerald-500/10 group-hover:bg-emerald-500 transition-all" />
+                
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:bg-emerald-600 group-hover:text-white transition-colors shrink-0">
+                    <Building2 size={24} strokeWidth={2.5} />
+                  </div>
+                  <div className="flex flex-col text-left">
+                    <h4 className="text-lg font-black text-gray-900 tracking-tight leading-none mb-1">{store.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded tracking-widest uppercase">{store.code || 'Branch'}</span>
+                      {store.stateCode && <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest">• {store.stateCode}</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-8">
+                  <div className="hidden lg:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Revenue</span>
+                    <span className="text-sm font-bold text-gray-900">₹{totalRevenue.toLocaleString()}</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Total Orders</span>
+                    <span className="text-sm font-bold text-gray-900">{totalOrders} Sales</span>
+                  </div>
+                  <div className="hidden md:flex flex-col items-end">
+                    <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Personnel</span>
+                    <span className="text-sm font-bold text-gray-900">{personnelCount} Members</span>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-600 group-hover:text-white transition-all">
+                    <ChevronRight size={20} strokeWidth={3} />
+                  </div>
+                </div>
+              </button>
+            );
+          })}
+          {stores.length === 0 && (
+            <div className="py-12 text-center bg-white rounded-[2rem] border border-dashed border-gray-200">
+              <Building2 size={48} className="mx-auto text-gray-300 mb-4" />
+              <p className="text-sm font-bold text-gray-400 uppercase tracking-widest">No Active Branches Found</p>
+            </div>
+          )}
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const classifiedView = renderClassifiedSales();
+  if (classifiedView) return (
+    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="flex flex-col gap-1">
+        <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
+        <p className="text-sm text-gray-500">Categorize your sales operations by branch</p>
+      </div>
+      {classifiedView}
+    </div>
+  );
 
   return (
     <div className="main-content-to-print space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
-          <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
-          <div className="flex items-center gap-2">
-            <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
-            {isTenantRoute && (
-              <>
-                <span className="text-gray-300">•</span>
-                <select
-                  value={storeFilterId || ''}
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      setSearchParams({ storeId: e.target.value });
-                    } else {
-                      setSearchParams({});
-                    }
-                  }}
-                  className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-2 pr-6 py-1 rounded-md border-none outline-none appearance-none focus:ring-1 focus:ring-emerald-500 cursor-pointer mt-0.5"
-                  style={{
-                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                    backgroundPosition: 'right 0.25rem center',
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: '1rem'
-                  }}
-                >
-                  <option value="">All Branches</option>
-                  {stores.map(s => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
-              </>
+          <div className="flex items-center gap-3 flex-wrap">
+            {storeFilterId && stores.length > 1 && (
+              <button
+                onClick={() => setSearchParams({})}
+                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                title="Back to All Branches"
+              >
+                <ChevronLeft size={18} />
+              </button>
+            )}
+            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Sales Management</h2>
+            {stores.length > 1 && (
+              <select
+                value={storeFilterId || ''}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSearchParams({ storeId: e.target.value });
+                  } else {
+                    setSearchParams({});
+                  }
+                }}
+                className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                style={{
+                  backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                  backgroundPosition: 'right 0.35rem center',
+                  backgroundRepeat: 'no-repeat',
+                  backgroundSize: '1.1rem'
+                }}
+              >
+                <option value="">All Branches</option>
+                {stores.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))}
+              </select>
             )}
           </div>
+          <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
         </div>
-        {can('SALES', 'CREATE') && !viewingOrder && (
-          <div className="flex items-center gap-3 no-print">
+
+        {can('SALES', 'CREATE') && !viewingOrder && !showCreateSale && (
+          <div className="flex items-center gap-2 no-print">
+            <button
+              onClick={() => setShowCreateSale(true)}
+              className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all flex items-center gap-2 group"
+            >
+              <Plus size={18} className="group-hover:rotate-90 transition-transform duration-300" />
+              Create Sale
+            </button>
+            <button
+              onClick={() => setShowBulkUploadModal(true)}
+              className="bg-amber-50 text-amber-700 border border-amber-100 px-4 py-2.5 rounded-xl text-sm font-bold shadow-sm hover:bg-amber-100 transition-all flex items-center gap-2 group"
+              title="Bulk Import Sales via Excel"
+            >
+              <FileSpreadsheet size={18} className="group-hover:-translate-y-0.5 transition-transform" />
+              Bulk Import
+            </button>
             <button
               onClick={() => setViewMode(prev => prev === 'analytics' ? 'list' : 'analytics')}
               className={`px-6 py-3 rounded-2xl transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm border ${viewMode === 'analytics' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-emerald-50 text-emerald-700 border-emerald-100 hover:bg-emerald-100'}`}
@@ -638,39 +1202,101 @@ export default function AdminSales() {
             </button>
             <button
               onClick={exportHistoryToExcel}
-              className="bg-emerald-600 text-white px-6 py-3 rounded-2xl hover:bg-emerald-700 transition-all flex items-center gap-2 font-black text-xs uppercase tracking-widest shadow-sm"
+              className="bg-emerald-50 text-emerald-600 border border-emerald-100 p-3 rounded-xl hover:bg-emerald-100 transition-all shadow-sm group"
+              title="Export Excel"
             >
-              <FileDown size={18} /> EXPORT
+              <Download size={20} />
+            </button>
+            <button
+              onClick={handleExportPDF}
+              className="bg-rose-50 text-rose-600 border border-rose-100 p-3 rounded-xl hover:bg-rose-100 transition-all shadow-sm group"
+              title="Export PDF"
+            >
+              <FileText size={20} />
+            </button>
+            <button
+              onClick={handlePrintList}
+              className="bg-blue-50 text-blue-600 border border-blue-100 p-3 rounded-xl hover:bg-blue-100 transition-all shadow-sm group"
+              title="Print History"
+            >
+              <Printer size={20} />
             </button>
           </div>
         )}
       </div>
 
-      {viewMode === 'list' && !viewingOrder && (
-        <div className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 w-fit no-print">
-          {[
-            { id: 'All', icon: ShoppingCart, label: 'All Sales' },
-            { id: 'Admins', icon: Shield, label: 'Admins' },
-            { id: 'Agent', icon: User, label: 'Agents' },
-            { id: 'Customer', icon: User, label: 'Customers' },
-          ].map((tab) => (
+      {/* Global Tab Navigation */}
+      {!viewingOrder && !showCreateSale && (
+        <div className="flex flex-col gap-3 mb-4">
+          <div className="flex items-center gap-2 bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 w-fit no-print">
             <button
-              key={tab.id}
-              onClick={() => { setActiveTab(tab.id); setCurrentPage(1); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
-                activeTab === tab.id
-                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-50'
-                  : 'text-gray-400 hover:text-gray-600'
+              onClick={() => { setActiveTab('sales'); setCurrentPage(1); }}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                activeTab === 'sales' 
+                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                  : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
               }`}
             >
-              <tab.icon size={14} />
-              {tab.label}
+              <ShoppingCart size={16} />
+              Sales List
             </button>
-          ))}
+            <button
+              onClick={() => { setActiveTab('customers'); setCurrentPage(1); }}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                activeTab === 'customers' 
+                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                  : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+              }`}
+            >
+              <User size={16} />
+              Customer Data
+            </button>
+            <button
+              onClick={() => { setActiveTab('analytics'); setCurrentPage(1); }}
+              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                activeTab === 'analytics' 
+                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                  : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+              }`}
+            >
+              <BarChart3 size={16} />
+              Analytics
+            </button>
+          </div>
+
+          {activeTab === 'sales' && viewMode === 'list' && (
+            <div className="flex items-center gap-2 p-1 bg-gray-50 rounded-2xl border border-gray-100 w-fit no-print animate-in fade-in duration-200">
+              {[
+                { id: 'All', icon: ShoppingCart, label: 'All Sales' },
+                { id: 'Admins', icon: Shield, label: 'Admins' },
+                { id: 'Agent', icon: User, label: 'Agents' },
+                { id: 'Customer', icon: User, label: 'Customers' },
+              ].map((tab) => (
+                <button
+                  key={tab.id}
+                  onClick={() => { setRoleTab(tab.id); setCurrentPage(1); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${
+                    roleTab === tab.id
+                      ? 'bg-white text-emerald-600 shadow-sm border border-emerald-50'
+                      : 'text-gray-400 hover:text-gray-600'
+                  }`}
+                >
+                  <tab.icon size={14} />
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
-      {viewingOrder ? (
+      {showCreateSale ? (
+        <ManualSaleDrawer 
+          isOpen={showCreateSale} 
+          onClose={() => setShowCreateSale(false)} 
+          onSuccess={() => { setShowCreateSale(false); fetchSales(); }}
+        />
+      ) : viewingOrder ? (
         /* ========== SALES DETAIL FULL PAGE VIEW ========== */
         <>
           <div className="space-y-6 animate-in slide-in-from-right-4 fade-in duration-500 pb-12">
@@ -689,9 +1315,9 @@ export default function AdminSales() {
                       Invoice <span className="text-emerald-600">#{detailOrder.displayId || detailOrder.orderNumber || viewingOrder.displayId || viewingOrder.orderNumber}</span>
                     </h2>
                     <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${(detailOrder.status || viewingOrder.status) === 'COMPLETED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                        (detailOrder.status || viewingOrder.status) === 'RETURNED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                          (detailOrder.status || viewingOrder.status) === 'CANCELLED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
-                            'bg-emerald-50 text-emerald-600 border-emerald-100'
+                      (detailOrder.status || viewingOrder.status) === 'RETURNED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
+                        (detailOrder.status || viewingOrder.status) === 'CANCELLED' ? 'bg-rose-50 text-rose-600 border-rose-100' :
+                          'bg-emerald-50 text-emerald-600 border-emerald-100'
                       }`}>
                       {detailOrder.status || viewingOrder.status || 'PENDING'}
                     </span>
@@ -724,7 +1350,7 @@ export default function AdminSales() {
                 <div className="h-12 w-[1px] bg-gray-100 mx-1 hidden md:block"></div>
                 <div className="flex flex-col items-end">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Bill Amount</p>
-                  <p className="text-2xl font-black text-gray-900 tabular-nums tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                  <p className="text-2xl font-black text-gray-900 tabular-nums tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</p>
                 </div>
               </div>
             </div>
@@ -868,7 +1494,7 @@ export default function AdminSales() {
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-emerald-600 group-hover:text-emerald-100 uppercase tracking-widest mb-1">Invoice Amount</p>
-                      <p className="text-xl font-black text-emerald-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                      <p className="text-xl font-black text-emerald-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</p>
                     </div>
                   </div>
 
@@ -882,7 +1508,7 @@ export default function AdminSales() {
                     <div>
                       <p className="text-[9px] font-black text-indigo-600 group-hover:text-indigo-100 uppercase tracking-widest mb-1">Net Paid (Mode)</p>
                       <div className="flex items-baseline gap-2">
-                        <p className="text-xl font-black text-indigo-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                        <p className="text-xl font-black text-indigo-900 group-hover:text-white tabular-nums">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</p>
                         <p className="text-[8px] font-black text-indigo-400 group-hover:text-indigo-200 uppercase tracking-widest">{viewingOrder.paymentMode}</p>
                       </div>
                     </div>
@@ -899,11 +1525,11 @@ export default function AdminSales() {
                       <div className="space-y-1">
                         <div className="flex justify-between text-[10px] font-black">
                           <span className="text-amber-500 group-hover:text-amber-200">CASH:</span>
-                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.cashAmount || 0).toFixed(2)}</span>
+                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.cashAmount || 0).toFixed(0)}</span>
                         </div>
                         <div className="flex justify-between text-[10px] font-black">
                           <span className="text-amber-500 group-hover:text-amber-200">UPI:</span>
-                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.upiAmount || 0).toFixed(2)}</span>
+                          <span className="text-amber-900 group-hover:text-white">₹{(viewingOrder.upiAmount || 0).toFixed(0)}</span>
                         </div>
                       </div>
                     </div>
@@ -917,7 +1543,7 @@ export default function AdminSales() {
                     </div>
                     <div>
                       <p className="text-[9px] font-black text-rose-600 group-hover:text-rose-100 uppercase tracking-widest mb-1">Returns & Adjust</p>
-                      <p className="text-xl font-black text-rose-900 group-hover:text-white tabular-nums">₹{(viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0).toFixed(2)}</p>
+                      <p className="text-xl font-black text-rose-900 group-hover:text-white tabular-nums">₹{(viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0).toFixed(0)}</p>
                     </div>
                   </div>
                 </div>
@@ -938,7 +1564,7 @@ export default function AdminSales() {
                     </div>
                     <div className="flex flex-col items-end">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Discount</p>
-                      <p className="text-sm font-black text-rose-600">-₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(2)}</p>
+                      <p className="text-sm font-black text-rose-600">-₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(0)}</p>
                     </div>
                   </div>
 
@@ -977,24 +1603,24 @@ export default function AdminSales() {
                               </span>
                             </td>
                             <td className="px-6 py-5 text-right font-black text-gray-600 text-xs tabular-nums">
-                              ₹{(item.price || 0).toFixed(2)}
+                              ₹{(item.price || 0).toFixed(0)}
                             </td>
                             <td className="px-6 py-5 text-right font-black text-gray-400 text-[10px] tabular-nums">
                               {item.product?.gst || 0}%
                             </td>
                             <td className="px-6 py-5 text-right font-black text-gray-900 text-xs tabular-nums">
-                              ₹{(item.price * item.quantity).toFixed(2)}
+                              ₹{(item.price * item.quantity).toFixed(0)}
                             </td>
                             {canEditOrder && (
                               <td className="px-6 py-5">
                                 <div className="flex items-center justify-end gap-1.5">
-                                  <button
+                                  {/* <button
                                     title="Edit Quantity"
                                     onClick={() => { setEditingItem(item); setEditQty(item.quantity); }}
                                     className="w-8 h-8 flex items-center justify-center bg-sky-50 text-sky-600 rounded-xl hover:bg-sky-500 hover:text-white transition-all border border-sky-100 shadow-sm"
                                   >
                                     <Edit3 size={14} />
-                                  </button>
+                                  </button> */}
                                   {(item.returnableQty > 0 || (!fullOrder && item.quantity > 0)) && (
                                     <button
                                       title="Return Item"
@@ -1004,7 +1630,7 @@ export default function AdminSales() {
                                       <RotateCcw size={14} />
                                     </button>
                                   )}
-                                  {(detailOrder.items || viewingOrder.items)?.length > 1 && (
+                                  {/* {(detailOrder.items || viewingOrder.items)?.length > 1 && (
                                     <button
                                       title="Remove Item"
                                       onClick={() => { if (confirm('Remove this item from the order?')) handleRemoveItem(item.id); }}
@@ -1012,7 +1638,7 @@ export default function AdminSales() {
                                     >
                                       <Trash2 size={14} />
                                     </button>
-                                  )}
+                                  )} */}
                                 </div>
                               </td>
                             )}
@@ -1026,7 +1652,7 @@ export default function AdminSales() {
                     <div className="flex items-center gap-6">
                       <div>
                         <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Bill (Gross)</p>
-                        <p className="text-2xl font-black tracking-tighter">₹{(detailOrder.totalAmount || viewingOrder.totalAmount || 0).toFixed(2)}</p>
+                        <p className="text-2xl font-black tracking-tighter">₹{(detailOrder.totalAmount || viewingOrder.totalAmount || 0).toFixed(0)}</p>
                       </div>
                       <div className="w-[1px] h-10 bg-gray-800"></div>
                       <div>
@@ -1062,7 +1688,7 @@ export default function AdminSales() {
                       {detailOrder.returns.map((r, i) => (
                         <div key={i} className="flex justify-between items-center py-3 px-4 bg-white rounded-2xl border border-rose-100/50">
                           <div>
-                            <p className="text-xs font-black text-rose-800">Qty: {r.returnQty} • ₹{(r.returnAmount || r.refundAmount || 0).toFixed(2)}</p>
+                            <p className="text-xs font-black text-rose-800">Qty: {r.returnQty} • ₹{(r.returnAmount || r.refundAmount || 0).toFixed(0)}</p>
                             {r.reason && <p className="text-[9px] font-bold text-rose-500/70 mt-0.5">{r.reason}</p>}
                           </div>
                           <span className="text-[9px] font-bold text-rose-400">{format(new Date(r.createdAt), 'dd MMM, hh:mm a')}</span>
@@ -1098,7 +1724,7 @@ export default function AdminSales() {
                   <input type="number" value={editQty} onChange={e => setEditQty(Math.max(1, parseInt(e.target.value) || 1))} className="w-24 text-center text-3xl font-black text-gray-900 bg-gray-50 rounded-2xl py-3 border border-gray-100 outline-none focus:ring-2 focus:ring-emerald-500/20" />
                   <button onClick={() => setEditQty(editQty + 1)} className="w-14 h-14 bg-emerald-50 text-emerald-600 rounded-2xl flex items-center justify-center hover:bg-emerald-100 active:scale-90 transition-all border border-emerald-100"><Plus size={22} /></button>
                 </div>
-                <p className="text-center text-xs font-black text-gray-400">New Total: <span className="text-emerald-600">₹{(editQty * (editingItem.price || 0)).toFixed(2)}</span></p>
+                <p className="text-center text-xs font-black text-gray-400">New Total: <span className="text-emerald-600">₹{(editQty * (editingItem.price || 0)).toFixed(0)}</span></p>
                 <div className="grid grid-cols-2 gap-3">
                   <button onClick={() => setEditingItem(null)} className="py-4 bg-gray-100 text-gray-600 font-black text-xs uppercase rounded-2xl hover:bg-gray-200 transition-all">Cancel</button>
                   <button onClick={handleEditQty} disabled={actionLoading} className="py-4 bg-emerald-600 text-white font-black text-xs uppercase rounded-2xl hover:bg-emerald-700 transition-all disabled:opacity-50 flex items-center justify-center gap-2 shadow-lg shadow-emerald-600/20">
@@ -1127,7 +1753,7 @@ export default function AdminSales() {
                 </div>
                 <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100 text-center">
                   <p className="text-[9px] font-black text-rose-400 uppercase tracking-widest mb-1">Refund Amount</p>
-                  <p className="text-2xl font-black text-rose-600 tracking-tighter">₹{(returnQty * (returningItem.price || 0)).toFixed(2)}</p>
+                  <p className="text-2xl font-black text-rose-600 tracking-tighter">₹{(returnQty * (returningItem.price || 0)).toFixed(0)}</p>
                 </div>
                 <input type="text" placeholder="Reason for return (optional)" value={returnReason} onChange={e => setReturnReason(e.target.value)} className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-100 text-sm font-bold text-gray-700 outline-none placeholder:text-gray-300 focus:ring-2 focus:ring-emerald-500/20" />
                 <div className="grid grid-cols-2 gap-3">
@@ -1152,7 +1778,7 @@ export default function AdminSales() {
                   </div>
                 </div>
                 <div className="bg-rose-50 rounded-2xl p-4 border border-rose-100">
-                  <p className="text-xs font-black text-rose-700">Order #{detailOrder?.displayId || detailOrder?.orderNumber} — ₹{(detailOrder?.totalAmount || 0).toFixed(2)}</p>
+                  <p className="text-xs font-black text-rose-700">Order #{detailOrder?.displayId || detailOrder?.orderNumber} — ₹{(detailOrder?.totalAmount || 0).toFixed(0)}</p>
                 </div>
                 <input type="text" placeholder="Cancellation reason..." value={cancelReason} onChange={e => setCancelReason(e.target.value)} className="w-full px-5 py-4 bg-gray-50 rounded-2xl border border-gray-100 text-sm font-bold text-gray-700 outline-none placeholder:text-gray-300 focus:ring-2 focus:ring-rose-500/20" />
                 <div className="grid grid-cols-2 gap-3">
@@ -1167,7 +1793,9 @@ export default function AdminSales() {
         </>
       ) : (
         <div className="space-y-6">
-          {/* Session Control Panel */}
+          {activeTab === 'sales' && (
+            <>
+              {/* Session Control Panel */}
           {sessionData && (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-6 space-y-4">
               <div className="flex items-center justify-between">
@@ -1218,37 +1846,57 @@ export default function AdminSales() {
               </div>
             </div>
           )}
-        </div>
-      )}
-
-      {viewMode === 'list' && !viewingOrder && (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+          {viewMode === 'list' && (
+            <div className="flex flex-col lg:flex-row items-center gap-3">
+              <div className="flex-1 w-full flex items-center gap-3 bg-white p-3 rounded-2xl border border-gray-100 shadow-sm transition-all focus-within:border-emerald-200 focus-within:ring-4 focus-within:ring-emerald-500/5">
               <Search size={20} className="text-gray-400" />
               <input
                 type="text"
                 placeholder="Search invoice or mobile..."
-                className="flex-1 bg-transparent border-none focus:outline-none text-sm"
+                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-bold placeholder:text-gray-300"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="w-full md:w-auto flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100 px-4">
-              <Calendar size={20} className="text-gray-400" />
-              <select
-                value={filterDate}
-                onChange={(e) => setFilterDate(e.target.value)}
-                className="flex-1 bg-transparent border-none focus:outline-none text-sm font-medium appearance-none"
-              >
-                <option>Today</option>
-                <option>Yesterday</option>
-                <option>Last 7 Days</option>
-                <option>All Time</option>
-              </select>
-              <Filter size={18} className="text-gray-400" />
+            
+            <div className="w-full lg:w-auto flex flex-col md:flex-row items-center gap-3">
+              <div className="w-full md:w-auto flex items-center gap-3 bg-gray-50 p-3 rounded-2xl border border-gray-100 px-4">
+                <Calendar size={18} className="text-gray-400" />
+                <select
+                  value={filterDate}
+                  onChange={(e) => setFilterDate(e.target.value)}
+                  className="bg-transparent border-none focus:outline-none text-xs font-black uppercase tracking-widest appearance-none cursor-pointer"
+                >
+                  <option>Today</option>
+                  <option>Yesterday</option>
+                  <option>Last 7 Days</option>
+                  <option>All Time</option>
+                </select>
+                <Filter size={16} className="text-gray-400" />
+              </div>
+
+              {/* Segmented Control - Sale Type Tabs */}
+              <div className="flex bg-gray-100 p-1 rounded-2xl w-full md:w-auto md:min-w-[340px] shadow-inner">
+                {['ALL', 'POS', 'AGENT'].map((type) => (
+                  <button
+                    key={type}
+                    onClick={() => {
+                      setSaleType(type);
+                      setCurrentPage(1);
+                    }}
+                    className={`flex-1 py-2 px-4 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all ${
+                      saleType === type 
+                        ? 'bg-white text-emerald-600 shadow-sm border border-emerald-50' 
+                        : 'text-gray-400 hover:text-gray-600'
+                    }`}
+                  >
+                    {type === 'ALL' ? 'All Sales' : type === 'POS' ? 'POS Sales' : 'Agent Sales'}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
+          )}
 
           <div className="space-y-4">
             {sales.length === 0 ? (
@@ -1272,7 +1920,7 @@ export default function AdminSales() {
                   <div className="space-y-4 md:hidden no-print">
                     {paginatedData.map((item) => (
                       <div key={item.id || item.mobile} className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col gap-4">
-                        {activeTab === 'Customer' ? (
+                        {roleTab === 'Customer' ? (
                           <div className="flex justify-between items-center">
                             <div className="flex items-center gap-3">
                               <div className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-xl flex items-center justify-center font-black">
@@ -1350,7 +1998,7 @@ export default function AdminSales() {
                     <table className="w-full text-left border-collapse">
                       <thead>
                         <tr className="bg-gray-50/50">
-                          {activeTab === 'Customer' ? (
+                          {roleTab === 'Customer' ? (
                             <>
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Customer Name</th>
                               <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Mobile Number</th>
@@ -1375,7 +2023,7 @@ export default function AdminSales() {
                       <tbody className="divide-y divide-gray-50 text-sm">
                         {paginatedData.map((item) => (
                           <tr key={item.id || item.mobile} className="hover:bg-gray-50/30 transition-colors group">
-                            {activeTab === 'Customer' ? (
+                            {roleTab === 'Customer' ? (
                               <>
                                 <td className="px-6 py-4">
                                   <div className="flex items-center gap-3">
@@ -1408,7 +2056,7 @@ export default function AdminSales() {
                                   <button 
                                     onClick={() => {
                                       setSearchQuery(item.mobile);
-                                      setActiveTab('All');
+                                      setRoleTab('All');
                                     }}
                                     className="text-[10px] font-black text-emerald-600 hover:underline uppercase tracking-widest"
                                   >
@@ -1526,6 +2174,84 @@ export default function AdminSales() {
         </>
       )}
 
+          {/* ── CUSTOMERS TAB ── */}
+          {activeTab === 'customers' && (
+            <CustomerManagement storeFilterId={storeFilterId} />
+          )}
+
+          {/* ── ANALYTICS TAB ── */}
+          {activeTab === 'analytics' && customerAnalytics && (
+            <div className="space-y-6 animate-in fade-in duration-500">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Top Spenders */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 shadow-sm border border-amber-100">
+                      <Coins size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Top Spenders</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Highest lifetime value customers</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {customerAnalytics.topSpenders.map((cust, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-amber-100 text-amber-700 font-black flex items-center justify-center text-xs border border-amber-200">
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 uppercase">{cust.name}</p>
+                            <p className="text-[10px] font-bold text-gray-500">{cust.mobile}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-emerald-700 tabular-nums">₹{cust.totalSpent.toFixed(0)}</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase">{cust.totalOrders} orders</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Most Frequent Buyers */}
+                <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-6 space-y-6">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 bg-indigo-50 rounded-xl flex items-center justify-center text-indigo-600 shadow-sm border border-indigo-100">
+                      <RefreshCw size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-black text-gray-900 uppercase tracking-tight">Frequent Buyers</h3>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Highest number of orders</p>
+                    </div>
+                  </div>
+                  <div className="space-y-4">
+                    {customerAnalytics.frequentBuyers.map((cust, idx) => (
+                      <div key={idx} className="flex items-center justify-between p-4 bg-gray-50/50 rounded-2xl border border-gray-100 hover:bg-gray-50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className="w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-black flex items-center justify-center text-xs border border-indigo-200">
+                            #{idx + 1}
+                          </div>
+                          <div>
+                            <p className="text-xs font-black text-gray-900 uppercase">{cust.name}</p>
+                            <p className="text-[10px] font-bold text-gray-500">{cust.mobile}</p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-black text-indigo-700 tabular-nums">{cust.totalOrders} Orders</p>
+                          <p className="text-[9px] font-bold text-gray-400 uppercase">₹{cust.totalSpent.toFixed(0)} total</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {/* ========== PROFESSIONAL PRINTABLE INVOICE TEMPLATE (MIRRORS PDF DESIGN) ========== */}
       {viewingOrder && (
         <div className="printable-invoice hidden print:block bg-white text-gray-900 font-sans p-0">
@@ -1634,15 +2360,15 @@ export default function AdminSales() {
               </div>
               <div>
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Cash Amount</p>
-                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.cashAmount || 0).toFixed(2)}</p>
+                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.cashAmount || 0).toFixed(0)}</p>
               </div>
               <div>
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">UPI Amount</p>
-                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.upiAmount || 0).toFixed(2)}</p>
+                <p className="text-xs font-black text-gray-900">₹{(viewingOrder.upiAmount || 0).toFixed(0)}</p>
               </div>
               <div>
                 <p className="text-[8px] font-black text-gray-400 uppercase tracking-widest">Discount</p>
-                <p className="text-xs font-black text-rose-600">₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(2)}</p>
+                <p className="text-xs font-black text-rose-600">₹{(viewingOrder.items?.reduce((sum, i) => sum + (i.discount || 0), 0) || 0).toFixed(0)}</p>
               </div>
             </div>
 
@@ -1662,7 +2388,7 @@ export default function AdminSales() {
               </div>
               <div>
                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Gross Amount</p>
-                <h4 className="text-xl font-black text-slate-900 tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(2)}</h4>
+                <h4 className="text-xl font-black text-slate-900 tracking-tighter">₹{(viewingOrder.totalAmount || 0).toFixed(0)}</h4>
               </div>
               <div className="text-center">
                 <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mb-1">Mode & Split</p>
@@ -1673,7 +2399,7 @@ export default function AdminSales() {
               </div>
               <div className="text-right">
                 <p className="text-[8px] font-black text-emerald-600 uppercase tracking-widest mb-1">Net Bill (INR)</p>
-                <h4 className="text-2xl font-black text-emerald-700 tracking-tighter">₹{(viewingOrder.totalAmount - (viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0)).toFixed(2)}</h4>
+                <h4 className="text-2xl font-black text-emerald-700 tracking-tighter">₹{(viewingOrder.totalAmount - (viewingOrder.returns?.reduce((sum, r) => sum + r.refundAmount, 0) || 0)).toFixed(0)}</h4>
                 <p className="text-[7px] font-bold text-emerald-600/60 uppercase">After Returns</p>
               </div>
             </div>
@@ -1696,8 +2422,8 @@ export default function AdminSales() {
                         <p className="font-black uppercase text-slate-900">{item.product?.name || item.productName}</p>
                       </td>
                       <td className="p-3 border-b border-slate-50 text-center font-bold">{item.quantity}</td>
-                      <td className="p-3 border-b border-slate-50 text-right">₹{item.price.toFixed(2)}</td>
-                      <td className="p-3 border-b border-slate-50 text-right font-black">₹{(item.price * item.quantity).toFixed(2)}</td>
+                      <td className="p-3 border-b border-slate-50 text-right">₹{item.price.toFixed(0)}</td>
+                      <td className="p-3 border-b border-slate-50 text-right font-black">₹{(item.price * item.quantity).toFixed(0)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1867,6 +2593,114 @@ export default function AdminSales() {
               </div>
             </>
           )}
+        </div>
+      )}
+
+      {/* ── Bulk Upload Modal ─────────────────────────────────────── */}
+      {showBulkUploadModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl max-w-xl w-full p-8 space-y-6 relative overflow-hidden animate-in zoom-in-95 duration-300">
+            <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-amber-400 via-emerald-500 to-teal-500" />
+            
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 rounded-2xl bg-amber-50 border border-amber-100 text-amber-600 flex items-center justify-center shrink-0">
+                  <FileSpreadsheet size={24} strokeWidth={2.5} />
+                </div>
+                <div>
+                  <h3 className="text-xl font-black text-slate-900 tracking-tight">Bulk Sales Import</h3>
+                  <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Excel Spreadsheet Parser</p>
+                </div>
+              </div>
+              <button
+                onClick={() => !isUploading && setShowBulkUploadModal(false)}
+                disabled={isUploading}
+                className="w-8 h-8 rounded-full bg-slate-50 text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all disabled:opacity-50"
+              >
+                <Minus size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              <div className="bg-amber-50/50 border border-amber-100/60 rounded-2xl p-4 text-xs text-amber-800 space-y-2">
+                <p className="font-bold">💡 How to Import Multi-Item Sales:</p>
+                <ul className="list-disc list-inside space-y-1 text-slate-600 font-medium">
+                  <li>Download the sample template to view strict column layout.</li>
+                  <li>Assign an identical <span className="font-bold text-slate-900">Invoice Group ID</span> to group multi-product rows into a unified sales receipt.</li>
+                  <li>Product names must align directly with Master Inventory.</li>
+                </ul>
+              </div>
+
+              <div className="flex items-center justify-between gap-4 pt-2">
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Step 1: Get Layout Template</span>
+                <button
+                  type="button"
+                  onClick={handleDownloadSample}
+                  className="px-4 py-2 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl font-bold text-xs hover:bg-slate-100 transition-all shadow-sm flex items-center gap-1.5"
+                >
+                  <Download size={14} className="text-emerald-600" /> Download Template
+                </button>
+              </div>
+
+              <div className="border-t border-slate-100 pt-4 space-y-2">
+                <span className="text-xs font-black uppercase tracking-widest text-slate-400">Step 2: Upload Populated Sheet</span>
+                <label className="relative flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-slate-200 hover:border-emerald-500 bg-slate-50/50 hover:bg-emerald-50/20 rounded-2xl cursor-pointer transition-all group overflow-hidden">
+                  <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center px-4">
+                    <Upload size={28} className="text-slate-400 group-hover:text-emerald-600 group-hover:-translate-y-1 transition-all mb-2" />
+                    <p className="text-xs font-bold text-slate-700">Click to upload spreadsheet file</p>
+                    <p className="text-[10px] font-medium text-slate-400 mt-1">Supports standard .xlsx or .xls files</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept=".xlsx, .xls"
+                    onChange={handleExcelUpload}
+                    disabled={isUploading}
+                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed"
+                  />
+                </label>
+
+                <div className="flex items-center gap-2 pt-2 px-1">
+                  <input
+                    type="checkbox"
+                    id="autoCreate"
+                    checked={autoCreateProducts}
+                    onChange={(e) => setAutoCreateProducts(e.target.checked)}
+                    disabled={isUploading}
+                    className="w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-slate-300 cursor-pointer"
+                  />
+                  <label htmlFor="autoCreate" className="text-xs font-bold text-slate-700 cursor-pointer select-none">
+                    Auto-register unrecognized spreadsheet items into Master Inventory
+                  </label>
+                </div>
+              </div>
+
+              {isUploading && (
+                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-4 text-center space-y-3 animate-in fade-in duration-300">
+                  <div className="flex items-center justify-center gap-2">
+                    <Loader2 size={16} className="animate-spin text-emerald-600" />
+                    <span className="text-xs font-black uppercase tracking-widest text-emerald-700">Processing Upload</span>
+                  </div>
+                  <div className="w-full bg-slate-200 h-1.5 rounded-full overflow-hidden relative">
+                    <div className="absolute inset-y-0 left-0 bg-emerald-500 rounded-full animate-[pulse_1.5s_infinite] w-3/4" />
+                  </div>
+                  {uploadProgress && (
+                    <p className="text-[11px] font-bold text-slate-500 tracking-tight">{uploadProgress}</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 pt-2 border-t border-slate-50">
+              <button
+                type="button"
+                onClick={() => setShowBulkUploadModal(false)}
+                disabled={isUploading}
+                className="px-6 py-2.5 bg-slate-100 text-slate-600 rounded-xl text-xs font-black uppercase tracking-wider hover:bg-slate-200 transition-all disabled:opacity-50"
+              >
+                Close Drawer
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

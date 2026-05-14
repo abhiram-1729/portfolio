@@ -15,7 +15,7 @@ export const logLocation = async (req, res, next) => {
     // We still log breadcrumbs even if accuracy is a bit lower (e.g. 100m), 
     // but we store the accuracy for filtering in reports.
     // However, per PRD, we should be strict if it's too bad.
-    if (accuracy > 100) {
+    if (accuracy > 500) {
       return res.status(200).json({ status: 'ignored', message: 'Accuracy too low for breadcrumb' });
     }
 
@@ -63,14 +63,30 @@ export const getLiveLocations = async (req, res, next) => {
     const { storeId } = req.query;
     const tenantId = req.user.tenantId;
 
-    // Get latest log for each user in the last 15 minutes
-    const fifteenMinsAgo = new Date(Date.now() - 15 * 60 * 1000);
+    // 1. Get all agents who have an ACTIVE shift today
+    const today = new Date().toISOString().split('T')[0];
+    const activeShifts = await prisma.shiftLog.findMany({
+      where: {
+        tenantId,
+        date: today,
+        status: 'STARTED',
+        user: storeId ? { storeId } : {}
+      },
+      include: {
+        user: {
+          select: { id: true, name: true, mobile: true, vgeType: true, storeId: true }
+        }
+      }
+    });
 
+    const activeUserIds = activeShifts.map(s => s.userId);
+
+    // 2. Get the latest location log for each of these active users
+    // We don't limit to 15 mins here, so we can show 'Last Known' position
     const latestLogs = await prisma.locationLog.findMany({
       where: {
         tenantId,
-        timestamp: { gte: fifteenMinsAgo },
-        user: storeId ? { storeId } : {}
+        userId: { in: activeUserIds }
       },
       distinct: ['userId'],
       orderBy: { timestamp: 'desc' },
@@ -81,7 +97,25 @@ export const getLiveLocations = async (req, res, next) => {
       }
     });
 
-    res.json(latestLogs);
+    // 3. Merge: If an agent is on duty but has NO logs, they still need to be in the result
+    const mergedResults = activeShifts.map(shift => {
+      const log = latestLogs.find(l => l.userId === shift.userId);
+      if (log) return { ...log, isOnDuty: true };
+      
+      // Fallback for agents who just started and haven't pinged yet
+      return {
+        userId: shift.userId,
+        user: shift.user,
+        lat: shift.startLat, // Use shift start location as fallback
+        long: shift.startLong,
+        timestamp: shift.startTime,
+        subLocation: 'Just Started (Shift Location)',
+        isOnDuty: true,
+        isPendingFirstPing: true
+      };
+    });
+
+    res.json(mergedResults);
   } catch (error) {
     next(error);
   }

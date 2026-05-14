@@ -10,7 +10,7 @@ export const getVehicles = async (req, res) => {
 
     if (storeId && storeId !== 'undefined' && storeId !== 'null') {
       where.storeId = storeId;
-    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+    } else if (req.user.storeId && !['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role)) {
       where.storeId = req.user.storeId;
     }
 
@@ -18,10 +18,12 @@ export const getVehicles = async (req, res) => {
       where,
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
+        store: { select: { id: true, name: true } }
       }
     });
     res.json(vehicles);
   } catch (error) {
+    console.error('❌ Error fetching vehicles:', error);
     res.status(500).json({ message: 'Error fetching vehicles', error: error.message });
   }
 };
@@ -33,6 +35,7 @@ export const getVehicleById = async (req, res) => {
       where: { id, tenantId: req.user.tenantId },
       include: {
         assignedUsers: { select: { id: true, name: true, role: true } },
+        store: { select: { id: true, name: true } }
       }
     });
 
@@ -48,6 +51,24 @@ export const createVehicle = async (req, res) => {
     const { vehicleNumber, vehicleName, status, assignedUserId, storeId } = req.body;
 
     console.log('📝 Creating vehicle order:', { vehicleNumber, vehicleName, status, assignedUserId, storeId });
+
+    if (!vehicleNumber || !vehicleNumber.trim()) {
+      return res.status(400).json({ message: 'Vehicle number is strictly required' });
+    }
+
+    // Pre-validate uniqueness before performing heavy storage uploads
+    const existingVehicle = await prisma.vehicle.findUnique({
+      where: {
+        tenantId_vehicleNumber: {
+          tenantId: req.user.tenantId,
+          vehicleNumber: vehicleNumber.trim()
+        }
+      }
+    });
+
+    if (existingVehicle) {
+      return res.status(400).json({ message: 'A vehicle with this registration number already exists in your fleet' });
+    }
 
     // Convert string status from FormData to boolean
     const isStatusActive = status === 'true' || status === true;
@@ -83,17 +104,17 @@ export const createVehicle = async (req, res) => {
 
     console.log('✅ Uploaded to Supabase:', { rcDocument, insuranceDocument, permitDocument });
 
-    const resolvedStoreId = (storeId && storeId !== 'null' && storeId !== '') ? storeId : req.user.storeId;
+    const cleanStoreId = (storeId && storeId !== 'null' && storeId !== 'undefined' && storeId !== '') ? storeId : (req.user.storeId || null);
 
     const displayId = await generateId({
       entity: 'VH',
       tenantId: req.user.tenantId,
-      storeId: resolvedStoreId
+      storeId: cleanStoreId
     });
 
     const vehicle = await prisma.vehicle.create({
       data: {
-        vehicleNumber,
+        vehicleNumber: vehicleNumber.trim(),
         vehicleName,
         displayId,
         status: isStatusActive,
@@ -101,20 +122,20 @@ export const createVehicle = async (req, res) => {
         insuranceDocument,
         permitDocument,
         tenantId: req.user.tenantId,
-        storeId: resolvedStoreId
+        storeId: cleanStoreId
       }
     });
 
     logActivity({
       userId: req.user.id,
       tenantId: req.user.tenantId,
-      storeId: resolvedStoreId,
+      storeId: cleanStoreId,
       action: 'VEHICLE_CREATED',
-      details: `Registered new vehicle: ${vehicle.vehicleNumber} (${vehicle.vehicleName})`,
+      details: `Registered new vehicle: ${vehicle.vehicleNumber} (${vehicle.vehicleName || 'N/A'})`,
       metadata: { vehicleId: vehicle.id }
     });
 
-    if (assignedUserId) {
+    if (assignedUserId && assignedUserId !== 'null' && assignedUserId !== '') {
       const user = await prisma.user.update({
         where: { id: assignedUserId },
         data: { assignedVehicleId: vehicle.id }
@@ -123,7 +144,7 @@ export const createVehicle = async (req, res) => {
       logActivity({
         userId: req.user.id,
         tenantId: req.user.tenantId,
-        storeId: resolvedStoreId,
+        storeId: cleanStoreId,
         action: 'DRIVER_ASSIGNED',
         details: `Assigned driver ${user.name} to vehicle ${vehicle.vehicleNumber}`,
         targetUserId: user.id,
@@ -134,6 +155,9 @@ export const createVehicle = async (req, res) => {
     res.status(201).json({ message: 'Vehicle created successfully', vehicle });
   } catch (error) {
     console.error('❌ Error creating vehicle:', error.message);
+    if (error.code === 'P2002') {
+      return res.status(400).json({ message: 'A vehicle with this registration number already exists in your fleet' });
+    }
     res.status(500).json({ message: 'Error creating vehicle', error: error.message });
   }
 };
@@ -342,5 +366,314 @@ export const getVehicleSales = async (req, res) => {
     res.json(orders);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching vehicle sales', error: error.message });
+  }
+};
+
+export const getVehicleStock = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const stocks = await prisma.vehicleStock.findMany({
+      where: { vehicleId: id },
+      include: {
+        product: {
+          select: { id: true, name: true, skuCode: true, price: true, mrp: true }
+        }
+      }
+    });
+    res.json(stocks);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching vehicle stock', error: error.message });
+  }
+};
+
+export const executeVehicleHandover = async (req, res) => {
+  try {
+    const { id } = req.params; // vehicleId
+    const { targetUserId, policy, auditItems, remark, existingStockPolicy, carryOverTargetVehicleId, carryOverTargetUserId } = req.body;
+
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id, tenantId: req.user.tenantId },
+      include: {
+        assignedUsers: true
+      }
+    });
+
+    if (!vehicle) return res.status(404).json({ message: 'Vehicle not found' });
+    const storeId = vehicle.storeId;
+
+    console.log(`Executing Handover for vehicle ${id} via policy ${policy}`);
+
+    await prisma.$transaction(async (tx) => {
+      if (policy === 'INHERIT') {
+        // Option A: Stock stays in target vehicle. Perform item audit updates if items provided.
+        if (auditItems && Array.isArray(auditItems) && auditItems.length > 0) {
+          // Create parent audit record
+          const audit = await tx.stockAudit.create({
+            data: {
+              tenantId: req.user.tenantId,
+              storeId: storeId || null,
+              vehicleId: id,
+              userId: req.user.id,
+              remark: remark || 'Handover Audit (Inherit Policy)'
+            }
+          });
+
+          // Fetch current stocks to log audit differences
+          const existingStocks = await tx.vehicleStock.findMany({
+            where: {
+              vehicleId: id,
+              productId: { in: auditItems.map(i => i.productId) }
+            }
+          });
+          const stockMap = new Map(existingStocks.map(s => [s.productId, s.quantity]));
+
+          const auditItemsData = [];
+          const transactionsData = [];
+
+          for (const item of auditItems) {
+            const cleanQty = Math.max(0, Math.floor(parseInt(item.quantity) || 0));
+            const oldQty = Math.floor(stockMap.get(item.productId) || 0);
+
+            auditItemsData.push({
+              tenantId: req.user.tenantId,
+              auditId: audit.id,
+              productId: item.productId,
+              oldQuantity: oldQty,
+              newQuantity: cleanQty
+            });
+
+            transactionsData.push({
+              tenantId: req.user.tenantId,
+              storeId: storeId || null,
+              type: 'AUDIT',
+              vehicleId: id,
+              productId: item.productId,
+              quantity: cleanQty,
+              date: new Date()
+            });
+
+            // Upsert vehicle stock
+            await tx.vehicleStock.upsert({
+              where: { vehicleId_productId: { vehicleId: id, productId: item.productId } },
+              update: { quantity: cleanQty },
+              create: {
+                id: `vstk_${Math.random().toString(36).substring(2, 15)}`,
+                tenantId: req.user.tenantId,
+                storeId: storeId || null,
+                vehicleId: id,
+                productId: item.productId,
+                quantity: cleanQty,
+                openingQuantity: cleanQty
+              }
+            });
+          }
+
+          if (auditItemsData.length > 0) {
+            await tx.stockAuditItem.createMany({ data: auditItemsData });
+            await tx.stockTransaction.createMany({ data: transactionsData });
+          }
+        }
+
+        // Assign Driver
+        await tx.user.updateMany({
+          where: { assignedVehicleId: id },
+          data: { assignedVehicleId: null }
+        });
+
+        if (targetUserId) {
+          await tx.user.update({
+            where: { id: targetUserId },
+            data: { assignedVehicleId: id }
+          });
+        }
+
+      } else if (policy === 'CARRY_OVER') {
+        // Option B: Agent strips source vehicle stock bare and moves it to manually chosen destination context.
+        // 1. Snapshot both leaving stock and incoming stock in memory BEFORE any database writes/updates
+        const sourceStocks = await tx.vehicleStock.findMany({
+          where: { vehicleId: id }
+        });
+
+        let targetUser = null;
+        if (targetUserId) {
+          targetUser = await tx.user.findUnique({
+            where: { id: targetUserId },
+            select: { id: true, assignedVehicleId: true, name: true, storeId: true }
+          });
+        }
+
+        const destVehicleId = targetUser?.assignedVehicleId;
+        let incomingStocks = [];
+        if (destVehicleId && destVehicleId !== id) {
+          incomingStocks = await tx.vehicleStock.findMany({
+            where: { vehicleId: destVehicleId }
+          });
+        }
+
+        // 2. Safely wipe both vehicle inventories bare in the DB to avoid primary key/increment state clashing
+        const vehiclesToClear = [id];
+        if (destVehicleId && destVehicleId !== id) {
+          vehiclesToClear.push(destVehicleId);
+        }
+        await tx.vehicleStock.deleteMany({
+          where: { vehicleId: { in: vehiclesToClear } }
+        });
+
+        // 3. Write INCOMING driver's stock natively into the current vehicle (id)
+        const validIncoming = incomingStocks.filter(inc => inc.quantity > 0);
+        if (validIncoming.length > 0) {
+          await tx.vehicleStock.createMany({
+            data: validIncoming.map(inc => ({
+              id: `vstk_${Math.random().toString(36).substring(2, 15)}`,
+              tenantId: req.user.tenantId,
+              storeId: storeId || null,
+              vehicleId: id,
+              productId: inc.productId,
+              quantity: inc.quantity,
+              openingQuantity: inc.openingQuantity || inc.quantity
+            }))
+          });
+
+          await tx.stockTransaction.createMany({
+            data: validIncoming.map(inc => ({
+              tenantId: req.user.tenantId,
+              storeId: storeId || null,
+              userId: req.user.id,
+              type: 'LOAD',
+              vehicleId: id,
+              productId: inc.productId,
+              quantity: inc.quantity
+            }))
+          });
+        }
+
+        // 4. Route OUTGOING driver's stock from current vehicle (id) to carryOverTargetVehicleId
+        const validSource = sourceStocks.filter(s => s.quantity > 0);
+        if (carryOverTargetVehicleId && carryOverTargetVehicleId !== 'WAREHOUSE' && carryOverTargetVehicleId !== id) {
+          // Pre-query destination vehicle stock to split creates vs updates, minimizing extension query overhead
+          const existingDestStocks = await tx.vehicleStock.findMany({
+            where: { vehicleId: carryOverTargetVehicleId },
+            select: { productId: true }
+          });
+          const existingDestIds = new Set(existingDestStocks.map(d => d.productId));
+
+          const itemsToCreate = validSource.filter(s => !existingDestIds.has(s.productId));
+          const itemsToUpdate = validSource.filter(s => existingDestIds.has(s.productId));
+
+          if (itemsToCreate.length > 0) {
+            await tx.vehicleStock.createMany({
+              data: itemsToCreate.map(s => ({
+                id: `vstk_${Math.random().toString(36).substring(2, 15)}`,
+                tenantId: req.user.tenantId,
+                storeId: storeId || null,
+                vehicleId: carryOverTargetVehicleId,
+                productId: s.productId,
+                quantity: s.quantity,
+                openingQuantity: s.openingQuantity || s.quantity
+              }))
+            });
+          }
+
+          if (itemsToUpdate.length > 0) {
+            await Promise.all(itemsToUpdate.map(s => 
+              tx.vehicleStock.updateMany({
+                where: { vehicleId: carryOverTargetVehicleId, productId: s.productId },
+                data: { quantity: { increment: s.quantity } }
+              })
+            ));
+          }
+
+          if (validSource.length > 0) {
+            await tx.stockTransaction.createMany({
+              data: validSource.map(s => ({
+                tenantId: req.user.tenantId,
+                storeId: storeId || null,
+                userId: req.user.id,
+                type: 'LOAD',
+                vehicleId: carryOverTargetVehicleId,
+                productId: s.productId,
+                quantity: s.quantity
+              }))
+            });
+          }
+
+          // If admin simultaneously selected an agent to assign to the destination routing vehicle
+          if (carryOverTargetUserId) {
+            // Unassign that user from their old vehicle if any
+            await tx.user.updateMany({
+              where: { id: carryOverTargetUserId },
+              data: { assignedVehicleId: null }
+            });
+            // Assign them directly to the destination vehicle absorbing the stock
+            await tx.user.update({
+              where: { id: carryOverTargetUserId },
+              data: { assignedVehicleId: carryOverTargetVehicleId }
+            });
+          }
+        } else {
+          // Flush OUTGOING driver's stock back to WAREHOUSE reserves
+          if (validSource.length > 0) {
+            await Promise.all(validSource.map(s => 
+              tx.product.updateMany({
+                where: { id: s.productId },
+                data: { stock: { increment: s.quantity } }
+              })
+            ));
+
+            await Promise.all(validSource.map(s => 
+              tx.warehouseInventory.updateMany({
+                where: { productId: s.productId },
+                data: { quantity: { increment: s.quantity } }
+              })
+            ));
+
+            await tx.stockTransaction.createMany({
+              data: validSource.map(s => ({
+                tenantId: req.user.tenantId,
+                storeId: storeId || null,
+                userId: req.user.id,
+                type: 'RETURN',
+                vehicleId: id,
+                productId: s.productId,
+                quantity: s.quantity
+              }))
+            });
+          }
+        }
+
+        // 5. Swap current vehicle driver references perfectly
+        await tx.user.updateMany({
+          where: { assignedVehicleId: id },
+          data: { assignedVehicleId: null }
+        });
+
+        if (targetUserId) {
+          await tx.user.update({
+            where: { id: targetUserId },
+            data: { assignedVehicleId: id }
+          });
+        }
+      }
+    }, {
+      maxWait: 20000,
+      timeout: 60000
+    });
+
+    // Log Activity
+    const targetUserObj = targetUserId ? await prisma.user.findUnique({ where: { id: targetUserId }, select: { name: true } }).catch(() => null) : null;
+    logActivity({
+      userId: req.user.id,
+      tenantId: req.user.tenantId,
+      storeId: storeId || req.user.storeId,
+      action: 'DRIVER_ASSIGNED',
+      details: `Handover executed for vehicle ${vehicle.vehicleNumber} to ${targetUserObj?.name || 'Driver'} via policy ${policy}`,
+      targetUserId,
+      metadata: { vehicleId: id, policy }
+    });
+
+    res.json({ message: `Vehicle handover successfully finalized using ${policy} policy` });
+  } catch (error) {
+    console.error('❌ Handover Execution Error:', error);
+    res.status(500).json({ message: 'Error executing vehicle handover', error: error.message });
   }
 };

@@ -6,6 +6,7 @@ import {
   getAdminReport, 
   requestException, 
   reviewException,
+  updateLateEntry,
   getLeaveBalance
 } from '../controllers/lateEntryController.js';
 import { getLateEntryStats, getTopOffenders } from '../controllers/lateEntryAnalytics.js';
@@ -22,6 +23,7 @@ router.post('/config', authorize('ADMIN', 'SUPER_ADMIN', 'TENANT_OWNER'), update
 // Late Entries
 router.get('/my', getMyLateHistory);
 router.get('/admin/report', authorize('ADMIN', 'SUPER_ADMIN', 'TENANT_OWNER', 'SUPERVISOR'), getAdminReport);
+router.patch('/:id', authorize('ADMIN', 'SUPER_ADMIN', 'TENANT_OWNER'), updateLateEntry);
 
 // Advanced Analytics
 router.get('/analytics/stats', authorize('ADMIN', 'SUPER_ADMIN', 'TENANT_OWNER', 'SUPERVISOR'), getLateEntryStats);

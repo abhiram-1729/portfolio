@@ -44,6 +44,7 @@ import AdminProcurement from './pages/admin/AdminProcurement';
 import TenantLayout from './components/tenant/TenantLayout';
 import TenantDashboard from './pages/tenant/TenantDashboard';
 import TenantStores from './pages/tenant/TenantStores';
+import AdminStores from './pages/admin/AdminStores';
 import TenantPrivileges from './pages/tenant/TenantPrivileges';
 import TenantActivityLogs from './pages/tenant/TenantActivityLogs';
 import AdminActivityLogs from './pages/admin/AdminActivityLogs';
@@ -55,6 +56,7 @@ import OrderDetail from './pages/OrderDetail';
 import AgentAttendance from './pages/AgentAttendance';
 import AdminAttendance from './pages/admin/AdminAttendance';
 import TenantOnboarding from './pages/tenant/TenantOnboarding';
+import CreateExpense from './pages/CreateExpense';
 
 // Admin Reports
 import OverviewReport from './pages/admin/adminreports/OverviewReport';
@@ -173,6 +175,7 @@ export default function App() {
           <Route path="sales-history" element={<SalesHistory />} />
           <Route path="order-detail/:id" element={<OrderDetail />} />
           <Route path="attendance" element={<AgentAttendance />} />
+          <Route path="create-expense" element={<CreateExpense />} />
         </Route>
 
         <Route path="/invoice" element={<PrivateRoute><InvoicePreview /></PrivateRoute>} />
@@ -215,6 +218,8 @@ export default function App() {
           <Route path="damage" element={<AdminDamage />} />
           <Route path="attendance" element={<AdminAttendance />} />
           <Route path="privileges" element={<TenantPrivileges />} />
+          <Route path="stores" element={<AdminStores />} />
+          <Route path="admins" element={<AdminUsers type="admin" />} />
         </Route>
         <Route path="/tenant" element={<TenantRoute><TenantLayout /></TenantRoute>}>
           <Route index element={<TenantDashboard />} />

@@ -8,19 +8,27 @@ import { startOfMonth, endOfMonth, format, subMonths, startOfDay, endOfDay } fro
  */
 export const getLateEntryStats = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.query;
+    const { startDate, endDate, storeId: queryStoreId } = req.query;
     const tenantId = req.user.tenantId;
 
     const start = startDate ? new Date(startDate) : startOfMonth(new Date());
     const end = endDate ? new Date(endDate) : endOfMonth(new Date());
 
+    const where = {
+      tenantId,
+      createdAt: { gte: start, lte: end }
+    };
+
+    if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
+      where.storeId = queryStoreId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
+
     // 1. Daily Trend
     const dailyLates = await prisma.lateEntry.groupBy({
       by: ['date'],
-      where: {
-        tenantId,
-        createdAt: { gte: start, lte: end }
-      },
+      where,
       _count: { id: true },
       _sum: { penaltyValue: true }
     });
@@ -28,22 +36,25 @@ export const getLateEntryStats = async (req, res, next) => {
     // 2. Penalty Distribution
     const penaltyDist = await prisma.lateEntry.groupBy({
       by: ['penaltyApplied'],
-      where: {
-        tenantId,
-        createdAt: { gte: start, lte: end }
-      },
+      where,
       _count: { id: true }
     });
 
     // 3. Exception Status
-    const exceptionStats = await prisma.lateEntryException.groupBy({
-      by: ['status'],
+    const exceptions = await prisma.lateEntryException.findMany({
       where: {
-        tenantId,
-        createdAt: { gte: start, lte: end }
+        tenantId: where.tenantId,
+        createdAt: where.createdAt,
+        ...(where.storeId ? { lateEntry: { storeId: where.storeId } } : {})
       },
-      _count: { id: true }
+      select: { status: true }
     });
+
+    const exceptionStats = Object.values(exceptions.reduce((acc, curr) => {
+      acc[curr.status] = acc[curr.status] || { status: curr.status, _count: { id: 0 } };
+      acc[curr.status]._count.id++;
+      return acc;
+    }, {}));
 
     res.json({
       success: true,
@@ -76,14 +87,23 @@ export const getLateEntryStats = async (req, res, next) => {
 export const getTopOffenders = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
+    const { storeId: queryStoreId } = req.query;
     const start = startOfMonth(new Date());
+
+    const where = {
+      tenantId,
+      createdAt: { gte: start }
+    };
+
+    if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
+      where.storeId = queryStoreId;
+    } else if (req.user.storeId && req.user.role !== 'TENANT_OWNER') {
+      where.storeId = req.user.storeId;
+    }
 
     const topUsers = await prisma.lateEntry.groupBy({
       by: ['userId'],
-      where: {
-        tenantId,
-        createdAt: { gte: start }
-      },
+      where,
       _count: { id: true },
       _sum: { penaltyValue: true },
       orderBy: {

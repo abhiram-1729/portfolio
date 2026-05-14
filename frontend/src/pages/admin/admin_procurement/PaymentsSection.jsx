@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { 
-  CreditCard, Plus, Search, Loader2, X
+  CreditCard, Plus, Search, Loader2, X, Trash2
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
 import toast from 'react-hot-toast';
@@ -71,6 +71,18 @@ const PaymentsSection = ({ can }) => {
     } catch (err) { toast.error(err.response?.data?.message || 'Payment error'); }
   };
 
+  const handleDeletePayment = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this payment? This will revert vendor balance and invoice allocations.')) return;
+    try {
+      await procurementAPI.deletePayment(id);
+      toast.success('Payment deleted');
+      const { data } = await procurementAPI.getPayments();
+      setPayments(data);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error deleting payment');
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white/50 p-3 rounded-3xl border border-gray-100">
@@ -122,11 +134,18 @@ const PaymentsSection = ({ can }) => {
                   {p.referenceNo && ` • Ref: ${p.referenceNo}`}
                 </p>
               </div>
-              {p.allocations?.length > 0 && (
-                <div className="text-right">
-                  <p className="text-[9px] font-bold text-gray-400">{p.allocations.length} invoice(s)</p>
-                </div>
-              )}
+              <div className="flex items-center gap-4">
+                {p.allocations?.length > 0 && (
+                  <div className="text-right">
+                    <p className="text-[9px] font-bold text-gray-400">{p.allocations.length} invoice(s)</p>
+                  </div>
+                )}
+                {can('PROCUREMENT', 'DELETE', 'PAYMENTS') && (
+                  <button onClick={() => handleDeletePayment(p.id)} className="p-2 bg-rose-50 text-rose-600 rounded-xl opacity-0 group-hover:opacity-100 transition-all hover:bg-rose-100" title="Delete Payment">
+                    <Trash2 size={14} />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

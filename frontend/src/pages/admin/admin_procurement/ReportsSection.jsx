@@ -67,7 +67,7 @@ const ReportsSection = () => {
         {reports.map(r => (
           <button key={r.key} onClick={() => setActiveReport(r.key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${
-              activeReport === r.key ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'
+              activeReport === r.key ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-emerald-200'
             }`}>
             <r.icon size={12} /> {r.label}
           </button>

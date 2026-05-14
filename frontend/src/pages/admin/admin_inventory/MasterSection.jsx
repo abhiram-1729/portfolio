@@ -68,9 +68,19 @@ const MasterSection = ({
               {item.displayId && <span className="text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{item.displayId}</span>}
               <div className="flex items-center gap-1.5 ml-auto">
                 <div className="flex flex-col items-end">
-                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Stock</span>
-                  <span className={`text-[10px] font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
-                    {item.stock || 0}
+                  <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest">Store</span>
+                  <span className="text-[10px] font-black text-emerald-700">{item.warehouseStock || 0}</span>
+                </div>
+                <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                <div className="flex flex-col items-end">
+                  <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest">Vehicle</span>
+                  <span className="text-[10px] font-black text-amber-700">{item.vehicleStock || 0}</span>
+                </div>
+                <div className="w-px h-4 bg-gray-200 mx-0.5" />
+                <div className="flex flex-col items-end bg-gray-50 px-1.5 py-0.5 rounded-lg border border-gray-100">
+                  <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest">Total</span>
+                  <span className={`text-[10px] font-black ${item.totalStock > (item.minStockAlert || 5) ? 'text-gray-900' : 'text-rose-600'}`}>
+                    {item.totalStock || 0}
                   </span>
                 </div>
               </div>
@@ -79,14 +89,30 @@ const MasterSection = ({
                   {item.unitValue || ''} {item.unit.type}
                 </span>
               )}
-              <span className={`text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-blue-100 text-blue-600')}`}>
-                {item.status || 'ACTIVE'}
-              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => handleToggleStatus(item)}
+                  className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${item.status === 'INACTIVE' ? 'bg-gray-200' : 'bg-emerald-500'}`}
+                >
+                  <span
+                    className={`pointer-events-none inline-block h-3 w-3 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.status === 'INACTIVE' ? 'translate-x-0' : 'translate-x-4'}`}
+                  />
+                </button>
+                <span className={`text-[7px] font-black uppercase tracking-widest ${item.status === 'INACTIVE' ? 'text-gray-400' : 'text-emerald-600'}`}>
+                  {item.status || 'ACTIVE'}
+                </span>
+              </div>
             </div>
             <div className="flex items-center gap-2 mt-1">
               <span className="text-[9px] text-gray-400 uppercase font-black tracking-widest">{item.category?.name || 'Uncategorized'}</span>
               <span className="text-[8px] text-gray-300 font-bold">•</span>
               <span className="text-[9px] text-gray-500 uppercase font-black tracking-widest">{item.subCategory?.name || 'General Item'}</span>
+              {item.storeName && (
+                <>
+                  <span className="text-[8px] text-gray-300 font-bold">•</span>
+                  <span className="text-[8px] text-emerald-600 uppercase font-black tracking-widest">Branch: {item.storeName}</span>
+                </>
+              )}
             </div>
             <div className="flex items-center gap-3 mt-1.5 flex-wrap">
               <div className="flex flex-col">
@@ -157,25 +183,23 @@ const MasterSection = ({
   const allSelected = filteredItems.length > 0 && selectedItems.length === filteredItems.length;
 
   const renderDesktopTable = (itemsToRender) => (
-    <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden mb-6">
-      <table className="w-full text-left border-collapse">
+    <div className="hidden md:block bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden mb-6">
+      <table className="w-full text-left border-collapse table-fixed">
         <thead>
           <tr className="bg-gray-50/50">
-            <th className="px-6 py-4 w-10">
+            <th className="pl-4 py-3 w-10">
               <button
                 onClick={() => handleSelectAll(itemsToRender)}
                 className={`p-1 rounded-md transition-colors ${selectedItems.length === itemsToRender.length && itemsToRender.length > 0 ? 'text-emerald-600' : 'text-gray-300'}`}
               >
-                {selectedItems.length === itemsToRender.length && itemsToRender.length > 0 ? <CheckSquare size={18} /> : <Square size={18} />}
+                {selectedItems.length === itemsToRender.length && itemsToRender.length > 0 ? <CheckSquare size={16} /> : <Square size={16} />}
               </button>
             </th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Product</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Category</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Pricing</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Tax</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/30">Store Stock</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-            <th className="px-6 py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 w-[25%]">Product & Category</th>
+            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center w-[15%]">Pricing & Tax</th>
+            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-widest text-emerald-600 text-center bg-emerald-50/30 w-[25%]">Stock Distribution</th>
+            <th className="px-3 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center w-[12%]">Status</th>
+            <th className="pr-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right w-[10%]">Actions</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-gray-50">
@@ -183,97 +207,104 @@ const MasterSection = ({
             const isSelected = selectedItems.includes(item.id);
             return (
               <tr key={item.id} className={`hover:bg-gray-50/30 transition-colors group ${isSelected ? 'bg-emerald-50/10' : ''}`}>
-                <td className="px-6 py-4">
+                <td className="pl-4 py-2">
                   <button
                     onClick={() => toggleSelectItem(item.id)}
                     className={`p-1 rounded-md transition-colors ${isSelected ? 'text-emerald-600' : 'text-gray-300'}`}
                   >
-                    {isSelected ? <CheckSquare size={18} /> : <Square size={18} />}
+                    {isSelected ? <CheckSquare size={16} /> : <Square size={16} />}
                   </button>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden border shadow-inner shrink-0 ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden border shadow-inner shrink-0 ${item.isFree ? 'bg-emerald-50 border-emerald-100 text-emerald-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
                       {item.image ? (
                         <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
-                        item.isFree ? <Gift size={18} /> : <Package size={18} />
+                        item.isFree ? <Gift size={14} /> : <Package size={14} />
                       )}
                     </div>
-                    <div className="flex flex-col">
-                      <span className="text-sm font-bold text-gray-900 leading-tight">{item.name}</span>
-                      {item.displayId && <span className="text-[9px] font-black w-fit text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider mt-0.5">{item.displayId}</span>}
-                      {item.unit && (
-                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-tighter">
-                          {item.unitValue || ''} {item.unit.type}
+                    <div className="flex flex-col min-w-0">
+                      <span className="text-[11px] font-bold text-gray-900 leading-tight truncate">{item.name}</span>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-[8px] font-black text-gray-400 uppercase tracking-tighter truncate max-w-[80px]">
+                          {item.category?.name || 'General'}
                         </span>
-                      )}
+                        {item.storeName && (
+                          <span className="text-[7px] font-black text-emerald-600 uppercase tracking-tighter truncate max-w-[80px]">
+                            • {item.storeName}
+                          </span>
+                        )}
+                        {item.displayId && <span className="text-[7px] font-black text-teal-600 bg-teal-50 px-1 rounded tracking-widest">{item.displayId}</span>}
+                      </div>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-col gap-1">
-                    <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest w-fit bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
-                      {item.category?.name || 'Uncategorized'}
-                    </span>
-                    <span className="text-[8px] font-bold text-gray-500 uppercase tracking-wider pl-1">
-                      ↳ {item.subCategory?.name || 'General Item'}
-                    </span>
+                <td className="px-3 py-2">
+                  <div className="flex flex-col items-center gap-0.5">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-black text-emerald-700">₹{item.price}</span>
+                      <span className="text-[8px] font-black text-blue-500 bg-blue-50 px-1 rounded">{item.gst || 0}%</span>
+                    </div>
+                    <div className="flex items-center gap-1 text-[8px] font-bold text-gray-400">
+                      <span className="line-through">₹{item.mrp || 0}</span>
+                      <span className="text-orange-500">(-₹{item.discount || 0})</span>
+                    </div>
                   </div>
                 </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-center gap-4">
+                <td className="px-3 py-2 bg-emerald-50/10">
+                  <div className="flex items-center justify-center gap-3">
                     <div className="flex flex-col items-center">
-                      <span className="text-[8px] font-black text-gray-300 uppercase tracking-tighter">Selling</span>
-                      <span className="text-xs font-black text-emerald-700">₹{item.price}</span>
+                      <span className="text-[10px] font-black text-emerald-700">{item.warehouseStock || 0}</span>
+                      <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-none mt-0.5">Store</span>
                     </div>
-                    <div className="flex flex-col items-center border-l border-gray-100 pl-4 text-gray-400">
-                      <span className="text-[8px] font-black uppercase tracking-tighter">MRP</span>
-                      <span className="text-[10px] line-through">₹{item.mrp || 0}</span>
+                    <div className="w-px h-4 bg-emerald-100" />
+                    <div className="flex flex-col items-center">
+                      <span className="text-[10px] font-black text-amber-700">{item.vehicleStock || 0}</span>
+                      <span className="text-[7px] font-black text-amber-600 uppercase tracking-widest leading-none mt-0.5">Fleet</span>
                     </div>
-                    <div className="flex flex-col items-center border-l border-gray-100 pl-4">
-                      <span className="text-[8px] font-black text-orange-400 uppercase tracking-tighter">Disc</span>
-                      <span className="text-[10px] text-orange-600 font-bold">₹{item.discount || 0}</span>
+                    <div className="w-px h-4 bg-emerald-100" />
+                    <div className="flex flex-col items-center bg-white px-1.5 py-0.5 rounded-lg border border-emerald-100 shadow-sm">
+                      <span className={`text-[10px] font-black ${item.totalStock > (item.minStockAlert || 5) ? 'text-gray-900' : 'text-rose-600'}`}>
+                        {item.totalStock || 0}
+                      </span>
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">Total</span>
                     </div>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <span className="text-[10px] font-black text-blue-600 bg-blue-50 px-2 py-1 rounded-full uppercase tracking-widest border border-blue-100">
-                    {item.gst || 0}%
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-center bg-emerald-50/10">
-                  <div className="flex flex-col items-center">
-                    <span className={`text-xs font-black ${item.stock > (item.minStockAlert || 5) ? 'text-emerald-700' : 'text-rose-600'}`}>
-                      {item.stock || 0}
+                <td className="px-3 py-2 text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <button
+                      onClick={() => handleToggleStatus(item)}
+                      className={`relative inline-flex h-5 w-10 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${item.status === 'INACTIVE' ? 'bg-gray-200' : 'bg-emerald-500'}`}
+                      title={item.status === 'INACTIVE' ? "Activate Item" : "Deactivate Item"}
+                    >
+                      <span
+                        className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${item.status === 'INACTIVE' ? 'translate-x-0' : 'translate-x-5'}`}
+                      />
+                    </button>
+                    <span className={`text-[7px] font-black uppercase tracking-widest ${item.status === 'INACTIVE' ? 'text-gray-400' : 'text-emerald-600'}`}>
+                      {item.status || 'ACTIVE'}
                     </span>
-                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mt-0.5">Stock</span>
                   </div>
                 </td>
-                <td className="px-6 py-4 text-center">
-                  <span className={`text-[8px] font-black px-2 py-1 rounded-full uppercase tracking-widest shadow-sm ${item.status === 'INACTIVE' ? 'bg-orange-500 text-white' : (item.isFree ? 'bg-emerald-100 text-emerald-600' : 'bg-emerald-500 text-white')}`}>
-                    {item.status || 'ACTIVE'}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center justify-end gap-1 transition-all">
+                <td className="pr-4 py-2">
+                  <div className="flex items-center justify-end gap-0.5 transition-all">
                     {can('INVENTORY', 'UPDATE', 'MASTER') && (
                       <button
                         onClick={() => openEditModal(item)}
-                        className="p-2 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all"
-                        title="Edit Item"
+                        className="p-1.5 text-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all"
                       >
-                        <Pencil size={16} />
+                        <Pencil size={14} />
                       </button>
                     )}
                     {can('INVENTORY', 'DELETE', 'MASTER') && (
                       <button
                         onClick={() => handleDeleteItem(item)}
                         disabled={deletingId === item.id}
-                        className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all disabled:opacity-50"
-                        title="Delete Item"
+                        className="p-1.5 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all disabled:opacity-50"
                       >
-                        {deletingId === item.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                        {deletingId === item.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
                       </button>
                     )}
                   </div>

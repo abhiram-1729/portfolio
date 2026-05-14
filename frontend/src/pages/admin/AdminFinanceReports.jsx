@@ -10,8 +10,12 @@ import {
     Receipt, 
     Coins,
     Loader2,
-    Download
+    Download,
+    Printer,
+    FileText,
+    ChevronLeft
 } from 'lucide-react';
+import { exportReportToExcel, generateReportPDF } from './adminreports/ReportUtils';
 import adminAPI from '../../services/adminService';
 import { format } from 'date-fns';
 import toast from 'react-hot-toast';
@@ -23,12 +27,25 @@ export default function AdminFinanceReports() {
     const [loading, setLoading] = useState(true);
     const [date, setDate] = useState(format(new Date(), 'yyyy-MM-dd'));
     const [data, setData] = useState(null);
+    const [stores, setStores] = useState([]);
 
     const [searchParams, setSearchParams] = useSearchParams();
     const storeId = searchParams.get('storeId');
     const location = useLocation();
     const currentUser = useUserStore(s => s.user);
     const can = useUserStore(s => s.can);
+
+    useEffect(() => {
+        const fetchStores = async () => {
+            try {
+                const res = await adminAPI.getStores();
+                if (res.data?.success || Array.isArray(res.data)) {
+                    setStores(res.data?.data || res.data);
+                }
+            } catch (e) {}
+        };
+        fetchStores();
+    }, []);
 
     useEffect(() => {
         loadData();
@@ -44,6 +61,21 @@ export default function AdminFinanceReports() {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleExportExcel = () => {
+        if (!data?.dailySheet) return;
+        exportReportToExcel('finance-daily-sheet', data.dailySheet);
+    };
+
+    const handleExportPDF = () => {
+        if (!data?.dailySheet) return;
+        generateReportPDF('finance-daily-sheet', data.dailySheet);
+    };
+
+    const handlePrint = () => {
+        if (!data?.dailySheet) return;
+        generateReportPDF('finance-daily-sheet', data.dailySheet, true);
     };
 
     if (loading && !data) {
@@ -79,21 +111,43 @@ export default function AdminFinanceReports() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div className="flex flex-col gap-1">
-                    <h2 className="text-2xl font-bold text-gray-900">Financial Reports</h2>
-                    <div className="flex items-center gap-2">
-                        <p className="text-sm text-gray-500">Comprehensive overview of revenue, expenses and profitability</p>
-                        {isTenantRoute && storeId && (
-                        <>
-                            <span className="text-gray-300">•</span>
-                            <button 
-                            onClick={() => setSearchParams({})} 
-                            className="text-[10px] font-black text-emerald-600 hover:text-emerald-700 uppercase tracking-widest bg-emerald-50 px-2 py-0.5 rounded transition-colors"
+                    <div className="flex items-center gap-3 flex-wrap">
+                        {storeId && stores.length > 1 && (
+                            <button
+                                onClick={() => setSearchParams({})}
+                                className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                                title="Back to All Branches"
                             >
-                            Change Store
+                                <ChevronLeft size={18} />
                             </button>
-                        </>
+                        )}
+                        <h2 className="text-2xl font-bold text-gray-900">Financial Reports</h2>
+                        {stores.length > 1 && (
+                            <select
+                                value={storeId || ''}
+                                onChange={(e) => {
+                                    if (e.target.value) {
+                                        setSearchParams({ storeId: e.target.value });
+                                    } else {
+                                        setSearchParams({});
+                                    }
+                                }}
+                                className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                                style={{
+                                    backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                                    backgroundPosition: 'right 0.35rem center',
+                                    backgroundRepeat: 'no-repeat',
+                                    backgroundSize: '1.1rem'
+                                }}
+                            >
+                                <option value="">All Branches</option>
+                                {stores.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
                         )}
                     </div>
+                    <p className="text-sm text-gray-500">Comprehensive overview of revenue, expenses and profitability</p>
                 </div>
 
                 <div className="flex items-center gap-3">
@@ -105,6 +159,29 @@ export default function AdminFinanceReports() {
                             onChange={(e) => setDate(e.target.value)}
                             className="bg-transparent border-none focus:outline-none text-sm font-bold text-gray-700 pr-2"
                         />
+                    </div>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={handleExportPDF}
+                            className="p-3 bg-white border border-gray-100 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all shadow-sm"
+                            title="Export PDF"
+                        >
+                            <FileText size={18} />
+                        </button>
+                        <button
+                            onClick={handlePrint}
+                            className="p-3 bg-white border border-gray-100 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all shadow-sm"
+                            title="Print Report"
+                        >
+                            <Printer size={18} />
+                        </button>
+                        <button
+                            onClick={handleExportExcel}
+                            className="p-3 bg-emerald-50 text-emerald-600 rounded-2xl border border-emerald-100 hover:bg-emerald-100 transition-all shadow-sm"
+                            title="Export Excel"
+                        >
+                            <Download size={18} />
+                        </button>
                     </div>
                 </div>
             </div>
@@ -219,9 +296,20 @@ export default function AdminFinanceReports() {
                         <h3 className="font-black text-gray-900 uppercase tracking-tight">Daily Cash Sheet</h3>
                     </div>
                     {can('REPORTS', 'CREATE') && (
-                      <button className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700">
-                          <Download size={14} /> Export PDF
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button 
+                            onClick={handleExportPDF}
+                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-rose-500 hover:text-rose-600"
+                        >
+                            <FileText size={14} /> PDF
+                        </button>
+                        <button 
+                            onClick={handleExportExcel}
+                            className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-emerald-600 hover:text-emerald-700"
+                        >
+                            <Download size={14} /> Excel
+                        </button>
+                      </div>
                     )}
                 </div>
                 <div className="overflow-x-auto">

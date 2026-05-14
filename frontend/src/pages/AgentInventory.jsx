@@ -151,7 +151,7 @@ export default function AgentInventory() {
             <div className="flex items-center gap-2">
               <button
                 onClick={refillToInitial}
-                className="px-3 py-2 bg-blue-100 text-blue-700 hover:bg-blue-200 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm"
+                className="px-3 py-2 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors rounded-xl font-black text-xs flex items-center gap-2 shadow-sm border border-emerald-100"
               >
                 <Package size={16} /> Original
               </button>
@@ -220,7 +220,7 @@ export default function AgentInventory() {
             ) : (
               <>
                 {/* Total Value Card */}
-                <div className="bg-blue-600 rounded-[2rem] p-6 shadow-xl shadow-blue-600/20 relative overflow-hidden group">
+                <div className="bg-emerald-600 rounded-[2rem] p-6 shadow-xl shadow-emerald-600/20 relative overflow-hidden group">
                   <div className="absolute top-[-50%] left-[-50%] w-[200%] h-[200%] bg-gradient-to-br from-white/20 to-transparent blur-[40px] pointer-events-none group-hover:scale-110 transition-transform duration-700" />
                   <div className="relative flex justify-between items-center text-white">
                     <div>
@@ -294,12 +294,18 @@ export default function AgentInventory() {
                     className="p-4 cursor-pointer hover:bg-slate-50 transition-colors flex items-center justify-between"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 rounded-2xl bg-fuchsia-50 flex items-center justify-center text-fuchsia-600 border border-fuchsia-100">
+                      <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
                         <History size={24} />
                       </div>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="text-[10px] font-black text-fuchsia-600 uppercase tracking-widest bg-fuchsia-50 px-2 py-0.5 rounded border border-fuchsia-100 shadow-sm">Stock Audit</span>
+                          <span className={`text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border shadow-sm ${
+                            audit.type === 'AUDIT' ? 'text-emerald-600 bg-emerald-50 border-emerald-100' :
+                            audit.type === 'LOAD' ? 'text-blue-600 bg-blue-50 border-blue-100' :
+                            'text-amber-600 bg-amber-50 border-amber-100'
+                          }`}>
+                            {audit.type === 'AUDIT' ? 'Stock Audit' : audit.type === 'LOAD' ? 'Stock Loading' : 'Stock Refill'}
+                          </span>
                           <span className="text-[9px] font-bold text-slate-400">{format(new Date(audit.createdAt), 'hh:mm a')}</span>
                         </div>
                         <p className="text-sm font-black text-slate-900 tracking-tight leading-none mb-1">
@@ -326,7 +332,11 @@ export default function AgentInventory() {
                         <div className="grid grid-cols-12 gap-2 px-2 mb-1">
                           <span className="col-span-6 text-[8px] font-black text-slate-400 uppercase tracking-widest">Adjusted Product</span>
                           <span className="col-span-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-center">System</span>
-                          <span className="col-span-2 text-[8px] font-black text-emerald-600 uppercase tracking-widest text-center">Audited</span>
+                          <span className={`col-span-2 text-[8px] font-black uppercase tracking-widest text-center ${
+                            audit.type === 'AUDIT' ? 'text-emerald-600' : 'text-blue-600'
+                          }`}>
+                            {audit.type === 'AUDIT' ? 'Audited' : 'Loaded'}
+                          </span>
                           <span className="col-span-2 text-[8px] font-black text-slate-400 uppercase tracking-widest text-right">Var</span>
                         </div>
                         {audit.items?.map((item) => {
@@ -419,7 +429,7 @@ export default function AgentInventory() {
                           <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest bg-emerald-50 px-1.5 py-0.5 rounded cursor-default border border-emerald-100 shrink-0">
                             Current: {currentStock}
                           </span>
-                          <span className="text-[9px] font-black text-orange-600 uppercase tracking-widest bg-orange-50 px-1.5 py-0.5 rounded cursor-default border border-orange-100 shrink-0">
+                          <span className="text-[9px] font-black text-emerald-700 uppercase tracking-widest bg-emerald-50/80 px-1.5 py-0.5 rounded cursor-default border border-emerald-100 shrink-0">
                             ₹{p.price}
                           </span>
                         </div>

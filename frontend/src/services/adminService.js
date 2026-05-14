@@ -14,23 +14,48 @@ export const adminAPI = {
   createUser: (data) => api.post('/admin/users', data),
   updateUser: (id, data) => api.put(`/admin/users/${id}`, data),
   deactivateUser: (id) => api.delete(`/admin/users/${id}`),
+  uploadUserDocument: (userId, data) => api.post(`/admin/users/${userId}/documents`, data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  updateUserDocumentStatus: (documentId, status) => api.put(`/admin/users/documents/${documentId}`, { status }),
+  getShifts: () => api.get('/admin/users/shifts'),
+  createShift: (data) => api.post('/admin/users/shifts', data),
 
   // Vehicles
   getVehicles: (params) => api.get('/admin/vehicles', { params }),
-  createVehicle: (data) => api.post('/admin/vehicles', data),
+  createVehicle: (data) => api.post('/admin/vehicles', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
   updateVehicle: (id, data) => api.put(`/admin/vehicles/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   deleteVehicle: (id) => api.delete(`/admin/vehicles/${id}`),
   assignDriver: (id, userId) => api.put(`/admin/vehicles/${id}/assign`, { userId }),
+  executeVehicleHandover: (id, payload) => api.post(`/admin/vehicles/${id}/handover`, payload),
+  getVehicleStock: (id) => api.get(`/admin/vehicles/${id}/stock`),
   getVehicleSales: (id) => api.get(`/admin/vehicles/${id}/sales`),
+  
+  // Vehicle Operations
+  getVehicleOpsTrips: (params) => api.get('/admin/vehicles/ops/trips', { params }),
+  startVehicleTrip: (data) => api.post('/admin/vehicles/ops/trips/start', data),
+  endVehicleTrip: (id, data) => api.put(`/admin/vehicles/ops/trips/${id}/end`, data),
+  getFuelLogs: (params) => api.get('/admin/vehicles/ops/fuel', { params }),
+  addFuelLog: (data) => api.post('/admin/vehicles/ops/fuel', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getMaintenanceLogs: (params) => api.get('/admin/vehicles/ops/maintenance', { params }),
+  addMaintenanceLog: (data) => api.post('/admin/vehicles/ops/maintenance', data, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 
   // Inventory
+  getInventoryInit: (params) => api.get('/admin/inventory/init', { params }),
   getItems: (params) => api.get('/admin/inventory/items', { params }),
   createItem: (data) => api.post('/admin/inventory/items', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
   bulkCreateItems: (data) => api.post('/admin/inventory/items/bulk', data),
+  bulkImportItems: (data) => api.post('/admin/inventory/items/bulk-import', data),
   bulkDeleteItems: (ids) => api.post('/admin/inventory/items/bulk-delete', { ids }),
   updateItem: (id, data) => api.put(`/admin/inventory/items/${id}`, data, {
     headers: { 'Content-Type': 'multipart/form-data' }
@@ -48,12 +73,14 @@ export const adminAPI = {
   approveRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/approve`, data),
   rejectRefillRequest: (id, data) => api.put(`/admin/inventory/refills/${id}/reject`, data),
   updateProductStock: (data) => api.post('/admin/inventory/stock', data),
+  updateInventory: (data) => api.post('/admin/inventory/stock', data),
   importZipInventory: (data) => api.post('/admin/inventory/items/zip-import', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 
   // Sales
   getSales: (params) => api.get('/admin/sales', { params }),
+  createManualSale: (data) => api.post('/admin/sales', data),
 
   // Activity Logs
   getActivityLogs: (params) => api.get('/admin/activities', { params }),
@@ -73,7 +100,17 @@ export const adminAPI = {
   getReturnReport: (params) => api.get('/admin/reports/returns', { params }),
   getSessionReport: (params) => api.get('/admin/reports/sessions', { params }),
   getVehicleAllPerformance: (params) => api.get('/admin/reports/vehicle-all', { params }),
+  getDayDetailedSales: (params) => api.get('/admin/reports/day-detailed', { params }),
+  getPaymentReport: (params) => api.get('/admin/reports/daily', { params }),
   getDamageReports: (params) => api.get('/damage/reports', { params }),
+  getDamageEntries: (params) => api.get('/damage/entries', { params }),
+
+  // Vehicle Damage CRUD (Separate)
+  getVehicleDamages: (params) => api.get('/admin/vehicle-damages', { params }),
+  createVehicleDamage: (data) => api.post('/admin/vehicle-damages', data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  updateVehicleDamage: (id, data) => api.put(`/admin/vehicle-damages/${id}`, data, { headers: { 'Content-Type': 'multipart/form-data' } }),
+  deleteVehicleDamage: (id) => api.delete(`/admin/vehicle-damages/${id}`),
+  getInvoiceReport: (params) => api.get('/admin/sales', { params }),
   getTrackingVillageVisits: (params) => api.get('/reports/tracking/village-visits', { params }),
   getTrackingTimeDeviation: (params) => api.get('/reports/tracking/time-deviation', { params }),
 
@@ -116,7 +153,7 @@ export const adminAPI = {
   vgeGenerateMonthly: (data) => api.post('/vge/admin/generate-monthly', data || {}),
 
   // Asset Management
-  getAssets: () => api.get('/admin/assets'),
+  getAssets: (params) => api.get('/admin/assets', { params }),
   createAsset: (data) => api.post('/admin/assets', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
@@ -127,12 +164,12 @@ export const adminAPI = {
   addAssetUnits: (id, data) => api.post(`/admin/assets/${id}/units`, data),
   assignAsset: (data) => api.post('/admin/assets/assign', data),
   returnAsset: (data) => api.post('/admin/assets/return', data),
-  getAssetTracking: () => api.get('/admin/assets/tracking'),
-  getAssetIssues: () => api.get('/admin/assets/issues'),
+  getAssetTracking: (params) => api.get('/admin/assets/tracking', { params }),
+  getAssetIssues: (params) => api.get('/admin/assets/issues', { params }),
   updateAssetIssue: (id, data) => api.put(`/admin/assets/issues/${id}`, data),
-  getAssetRequests: () => api.get('/admin/assets/requests'),
+  getAssetRequests: (params) => api.get('/admin/assets/requests', { params }),
   updateAssetRequest: (id, data) => api.put(`/admin/assets/requests/${id}`, data),
-  getAssetReports: () => api.get('/admin/assets/reports'),
+  getAssetReports: (params) => api.get('/admin/assets/reports', { params }),
 
   // Asset Categories
   getAssetCategories: (params) => api.get('/admin/asset-categories', { params }),
@@ -147,11 +184,11 @@ export const adminAPI = {
   },
   resolveVillageLink: (url) => api.post('/admin/villages/resolve-link', { url }),
 
-  // Tenant Stores Management
-  getStores: () => api.get('/tenant/stores'),
-  createStore: (data) => api.post('/tenant/stores', data),
-  updateStore: (id, data) => api.put(`/tenant/stores/${id}`, data),
-  deleteStore: (id) => api.delete(`/tenant/stores/${id}`),
+  // Organization Stores Management (Admin Perspective)
+  getStores: () => api.get('/admin/stores'),
+  createStore: (data) => api.post('/admin/stores', data),
+  updateStore: (id, data) => api.put(`/admin/stores/${id}`, data),
+  deleteStore: (id) => api.delete(`/admin/stores/${id}`),
 
   // Role & Privileges Management
   getRoles: () => api.get('/admin/roles'),
@@ -165,6 +202,22 @@ export const adminAPI = {
   uploadProductImage: (data) => api.post('/admin/upload-image', data, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+
+  // Customers Module
+  getCustomers: (params) => api.get('/customers', { params }),
+  registerCustomer: (data) => api.post('/customers', data),
+  loginCustomer: (data) => api.post('/customers/login', data),
+  getCustomerHistory: (id) => api.get(`/customers/${id}/history`),
+  updateCustomerProfile: (id, data) => api.put(`/customers/${id}`, data),
+  adjustCreditBalance: (id, data) => api.post(`/customers/${id}/credit`, data),
+  adjustLoyaltyPoints: (id, data) => api.post(`/customers/${id}/points`, data),
+
+  // Module 14 Enterprise Asset Extensions
+  updateAssetVehicleMapping: (data) => api.put('/admin/assets/vehicle-mapping', data),
+  getDepreciationSchedules: (params) => api.get('/admin/assets/depreciation', { params }),
+  saveDepreciationSchedule: (data) => api.post('/admin/assets/depreciation', data),
+  getAssetAudits: (params) => api.get('/admin/assets/audits', { params }),
+  createAssetAudit: (data) => api.post('/admin/assets/audits', data),
 };
 
 export default adminAPI;

@@ -39,7 +39,8 @@ import {
   Navigation,
   RotateCcw,
   FileText,
-  Zap
+  Zap,
+  ShoppingBag
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -54,23 +55,80 @@ function cn(...inputs) {
 }
 
 export default function AdminLayout() {
-  const { clearUser, user } = useUserStore();
+  const { clearUser, user, refreshUserProfile } = useUserStore();
   const unreadCount = useNotificationStore(s => s.unreadCount);
   const navigate = useNavigate();
   const [isNotifOpen, setIsNotifOpen] = React.useState(false);
+  const [isUserDropdownOpen, setIsUserDropdownOpen] = React.useState(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = React.useState(false);
+  const userDropdownRef = React.useRef(null);
+  const [lastOpenedMenu, setLastOpenedMenu] = React.useState(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+
+  React.useEffect(() => {
+    refreshUserProfile();
+  }, []);
   const [searchParams] = useSearchParams();
   const location = useLocation();
+  const [openMenus, setOpenMenus] = React.useState({
+    Procurement: location.pathname.startsWith('/admin/procurement'),
+    Inventory: location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage'),
+    Operation: location.pathname.startsWith('/admin/users'),
+    Routes: location.pathname.startsWith('/admin/routes') || (location.pathname.startsWith('/admin/vehicles') && (
+      location.search.includes('sub=route_mapping') ||
+      location.search.includes('sub=sales') ||
+      location.search.includes('sub=collection')
+    )),
+    Vehicles: location.pathname.startsWith('/admin/vehicles'),
+    'Return & Stock': location.search.includes('tab=return'),
+    Reports: location.pathname.startsWith('/admin/reports')
+  });
+
+  const toggleMenu = (label) => {
+    setOpenMenus(prev => {
+      const isOpening = !prev[label];
+      if (isOpening) setLastOpenedMenu(label);
+      return { ...prev, [label]: isOpening };
+    });
+  };
+
   const activeStoreId = searchParams.get('storeId');
   const activeStoreName = searchParams.get('storeName');
 
   const displayStoreName = activeStoreName || user?.storeName || user?.tenantName || 'VillagKart';
 
   const appendParams = (path) => {
-    if (!activeStoreId) return path;
+    if (!activeStoreId || path.startsWith('/admin/cash')) return path;
     const separator = path.includes('?') ? '&' : '?';
     return `${path}${separator}storeId=${activeStoreId}&storeName=${activeStoreName || ''}`;
   };
+
+  React.useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (userDropdownRef.current && !userDropdownRef.current.contains(event.target)) {
+        setIsUserDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  React.useEffect(() => {
+    if (lastOpenedMenu && openMenus[lastOpenedMenu]) {
+      // Use a small timeout to allow the menu to expand before scrolling
+      const timer = setTimeout(() => {
+        const element = document.getElementById(`nav-group-${lastOpenedMenu.replace(/\s+/g, '-').toLowerCase()}`);
+        if (element) {
+          element.scrollIntoView({
+            behavior: 'smooth',
+            block: 'center',
+            inline: 'nearest'
+          });
+        }
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [openMenus, lastOpenedMenu]);
 
   const handleLogout = () => {
     clearUser();
@@ -81,13 +139,14 @@ export default function AdminLayout() {
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
     {
       label: 'Operation',
-      icon: ClipboardList,
+      icon: Users,
       subItems: [
         { to: '/admin/users', icon: Users, label: 'Users', module: 'STAFF' },
+        { to: '/admin/routes', icon: Navigation, label: 'Routes', module: 'ROUTES' },
         { to: '/admin/vehicles', icon: Truck, label: 'Vehicles', module: 'VEHICLES' },
-        { to: '/admin/routes', icon: MapPin, label: 'Routes', module: 'ROUTES', section: 'ROUTES' },
       ]
     },
+    // { to: '/admin/stores', icon: Store, label: 'Stores' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
@@ -95,6 +154,7 @@ export default function AdminLayout() {
       icon: Package,
       module: 'INVENTORY',
       subItems: [
+        // { to: '/admin/inventory?tab=main_master', label: 'Registry', icon: Shield, section: 'MAIN_MASTER' },
         { to: '/admin/inventory?tab=master', label: 'Master', icon: Grid, section: 'MASTER' },
         { to: '/admin/inventory?tab=inventory', label: 'Store Stock', icon: Package, section: 'STORE_STOCK' },
         { to: '/admin/inventory?tab=return&sub=tracking', label: 'Vehicle Stock', icon: Truck, section: 'VEHICLE_STOCK' },
@@ -102,6 +162,9 @@ export default function AdminLayout() {
         { to: '/admin/inventory?tab=return&sub=return', label: 'Return', icon: ArrowDownCircle, section: 'RETURN' },
         { to: '/admin/inventory?tab=return&sub=refills', label: 'Refills', icon: Package, section: 'REFILLS' },
         { to: '/admin/damage', label: 'Damage', icon: AlertTriangle, section: 'DAMAGE' },
+        // { to: '/admin/inventory?tab=return&sub=trips', label: 'Trips/Shifts', icon: HistoryIcon, section: 'TRIPS' },
+        // { to: '/admin/inventory?tab=return&sub=fuel', icon: CreditCard, label: 'Fuel Logs', section: 'FUEL' },
+        // { to: '/admin/inventory?tab=return&sub=maintenance', icon: Settings, label: 'Maintenance', section: 'MAINTENANCE' },
         { to: '/admin/inventory?tab=return&sub=audits', label: 'Audit History', icon: CheckSquare, section: 'AUDITS' },
       ]
     },
@@ -146,26 +209,31 @@ export default function AdminLayout() {
         { to: '/admin/procurement?tab=reports', icon: BarChart3, label: 'Reports', section: 'REPORTS' },
       ]
     },
-    { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
+    // { to: '/admin/finance-reports', icon: PieChart, label: 'Finance Reports', module: 'REPORTS' },
   ];
 
   const navItems = rawNavItems.map(item => {
     if (item.subItems) {
       const filteredSubItems = item.subItems.filter(sub => {
         const requiredModule = sub.module || item.module;
-        if (!requiredModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
-        
+        // Global Bypass for Admins
+        if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+
+        if (!requiredModule || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+
         // 1. Prioritize Section-Level Gating (REPORTS bypass module READ)
         if (sub.section) {
+          if (sub.section === 'MAIN_MASTER') return true;
           if (requiredModule === 'REPORTS' && user?.permissions?.REPORT_TARGET_SECTIONS) {
             return user.permissions.REPORT_TARGET_SECTIONS.includes(sub.section);
           }
-          
+
           if (requiredModule === 'INVENTORY') {
+            if (['TRIPS', 'FUEL', 'MAINTENANCE'].includes(sub.section)) return true;
             const sections = user?.permissions?.INVENTORY_SECTIONS;
             if (sections) return (sections[sub.section] || []).includes('READ');
             if (user?.permissions?.INVENTORY_TARGET_SECTIONS) return user.permissions.INVENTORY_TARGET_SECTIONS.includes(sub.section);
-            return false;
+            return true; // Fallback for new sections
           }
 
           if (requiredModule === 'PROCUREMENT') {
@@ -191,8 +259,11 @@ export default function AdminLayout() {
     return item;
   }).filter(item => {
     if (item.subItems) return item.subItems.length > 0;
-    if (!item.module || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
-    
+    // Global Bypass for Admins
+    if (user?.role === 'ADMIN' || user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
+
+    if (!item.module || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+
     const hasModuleRead = (user?.permissions?.[item.module] || []).includes('READ');
     if (!hasModuleRead) return false;
 
@@ -229,18 +300,6 @@ export default function AdminLayout() {
     return true;
   });
 
-  const [openMenus, setOpenMenus] = React.useState({
-    Procurement: location.pathname.startsWith('/admin/procurement'),
-    Inventory: location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage'),
-    Operation: location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes'),
-    'Return & Stock': location.search.includes('tab=return'),
-    Reports: location.pathname.startsWith('/admin/reports')
-  });
-
-  const toggleMenu = (label) => {
-    setOpenMenus(prev => ({ ...prev, [label]: !prev[label] }));
-  };
-
   const getRequiredModule = (pathname) => {
     if (pathname === '/admin') return 'DASHBOARD';
     if (pathname.startsWith('/admin/users')) return 'STAFF';
@@ -258,14 +317,16 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
     if (pathname.startsWith('/admin/attendance')) return 'STAFF';
     if (pathname.startsWith('/admin/privileges')) return 'ADMIN';
+    if (pathname.startsWith('/admin/stores')) return 'ADMIN';
     return null;
   };
 
   const currentModule = getRequiredModule(location.pathname);
-  
+
   const isAuthorizedRoute = () => {
     if (location.pathname.startsWith('/admin/privileges')) return true; // Explicitly allow privileges if in Admin portal
-    if (!currentModule || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
+    if (location.pathname.startsWith('/admin/stores')) return true; // Explicitly allow stores
+    if (!currentModule || ['TENANT_OWNER', 'ADMIN', 'SUPER_ADMIN'].includes(user?.role)) return true;
 
     if (location.pathname.startsWith('/admin/reports')) {
       if (user?.permissions?.REPORT_TARGET_SECTIONS?.length > 0) return true;
@@ -285,7 +346,7 @@ export default function AdminLayout() {
       const sections = user?.permissions?.PROCUREMENT_SECTIONS;
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
       if (user?.permissions?.PROCUREMENT_TARGET_SECTIONS?.length > 0) return true;
-      
+
       const tab = searchParams.get('tab') || 'vendors';
       const tabMap = { 'vendors': 'VENDORS', 'mapping': 'MAPPING', 'po': 'PO', 'grn': 'GRN', 'purchases': 'PURCHASES', 'ledger': 'LEDGER', 'payments': 'PAYMENTS', 'reports': 'REPORTS' };
       if (sections && tabMap[tab] && (sections[tabMap[tab]] || []).includes('READ')) return true;
@@ -301,14 +362,14 @@ export default function AdminLayout() {
       const sub = searchParams.get('sub') || (location.pathname === '/admin/damage' ? 'damage' : 'loading');
       const tabMap = { 'master': 'MASTER', 'inventory': 'STORE_STOCK', 'vehicle-stock': 'VEHICLE_STOCK' };
       const subTabMap = { 'loading': 'LOADING', 'return': 'RETURN', 'refills': 'REFILLS', 'damage': 'DAMAGE', 'audits': 'AUDITS', 'tracking': 'VEHICLE_STOCK' };
-      
+
       if (sections) {
         if (tabMap[tab] && (sections[tabMap[tab]] || []).includes('READ')) return true;
         if (tab === 'return' && (sections[subTabMap[sub]] || []).includes('READ')) return true;
       }
       if (user?.permissions?.INVENTORY_TARGET_SECTIONS) {
-         if (tabMap[tab] && user.permissions.INVENTORY_TARGET_SECTIONS.includes(tabMap[tab])) return true;
-         if (tab === 'return' && user.permissions.INVENTORY_TARGET_SECTIONS.includes(subTabMap[sub])) return true;
+        if (tabMap[tab] && user.permissions.INVENTORY_TARGET_SECTIONS.includes(tabMap[tab])) return true;
+        if (tab === 'return' && user.permissions.INVENTORY_TARGET_SECTIONS.includes(subTabMap[sub])) return true;
       }
     }
 
@@ -330,259 +391,342 @@ export default function AdminLayout() {
 
   return (
     <div className={cn(
-      "min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0",
-      !isPOS && "md:pl-64"
+      "min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0 transition-all duration-300",
+      !isPOS && (isSidebarCollapsed ? "md:pl-20" : "md:pl-64")
     )}>
       {/* Header */}
       {!isPOS && (
-      <header className="sticky top-0 z-30 w-full bg-white border-b border-gray-200 px-4 py-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <img src={logo} alt="VillagKart" className="h-10 w-auto" />
-          <div className="flex flex-col">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
-            <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
-          </div>
-        </div>
-        <div className="flex items-center gap-4 relative">
-          {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
-            <Link
-              to={appendParams('/admin/pos')}
-              className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
-              title="Point of Sale"
-            >
-              <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-                <PlusCircle size={18} strokeWidth={3} />
+        <header className="sticky top-0 z-50 w-full bg-white border-b border-gray-200 px-4 py-3">
+          <div className="max-w-[1600px] mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+                className="p-2 hover:bg-gray-50 rounded-xl text-gray-400 hover:text-emerald-600 transition-all hidden md:flex"
+                title={isSidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
+              >
+                <Menu size={20} className={cn("transition-transform duration-300", !isSidebarCollapsed && "rotate-180")} />
+              </button>
+              <div className="flex items-center gap-3">
+                <img src={logo} alt="VillagKart" className="h-10 w-auto" />
+                <div className={cn("flex flex-col transition-all duration-300", isSidebarCollapsed ? "opacity-0 invisible w-0" : "opacity-100 visible")}>
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">VillagKart</span>
+                  <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
+                </div>
               </div>
-              <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
-            </Link>
-          )}
+            </div>
+            <div className="flex items-center gap-4 relative">
+              {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
+                <Link
+                  to={appendParams('/admin/pos')}
+                  className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
+                  title="Point of Sale"
+                >
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
+                    <PlusCircle size={18} strokeWidth={3} />
+                  </div>
+                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
+                </Link>
+              )}
 
-          <NotificationPopover
-            isOpen={isNotifOpen}
-            onClose={() => setIsNotifOpen(false)}
-          />
-          <button
-            onClick={() => setIsNotifOpen(!isNotifOpen)}
-            className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
-          >
-            <Bell size={22} strokeWidth={2.5} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-red-500/10 z-10 transition-all">
-                {unreadCount}
-              </span>
-            )}
-          </button>
+              <NotificationPopover
+                isOpen={isNotifOpen}
+                onClose={() => setIsNotifOpen(false)}
+              />
+              <button
+                onClick={() => setIsNotifOpen(!isNotifOpen)}
+                className={`relative p-2 transition-colors rounded-full ${isNotifOpen ? 'bg-emerald-50 text-emerald-600' : 'text-gray-500 hover:text-emerald-600'}`}
+              >
+                <Bell size={22} strokeWidth={2.5} />
+                {unreadCount > 0 && (
+                  <span className="absolute -top-1 -right-1 flex min-w-[20px] h-[20px] px-1.5 items-center justify-center rounded-full bg-red-500 text-[10px] font-black text-white border-2 border-white shadow-lg shadow-red-500/10 z-10 transition-all">
+                    {unreadCount}
+                  </span>
+                )}
+              </button>
 
-          {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
-            <button
-              onClick={() => navigate('/admin/settings')}
-              className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50"
-              title="Admin Settings"
-            >
-              <Settings size={22} strokeWidth={2.5} />
-            </button>
-          )}
+              <div className="h-8 w-px bg-gray-100 mx-1 hidden sm:block" />
 
-          <button
-            onClick={handleLogout}
-            className="p-2 text-gray-400 hover:text-red-600 transition-all rounded-xl hover:bg-red-50"
-          >
-            <LogOut size={20} />
-          </button>
-        </div>
-      </header>
+              {/* User Dropdown */}
+              <div className="relative" ref={userDropdownRef}>
+                <button
+                  onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
+                  className={cn(
+                    "flex items-center gap-3 p-1.5 rounded-2xl transition-all duration-300 group",
+                    isUserDropdownOpen ? "bg-emerald-50" : "hover:bg-gray-50"
+                  )}
+                >
+                  <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-700 flex items-center justify-center text-white font-black text-[10px] shadow-lg shadow-emerald-200 group-hover:scale-105 transition-transform border border-emerald-500/20">
+                    {user?.name ? user.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase() : 'VK'}
+                  </div>
+                  <div className="hidden md:flex flex-col items-start pr-2">
+                    <span className="text-xs font-black text-gray-900 leading-none mb-1 uppercase tracking-tight">{user?.name}</span>
+                    <span className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">{user?.role?.replace('_', ' ')}</span>
+                  </div>
+                  <ChevronDown
+                    size={14}
+                    className={cn(
+                      "text-gray-400 transition-transform duration-300",
+                      isUserDropdownOpen && "rotate-180 text-emerald-600"
+                    )}
+                  />
+                </button>
+
+                {isUserDropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl shadow-2xl border border-gray-100 overflow-hidden animate-in fade-in zoom-in-95 slide-in-from-top-2 duration-200">
+                    <div className="p-4 border-b border-gray-50 bg-gray-50/50">
+                      <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Signed in as</p>
+                      <p className="text-xs font-black text-gray-900 truncate">{user?.email || user?.name}</p>
+                    </div>
+
+                    <div className="p-2">
+                      {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS || []).includes('READ')) && (
+                        <button
+                          onClick={() => { navigate('/admin/settings'); setIsUserDropdownOpen(false); }}
+                          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-all"
+                        >
+                          <Settings size={18} />
+                          <span>Settings</span>
+                        </button>
+                      )}
+                      <button
+                        onClick={handleLogout}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-xs font-bold text-rose-500 hover:bg-rose-50 transition-all"
+                      >
+                        <LogOut size={18} />
+                        <span>Sign Out</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
       )}
 
 
       {/* Desktop Sidebar - Non-scrollable Single Screen */}
       {!isPOS && (
-        <aside className="hidden md:flex fixed left-0 top-0 h-screen w-64 bg-white border-r border-gray-200 flex-col z-40">
-        {/* Sidebar Header: Store Info */}
-        <div className="p-6">
-          <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200">
-                <Store size={20} strokeWidth={2.5} />
-              </div>
-              <div className="min-w-0">
-                <h2 className="text-base font-black text-gray-900 leading-tight truncate">
-                  {displayStoreName}
-                </h2>
-                <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Admin Portal</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Navigation - Flex Grow but hide scrollbar */}
-        <div className="flex-1 overflow-y-auto px-4 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <nav className="space-y-0.5 pb-6">
-            <p className="px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em]">Management</p>
-            {navItems.map((item) => {
-              const hasSubItems = item.subItems && item.subItems.length > 0;
-              const isMenuOpen = openMenus[item.label];
-
-              if (hasSubItems) {
-                return (
-                  <div key={item.label} className="space-y-1">
-                    <button
-                      onClick={() => toggleMenu(item.label)}
-                      className={cn(
-                        "w-full flex items-center justify-between gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
-                        (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
-                          ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
-                          ((location.pathname.startsWith('/admin/users') || location.pathname.startsWith('/admin/vehicles') || location.pathname.startsWith('/admin/routes')) && item.label === 'Operation')
-                          ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
-                          : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
-                      )}
-                    >
-                      <div className="flex items-center gap-3">
-                        <item.icon size={16} strokeWidth={2.5} />
-                        {item.label}
-                      </div>
-                      <ChevronDown
-                        size={14}
-                        className={cn("transition-transform duration-200", isMenuOpen ? "rotate-0" : "-rotate-90")}
-                      />
-                    </button>
-                    {isMenuOpen && (
-                      <div className="pl-4 space-y-1 animate-in slide-in-from-top-1 duration-200 border-l border-emerald-50 ml-6">
-                        {item.subItems.map((sub) => {
-                          const hasNestedItems = sub.subItems && sub.subItems.length > 0;
-                          const isNestedOpen = openMenus[sub.label];
-
-                          if (hasNestedItems) {
-                            const isNestedActive = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return';
-                            return (
-                              <div key={sub.label} className="space-y-0.5">
-                                <button
-                                  onClick={() => toggleMenu(sub.label)}
-                                  className={cn(
-                                    "flex items-center justify-between gap-3 px-4 py-1.5 w-full rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                                    isNestedActive ? "text-emerald-600" : "text-gray-400 hover:text-gray-600"
-                                  )}
-                                >
-                                  <div className="flex items-center gap-3">
-                                    <sub.icon size={14} strokeWidth={2.5} />
-                                    {sub.label}
-                                  </div>
-                                  <ChevronDown
-                                    size={12}
-                                    className={cn("transition-transform duration-200", isNestedOpen ? "rotate-0" : "-rotate-90")}
-                                  />
-                                </button>
-                                {isNestedOpen && (
-                                  <div className="pl-4 space-y-0.5 border-l border-emerald-50 ml-6 animate-in slide-in-from-top-1">
-                                    {sub.subItems.map(nested => {
-                                      const isTarget = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return' && searchParams.get('sub') === new URLSearchParams(nested.to.split('?')[1]).get('sub');
-                                      return (
-                                        <NavLink
-                                          key={nested.to}
-                                          to={appendParams(nested.to)}
-                                          className={cn(
-                                            "flex items-center gap-3 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
-                                            isTarget
-                                              ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
-                                              : "text-gray-400 hover:text-gray-600"
-                                          )}
-                                        >
-                                          <nested.icon size={12} strokeWidth={isTarget ? 3 : 2.5} />
-                                          {nested.label}
-                                        </NavLink>
-                                      );
-                                    })}
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          }
-
-                          const isProcurement = location.pathname === '/admin/procurement';
-                          const isInventoryPath = location.pathname === '/admin/inventory';
-                          const isDamagePath = location.pathname === '/admin/damage';
-
-                          let isActive = false;
-                          if (isProcurement && item.label === 'Procurement') {
-                            isActive = searchParams.get('tab') === new URLSearchParams(sub.to.split('?')[1]).get('tab');
-                          } else if (item.label === 'Inventory') {
-                            if (sub.to === '/admin/damage') {
-                              isActive = isDamagePath;
-                            } else if (isInventoryPath) {
-                              const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
-                              const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
-                              isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
-                            }
-                          } else if (item.label === 'Operation' || item.label === 'Reports') {
-                            isActive = location.pathname === sub.to;
-                          }
-
-                          return (
-                            <NavLink
-                              key={sub.to}
-                              to={appendParams(sub.to)}
-                              className={cn(
-                                "flex items-center gap-3 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
-                                isActive
-                                  ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
-                                  : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
-                              )}
-                            >
-                              <sub.icon size={14} strokeWidth={isActive ? 3 : 2.5} />
-                              {sub.label}
-                              {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-white animate-pulse" />}
-                            </NavLink>
-                          );
-                        })}
-                      </div>
-                    )}
+        <aside className={cn(
+          "hidden md:flex fixed left-0 top-0 h-screen bg-white border-r border-gray-200 flex-col z-40 transition-all duration-300",
+          isSidebarCollapsed ? "w-20" : "w-64"
+        )}>
+          {/* Sidebar Header: Store Info */}
+          <div className="p-6">
+            <div className="flex flex-col gap-4">
+              <div className={cn("flex items-center gap-3", isSidebarCollapsed && "justify-center")}>
+                <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-200 shrink-0">
+                  <Store size={20} strokeWidth={2.5} />
+                </div>
+                {!isSidebarCollapsed && (
+                  <div className="min-w-0 animate-in fade-in duration-300">
+                    <h2 className="text-base font-black text-gray-900 leading-tight truncate">
+                      {displayStoreName}
+                    </h2>
+                    <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Admin Portal</p>
                   </div>
-                );
-              }
-
-              return (
-                <NavLink
-                  key={item.to}
-                  to={appendParams(item.to)}
-                  end={item.end}
-                  className={({ isActive }) => cn(
-                    "flex items-center gap-3 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all duration-200 rounded-r-xl rounded-l-none border-l-4",
-                    isActive
-                      ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 border-emerald-600"
-                      : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-transparent"
-                  )}
-                >
-                  {({ isActive }) => (
-                    <>
-                      <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
-                      {item.label}
-                    </>
-                  )}
-                </NavLink>
-              );
-            })}
-          </nav>
-        </div>
-
-        {/* Sidebar Footer: Admin Profile Data */}
-        <div className="p-4 border-t border-gray-50 bg-gray-50/30">
-          <div className="flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 shadow-sm mb-3">
-            <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50">
-              {user?.name?.charAt(0) || 'A'}
-            </div>
-            <div className="flex flex-col min-w-0">
-              <span className="text-[11px] font-black text-gray-900 truncate tracking-tight">{user?.name}</span>
-              <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
+                )}
+              </div>
             </div>
           </div>
-          <button
-            onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100"
-          >
-            <LogOut size={14} />
-            <span>Sign Out</span>
-          </button>
-        </div>
-      </aside>
+
+          {/* Navigation - Flex Grow but hide scrollbar */}
+          <div className="flex-1 overflow-y-auto px-3 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            <nav className="space-y-0.5 pb-6">
+              {!isSidebarCollapsed && (
+                <p className="px-4 py-2 text-[9px] font-black text-gray-400 uppercase tracking-[0.2em] animate-in fade-in duration-300">Management</p>
+              )}
+              {navItems.map((item) => {
+                const hasSubItems = item.subItems && item.subItems.length > 0;
+                const isMenuOpen = openMenus[item.label];
+
+                if (hasSubItems) {
+                  return (
+                    <div key={item.label} id={`nav-group-${item.label.replace(/\s+/g, '-').toLowerCase()}`} className="space-y-1">
+                      <button
+                        onClick={() => toggleMenu(item.label)}
+                        title={isSidebarCollapsed ? item.label : ""}
+                        className={cn(
+                          "w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all duration-200",
+                          isSidebarCollapsed ? "justify-center px-0" : "justify-between",
+                          (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
+                            ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
+                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Oppoeration') ||
+                            ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
+                            ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
+                            ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
+                            : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
+                        )}
+                      >
+                        <div className="flex items-center gap-3">
+                          <item.icon size={16} strokeWidth={2.5} />
+                          {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">{item.label}</span>}
+                        </div>
+                        {!isSidebarCollapsed && (
+                          <ChevronDown
+                            size={14}
+                            className={cn("transition-transform duration-200", isMenuOpen ? "rotate-0" : "-rotate-90")}
+                          />
+                        )}
+                      </button>
+                      {isMenuOpen && !isSidebarCollapsed && (
+                        <div className="pl-4 space-y-1 animate-in slide-in-from-top-1 duration-200 border-l border-emerald-50 ml-6">
+                          {item.subItems.map((sub) => {
+                            const hasNestedItems = sub.subItems && sub.subItems.length > 0;
+                            const isNestedOpen = openMenus[sub.label];
+
+                            if (hasNestedItems) {
+                              const isNestedActive = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return';
+                              return (
+                                <div key={sub.label} id={`nav-group-${sub.label.replace(/\s+/g, '-').toLowerCase()}`} className="space-y-0.5">
+                                  <button
+                                    onClick={() => toggleMenu(sub.label)}
+                                    className={cn(
+                                      "flex items-center justify-between gap-3 px-4 py-1.5 w-full rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                      isNestedActive ? "text-emerald-600" : "text-gray-400 hover:text-gray-600"
+                                    )}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <sub.icon size={14} strokeWidth={2.5} />
+                                      {sub.label}
+                                    </div>
+                                    <ChevronDown
+                                      size={12}
+                                      className={cn("transition-transform duration-200", isNestedOpen ? "rotate-0" : "-rotate-90")}
+                                    />
+                                  </button>
+                                  {isNestedOpen && (
+                                    <div className="pl-4 space-y-0.5 border-l border-emerald-50 ml-6 animate-in slide-in-from-top-1">
+                                      {sub.subItems.map(nested => {
+                                        const isTarget = location.pathname === '/admin/inventory' && searchParams.get('tab') === 'return' && searchParams.get('sub') === new URLSearchParams(nested.to.split('?')[1]).get('sub');
+                                        return (
+                                          <NavLink
+                                            key={nested.to}
+                                            to={appendParams(nested.to)}
+                                            className={cn(
+                                              "flex items-center gap-3 px-4 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all",
+                                              isTarget
+                                                ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                                : "text-gray-400 hover:text-gray-600"
+                                            )}
+                                          >
+                                            <nested.icon size={12} strokeWidth={isTarget ? 3 : 2.5} />
+                                            {nested.label}
+                                          </NavLink>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+
+                            const isProcurement = location.pathname === '/admin/procurement';
+                            const isInventoryPath = location.pathname === '/admin/inventory';
+                            const isDamagePath = location.pathname === '/admin/damage';
+
+                            let isActive = false;
+                            if (isProcurement && item.label === 'Procurement') {
+                              isActive = searchParams.get('tab') === new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                            } else if (item.label === 'Inventory') {
+                              if (sub.to === '/admin/damage') {
+                                isActive = isDamagePath;
+                              } else if (isInventoryPath) {
+                                const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                                const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
+                                isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
+                              }
+                            } else if (['Operation', 'Reports', 'Vehicles', 'Routes'].includes(item.label)) {
+                              if (item.label === 'Vehicles' || item.label === 'Routes') {
+                                const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
+                                const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                                if (targetSub) {
+                                  isActive = location.pathname === '/admin/vehicles' && searchParams.get('sub') === targetSub;
+                                } else if (targetTab) {
+                                  isActive = location.pathname === '/admin/routes' && searchParams.get('tab') === targetTab;
+                                } else {
+                                  isActive = location.pathname === sub.to;
+                                }
+                              } else {
+                                isActive = location.pathname === sub.to;
+                              }
+                            }
+
+                            return (
+                              <NavLink
+                                key={sub.to}
+                                to={appendParams(sub.to)}
+                                className={cn(
+                                  "flex items-center gap-3 px-4 py-2 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all",
+                                  isActive
+                                    ? "bg-emerald-600 text-white shadow-md shadow-emerald-200"
+                                    : "text-gray-400 hover:bg-gray-50 hover:text-gray-600"
+                                )}
+                              >
+                                <sub.icon size={14} strokeWidth={isActive ? 3 : 2.5} />
+                                {sub.label}
+                                {isActive && <div className="ml-auto w-1 h-1 rounded-full bg-white animate-pulse" />}
+                              </NavLink>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                }
+
+                return (
+                  <NavLink
+                    key={item.to}
+                    to={appendParams(item.to)}
+                    end={item.end}
+                    title={isSidebarCollapsed ? item.label : ""}
+                    className={({ isActive }) => cn(
+                      "flex items-center gap-3 px-4 py-2.5 text-xs font-black uppercase tracking-wider transition-all duration-200 rounded-r-xl rounded-l-none border-l-4",
+                      isSidebarCollapsed ? "justify-center px-0" : "",
+                      isActive
+                        ? "bg-emerald-600 text-white shadow-lg shadow-emerald-200 border-emerald-600"
+                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-transparent"
+                    )}
+                  >
+                    {({ isActive }) => (
+                      <>
+                        <item.icon size={16} strokeWidth={isActive ? 3 : 2} />
+                        {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">{item.label}</span>}
+                      </>
+                    )}
+                  </NavLink>
+                );
+              })}
+            </nav>
+          </div>
+
+          {/* Sidebar Footer: Admin Profile Data */}
+          <div className="p-4 border-t border-gray-50 bg-gray-50/30">
+            <div className={cn("flex items-center gap-3 p-3 rounded-2xl bg-white border border-gray-100 shadow-sm mb-3 transition-all", isSidebarCollapsed && "justify-center p-2")}>
+              <div className="w-9 h-9 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600 font-black text-xs border border-emerald-100/50 shrink-0">
+                {user?.name?.charAt(0) || 'A'}
+              </div>
+              {!isSidebarCollapsed && (
+                <div className="flex flex-col min-w-0 animate-in fade-in duration-300">
+                  <span className="text-[11px] font-black text-gray-900 truncate tracking-tight">{user?.name}</span>
+                  <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
+                </div>
+              )}
+            </div>
+            <button
+              onClick={handleLogout}
+              title={isSidebarCollapsed ? "Sign Out" : ""}
+              className={cn(
+                "flex items-center gap-3 w-full px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all border border-transparent hover:border-red-100",
+                isSidebarCollapsed && "justify-center px-0"
+              )}
+            >
+              <LogOut size={14} />
+              {!isSidebarCollapsed && <span className="animate-in fade-in duration-300">Sign Out</span>}
+            </button>
+          </div>
+        </aside>
       )}
 
       {/* Main Content */}
@@ -598,7 +742,7 @@ export default function AdminLayout() {
             <p className="text-gray-500 font-medium tracking-wide text-center max-w-sm mb-8">
               You do not have the required privileges to view this section. Please contact your administrator.
             </p>
-            <button 
+            <button
               onClick={() => navigate('/admin')}
               className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black text-xs uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all hover:-translate-y-0.5 active:translate-y-0"
             >
@@ -611,36 +755,36 @@ export default function AdminLayout() {
       {/* Mobile Bottom Navigation */}
       {!isPOS && (
         <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white border-t border-gray-200 flex items-center justify-around px-2 py-3 md:hidden">
-        {navItems.slice(0, 5).map((item) => (
-          <NavLink
-            key={item.to || item.label}
-            to={appendParams(item.to || '#')}
-            end={item.end}
-            className={({ isActive }) => cn(
+          {navItems.slice(0, 5).map((item) => (
+            <NavLink
+              key={item.to || item.label}
+              to={appendParams(item.to || '#')}
+              end={item.end}
+              className={({ isActive }) => cn(
+                "flex flex-col items-center gap-1 transition-all duration-200 min-w-[64px]",
+                isActive ? "text-emerald-600" : "text-gray-400"
+              )}
+            >
+              {({ isActive }) => (
+                <>
+                  <item.icon size={20} className={cn(isActive && "stroke-[2.5px]")} />
+                  <span className="text-[10px] font-medium">{item.label}</span>
+                </>
+              )}
+            </NavLink>
+          ))}
+          {/* More button for reports/settings on mobile */}
+          <button
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className={cn(
               "flex flex-col items-center gap-1 transition-all duration-200 min-w-[64px]",
-              isActive ? "text-emerald-600" : "text-gray-400"
+              isMobileMenuOpen ? "text-emerald-600" : "text-gray-400"
             )}
           >
-            {({ isActive }) => (
-              <>
-                <item.icon size={20} className={cn(isActive && "stroke-[2.5px]")} />
-                <span className="text-[10px] font-medium">{item.label}</span>
-              </>
-            )}
-          </NavLink>
-        ))}
-        {/* More button for reports/settings on mobile */}
-        <button
-          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-          className={cn(
-            "flex flex-col items-center gap-1 transition-all duration-200 min-w-[64px]",
-            isMobileMenuOpen ? "text-emerald-600" : "text-gray-400"
-          )}
-        >
-          <Menu size={20} />
-          <span className="text-[10px] font-medium">Menu</span>
-        </button>
-      </nav>
+            <Menu size={20} />
+            <span className="text-[10px] font-medium">Menu</span>
+          </button>
+        </nav>
       )}
 
       {/* Mobile Overlay Menu */}

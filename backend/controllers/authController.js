@@ -24,17 +24,17 @@ export const loginUser = async (req, res, next) => {
 
         if (user.status === 'SUSPENDED') {
             console.log('[DEBUG] Login failed: User suspended');
-            return res.status(403).json({ 
-                success: false, 
-                message: 'Account is suspended. Please contact your administrator.' 
+            return res.status(403).json({
+                success: false,
+                message: 'Account is suspended. Please contact your administrator.'
             });
         }
 
         if (user.role === 'SALES_AGENT' && user.assignedVehicle && user.assignedVehicle.status === false) {
             console.log('[DEBUG] Login failed: Vehicle inactive');
-            return res.status(403).json({ 
-                success: false, 
-                message: `Your assigned vehicle (${user.assignedVehicle.vehicleNumber}) is currently INACTIVE. Access denied.` 
+            return res.status(403).json({
+                success: false,
+                message: `Your assigned vehicle (${user.assignedVehicle.vehicleNumber}) is currently INACTIVE. Access denied.`
             });
         }
 
@@ -43,7 +43,7 @@ export const loginUser = async (req, res, next) => {
             console.log('[DEBUG] Password matched. Generating token...');
             const token = generateToken(user.id, user.role, user.assignedVehicleId, user.tenantId);
             console.log('[DEBUG] Token generated successfully');
-            
+
             res.json({
                 id: user.id,
                 tenantId: user.tenantId,
@@ -60,6 +60,7 @@ export const loginUser = async (req, res, next) => {
                 customRoleName: user.customRole?.name || null,
                 permissions: user.customRole?.permissions || null,
                 portalType: user.customRole?.portalType || null,
+                attendanceEnabled: user.attendanceEnabled,
                 token: token,
             });
         } else {
@@ -158,7 +159,8 @@ export const getUserProfile = async (req, res, next) => {
                 tenant: { select: { name: true, logo: true } },
                 store: { select: { name: true, code: true } },
                 assignedVehicle: true,
-                customRole: true
+                customRole: true,
+                documents: true
             }
         });
 
@@ -211,6 +213,47 @@ export const updatePassword = async (req, res, next) => {
         });
 
         res.json({ message: 'Password updated successfully' });
+    } catch (error) {
+        next(error);
+    }
+};
+
+import { uploadToSupabase } from '../utils/supabaseService.js';
+// jsjsjs
+// @desc    Upload document for current user
+// @route   POST /api/auth/me/documents
+// @access  Private
+export const uploadMyDocument = async (req, res, next) => {
+    try {
+        const { type, documentNumber } = req.body;
+
+        if (!req.file) {
+            return res.status(400).json({ message: 'No file uploaded' });
+        }
+
+        const fileUrl = await uploadToSupabase(
+            req.file.buffer,
+            req.file.originalname,
+            req.file.mimetype,
+            'users',
+            'kyc'
+        );
+
+        if (!fileUrl) {
+            return res.status(500).json({ message: 'Failed to upload to cloud storage' });
+        }
+
+        const document = await prisma.userDocument.create({
+            data: {
+                userId: req.user.id,
+                type,
+                documentNumber,
+                fileUrl,
+                status: 'PENDING'
+            }
+        });
+
+        res.status(201).json({ message: 'Document uploaded successfully', document });
     } catch (error) {
         next(error);
     }
