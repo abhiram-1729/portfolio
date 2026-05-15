@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt, Camera } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { CreditCard, Percent, FileText, ChevronRight, Bell, Lock, X, Loader2, Save, Store, Mail, Phone, MapPin, Hash, Package, Trash2, Edit, ArrowLeft, CheckCircle2, Plus, AlertTriangle, Search, Clock, Receipt, Truck, Tag } from 'lucide-react';
 import adminAPI from '../../services/adminService';
 import { getExpenseCategories, createExpenseCategory, updateExpenseCategory, deleteExpenseCategory } from '../../services/expenseService';
 import toast from 'react-hot-toast';
@@ -7,6 +8,7 @@ import { useUserStore } from '../../store/userStore';
 import AdminLateEntryConfig from './AdminLateEntryConfig';
 
 export default function AdminSettings() {
+  const navigate = useNavigate();
   const [settings, setSettings] = useState({
     businessName: '',
     gstNo: '',
@@ -15,11 +17,14 @@ export default function AdminSettings() {
     address: '',
     taxRates: '0,5,12,18',
     shiftMode: 'STANDARD', // 'STANDARD' | 'MULTI'
-    shifts: []
+    shifts: [],
+    deliverySlabs: [],
+    deliverySlots: [],
+    deliveryRadiusEnforced: true
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [activeModal, setActiveModal] = useState(null); // 'TAX' | 'BUSINESS' | 'UNITS' | 'CATEGORIES' | 'SHIFTS'
+  const [activeModal, setActiveModal] = useState(null); // 'TAX' | 'BUSINESS' | 'UNITS' | 'CATEGORIES' | 'SHIFTS' | 'DELIVERY'
   const [isCreatingShift, setIsCreatingShift] = useState(false);
   const [editingShiftId, setEditingShiftId] = useState(null);
   const [shiftForm, setShiftForm] = useState({
@@ -69,6 +74,8 @@ export default function AdminSettings() {
   const [subCategorySearch, setSubCategorySearch] = useState('');
   const [assetCategorySearch, setAssetCategorySearch] = useState('');
   const [expenseCategorySearch, setExpenseCategorySearch] = useState('');
+  
+
 
   const currentUser = useUserStore(s => s.user);
   const can = useUserStore(s => s.can);
@@ -146,7 +153,12 @@ export default function AdminSettings() {
     try {
       const { data } = await adminAPI.getSettings({ storeId: currentUser?.storeId });
       if (data.success) {
-        setSettings(data.data);
+        setSettings({
+          ...data.data,
+          deliverySlabs: data.data.deliverySlabs || [],
+          deliverySlots: data.data.deliverySlots || [],
+          deliveryRadiusEnforced: data.data.deliveryRadiusEnforced !== undefined ? data.data.deliveryRadiusEnforced : true
+        });
       }
     } catch (error) {
       toast.error('Failed to load settings');
@@ -158,22 +170,45 @@ export default function AdminSettings() {
   // Initialize shifts if empty when entering SHIFTS modal
   useEffect(() => {
     if (activeModal === 'SHIFTS' && (settings.shifts || []).length === 0) {
-      const isMulti = settings.shiftMode === 'MULTI';
-      setSettings(prev => ({
-        ...prev,
-        shifts: [{
-          id: `shift_${Date.now()}`,
-          name: isMulti ? 'Morning Shift' : 'General Shift',
+      const now = Date.now();
+      const defaultShifts = [
+        {
+          id: `shift_${now}_1`,
+          name: 'Full Day',
+          type: 'STANDARD',
           startTime: '09:00',
           endTime: '18:00',
+          sessions: [{ startTime: '09:00', endTime: '18:00' }],
           isActive: true
-        }]
+        },
+        {
+          id: `shift_${now}_2`,
+          name: 'Afternoon',
+          type: 'MULTI_SESSION',
+          startTime: '14:30',
+          endTime: '17:00',
+          sessions: [{ startTime: '14:30', endTime: '17:00' }],
+          isActive: true
+        },
+        {
+          id: `shift_${now}_3`,
+          name: 'Break shift',
+          type: 'MULTI_SESSION',
+          startTime: '15:00',
+          endTime: '19:00',
+          sessions: [{ startTime: '15:00', endTime: '19:00' }],
+          isActive: true
+        }
+      ];
+      setSettings(prev => ({
+        ...prev,
+        shifts: defaultShifts
       }));
     }
-  }, [activeModal, settings.shiftMode]);
+  }, [activeModal]);
 
   const handleUpdateSettings = async (e) => {
-    e.preventDefault();
+    e?.preventDefault?.();
     setSaving(true);
     try {
       const { data } = await adminAPI.updateSettings({ ...settings, storeId: currentUser?.storeId });
@@ -421,13 +456,23 @@ export default function AdminSettings() {
   };
 
   const hasPermission = (sectionKey) => {
-    if (!currentUser?.customRoleId) return true;
-    const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS || [];
+    // No restriction key = always show (generic sections visible to anyone with SETTINGS access)
+    if (!sectionKey) return true;
+    if (sectionKey === 'EXPENSE_SETTINGS') {
+      return can('EXPENSES', 'READ', 'SETTINGS') || can('EXPENSES', 'UPDATE', 'SETTINGS');
+    }
+    const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS;
+    // No widget config exists at all → show everything (TENANT_OWNER / no customRole)
+    if (targetSections === undefined || targetSections === null) return true;
+    // Config exists → enforce it
     return targetSections.includes(sectionKey);
   };
 
+  const hasSectionAccess = (sectionKey) => hasPermission(sectionKey);
+
   const sections = [
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Inventory Management', 
       icon: Package, 
       items: [
@@ -438,6 +483,7 @@ export default function AdminSettings() {
       ]
     },
     {
+      sectionKey: 'EXPENSE_SETTINGS',
       title: 'Expense Management',
       icon: Receipt,
       items: [
@@ -446,15 +492,17 @@ export default function AdminSettings() {
       ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Payment Settings', 
       icon: CreditCard, 
       items: [
-        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
-        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' },
-        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon'), key: 'POS_CONFIG' }
-      ].filter(item => hasPermission(item.key))
+        { label: 'Add/Edit Payment Modes', action: () => toast.error('This feature is coming soon') },
+        { label: 'UPI Settings', action: () => toast.error('This feature is coming soon') },
+        { label: 'Card Terminal Config', action: () => toast.error('This feature is coming soon') }
+      ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Business Profile', 
       icon: Store, 
       items: [
@@ -463,6 +511,7 @@ export default function AdminSettings() {
       ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Tax Settings', 
       icon: Receipt, 
       items: [
@@ -471,15 +520,17 @@ export default function AdminSettings() {
       ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Invoice Format', 
       icon: FileText, 
       items: [
-        { label: 'Header/Footer Text', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
-        { label: 'Upload Logo', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' },
-        { label: 'Sequential Numbering', action: () => toast.error('Coming soon'), key: 'POS_CONFIG' }
-      ].filter(item => hasPermission(item.key))
+        { label: 'Header/Footer Text', action: () => toast.error('Coming soon') },
+        { label: 'Upload Logo', action: () => toast.error('Coming soon') },
+        { label: 'Sequential Numbering', action: () => toast.error('Coming soon') }
+      ]
     },
     { 
+      sectionKey: 'POS_CONFIG',
       title: 'Notifications', 
       icon: Bell, 
       items: [
@@ -488,14 +539,44 @@ export default function AdminSettings() {
       ]
     },
     {
+      sectionKey: 'POS_CONFIG',
       title: 'Shift Management',
       icon: Clock,
       items: [
         { label: 'Configure Timing & Shifts', action: () => { setActiveModal('SHIFTS'); setSettings(prev => ({...prev, shiftMode: 'MULTI'})); } },
         { label: 'Late Entry Rules', action: () => setActiveModal('LATE_RULES') }
       ]
+    },
+    {
+      sectionKey: 'POS_CONFIG',
+      title: 'Delivery Logistics',
+      icon: Truck,
+      items: [
+        { label: 'Delivery Fee Slabs', action: () => navigate('/admin/delivery-logistics') },
+        { label: 'Time Slots Management', action: () => navigate('/admin/delivery-logistics') },
+        { label: 'Radius Enforcement', action: () => navigate('/admin/delivery-logistics') }
+      ]
+    },
+    {
+      sectionKey: 'POS_CONFIG',
+      title: 'Marketing & Offers',
+      icon: Tag,
+      items: [
+        { label: 'Coupons & Promo Codes', action: () => navigate('/admin/promotions') },
+        { label: 'BOGO & Combo Deals', action: () => navigate('/admin/promotions') },
+        { label: 'Targeted Campaigns', action: () => navigate('/admin/promotions') }
+      ]
+    },
+    {
+      sectionKey: 'POS_TERMINAL',
+      title: 'POS Terminal Access',
+      icon: CreditCard,
+      items: [
+        { label: 'Open POS Interface', action: () => navigate('/pos') },
+        { label: 'Launch Billing Station', action: () => window.open('/pos', '_blank') }
+      ]
     }
-  ];
+  ].filter(s => hasSectionAccess(s.sectionKey));
 
   if (loading) {
     return (
@@ -905,6 +986,8 @@ export default function AdminSettings() {
     );
   }
 
+
+
   if (activeModal === 'BUSINESS') {
     return (
       <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in slide-in-from-right-10 duration-700">
@@ -1114,9 +1197,12 @@ export default function AdminSettings() {
     if (isCreatingShift) {
       return (
         <div className="max-w-3xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-500 pb-20">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-8">
              <div className="flex items-center gap-4">
-                <button onClick={() => { setIsCreatingShift(false); setEditingShiftId(null); }} className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-rose-600 transition-all shadow-sm">
+                <button 
+                  onClick={() => { setIsCreatingShift(false); setEditingShiftId(null); setShiftForm({ type: 'STANDARD', name: '', isActive: true, sessions: [{ startTime: '09:00', endTime: '18:00' }] }); }} 
+                  className="p-2.5 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-rose-600 transition-all shadow-sm"
+                >
                   <ArrowLeft size={20} />
                 </button>
                 <div>
@@ -1240,10 +1326,11 @@ export default function AdminSettings() {
 
     return (
       <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-6 duration-700 pb-20">
-        <div className="flex items-center justify-between">
+        {renderHeader('Shift Configuration', 'Manage Operational Sessions', Clock, 'text-emerald-600 bg-emerald-100')}
+        
+        <div className="flex items-center justify-between mb-2">
           <div>
-            <h2 className="text-2xl font-black text-gray-900 tracking-tight">Shift Configuration</h2>
-            <p className="text-[10px] uppercase font-black text-gray-400 tracking-widest mt-1">Manage Operational Sessions</p>
+            <h4 className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Active Registry</h4>
           </div>
           <button 
             onClick={() => setIsCreatingShift(true)}

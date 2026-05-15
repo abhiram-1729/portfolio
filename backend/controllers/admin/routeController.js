@@ -206,8 +206,10 @@ export const getAdminRoutes = async (req, res, next) => {
         const { storeId: queryStoreId } = req.query;
         const where = { tenantId: req.user.tenantId };
         
-        if (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null') {
-            where.storeId = queryStoreId;
+        const normalizedStoreId = (queryStoreId && queryStoreId !== 'undefined' && queryStoreId !== 'null' && queryStoreId !== '') ? queryStoreId : null;
+
+        if (normalizedStoreId) {
+            where.storeId = normalizedStoreId;
         } else if (req.user.storeId) {
             const isGlobal = 
                 ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 
@@ -238,9 +240,10 @@ export const getRouteAssignments = async (req, res, next) => {
         const { storeId } = req.query;
         const where = { status: true };
 
-        // Filter assignments by vehicle's store
-        if (storeId && storeId !== 'undefined' && storeId !== 'null') {
-            where.vehicle = { storeId };
+        const normalizedStoreId = (storeId && storeId !== 'undefined' && storeId !== 'null' && storeId !== '') ? storeId : null;
+
+        if (normalizedStoreId) {
+            where.vehicle = { storeId: normalizedStoreId };
         } else if (req.user.storeId) {
             const isGlobal = 
                 ['TENANT_OWNER', 'SUPER_ADMIN', 'ADMIN'].includes(req.user.role) || 

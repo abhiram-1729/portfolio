@@ -13,7 +13,7 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private
 export const createOrderFromCart = async (req, res, next) => {
     try {
-        const { mobile, customerName, items, customerId } = req.body;
+        const { mobile, customerName, items, customerId, deliverySlot, deliveryDate, lat, lon, couponCode } = req.body;
         const agentId = req.user.id;
 
         let resolvedCustomerId = customerId || null;
@@ -66,12 +66,13 @@ export const createOrderFromCart = async (req, res, next) => {
         }, {});
 
         let totalAmount = 0;
+        let subtotal = 0;
         const orderItemsData = [];
 
         // Pre-calculate subtotal for non-free items to determine 'Free' eligibility
         const paidSubtotal = cartItems.reduce((sum, item) => {
             const product = productMap[item.productId];
-            const isFree = product.isFree === true || product.isFree === 'true';
+            const isFree = product?.isFree === true || product?.isFree === 'true';
             if (product && !isFree) {
                 return sum + Number(product.price || 0) * item.quantity;
             }
@@ -80,13 +81,9 @@ export const createOrderFromCart = async (req, res, next) => {
 
         // Ensure subtotal is rounded to 2 decimal places to avoid floating point errors in comparison
         const subtotalForComparison = Math.round(paidSubtotal * 100) / 100;
-        console.log(`[OrderCreate] Paid Subtotal: ₹${subtotalForComparison} | Total Items: ${cartItems.length}`);
 
-        console.log(`[OrderCreate] Starting Processing. Total Items: ${cartItems.length}`);
         for (const item of cartItems) {
             const product = productMap[item.productId];
-            console.log(`[OrderCreate] Processing: ${product?.name} | Qty: ${item.quantity} | isFree: ${product?.isFree} | Min: ${product?.minShopAmount}`);
-
             if (!product) {
                 res.status(400);
                 throw new Error(`Product ${item.productId} not found`);
@@ -99,19 +96,14 @@ export const createOrderFromCart = async (req, res, next) => {
 
             if (isFreeProduct) {
                 const threshold = Number(product.minShopAmount || 0);
-                console.log(`[OrderCreate] Evaluating Gift: ${product.name} | Threshold: ₹${threshold} | Cart Subtotal: ₹${subtotalForComparison}`);
-
                 if (subtotalForComparison >= threshold) {
-                    console.log(`[OrderCreate] Success: Threshold met for GIFT: ${product.name}`);
                     finalPrice = 0;
                     isItemFree = true;
-                } else {
-                    console.warn(`[OrderCreate] Threshold NOT met for GIFT: ${product.name}. Charging regular price.`);
-                    // Fall back to regular price instead of skipping
                 }
             }
 
             const itemTotal = finalPrice * item.quantity;
+            subtotal += itemTotal;
             totalAmount += itemTotal;
 
             orderItemsData.push({
@@ -136,18 +128,61 @@ export const createOrderFromCart = async (req, res, next) => {
             coverageType: coverage
         };
 
+        // 2.6 Handle Promotion / Coupon
+        let discountAmount = 0;
+        let appliedPromotionId = null;
+
+        if (couponCode) {
+            const promotion = await prisma.promotion.findUnique({
+                where: { code: couponCode }
+            });
+
+            if (promotion && promotion.isActive) {
+                // Perform validation similar to promotionController.validatePromotion
+                const now = new Date();
+                const isDateValid = (!promotion.startDate || now >= promotion.startDate) && 
+                                   (!promotion.endDate || now <= promotion.endDate);
+                const isLimitValid = !promotion.usageLimit || promotion.usedCount < promotion.usageLimit;
+                const isAmountValid = !promotion.minOrderAmount || subtotal >= promotion.minOrderAmount;
+                const isRouteValid = promotion.targetRouteIds.length === 0 || promotion.targetRouteIds.includes(routeTag.routeId);
+                const isVillageValid = promotion.targetVillageNames.length === 0 || promotion.targetVillageNames.includes(routeTag.villageName);
+
+                if (isDateValid && isLimitValid && isAmountValid && isRouteValid && isVillageValid) {
+                    appliedPromotionId = promotion.id;
+                    
+                    if (promotion.discountType === 'PERCENTAGE') {
+                        discountAmount = (subtotal * promotion.discountValue) / 100;
+                        if (promotion.maxDiscount && discountAmount > promotion.maxDiscount) {
+                            discountAmount = promotion.maxDiscount;
+                        }
+                    } else if (promotion.discountType === 'FLAT_AMOUNT') {
+                        discountAmount = promotion.discountValue;
+                    }
+                    
+                    // Increment usage count
+                    await prisma.promotion.update({
+                        where: { id: promotion.id },
+                        data: { usedCount: { increment: 1 } }
+                    });
+                }
+            }
+        }
+
+        // Final total after discount
+        totalAmount = Math.max(0, totalAmount - discountAmount);
+
         // 2.7 Verify Stock Availability (Vehicle Stock OR Store Stock)
         if (vehicleId) {
             for (const item of orderItemsData) {
                 const stock = await prisma.vehicleStock.findUnique({
-                    where: { 
+                    where: {
                         vehicleId_productId: { vehicleId, productId: item.productId }
                     }
                 });
-                
+
                 if (!stock || stock.quantity < item.quantity) {
                     const product = await prisma.product.findUnique({ where: { id: item.productId } });
-                    
+
                     sendNotification({
                         roles: ['ADMIN'],
                         title: 'Inventory Alert: Stock Mismatch',
@@ -156,7 +191,7 @@ export const createOrderFromCart = async (req, res, next) => {
                         priority: 'high',
                         metadata: { productId: item.productId, vehicleId, requested: item.quantity, available: stock?.quantity || 0 }
                     });
-                    
+
                     res.status(400);
                     throw new Error(`Insufficient stock for ${product.name} (Available: ${stock?.quantity || 0})`);
                 }
@@ -177,12 +212,70 @@ export const createOrderFromCart = async (req, res, next) => {
             }
         }
 
+        // 2.8 Delivery Logistics
+        let deliveryCharge = 0;
+        const settings = await prisma.businessSettings.findUnique({
+            where: { tenantId_storeId: { tenantId: req.user.tenantId, storeId: req.user.storeId || null } }
+        });
+
+        if (settings) {
+            // A. Calculate Delivery Charge from Slabs
+            if (settings.deliverySlabs && Array.isArray(settings.deliverySlabs)) {
+                const slabs = [...settings.deliverySlabs].sort((a, b) => b.minOrderValue - a.minOrderValue);
+                const matchedSlab = slabs.find(slab => subtotal >= slab.minOrderValue);
+                if (matchedSlab) {
+                    deliveryCharge = Number(matchedSlab.fee || 0);
+                }
+            }
+
+            // B. Radius Enforcement
+            const isAgent = req.user.role === 'SALES_AGENT';
+            if (settings.deliveryRadiusEnforced && isAgent) {
+                const uLat = Number(lat);
+                const uLon = Number(lon);
+
+                if (!uLat || !uLon) {
+                    res.status(400);
+                    throw new Error("Delivery location coordinates are required to verify geofencing compliance.");
+                }
+                
+                if (!routeTag?.villageName) {
+                    res.status(400);
+                    throw new Error("Unable to verify geofencing: No active village assignment found for this shift.");
+                }
+
+                const village = await prisma.village.findFirst({
+                    where: { name: routeTag.villageName, tenantId: req.user.tenantId }
+                });
+
+                if (village && village.latitude && village.longitude) {
+                    const R = 6371e3; // metres
+                    const φ1 = uLat * Math.PI / 180;
+                    const φ2 = village.latitude * Math.PI / 180;
+                    const Δφ = (village.latitude - uLat) * Math.PI / 180;
+                    const Δλ = (village.longitude - uLon) * Math.PI / 180;
+                    const a = Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
+                              Math.cos(φ1) * Math.cos(φ2) *
+                              Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
+                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                    const distance = R * c;
+
+                    if (distance > (village.radius || 500)) {
+                        res.status(400);
+                        throw new Error(`Delivery location is outside the authorized radius for ${village.name} (${Math.round(distance)}m > ${village.radius}m)`);
+                    }
+                }
+            }
+        }
+
+        totalAmount += deliveryCharge;
+
         // 3. Create Order + OrderItems in a transaction
         const order = await prisma.$transaction(async (tx) => {
             const orderDisplayId = await generateId({
-              entity: 'ORD',
-              tenantId: req.user.tenantId,
-              storeId: req.user.storeId
+                entity: 'ORD',
+                tenantId: req.user.tenantId,
+                storeId: req.user.storeId
             });
 
             const newOrder = await tx.order.create({
@@ -201,9 +294,15 @@ export const createOrderFromCart = async (req, res, next) => {
                     routeId: routeTag.routeId || null,
                     villageName: routeTag.villageName,
                     coverageType: routeTag.coverageType,
+                    appliedPromotion: appliedPromotionId ? { connect: { id: appliedPromotionId } } : undefined,
+                    discountAmount,
+                    storeId: req.user.storeId || null,
+                    deliveryCharge: deliveryCharge,
+                    deliverySlot: deliverySlot || null,
+                    deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
                     items: {
-                        create: orderItemsData.map(item => ({ 
-                            ...item, 
+                        create: orderItemsData.map(item => ({
+                            ...item,
                             tenantId: req.user.tenantId,
                             storeId: req.user.storeId
                         })),
@@ -223,8 +322,6 @@ export const createOrderFromCart = async (req, res, next) => {
         res.status(201).json(order);
     } catch (error) {
         console.error('[Order Create Error]:', error);
-        if (error.code) console.error('[Prisma Error Code]:', error.code);
-        if (error.meta) console.error('[Prisma Error Meta]:', error.meta);
         next(error);
     }
 };
@@ -323,8 +420,8 @@ export const completePayment = async (req, res, next) => {
                     // 2. Sync with WarehouseInventory if it exists
                     // We target the same tenant and optionally storeId if available
                     const wi = await tx.warehouseInventory.findFirst({
-                        where: { 
-                            productId: item.productId, 
+                        where: {
+                            productId: item.productId,
                             tenantId: order.tenantId
                         }
                     });
@@ -357,8 +454,8 @@ export const completePayment = async (req, res, next) => {
             storeId: req.user.storeId,
             action: 'SALE_COMPLETED',
             details: `Completed sale #${updatedOrder.orderNumber} for ₹${updatedOrder.totalAmount}`,
-            metadata: { 
-                orderId: updatedOrder.id, 
+            metadata: {
+                orderId: updatedOrder.id,
                 orderNumber: updatedOrder.orderNumber,
                 amount: updatedOrder.totalAmount,
                 paymentMode: updatedOrder.paymentMode,
@@ -372,7 +469,7 @@ export const completePayment = async (req, res, next) => {
         // Notify for low stock (Consolidated)
         if (lowStockItems.length > 0) {
             const lowStockCount = lowStockItems.length;
-            const msg = lowStockCount === 1 
+            const msg = lowStockCount === 1
                 ? `Vehicle is low on ${lowStockItems[0].name} (Only ${lowStockItems[0].quantity} left).`
                 : `Vehicle is low on ${lowStockCount} items including ${lowStockItems[0].name}. Please check inventory.`;
 
@@ -395,19 +492,19 @@ export const completePayment = async (req, res, next) => {
             message: `Order #${updatedOrder.orderNumber} for ₹${updatedOrder.totalAmount} has been completed by ${req.user.name}.`,
             type: 'sales',
             priority: updatedOrder.totalAmount >= 2000 ? 'high' : 'medium',
-            metadata: { 
-              orderId: updatedOrder.id, 
-              amount: updatedOrder.totalAmount, 
-              vehicleId: updatedOrder.vehicleId,
-              orderNumber: updatedOrder.orderNumber 
+            metadata: {
+                orderId: updatedOrder.id,
+                amount: updatedOrder.totalAmount,
+                vehicleId: updatedOrder.vehicleId,
+                orderNumber: updatedOrder.orderNumber
             }
         });
 
         // 5. Trigger VGE performance recalculation (fire-and-forget)
         if (updatedOrder.agentId) {
-          updateDailyPerformance(updatedOrder.agentId).catch(err => {
-            console.warn('[VGE] Background recalculation failed:', err.message);
-          });
+            updateDailyPerformance(updatedOrder.agentId).catch(err => {
+                console.warn('[VGE] Background recalculation failed:', err.message);
+            });
         }
 
         // 6. Recalculate Daily Cash Summary if CASH or CASH_UPI payment
@@ -436,6 +533,9 @@ export const getOrderById = async (req, res, next) => {
                 returns: {
                     orderBy: { createdAt: 'desc' }
                 },
+                appliedPromotion: {
+                    select: { name: true, code: true, type: true, discountType: true }
+                }
             },
         });
 
@@ -484,7 +584,7 @@ export const getMyOrders = async (req, res, next) => {
         const { limit = 100, page = 1 } = req.query;
 
         const orders = await prisma.order.findMany({
-            where: { 
+            where: {
                 tenantId: tenantId,
                 OR: [
                     { agentId: userId },

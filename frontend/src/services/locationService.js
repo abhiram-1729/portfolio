@@ -1,6 +1,5 @@
-import axios from 'axios';
+import api from './api';
 
-const API_URL = import.meta.env.VITE_API_URL || '/api';
 const PENDING_LOGS_KEY = 'vk_pending_location_logs';
 
 /**
@@ -18,10 +17,7 @@ export const logLocation = async (data) => {
       queueLog(data);
       return { status: 'queued' };
     }
-    return await axios.post(`${API_URL}/location/log`, data, { 
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true 
-    });
+    return await api.post(`/location/log`, data);
   } catch (error) {
     queueLog(data);
     return { status: 'queued' };
@@ -45,14 +41,10 @@ export const syncPendingLogs = async () => {
   if (pending.length === 0) return;
 
   const successfulSyncs = [];
-  const token = localStorage.getItem('token');
 
   for (const log of pending) {
     try {
-      await axios.post(`${API_URL}/location/log`, log, { 
-        headers: { Authorization: `Bearer ${token}` },
-        withCredentials: true 
-      });
+      await api.post(`/location/log`, log);
       successfulSyncs.push(log);
     } catch (error) {
       console.error('Failed to sync log:', error);
@@ -101,4 +93,24 @@ export const stopLiveTracking = () => {
 
 export const isTrackingActive = () => {
   return trackingInterval !== null;
+};
+
+/**
+ * Admin: Get latest locations for all active agents
+ */
+export const getLiveLocations = async (storeId) => {
+    const response = await api.get(`/location/live`, {
+        params: { storeId }
+    });
+    return response.data;
+};
+
+/**
+ * Admin: Get location history for a specific date/user
+ */
+export const getLocationHistory = async (params) => {
+    const response = await api.get(`/location/history`, {
+        params
+    });
+    return response.data;
 };

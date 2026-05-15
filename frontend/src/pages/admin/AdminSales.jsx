@@ -602,10 +602,17 @@ export default function AdminSales() {
       doc.text("FINANCIAL SUMMARY", 25, y + 2);
 
       doc.setFontSize(9);
-      doc.text(`Total Bill: Rs. ${order.totalAmount.toFixed(0)}`, 110, y + 2);
-      doc.text(`Paid via: ${order.paymentMode}`, 110, y + 9);
+      const grossAmount = order.totalAmount + (order.discountAmount || 0);
+      doc.text(`Gross Bill: Rs. ${grossAmount.toFixed(0)}`, 110, y + 2);
+      if (order.discountAmount > 0) {
+        doc.setTextColor(16, 185, 129); // Emerald-600
+        doc.text(`Promo Discount: -Rs. ${order.discountAmount.toFixed(0)}`, 110, y + 9);
+        doc.setTextColor(40, 40, 40);
+      }
+      doc.text(`Total Payable: Rs. ${order.totalAmount.toFixed(0)}`, 110, y + 16);
       doc.setFont("helvetica", "normal");
       doc.text(`Net After Returns: Rs. ${(order.totalAmount - returnAmt).toFixed(0)}`, 25, y + 9);
+      doc.text(`Paid via: ${order.paymentMode}`, 25, y + 16);
 
       // Items Table
       y = 150;
@@ -1651,7 +1658,22 @@ export default function AdminSales() {
                   <div className="p-8 bg-gray-900 text-white flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
                     <div className="flex items-center gap-6">
                       <div>
-                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Total Bill (Gross)</p>
+                        <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1">Gross Bill</p>
+                        <p className="text-lg font-black text-gray-300">₹{((detailOrder.totalAmount || viewingOrder.totalAmount || 0) + (detailOrder.discountAmount || 0)).toFixed(0)}</p>
+                      </div>
+                      {detailOrder.appliedPromotion && (
+                        <>
+                          <div className="w-[1px] h-10 bg-gray-800"></div>
+                          <div>
+                            <p className="text-[9px] font-black text-emerald-400 uppercase tracking-widest mb-1">Promo Discount</p>
+                            <p className="text-lg font-black text-emerald-400">-₹{(detailOrder.discountAmount || 0).toFixed(0)}</p>
+                            <p className="text-[8px] font-bold text-emerald-500/50 uppercase tracking-tighter">{detailOrder.appliedPromotion.code}</p>
+                          </div>
+                        </>
+                      )}
+                      <div className="w-[1px] h-10 bg-gray-800"></div>
+                      <div>
+                        <p className="text-[9px] font-black text-white uppercase tracking-widest mb-1">Net Payable</p>
                         <p className="text-2xl font-black tracking-tighter">₹{(detailOrder.totalAmount || viewingOrder.totalAmount || 0).toFixed(0)}</p>
                       </div>
                       <div className="w-[1px] h-10 bg-gray-800"></div>
@@ -2021,7 +2043,7 @@ export default function AdminSales() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 text-sm">
-                        {paginatedData.map((item) => (
+                        {(window.matchMedia && window.matchMedia('print').matches ? (roleTab === 'Customer' ? customerList : listToRender) : paginatedData).map((item) => (
                           <tr key={item.id || item.mobile} className="hover:bg-gray-50/30 transition-colors group">
                             {roleTab === 'Customer' ? (
                               <>
@@ -2093,7 +2115,12 @@ export default function AdminSales() {
                                   </div>
                                 </td>
                                 <td className="px-6 py-4">
-                                  <span className="font-black text-emerald-700">₹{item.totalAmount.toFixed(0)}</span>
+                                  <div className="flex flex-col">
+                                    <span className="font-black text-emerald-700">₹{item.totalAmount.toFixed(0)}</span>
+                                    {item.discountAmount > 0 && (
+                                      <span className="text-[7px] font-black text-emerald-500 bg-emerald-50 px-1 rounded border border-emerald-100 uppercase mt-0.5 tracking-tighter w-fit">PROMO</span>
+                                    )}
+                                  </div>
                                 </td>
                                 <td className="px-6 py-4">
                                   <span className="text-[9px] bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full font-black uppercase tracking-widest border border-emerald-100">

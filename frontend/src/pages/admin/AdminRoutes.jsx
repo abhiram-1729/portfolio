@@ -60,7 +60,7 @@ export default function AdminRoutes() {
   const location = useLocation();
 
   const getInitialTab = () => {
-    if (urlTab && ['villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab)) return urlTab;
+    if (urlTab && ['performance', 'villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab)) return urlTab;
     if (isAdmin || !currentUser?.customRoleId || !currentUser?.permissions?.ROUTE_TARGET_SECTIONS) return 'villages';
     const sections = currentUser.permissions.ROUTE_TARGET_SECTIONS;
     if (sections.includes('VILLAGES')) return 'villages';
@@ -69,10 +69,10 @@ export default function AdminRoutes() {
     return 'villages';
   };
 
-  const [activeTab, setActiveTab] = useState(getInitialTab());
+  const [activeTab, setActiveTab] = useState('performance');
 
   useEffect(() => {
-    if (urlTab && ['villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab) && urlTab !== activeTab) {
+    if (urlTab && ['performance', 'villages', 'routes', 'assignments', 'sales', 'collections'].includes(urlTab) && urlTab !== activeTab) {
       setActiveTab(urlTab);
     }
   }, [urlTab]);
@@ -320,7 +320,7 @@ export default function AdminRoutes() {
         });
         toast.success('Village created');
       }
-      setShowVillageModal(false);
+      setIsVillageEditorOpen(false);
       resetVillageForm();
       fetchData();
     } catch (error) {
@@ -564,6 +564,13 @@ export default function AdminRoutes() {
         <div className="pt-2 border-t border-gray-50">
           <div className="w-full overflow-x-auto custom-scrollbar pb-1.5">
             <div className="flex items-center gap-1.5 bg-gray-50/80 p-1.5 rounded-2xl w-fit min-w-max border border-gray-100/80 shadow-2xs">
+              <button
+                onClick={() => handleTabChange('performance')}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'performance' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
+              >
+                <Target size={15} strokeWidth={2.5} />
+                <span>Performance</span>
+              </button>
               {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
                 <button
                   onClick={() => handleTabChange('villages')}
@@ -609,6 +616,11 @@ export default function AdminRoutes() {
           </div>
         </div>
       </div>
+
+      {/* --- PERFORMANCE TAB --- */}
+      {activeTab === 'performance' && (
+        <RoutePerformanceDashboard storeId={storeId} isLoaded={isLoaded} />
+      )}
 
       {/* --- VILLAGES TAB --- */}
       {activeTab === 'villages' && (

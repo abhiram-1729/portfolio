@@ -9,6 +9,7 @@ import BarcodeScannerOverlay from '../components/BarcodeScannerOverlay';
 import { useBarcodeScanner } from '../hooks/useBarcodeScanner';
 import { getCashStatus } from '../services/cashService';
 import { getTodayPlan } from '../services/routeService';
+import adminAPI from '../services/adminService';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -40,6 +41,7 @@ export default function SalesEntry() {
       checkCashStatus();
       loadPlan();
       loadProducts();
+      fetchSettings();
     }
   }, [user]);
 
@@ -49,6 +51,17 @@ export default function SalesEntry() {
       setPlan(data);
     } catch (err) {
       console.error('Failed to load plan');
+    }
+  };
+
+  const fetchSettings = async () => {
+    try {
+      const { data } = await adminAPI.getSettings();
+      if (data?.success && data.data.deliverySlabs) {
+        useCartStore.getState().setDeliverySlabs(data.data.deliverySlabs);
+      }
+    } catch (err) {
+      console.warn('Failed to load settings');
     }
   };
 
@@ -327,7 +340,13 @@ export default function SalesEntry() {
       )}
 
       {/* Cart Drawer */}
-      <CartDrawer isOpen={cartOpen} onClose={() => setCartOpen(false)} products={products} />
+      <CartDrawer 
+        isOpen={cartOpen} 
+        onClose={() => setCartOpen(false)} 
+        products={products} 
+        routeId={plan?.routeId}
+        villageName={plan?.villageName}
+      />
 
       {/* Barcode Scanner Overlay */}
       {showScanner && (

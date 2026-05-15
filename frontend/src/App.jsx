@@ -57,6 +57,8 @@ import AgentAttendance from './pages/AgentAttendance';
 import AdminAttendance from './pages/admin/AdminAttendance';
 import TenantOnboarding from './pages/tenant/TenantOnboarding';
 import CreateExpense from './pages/CreateExpense';
+import AdminDeliveryLogistics from './pages/admin/AdminDeliveryLogistics';
+import AdminPromotions from './pages/admin/AdminPromotions';
 
 // Admin Reports
 import OverviewReport from './pages/admin/adminreports/OverviewReport';
@@ -209,6 +211,8 @@ export default function App() {
           <Route path="settings" element={<AdminSettings />} />
           <Route path="notifications" element={<AdminNotifications />} />
           <Route path="routes" element={<AdminRoutes />} />
+          <Route path="delivery-logistics" element={<AdminDeliveryLogistics />} />
+          <Route path="promotions" element={<AdminPromotions />} />
           <Route path="targets" element={<AdminTargets />} />
           <Route path="assets" element={<AdminAssets />} />
           <Route path="expenses" element={<AdminExpenses />} />
