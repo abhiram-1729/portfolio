@@ -125,8 +125,8 @@ const STORE_CONTEXT_SECTIONS = [
 const PORTAL_TYPES = [
   { key: 'ADMIN', label: 'Admin', desc: 'Full backend access', icon: Shield, color: 'emerald' },
   { key: 'AGENT', label: 'Agent Portal', desc: 'Sales & Field activities', icon: Users, color: 'blue' },
-  { key: 'SUPERVISOR', label: 'Supervisor Portal', desc: 'Branch management', icon: Key, color: 'amber' },
-  { key: 'HELPER', label: 'Helper Portal', desc: 'Logistics support', icon: Plus, color: 'rose' },
+  // { key: 'SUPERVISOR', label: 'Supervisor Portal', desc: 'Branch management', icon: Key, color: 'amber' },
+  // { key: 'HELPER', label: 'Helper Portal', desc: 'Logistics support', icon: Plus, color: 'rose' },
 ];
 
 const REPORT_SECTIONS_LIST = [
@@ -215,12 +215,12 @@ const CollapsibleSection = ({ title, desc, icon: Icon, children, isOpen, onToggl
   );
 };
 
-const PermissionTable = ({ 
-  modules, 
-  isGranular = false, 
-  sectionKey = '', 
-  formPerms, 
-  togglePermission, 
+const PermissionTable = ({
+  modules,
+  isGranular = false,
+  sectionKey = '',
+  formPerms,
+  togglePermission,
   toggleAllForModule,
   customToggle = null,
   customToggleAll = null
@@ -379,7 +379,7 @@ export default function TenantPrivileges() {
     try {
       const res = await adminAPI.getUsers({ roleId });
       setRoleUsers(Array.isArray(res.data) ? res.data : (res.data?.data || []));
-      
+
       // Also fetch all users to allow assigning new ones
       const allRes = await adminAPI.getUsers();
       const everyUser = Array.isArray(allRes.data) ? allRes.data : (allRes.data?.data || []);
@@ -689,7 +689,7 @@ export default function TenantPrivileges() {
       const current = prev[moduleKey] || [];
       const allSelected = ACTIONS.every(a => current.includes(a.key));
       const nextPerms = allSelected ? [] : ACTIONS.map(a => a.key);
-      
+
       let updated = {
         ...prev,
         [moduleKey]: nextPerms
@@ -890,8 +890,8 @@ export default function TenantPrivileges() {
                   placeholder="Role Name"
                   disabled={!headerEditing}
                   className={`text-2xl font-black tracking-tight w-full transition-all duration-300 ${headerEditing
-                      ? 'bg-gray-50 border border-emerald-200 rounded-xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-emerald-500/5 outline-none'
-                      : 'bg-transparent border-none p-0 text-gray-900 cursor-default outline-none'
+                    ? 'bg-gray-50 border border-emerald-200 rounded-xl px-4 py-3 text-gray-900 focus:ring-4 focus:ring-emerald-500/5 outline-none'
+                    : 'bg-transparent border-none p-0 text-gray-900 cursor-default outline-none'
                     }`}
                 />
               </div>
@@ -904,8 +904,8 @@ export default function TenantPrivileges() {
                   placeholder="Add a description for this role..."
                   disabled={!headerEditing}
                   className={`text-sm font-bold w-full transition-all duration-300 ${headerEditing
-                      ? 'bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-gray-700 focus:ring-4 focus:ring-gray-500/5 outline-none'
-                      : 'bg-transparent border-none p-0 text-gray-400 cursor-default outline-none'
+                    ? 'bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 text-gray-700 focus:ring-4 focus:ring-gray-500/5 outline-none'
+                    : 'bg-transparent border-none p-0 text-gray-400 cursor-default outline-none'
                     }`}
                 />
               </div>
@@ -913,8 +913,8 @@ export default function TenantPrivileges() {
             <button
               onClick={() => setHeaderEditing(!headerEditing)}
               className={`p-3 rounded-2xl transition-all shadow-sm flex items-center justify-center ${headerEditing
-                  ? 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
-                  : 'bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100'
+                ? 'bg-emerald-600 text-white shadow-emerald-200 hover:bg-emerald-700'
+                : 'bg-white border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-emerald-100'
                 }`}
             >
               {headerEditing ? <Check size={18} strokeWidth={2.5} /> : <Pencil size={18} strokeWidth={2.5} />}
@@ -1029,224 +1029,224 @@ export default function TenantPrivileges() {
                   {/* Core Modules */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Core Operations"
-                    desc="Staff, Vehicles, Sales & HR"
-                    icon={LayoutGrid}
-                    isOpen={openSections.includes('core')}
-                    onToggle={() => toggleAccordion('core')}
-                  >
-                    <PermissionTable
-                      modules={MODULES.filter(m => !['DASHBOARD', 'SETTINGS', 'EXPENSES'].includes(m.key))}
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                    />
-                  </CollapsibleSection>
+                      title="Core Operations"
+                      desc="Staff, Vehicles, Sales & HR"
+                      icon={LayoutGrid}
+                      isOpen={openSections.includes('core')}
+                      onToggle={() => toggleAccordion('core')}
+                    >
+                      <PermissionTable
+                        modules={MODULES.filter(m => !['DASHBOARD', 'SETTINGS', 'EXPENSES'].includes(m.key))}
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                      />
+                    </CollapsibleSection>
                   )}
 
                   {/* Dashboard & Metrics */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Dashboard & Metrics"
-                    desc="Main overview visibility & widget control"
-                    icon={BarChart3}
-                    isOpen={openSections.includes('dashboard')}
-                    onToggle={() => toggleAccordion('dashboard')}
-                  >
-                    <div className="space-y-6">
-                      <PermissionTable
-                        modules={MODULES.filter(m => m.key === 'DASHBOARD')}
-                        formPerms={formPerms}
-                        togglePermission={togglePermission}
-                        toggleAllForModule={toggleAllForModule}
-                      />
-                      {formPerms.DASHBOARD?.includes('READ') && (
-                        <div className="pt-6 border-t border-gray-50">
-                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Visible Dashboard Widgets</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {DASHBOARD_WIDGETS.map(widget => {
-                              const Icon = widget.icon;
-                              const isChecked = (formPerms.DASHBOARD_WIDGETS || []).includes(widget.key);
-                              return (
-                                <button
-                                  key={widget.key}
-                                  onClick={() => {
-                                    setFormPerms(prev => {
-                                      const cur = prev.DASHBOARD_WIDGETS || [];
-                                      const next = cur.includes(widget.key) ? cur.filter(k => k !== widget.key) : [...cur, widget.key];
-                                      return { ...prev, DASHBOARD_WIDGETS: next };
-                                    });
-                                  }}
-                                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
-                                >
-                                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400 group-hover:text-emerald-500'}`}>
-                                    <Icon size={16} />
-                                  </div>
-                                  <div className="flex flex-col min-w-0">
-                                    <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{widget.label}</span>
-                                    <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{widget.desc}</span>
-                                  </div>
-                                  <div className="ml-auto">
-                                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
-                                      {isChecked && <Check size={12} strokeWidth={4} />}
+                      title="Dashboard & Metrics"
+                      desc="Main overview visibility & widget control"
+                      icon={BarChart3}
+                      isOpen={openSections.includes('dashboard')}
+                      onToggle={() => toggleAccordion('dashboard')}
+                    >
+                      <div className="space-y-6">
+                        <PermissionTable
+                          modules={MODULES.filter(m => m.key === 'DASHBOARD')}
+                          formPerms={formPerms}
+                          togglePermission={togglePermission}
+                          toggleAllForModule={toggleAllForModule}
+                        />
+                        {formPerms.DASHBOARD?.includes('READ') && (
+                          <div className="pt-6 border-t border-gray-50">
+                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Visible Dashboard Widgets</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {DASHBOARD_WIDGETS.map(widget => {
+                                const Icon = widget.icon;
+                                const isChecked = (formPerms.DASHBOARD_WIDGETS || []).includes(widget.key);
+                                return (
+                                  <button
+                                    key={widget.key}
+                                    onClick={() => {
+                                      setFormPerms(prev => {
+                                        const cur = prev.DASHBOARD_WIDGETS || [];
+                                        const next = cur.includes(widget.key) ? cur.filter(k => k !== widget.key) : [...cur, widget.key];
+                                        return { ...prev, DASHBOARD_WIDGETS: next };
+                                      });
+                                    }}
+                                    className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
+                                  >
+                                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-600 text-white' : 'bg-gray-50 text-gray-400 group-hover:text-emerald-500'}`}>
+                                      <Icon size={16} />
                                     </div>
-                                  </div>
-                                </button>
-                              );
-                            })}
+                                    <div className="flex flex-col min-w-0">
+                                      <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{widget.label}</span>
+                                      <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{widget.desc}</span>
+                                    </div>
+                                    <div className="ml-auto">
+                                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
+                                        {isChecked && <Check size={12} strokeWidth={4} />}
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleSection>
+                        )}
+                      </div>
+                    </CollapsibleSection>
                   )}
 
                   {/* Inventory Operations */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Inventory Management"
-                    desc="Stock, Master Registry & Loading"
-                    icon={Package}
-                    isOpen={openSections.includes('inventory')}
-                    onToggle={() => toggleAccordion('inventory')}
-                  >
-                    <PermissionTable
-                      modules={INVENTORY_SECTIONS}
-                      isGranular={true}
-                      sectionKey="INVENTORY_SECTIONS"
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                      customToggle={toggleInventorySectionPermission}
-                      customToggleAll={toggleAllForInventorySection}
-                    />
-                  </CollapsibleSection>
+                      title="Inventory Management"
+                      desc="Stock, Master Registry & Loading"
+                      icon={Package}
+                      isOpen={openSections.includes('inventory')}
+                      onToggle={() => toggleAccordion('inventory')}
+                    >
+                      <PermissionTable
+                        modules={INVENTORY_SECTIONS}
+                        isGranular={true}
+                        sectionKey="INVENTORY_SECTIONS"
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                        customToggle={toggleInventorySectionPermission}
+                        customToggleAll={toggleAllForInventorySection}
+                      />
+                    </CollapsibleSection>
                   )}
 
                   {/* Cash Operations */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Cash Flow & Safe"
-                    desc="Safe Control & Daily Reconciliation"
-                    icon={Coins}
-                    isOpen={openSections.includes('cash')}
-                    onToggle={() => toggleAccordion('cash')}
-                    extraHeaderAction={
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const sections = {};
-                          CASH_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                          setFormPerms(prev => ({ ...prev, CASH: ['READ'], CASH_SECTIONS: sections }));
-                        }}
-                        className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
-                      >
-                        Grant All Cash Access
-                      </button>
-                    }
-                  >
-                    <PermissionTable
-                      modules={CASH_SECTIONS_LIST}
-                      isGranular={true}
-                      sectionKey="CASH_SECTIONS"
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                      customToggle={toggleCashSectionPermission}
-                      customToggleAll={toggleAllForCashSection}
-                    />
-                  </CollapsibleSection>
+                      title="Cash Flow & Safe"
+                      desc="Safe Control & Daily Reconciliation"
+                      icon={Coins}
+                      isOpen={openSections.includes('cash')}
+                      onToggle={() => toggleAccordion('cash')}
+                      extraHeaderAction={
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const sections = {};
+                            CASH_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                            setFormPerms(prev => ({ ...prev, CASH: ['READ'], CASH_SECTIONS: sections }));
+                          }}
+                          className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
+                        >
+                          Grant All Cash Access
+                        </button>
+                      }
+                    >
+                      <PermissionTable
+                        modules={CASH_SECTIONS_LIST}
+                        isGranular={true}
+                        sectionKey="CASH_SECTIONS"
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                        customToggle={toggleCashSectionPermission}
+                        customToggleAll={toggleAllForCashSection}
+                      />
+                    </CollapsibleSection>
                   )}
 
                   {/* Expense Control */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Expense Control"
-                    desc="Monitoring, Approval & Policies"
-                    icon={Receipt}
-                    isOpen={openSections.includes('expenses')}
-                    onToggle={() => toggleAccordion('expenses')}
-                    extraHeaderAction={
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          const sections = {};
-                          EXPENSE_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                          setFormPerms(prev => ({ ...prev, EXPENSES: ['READ', 'UPDATE'], EXPENSE_SECTIONS: sections }));
-                        }}
-                        className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
-                      >
-                        Grant All Expense Access
-                      </button>
-                    }
-                  >
-                    <PermissionTable
-                      modules={EXPENSE_SECTIONS_LIST}
-                      isGranular={true}
-                      sectionKey="EXPENSE_SECTIONS"
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                      customToggle={toggleExpenseSectionPermission}
-                      customToggleAll={toggleAllForExpenseSection}
-                    />
-                  </CollapsibleSection>
+                      title="Expense Control"
+                      desc="Monitoring, Approval & Policies"
+                      icon={Receipt}
+                      isOpen={openSections.includes('expenses')}
+                      onToggle={() => toggleAccordion('expenses')}
+                      extraHeaderAction={
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const sections = {};
+                            EXPENSE_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                            setFormPerms(prev => ({ ...prev, EXPENSES: ['READ', 'UPDATE'], EXPENSE_SECTIONS: sections }));
+                          }}
+                          className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
+                        >
+                          Grant All Expense Access
+                        </button>
+                      }
+                    >
+                      <PermissionTable
+                        modules={EXPENSE_SECTIONS_LIST}
+                        isGranular={true}
+                        sectionKey="EXPENSE_SECTIONS"
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                        customToggle={toggleExpenseSectionPermission}
+                        customToggleAll={toggleAllForExpenseSection}
+                      />
+                    </CollapsibleSection>
                   )}
 
                   {/* Procurement */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Procurement & Vendors"
-                    desc="PO, GRN & Vendor Payments"
-                    icon={ShoppingCart}
-                    isOpen={openSections.includes('procurement')}
-                    onToggle={() => toggleAccordion('procurement')}
-                  >
-                    <PermissionTable
-                      modules={PROCUREMENT_SECTIONS_LIST}
-                      isGranular={true}
-                      sectionKey="PROCUREMENT_SECTIONS"
-                      formPerms={formPerms}
-                      togglePermission={togglePermission}
-                      toggleAllForModule={toggleAllForModule}
-                      customToggle={toggleProcurementSectionPermission}
-                      customToggleAll={toggleAllForProcurementSection}
-                    />
-                  </CollapsibleSection>
+                      title="Procurement & Vendors"
+                      desc="PO, GRN & Vendor Payments"
+                      icon={ShoppingCart}
+                      isOpen={openSections.includes('procurement')}
+                      onToggle={() => toggleAccordion('procurement')}
+                    >
+                      <PermissionTable
+                        modules={PROCUREMENT_SECTIONS_LIST}
+                        isGranular={true}
+                        sectionKey="PROCUREMENT_SECTIONS"
+                        formPerms={formPerms}
+                        togglePermission={togglePermission}
+                        toggleAllForModule={toggleAllForModule}
+                        customToggle={toggleProcurementSectionPermission}
+                        customToggleAll={toggleAllForProcurementSection}
+                      />
+                    </CollapsibleSection>
                   )}
 
                   {/* Route Management */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Route Operations"
-                    desc="Villages, Routes & Assignments"
-                    icon={MapPin}
-                    isOpen={openSections.includes('routes')}
-                    onToggle={() => toggleAccordion('routes')}
-                  >
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {ROUTE_SECTIONS_LIST.map(section => {
-                        const isChecked = (formPerms.ROUTE_TARGET_SECTIONS || []).includes(section.key);
-                        return (
-                          <button
-                            key={section.key}
-                            onClick={() => toggleRouteSection(section.key)}
-                            className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
-                          >
-                            <div className="flex flex-col min-w-0">
-                              <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
-                              <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
-                            </div>
-                            <div className="ml-auto">
-                              <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
-                                {isChecked && <Check size={12} strokeWidth={4} />}
+                      title="Route Operations"
+                      desc="Villages, Routes & Assignments"
+                      icon={MapPin}
+                      isOpen={openSections.includes('routes')}
+                      onToggle={() => toggleAccordion('routes')}
+                    >
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                        {ROUTE_SECTIONS_LIST.map(section => {
+                          const isChecked = (formPerms.ROUTE_TARGET_SECTIONS || []).includes(section.key);
+                          return (
+                            <button
+                              key={section.key}
+                              onClick={() => toggleRouteSection(section.key)}
+                              className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
+                            >
+                              <div className="flex flex-col min-w-0">
+                                <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
+                                <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
                               </div>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </CollapsibleSection>
+                              <div className="ml-auto">
+                                <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
+                                  {isChecked && <Check size={12} strokeWidth={4} />}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </CollapsibleSection>
                   )}
 
                   {/* Admin Specific Sections (Shown at bottom for Agent Identity) */}
@@ -1290,98 +1290,98 @@ export default function TenantPrivileges() {
                   {/* Business Reports */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="Business Intelligence"
-                    desc="Comprehensive data analytics"
-                    icon={PieChart}
-                    isOpen={openSections.includes('reports')}
-                    onToggle={() => toggleAccordion('reports')}
-                  >
-                    <div className="space-y-6">
-                      <PermissionTable
-                        modules={MODULES.filter(m => m.key === 'REPORTS')}
-                        formPerms={formPerms}
-                        togglePermission={togglePermission}
-                        toggleAllForModule={toggleAllForModule}
-                      />
-                      {formPerms.REPORTS?.includes('READ') && (
-                        <div className="pt-6 border-t border-gray-50">
-                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Accessible Reports</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {REPORT_SECTIONS_LIST.map(section => {
-                              const isChecked = (formPerms.REPORT_TARGET_SECTIONS || []).includes(section.key);
-                              return (
-                                <button
-                                  key={section.key}
-                                  onClick={() => toggleReportSection(section.key)}
-                                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
-                                >
-                                  <div className="flex flex-col min-w-0">
-                                    <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
-                                    <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
-                                  </div>
-                                  <div className="ml-auto">
-                                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
-                                      {isChecked && <Check size={12} strokeWidth={4} />}
+                      title="Business Intelligence"
+                      desc="Comprehensive data analytics"
+                      icon={PieChart}
+                      isOpen={openSections.includes('reports')}
+                      onToggle={() => toggleAccordion('reports')}
+                    >
+                      <div className="space-y-6">
+                        <PermissionTable
+                          modules={MODULES.filter(m => m.key === 'REPORTS')}
+                          formPerms={formPerms}
+                          togglePermission={togglePermission}
+                          toggleAllForModule={toggleAllForModule}
+                        />
+                        {formPerms.REPORTS?.includes('READ') && (
+                          <div className="pt-6 border-t border-gray-50">
+                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Accessible Reports</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {REPORT_SECTIONS_LIST.map(section => {
+                                const isChecked = (formPerms.REPORT_TARGET_SECTIONS || []).includes(section.key);
+                                return (
+                                  <button
+                                    key={section.key}
+                                    onClick={() => toggleReportSection(section.key)}
+                                    className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
+                                  >
+                                    <div className="flex flex-col min-w-0">
+                                      <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
+                                      <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
                                     </div>
-                                  </div>
-                                </button>
-                              );
-                            })}
+                                    <div className="ml-auto">
+                                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
+                                        {isChecked && <Check size={12} strokeWidth={4} />}
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleSection>
+                        )}
+                      </div>
+                    </CollapsibleSection>
                   )}
 
                   {/* System Settings */}
                   {formPortalType !== 'AGENT' && (
                     <CollapsibleSection
-                    title="System & POS Settings"
-                    desc="POS configurations & global settings"
-                    icon={Settings}
-                    isOpen={openSections.includes('settings')}
-                    onToggle={() => toggleAccordion('settings')}
-                  >
-                    <div className="space-y-4">
-                      {/* SETTINGS module-level toggles */}
-                      <PermissionTable
-                        modules={[{ key: 'SETTINGS', label: 'Settings', desc: 'System configuration access' }]}
-                        formPerms={formPerms}
-                        togglePermission={togglePermission}
-                        toggleAllForModule={toggleAllForModule}
-                      />
+                      title="System & POS Settings"
+                      desc="POS configurations & global settings"
+                      icon={Settings}
+                      isOpen={openSections.includes('settings')}
+                      onToggle={() => toggleAccordion('settings')}
+                    >
+                      <div className="space-y-4">
+                        {/* SETTINGS module-level toggles */}
+                        <PermissionTable
+                          modules={[{ key: 'SETTINGS', label: 'Settings', desc: 'System configuration access' }]}
+                          formPerms={formPerms}
+                          togglePermission={togglePermission}
+                          toggleAllForModule={toggleAllForModule}
+                        />
 
-                      {/* Granular section access */}
-                      {(formPerms.SETTINGS || []).includes('READ') && (
-                        <div className="pt-6 border-t border-gray-50">
-                          <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Accessible Setting Sections</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                            {SETTINGS_SECTIONS.map(section => {
-                              const isChecked = (formPerms.SETTINGS_TARGET_SECTIONS || []).includes(section.key);
-                              return (
-                                <button
-                                  key={section.key}
-                                  onClick={() => toggleSettingsSection(section.key)}
-                                  className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
-                                >
-                                  <div className="flex flex-col min-w-0">
-                                    <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
-                                    <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
-                                  </div>
-                                  <div className="ml-auto">
-                                    <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
-                                      {isChecked && <Check size={12} strokeWidth={4} />}
+                        {/* Granular section access */}
+                        {(formPerms.SETTINGS || []).includes('READ') && (
+                          <div className="pt-6 border-t border-gray-50">
+                            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-600 mb-4 block">Accessible Setting Sections</label>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
+                              {SETTINGS_SECTIONS.map(section => {
+                                const isChecked = (formPerms.SETTINGS_TARGET_SECTIONS || []).includes(section.key);
+                                return (
+                                  <button
+                                    key={section.key}
+                                    onClick={() => toggleSettingsSection(section.key)}
+                                    className={`flex items-center gap-3 p-4 rounded-2xl border transition-all text-left group ${isChecked ? 'bg-emerald-50 border-emerald-100' : 'bg-white border-gray-100 hover:border-emerald-100'}`}
+                                  >
+                                    <div className="flex flex-col min-w-0">
+                                      <span className={`text-[11px] font-black uppercase tracking-tight truncate ${isChecked ? 'text-gray-900' : 'text-gray-500'}`}>{section.label}</span>
+                                      <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{section.desc}</span>
                                     </div>
-                                  </div>
-                                </button>
-                              );
-                            })}
+                                    <div className="ml-auto">
+                                      <div className={`w-5 h-5 rounded-lg border-2 flex items-center justify-center transition-all ${isChecked ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-gray-200'}`}>
+                                        {isChecked && <Check size={12} strokeWidth={4} />}
+                                      </div>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
-                  </CollapsibleSection>
+                        )}
+                      </div>
+                    </CollapsibleSection>
                   )}
                 </div>
               </div>
@@ -1391,10 +1391,10 @@ export default function TenantPrivileges() {
                   <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
                     <Users size={14} className="text-emerald-600" /> Active Users for {formName}
                   </h3>
-                  
+
                   <div className="relative">
                     {!isAssigning ? (
-                      <button 
+                      <button
                         onClick={() => setIsAssigning(true)}
                         className="flex items-center gap-2 px-4 py-2 bg-emerald-50 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white transition-all"
                       >
@@ -1405,7 +1405,7 @@ export default function TenantPrivileges() {
                       <div className="flex items-center gap-2 animate-in slide-in-from-right-2">
                         <div className="relative">
                           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={14} />
-                          <input 
+                          <input
                             autoFocus
                             placeholder="Search Name/Mobile..."
                             value={searchQuery}
@@ -1433,7 +1433,7 @@ export default function TenantPrivileges() {
                             </div>
                           )}
                         </div>
-                        <button 
+                        <button
                           onClick={() => { setIsAssigning(false); setSearchQuery(''); }}
                           className="p-2 text-gray-400 hover:text-rose-600 rounded-xl"
                         >
