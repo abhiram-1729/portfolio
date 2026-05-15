@@ -234,23 +234,23 @@ const VendorsSection = ({ can }) => {
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            <table className="w-full text-left border-collapse">
+          <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-x-auto custom-scrollbar w-full">
+            <table className="w-max min-w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/50">
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Vendor</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Mobile</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">GST</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Credit Days</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Balance</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
-                  <th className="px-5 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+                <tr className="bg-gray-50/50 whitespace-nowrap">
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Vendor</th>
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Mobile</th>
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">GST</th>
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Credit Days</th>
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Balance</th>
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Status</th>
+                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right sticky right-0 bg-[#f8fafc] z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(v => (
-                  <tr key={v.id} className="hover:bg-gray-50/30 transition-colors">
-                    <td className="px-5 py-3">
+                  <tr key={v.id} className="hover:bg-gray-50/30 transition-colors whitespace-nowrap group">
+                    <td className="px-6 py-4 whitespace-nowrap">
                       <div>
                         <span className="text-sm font-black text-gray-900">{v.vendorName}</span>
                         {v.displayId && <span className="ml-2 text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{v.displayId}</span>}
@@ -267,12 +267,12 @@ const VendorsSection = ({ can }) => {
                         {v.currentBalance < 0 && ' CR'}
                       </span>
                     </td>
-                    <td className="px-5 py-3 text-center">
+                    <td className="px-6 py-4 text-center whitespace-nowrap">
                       <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
                         v.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-gray-100 text-gray-400'
                       }`}>{v.status}</span>
                     </td>
-                    <td className="px-5 py-3 text-right">
+                    <td className="px-6 py-4 text-right sticky right-0 bg-white group-hover:bg-[#fcfdfd] transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">
                       <div className="flex items-center justify-end gap-1.5">
                         <button onClick={() => openLedger(v.id)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all" title="View Ledger"><BookOpen size={14} /></button>
                         {can('PROCUREMENT', 'UPDATE', 'VENDORS') && (
