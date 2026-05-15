@@ -572,7 +572,7 @@ export default function AdminRoutes() {
                 <Target size={15} strokeWidth={2.5} />
                 <span>Performance</span>
               </button>
-              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('VILLAGES')) && (
+              {can('ROUTES', 'READ', 'VILLAGES') && (
                 <button
                   onClick={() => handleTabChange('villages')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'villages' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
@@ -581,7 +581,7 @@ export default function AdminRoutes() {
                   <span>Village</span>
                 </button>
               )}
-              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ROUTES')) && (
+              {can('ROUTES', 'READ', 'ROUTES') && (
                 <button
                   onClick={() => handleTabChange('routes')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'routes' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
@@ -590,7 +590,7 @@ export default function AdminRoutes() {
                   <span>Routes</span>
                 </button>
               )}
-              {(isAdmin || !currentUser?.customRoleId || currentUser?.permissions?.ROUTE_TARGET_SECTIONS?.includes('ASSIGNMENTS')) && (
+              {can('ROUTES', 'READ', 'ASSIGNMENTS') && (
                 <button
                   onClick={() => handleTabChange('assignments')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider transition-all shrink-0 ${activeTab === 'assignments' ? 'bg-white text-emerald-700 shadow-xs ring-1 ring-black/5' : 'text-gray-400 hover:text-gray-900 hover:bg-white/50'}`}
@@ -944,7 +944,7 @@ export default function AdminRoutes() {
                     onChange={(e) => setVillageSearchQuery(e.target.value)}
                   />
                 </div>
-                {can('ROUTES', 'CREATE') && (
+                {can('ROUTES', 'CREATE', 'VILLAGES') && (
                   <button
                     onClick={() => { resetVillageForm(); setIsVillageEditorOpen(true); }}
                     className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
@@ -1013,7 +1013,7 @@ export default function AdminRoutes() {
                                   >
                                     <MapPin size={15} />
                                   </a>
-                                  {can('ROUTES', 'UPDATE') && (
+                                  {can('ROUTES', 'UPDATE', 'VILLAGES') && (
                                     <button
                                       onClick={() => {
                                         setVillageForm({
@@ -1037,7 +1037,7 @@ export default function AdminRoutes() {
                                       <Pencil size={15} />
                                     </button>
                                   )}
-                                  {can('ROUTES', 'DELETE') && (
+                                  {can('ROUTES', 'DELETE', 'VILLAGES') && (
                                     <button
                                       onClick={() => handleDeleteVillage(v.id)}
                                       className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"
@@ -1219,7 +1219,7 @@ export default function AdminRoutes() {
                     onChange={(e) => setRouteSearchQuery(e.target.value)}
                   />
                 </div>
-                {can('ROUTES', 'CREATE') && (
+                {can('ROUTES', 'CREATE', 'ROUTES') && (
                   <button
                     onClick={() => { setRouteForm({ id: '', routeName: '', selectedVillages: [] }); setIsRouteEditorOpen(true); }}
                     className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
@@ -1280,7 +1280,7 @@ export default function AdminRoutes() {
                             </td>
                             <td className="px-8 py-6 text-right">
                               <div className="flex items-center justify-end gap-2 transition-all">
-                                {can('ROUTES', 'UPDATE') && (
+                                {can('ROUTES', 'UPDATE', 'ROUTES') && (
                                   <button
                                     onClick={() => {
                                       setRouteForm({
@@ -1295,7 +1295,7 @@ export default function AdminRoutes() {
                                     <Pencil size={15} />
                                   </button>
                                 )}
-                                {can('ROUTES', 'DELETE') && (
+                                {can('ROUTES', 'DELETE', 'ROUTES') && (
                                   <button onClick={async () => { if (window.confirm('Delete?')) { await routeService.deleteRoute(r.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><Trash2 size={15} /></button>
                                 )}
                               </div>
@@ -1374,7 +1374,7 @@ export default function AdminRoutes() {
                 onChange={(e) => setAssignmentSearchQuery(e.target.value)}
               />
             </div>
-            {can('ROUTES', 'CREATE') && (
+            {can('ROUTES', 'CREATE', 'ASSIGNMENTS') && (
               <button
                 onClick={() => { setAssignmentForm({ id: '', vehicleId: '', userId: '', routeId: '', morningSession: '', afternoonSession: '' }); setShowAssignModal(true); }}
                 className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-4 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all active:scale-[0.98]"
@@ -1400,7 +1400,7 @@ export default function AdminRoutes() {
                       <div className="flex justify-between items-center pb-3 border-b border-gray-50">
                         <h4 className="font-black text-gray-900 uppercase tracking-tight">{a.route?.routeName}</h4>
                         <div className="flex gap-1">
-                          {can('ROUTES', 'UPDATE') && (
+                          {can('ROUTES', 'UPDATE', 'ASSIGNMENTS') && (
                             <button onClick={() => {
                               setAssignmentForm({
                                 id: a.id,
@@ -1414,7 +1414,7 @@ export default function AdminRoutes() {
                               setShowAssignModal(true);
                             }} className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"><Pencil size={15} /></button>
                           )}
-                          {can('ROUTES', 'DELETE') && (
+                          {can('ROUTES', 'DELETE', 'ASSIGNMENTS') && (
                             <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"><X size={15} /></button>
                           )}
                         </div>
@@ -1527,7 +1527,7 @@ export default function AdminRoutes() {
                           </td>
                           <td className="px-8 py-6 text-right">
                             <div className="flex items-center justify-end gap-2 transition-all">
-                              {can('ROUTES', 'UPDATE') && (
+                              {can('ROUTES', 'UPDATE', 'ASSIGNMENTS') && (
                                 <button onClick={() => {
                                   setAssignmentForm({
                                     id: a.id,
@@ -1541,7 +1541,7 @@ export default function AdminRoutes() {
                                   setShowAssignModal(true);
                                 }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-emerald-600 hover:border-indigo-200 shadow-sm transition-all"><Pencil size={15} /></button>
                               )}
-                              {can('ROUTES', 'DELETE') && (
+                              {can('ROUTES', 'DELETE', 'ASSIGNMENTS') && (
                                 <button onClick={async () => { if (window.confirm('Remove?')) { await routeService.deleteRouteAssignment(a.id); fetchData(); } }} className="p-2.5 bg-white rounded-xl border border-gray-100 text-gray-400 hover:text-rose-600 hover:border-rose-200 shadow-sm transition-all"><X size={15} /></button>
                               )}
                             </div>
