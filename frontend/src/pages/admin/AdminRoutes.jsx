@@ -40,6 +40,7 @@ import * as XLSX from 'xlsx';
 import { generateReportPDF } from './adminreports/ReportUtils';
 import VehicleSalesSection from './admin_vehicles/VehicleSalesSection';
 import RouteCollectionSection from './admin_vehicles/RouteCollectionSection';
+import RoutePerformanceDashboard from './components/RoutePerformanceDashboard';
 
 export default function AdminRoutes() {
   const [villages, setVillages] = useState([]);

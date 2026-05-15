@@ -445,6 +445,10 @@ export default function AdminLayout() {
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
     }
 
+    if (location.pathname.startsWith('/admin/routes')) {
+      if (user?.permissions?.ROUTE_TARGET_SECTIONS?.length > 0) return true;
+    }
+
     let hasModuleRead = false;
     if (currentModule === 'STAFF_VIRTUAL') {
       const hasAdmin = (user?.permissions?.['STAFF_ADMIN'] || []).includes('READ');

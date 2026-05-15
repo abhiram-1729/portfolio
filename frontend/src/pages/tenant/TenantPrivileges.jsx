@@ -431,11 +431,16 @@ export default function TenantPrivileges() {
     setFormPerms(prev => {
       const current = prev.ROUTE_TARGET_SECTIONS || [];
       const has = current.includes(sectionKey);
+      const nextSections = has
+        ? current.filter(s => s !== sectionKey)
+        : [...current, sectionKey];
+
       return {
         ...prev,
-        ROUTE_TARGET_SECTIONS: has
-          ? current.filter(s => s !== sectionKey)
-          : [...current, sectionKey]
+        ROUTE_TARGET_SECTIONS: nextSections,
+        ROUTES: nextSections.length > 0
+          ? (prev.ROUTES || []).includes('READ') ? prev.ROUTES : [...(prev.ROUTES || []), 'READ']
+          : (prev.ROUTES || []).filter(a => a !== 'READ')
       };
     });
   };
