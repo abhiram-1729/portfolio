@@ -1,13 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Truck, X, ChevronRight, Loader2, Trash2, History, PackageCheck, Edit3, FileText, Upload, Paperclip, File, Trash
+  Truck, X, ChevronRight, Loader2, Trash2, History, PackageCheck, Edit3, FileText, Upload, 
+  Paperclip, File, Trash, CheckCircle2, ShoppingCart, MapPin, ShieldCheck, Package, 
+  AlertTriangle, MinusCircle, Timer, MessageSquare, FileX, Printer, Download, ShieldCheck as ShieldCheckIcon
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-const GRNSection = ({ can, storeId }) => {
+const GRNSection = ({ can, storeId, setHideMainHeader }) => {
   const [view, setView] = useState('receive'); // 'receive' or 'history' or 'report'
   const [pos, setPOs] = useState([]);
   const [grns, setGRNs] = useState([]);
@@ -40,11 +42,13 @@ const GRNSection = ({ can, storeId }) => {
   const handleViewReport = (grn) => {
     setSelectedReport(grn);
     setView('report');
+    setHideMainHeader?.(true);
   };
 
   const handlePrintReport = (grn) => {
     setSelectedReport(grn);
     setView('report');
+    setHideMainHeader?.(true);
     setTimeout(() => window.print(), 200);
   };
 
@@ -175,28 +179,30 @@ const GRNSection = ({ can, storeId }) => {
   return (
     <div className="flex-1 flex flex-col min-h-0 overflow-y-auto pr-2 custom-scrollbar space-y-4">
       {/* View Toggle */}
-      <div className="flex gap-4 p-1 rounded-2xl w-fit">
-        <button 
-          onClick={() => { setView('receive'); setSelectedPO(null); }} 
-          className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            view === 'receive' 
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
-              : 'text-gray-400 hover:text-gray-600 bg-gray-50'
-          }`}
-        >
-          Receive Goods
-        </button>
-        <button 
-          onClick={() => setView('history')} 
-          className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
-            view === 'history' 
-              ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
-              : 'text-gray-400 hover:text-gray-600 bg-gray-50'
-          }`}
-        >
-          GRN History
-        </button>
-      </div>
+      {view !== 'report' && (
+        <div className="flex gap-4 p-1 rounded-2xl w-fit">
+          <button 
+            onClick={() => { setView('receive'); setSelectedPO(null); }} 
+            className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              view === 'receive' 
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
+                : 'text-gray-400 hover:text-gray-600 bg-gray-50'
+            }`}
+          >
+            Receive Goods
+          </button>
+          <button 
+            onClick={() => setView('history')} 
+            className={`flex items-center gap-2 px-8 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${
+              view === 'history' 
+                ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' 
+                : 'text-gray-400 hover:text-gray-600 bg-gray-50'
+            }`}
+          >
+            GRN History
+          </button>
+        </div>
+      )}
 
       {view === 'receive' && (
         <>
@@ -552,16 +558,16 @@ const GRNSection = ({ can, storeId }) => {
             <div className="overflow-x-auto">
               <table className="w-full text-left">
                 <thead>
-                  <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                    <th className="px-6 py-5">GRN ID</th>
-                    <th className="px-6 py-5">Related PO</th>
-                    <th className="px-6 py-5">Vendor</th>
-                    <th className="px-6 py-5">Date</th>
-                    <th className="px-6 py-5">Verification Result</th>
-                    <th className="px-6 py-5 text-center">Discrepancies</th>
-                    <th className="px-6 py-5 text-center">Final Accepted Qty</th>
-                    <th className="px-6 py-5 text-center">Status</th>
-                    <th className="px-6 py-5 text-right">Actions</th>
+                  <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100 bg-gray-50/50">
+                    <th className="px-4 py-4">GRN ID</th>
+                    <th className="px-4 py-4">Related PO</th>
+                    <th className="px-4 py-4">Vendor</th>
+                    <th className="px-4 py-4">Date & Time</th>
+                    <th className="px-4 py-4">Verification</th>
+                    <th className="px-4 py-4 text-center">Alerts</th>
+                    <th className="px-4 py-4 text-center">Accepted Qty</th>
+                    <th className="px-4 py-4 text-center">Status</th>
+                    <th className="px-4 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -573,74 +579,62 @@ const GRNSection = ({ can, storeId }) => {
                     const isFullyAccepted = totalDiscrepancies === 0;
 
                     return (
-                      <tr key={grn.id} className="group hover:bg-gray-50/50 transition-all">
-                        <td className="px-6 py-6">
-                          <span className="text-sm font-black text-gray-900 uppercase tracking-tight">GRN-{grn.displayId}</span>
+                      <tr key={grn.id} className="group hover:bg-emerald-50/20 transition-all">
+                        <td className="px-4 py-5 whitespace-nowrap">
+                          <span className="text-xs font-black text-gray-900 uppercase tracking-tight">GRN-{grn.displayId}</span>
                         </td>
-                        <td className="px-6 py-6">
-                          <span className="text-[11px] font-bold text-gray-500 uppercase">PO-{grn.po?.displayId}</span>
+                        <td className="px-4 py-5 whitespace-nowrap">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">PO-{grn.po?.displayId}</span>
                         </td>
-                        <td className="px-6 py-6">
-                          <span className="text-sm font-black text-gray-900 tracking-tight">{grn.po?.vendor?.vendorName}</span>
+                        <td className="px-4 py-5 whitespace-nowrap">
+                          <span className="text-xs font-black text-gray-900 tracking-tight">{grn.po?.vendor?.vendorName}</span>
                         </td>
-                        <td className="px-6 py-6">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-black text-gray-900 tracking-tight">{format(new Date(grn.createdAt), 'yyyy-MM-dd')}</span>
-                            <span className="text-[10px] font-bold text-gray-400 uppercase">{format(new Date(grn.createdAt), 'hh:mm a')}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-6">
-                          <span className={`text-sm font-black tracking-tight ${isFullyAccepted ? 'text-gray-900' : 'text-amber-600'}`}>
-                            {isFullyAccepted ? 'Fully Accepted' : 'Partially Accepted'}
+                        <td className="px-4 py-5 whitespace-nowrap">
+                          <span className="text-[10px] font-black text-gray-700">
+                            {format(new Date(grn.createdAt), 'dd MMM yy, hh:mm a')}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-center">
+                        <td className="px-4 py-5 whitespace-nowrap">
+                          <span className={`text-[10px] font-black uppercase tracking-tight px-2 py-0.5 rounded ${isFullyAccepted ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>
+                            {isFullyAccepted ? 'Fully Accepted' : 'Partial'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-5 text-center whitespace-nowrap">
                           {totalDiscrepancies > 0 ? (
-                            <div className="flex items-center justify-center gap-2 px-3 py-1 bg-rose-50 border border-rose-100 rounded-full w-fit mx-auto">
-                              <span className="w-5 h-5 bg-rose-500 text-white text-[10px] font-black rounded-full flex items-center justify-center">
-                                {totalDiscrepancies}
-                              </span>
-                            </div>
+                            <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black border border-rose-100 uppercase">
+                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              {totalDiscrepancies} Issue
+                            </span>
                           ) : (
-                            <span className="text-[10px] font-bold text-gray-300 uppercase tracking-widest">None</span>
+                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">None</span>
                           )}
                         </td>
-                        <td className="px-6 py-6 text-center">
-                          <span className="text-sm font-black text-gray-900">{totalAccepted}</span>
+                        <td className="px-4 py-5 text-center whitespace-nowrap">
+                          <span className="text-xs font-black text-gray-900">{totalAccepted}</span>
                         </td>
-                        <td className="px-6 py-6 text-center">
-                          <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-lg border tracking-widest ${
+                        <td className="px-4 py-5 text-center whitespace-nowrap">
+                          <span className={`text-[9px] font-black uppercase px-2.5 py-1 rounded-md border tracking-widest ${
                             grn.status === 'COMPLETE' 
                               ? 'bg-emerald-50 text-emerald-600 border-emerald-100' 
                               : 'bg-amber-50 text-amber-600 border-amber-100'
                           }`}>
-                            {grn.status === 'COMPLETE' ? 'Completed' : 'Partial'}
+                            {grn.status}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-right">
-                          <div className="flex justify-end gap-2">
+                        <td className="px-4 py-5 text-right whitespace-nowrap">
+                          <div className="flex justify-end gap-1.5">
                             <button 
                               onClick={() => handleViewReport(grn)}
-                              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm active:scale-95"
+                              className="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm active:scale-95"
                             >
-                              <FileText size={14} strokeWidth={3} />
                               View
                             </button>
                             <button 
                               onClick={() => handlePrintReport(grn)}
-                              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-100 rounded-xl text-[10px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                              className="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm active:scale-95"
                             >
-                              <Truck size={14} strokeWidth={3} className="opacity-40" />
                               PDF
                             </button>
-                            {can('PROCUREMENT', 'DELETE', 'GRN') && (
-                              <button 
-                                onClick={() => handleDeleteGRN(grn.id)}
-                                className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-all opacity-0 group-hover:opacity-100"
-                              >
-                                <Trash2 size={12} />
-                              </button>
-                            )}
                           </div>
                         </td>
                       </tr>
@@ -654,172 +648,165 @@ const GRNSection = ({ can, storeId }) => {
       )}
 
       {view === 'report' && selectedReport && (
-        <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          {/* Header */}
-          <div className="flex flex-col gap-6">
-            <button 
-              onClick={() => { setView('history'); setSelectedReport(null); }}
-              className="flex items-center gap-2 text-[10px] font-black text-emerald-600 uppercase tracking-widest hover:translate-x-[-4px] transition-all w-fit"
-            >
-              <ChevronRight size={14} className="rotate-180" strokeWidth={3} />
-              Back to GRN History
-            </button>
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 space-y-10 animate-in fade-in duration-500">
+          
+          {/* Top Navigation */}
+          <button 
+            onClick={() => { setView('history'); setSelectedReport(null); setHideMainHeader?.(false); }}
+            className="flex items-center gap-2 text-sm font-bold text-emerald-600 hover:text-emerald-700 transition-all group"
+          >
+            <ChevronRight size={18} className="rotate-180 group-hover:-translate-x-1 transition-transform" />
+            Back to GRN History
+          </button>
 
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-              <div className="space-y-1">
-                <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">GRN Report</h2>
-                <div className="flex items-center gap-2 text-[10px] font-bold text-gray-400 uppercase tracking-widest">
-                  <span>Procurement</span>
-                  <ChevronRight size={10} strokeWidth={3} />
-                  <span>Goods Receipt</span>
-                  <ChevronRight size={10} strokeWidth={3} />
-                  <span className="text-emerald-600">Report</span>
+          {/* Title Section */}
+          <div className="space-y-1">
+            <h2 className="text-3xl font-bold text-gray-900">GRN Report</h2>
+            <div className="flex items-center gap-2 text-sm text-gray-400 font-medium">
+              <span>Procurement</span>
+              <span>→</span>
+              <span>Goods Receipt</span>
+              <span>→</span>
+              <span className="text-gray-500">Report</span>
+            </div>
+          </div>
+
+          {/* Main Info Card */}
+          <div className="bg-gray-50/30 rounded-3xl border border-gray-100 p-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-y-10 gap-x-12">
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">GRN ID</span>
+                <p className="text-base font-bold text-gray-900 uppercase">GRN-{selectedReport.displayId}</p>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Related PO</span>
+                <p className="text-base font-bold text-gray-900 uppercase">PO-{selectedReport.po?.displayId}</p>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vendor</span>
+                <p className="text-base font-bold text-gray-900 uppercase">{selectedReport.po?.vendor?.vendorName}</p>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Branch</span>
+                <p className="text-base font-bold text-gray-900 uppercase">{selectedReport.store?.name || 'Main Store'}</p>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Delivery Date & Time</span>
+                <p className="text-base font-bold text-gray-900 uppercase">{format(new Date(selectedReport.createdAt), 'yyyy-MM-dd hh:mm a')}</p>
+              </div>
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Approval Status</span>
+                <div>
+                  <span className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-xs font-bold uppercase tracking-wider">
+                    <CheckCircle2 size={14} /> Approved
+                  </span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Top Info Bar */}
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-6 py-6 border-y border-gray-50">
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">GRN ID</span>
-              <p className="text-sm font-black text-gray-900 uppercase">GRN-{selectedReport.displayId}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Related PO</span>
-              <p className="text-sm font-black text-gray-900 uppercase">PO-{selectedReport.po?.displayId}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Vendor</span>
-              <p className="text-sm font-black text-gray-900">{selectedReport.po?.vendor?.vendorName}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Branch</span>
-              <p className="text-sm font-black text-gray-900">{selectedReport.store?.name || 'Main Warehouse'}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Delivery Date & Time</span>
-              <p className="text-sm font-black text-gray-900">{format(new Date(selectedReport.createdAt), 'yyyy-MM-dd, hh:mm a')}</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Approval Status</span>
-              <div>
-                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[9px] font-black uppercase tracking-widest">
-                  Approved
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* Stats Cards */}
+          {/* Stats Bar */}
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             {[
-              { label: 'Total Items', value: selectedReport.items?.length || 0, color: 'gray' },
-              { label: 'Accepted', value: selectedReport.items?.reduce((acc, i) => acc + (i.receivedQty || 0) - (i.damagedQty || 0), 0), color: 'emerald' },
-              { label: 'Damaged', value: selectedReport.items?.reduce((acc, i) => acc + (i.damagedQty || 0), 0), color: 'rose' },
-              { label: 'Missing', value: selectedReport.items?.reduce((acc, i) => acc + (i.missingQty || 0), 0), color: 'amber' },
-              { label: 'Near Expiry', value: selectedReport.items?.filter(i => i.expiryStatus === 'NEAR').length, color: 'orange' },
+              { label: 'Total Items', value: selectedReport.items?.length || 0, bg: 'bg-gray-50', text: 'text-gray-900' },
+              { label: 'Accepted', value: selectedReport.items?.reduce((acc, i) => acc + (i.receivedQty || 0) - (i.damagedQty || 0), 0), bg: 'bg-emerald-50', text: 'text-emerald-600' },
+              { label: 'Damaged', value: selectedReport.items?.reduce((acc, i) => acc + (i.damagedQty || 0), 0), bg: 'bg-rose-50', text: 'text-rose-500' },
+              { label: 'Missing', value: selectedReport.items?.reduce((acc, i) => acc + (i.missingQty || 0), 0), bg: 'bg-orange-50', text: 'text-orange-500' },
+              { label: 'Near Expiry', value: selectedReport.items?.filter(i => i.expiryStatus === 'NEAR').length, bg: 'bg-amber-50', text: 'text-amber-500' },
             ].map(stat => (
-              <div key={stat.label} className={`p-6 rounded-[2rem] border border-gray-100 shadow-sm flex flex-col items-center justify-center gap-1 ${
-                stat.color === 'emerald' ? 'bg-emerald-50/30' : 
-                stat.color === 'rose' ? 'bg-rose-50/30' : 
-                stat.color === 'amber' ? 'bg-amber-50/30' : 
-                stat.color === 'orange' ? 'bg-orange-50/30' : 'bg-gray-50/30'
-              }`}>
-                <span className={`text-2xl font-black ${
-                  stat.color === 'emerald' ? 'text-emerald-600' : 
-                  stat.color === 'rose' ? 'text-rose-500' : 
-                  stat.color === 'amber' ? 'text-amber-500' : 
-                  stat.color === 'orange' ? 'text-orange-500' : 'text-gray-900'
-                }`}>{stat.value}</span>
-                <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">{stat.label}</span>
+              <div key={stat.label} className={`${stat.bg} p-8 rounded-2xl flex flex-col items-center justify-center gap-2 transition-transform hover:scale-[1.02] cursor-default shadow-sm border border-black/5`}>
+                <span className={`text-4xl font-bold ${stat.text}`}>{stat.value}</span>
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">{stat.label}</span>
               </div>
             ))}
           </div>
 
-          {/* Verification Details Table */}
-          <div className="space-y-4">
-            <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest">Verification Details</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left">
-                <thead>
-                  <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                    <th className="px-4 py-4">Item</th>
-                    <th className="px-4 py-4 text-center">Ordered</th>
-                    <th className="px-4 py-4 text-center">Received</th>
-                    <th className="px-4 py-4 text-center">Accepted</th>
-                    <th className="px-4 py-4 text-center">Damaged</th>
-                    <th className="px-4 py-4 text-center">Expiry</th>
-                    <th className="px-4 py-4 text-center">Missing</th>
-                    <th className="px-4 py-4 text-right">Final Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {selectedReport.items?.map(item => (
-                    <tr key={item.id} className="text-xs font-bold text-gray-900">
-                      <td className="px-4 py-6">
-                        <div className="flex flex-col">
-                          <span className="font-black">{item.product?.name}</span>
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            <span className="text-[9px] text-gray-400">SKU: {item.product?.displayId || item.product?.skuCode || 'N/A'}</span>
-                            {item.product?.brand && <span className="text-[8px] font-black px-1.5 py-0.5 bg-gray-50 text-gray-400 rounded uppercase tracking-tighter">{item.product.brand.name}</span>}
-                            {item.product?.category && <span className="text-[8px] font-black px-1.5 py-0.5 bg-blue-50 text-blue-400 rounded uppercase tracking-tighter">{item.product.category.name}</span>}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-6 text-center">{item.orderedQty}</td>
-                      <td className="px-4 py-6 text-center">{item.receivedQty}</td>
-                      <td className="px-4 py-6 text-center text-emerald-600">{item.receivedQty - (item.damagedQty || 0)}</td>
-                      <td className="px-4 py-6 text-center text-rose-500">{item.damagedQty || 0}</td>
-                      <td className="px-4 py-6 text-center">
-                        <span className={`px-2 py-0.5 rounded text-[8px] font-black uppercase ${
-                          item.expiryStatus === 'SAFE' ? 'bg-emerald-50 text-emerald-600' :
-                          item.expiryStatus === 'NEAR' ? 'bg-amber-50 text-amber-600' : 'bg-rose-50 text-rose-600'
-                        }`}>
-                          {item.expiryStatus || 'SAFE'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-6 text-center text-amber-500">{item.missingQty || 0}</td>
-                      <td className="px-4 py-6 text-right">
-                        <span className="px-3 py-1 bg-emerald-50 text-emerald-600 border border-emerald-100 rounded-full text-[9px] font-black uppercase tracking-widest">
-                          Accepted
-                        </span>
-                      </td>
+          {/* Verification Details */}
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold text-gray-900">Verification Details</h3>
+            <div className="bg-white border border-gray-100 rounded-3xl overflow-hidden shadow-sm">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead className="bg-gray-50/80">
+                    <tr className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      <th className="px-8 py-5">Item</th>
+                      <th className="px-4 py-5 text-center">Ordered</th>
+                      <th className="px-4 py-5 text-center">Received</th>
+                      <th className="px-4 py-5 text-center">Accepted</th>
+                      <th className="px-4 py-5 text-center">Damaged</th>
+                      <th className="px-4 py-5 text-center">Expiry</th>
+                      <th className="px-4 py-5 text-center">Missing</th>
+                      <th className="px-8 py-5 text-right">Final Status</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {selectedReport.items?.map(item => (
+                      <tr key={item.id} className="text-sm">
+                        <td className="px-8 py-8">
+                          <div className="space-y-1">
+                            <p className="font-bold text-gray-900">{item.product?.name}</p>
+                            <p className="text-xs text-gray-400 font-medium uppercase tracking-tighter">SKU: {item.product?.skuCode || 'N/A'}</p>
+                            <p className="text-[11px] text-gray-400 font-medium">{item.product?.unitValue || '1'} kg</p>
+                          </div>
+                        </td>
+                        <td className="px-4 py-8 text-center font-bold text-gray-900">{item.orderedQty}</td>
+                        <td className="px-4 py-8 text-center font-bold text-gray-900">{item.receivedQty}</td>
+                        <td className="px-4 py-8 text-center font-bold text-emerald-600">{item.receivedQty - (item.damagedQty || 0)}</td>
+                        <td className="px-4 py-8 text-center font-bold text-rose-500">{item.damagedQty || 0}</td>
+                        <td className="px-4 py-8 text-center">
+                          <span className={`px-3 py-1 rounded-full text-[11px] font-bold uppercase tracking-wider ${
+                            item.expiryStatus === 'SAFE' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'
+                          }`}>
+                            {item.expiryStatus || 'Safe'}
+                          </span>
+                        </td>
+                        <td className="px-4 py-8 text-center font-bold text-orange-500">{item.missingQty || 0}</td>
+                        <td className="px-8 py-8 text-right">
+                          <span className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-xs font-bold uppercase tracking-wider">
+                            Accepted
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
           {/* Verification Notes */}
-          <div className="space-y-2">
-            <h3 className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Verification Notes</h3>
-            <div className="p-4 bg-gray-50 border border-gray-100 rounded-2xl text-xs font-bold text-gray-500 leading-relaxed">
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-gray-900">Verification Notes</h3>
+            <div className="p-8 bg-white border border-gray-100 rounded-3xl shadow-sm text-sm font-medium text-gray-500 leading-relaxed">
               {selectedReport.remarks || 'All items received in good condition. Quality verified and approved for stock entry.'}
             </div>
           </div>
 
           {/* Approval Information */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 py-8 border-t border-gray-50">
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Verified by</span>
-              <p className="text-sm font-black text-gray-900">Rajesh Kumar</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Approved by</span>
-              <p className="text-sm font-black text-gray-900">Priya Sharma</p>
-            </div>
-            <div className="space-y-1">
-              <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Verification Timestamp</span>
-              <p className="text-sm font-black text-gray-900">{format(new Date(selectedReport.createdAt), 'yyyy-MM-dd, hh:mm a')}</p>
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-gray-900">Approval Information</h3>
+            <div className="p-10 bg-white border border-gray-100 rounded-3xl shadow-sm">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Verified By</span>
+                  <p className="text-base font-bold text-gray-900">Rajesh Kumar</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Approved By</span>
+                  <p className="text-base font-bold text-gray-900">Priya Sharma</p>
+                </div>
+                <div className="space-y-1.5">
+                  <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Verification Timestamp</span>
+                  <p className="text-base font-bold text-gray-900">{format(new Date(selectedReport.createdAt), 'yyyy-MM-dd hh:mm a')}</p>
+                </div>
+              </div>
             </div>
           </div>
 
           {/* Attachments */}
-          <div className="space-y-3">
-            <h3 className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Attachments</h3>
-            <div className="flex flex-wrap gap-3">
+          <div className="space-y-4">
+            <h3 className="text-xl font-bold text-gray-900">Attachments</h3>
+            <div className="p-8 bg-white border border-gray-100 rounded-3xl shadow-sm flex flex-wrap gap-4">
               {selectedReport.attachments && selectedReport.attachments.length > 0 ? (
                 selectedReport.attachments.map((url, idx) => (
                   <a 
@@ -827,16 +814,16 @@ const GRNSection = ({ can, storeId }) => {
                     href={url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-3 px-4 py-2.5 bg-white border border-gray-200 rounded-xl shadow-sm hover:border-emerald-500 hover:text-emerald-600 transition-all active:scale-95"
+                    className="flex items-center gap-3 px-6 py-4 bg-gray-50 border border-gray-100 rounded-2xl hover:bg-white hover:shadow-md transition-all group"
                   >
-                    <FileText size={16} className="text-emerald-600" />
-                    <span className="text-[10px] font-black uppercase tracking-tight truncate max-w-[150px]">
-                      {url.split('/').pop() || `Attachment ${idx + 1}`}
+                    <FileText size={18} className="text-gray-400 group-hover:text-emerald-600" />
+                    <span className="text-xs font-bold text-gray-600 truncate max-w-[200px]">
+                      {url.split('/').pop() || `Record_${idx + 1}`}
                     </span>
                   </a>
                 ))
               ) : (
-                <div className="px-4 py-2 bg-gray-50 rounded-xl text-[10px] font-bold text-gray-400 uppercase tracking-widest border border-gray-100">
+                <div className="text-sm font-bold text-gray-300 uppercase tracking-widest italic py-4 px-2">
                   No attachments available
                 </div>
               )}
@@ -844,23 +831,24 @@ const GRNSection = ({ can, storeId }) => {
           </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-50">
+          <div className="flex justify-end gap-5 pt-4">
             <button 
               onClick={() => window.print()}
-              className="flex items-center gap-2 px-6 py-3 bg-white border border-gray-200 text-gray-400 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
+              className="flex items-center gap-2 px-8 py-3.5 bg-gray-50 border border-gray-200 text-gray-600 rounded-xl text-sm font-bold hover:bg-gray-100 transition-all active:scale-95 shadow-sm"
             >
+              <Printer size={18} />
               Print Report
             </button>
             <button 
               onClick={() => window.print()}
-              className="flex items-center gap-2 px-8 py-3 bg-emerald-600 text-white rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20"
+              className="flex items-center gap-2 px-10 py-3.5 bg-emerald-600 text-white rounded-xl text-sm font-bold hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 active:scale-95"
             >
+              <Download size={18} />
               Download PDF
             </button>
           </div>
         </div>
       )}
-
     </div>
   );
 };
