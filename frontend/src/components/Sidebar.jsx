@@ -18,12 +18,12 @@ export default function Sidebar({ isOpen, onClose }) {
   };
 
   const menuItems = [
-    { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'SALES' },
-    { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'ROUTES' },
+    { name: 'Sales Grid', path: '/', icon: PackageSearch, color: 'text-emerald-600', bg: 'bg-emerald-50', module: 'AGENT_PORTAL', section: 'SALES_POS' },
+    { name: 'Today\'s Plan', path: '/today-plan', icon: Calendar, color: 'text-indigo-600', bg: 'bg-indigo-50', module: 'AGENT_PORTAL', section: 'ROUTE_PLAN' },
     // { name: 'Shift Tracking', path: '/shift-tracking', icon: Clock, color: 'text-rose-600', bg: 'bg-rose-50' },
     // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
-    { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'INVENTORY' },
+    { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'AGENT_PORTAL', section: 'AGENT_INVENTORY' },
     {
       name: 'Inventory',
       icon: Package,
@@ -97,13 +97,8 @@ export default function Sidebar({ isOpen, onClose }) {
       icon: Wallet,
       color: 'text-orange-600',
       bg: 'bg-orange-50',
-      module: 'CASH',
-      shouldShow: () => {
-        if (!user?.customRoleId || ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role)) return true;
-        const sections = user?.permissions?.CASH_SECTIONS;
-        if (sections) return (sections['RECONCILIATION'] || []).includes('READ');
-        return user?.permissions?.CASH_TARGET_SECTIONS?.includes('RECONCILIATION');
-      }
+      module: 'AGENT_PORTAL',
+      section: 'CASH_RECON'
     },
     {
       name: 'Cash Wallet',
@@ -111,28 +106,25 @@ export default function Sidebar({ isOpen, onClose }) {
       icon: Wallet,
       color: 'text-emerald-500',
       bg: 'bg-emerald-50',
-      module: 'CASH',
-      shouldShow: () => {
-        if (!user?.customRoleId || ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role)) return true;
-        const sections = user?.permissions?.CASH_SECTIONS;
-        if (sections) return (sections['LIVE_CASH'] || []).includes('READ');
-        return user?.permissions?.CASH_TARGET_SECTIONS?.includes('LIVE_CASH');
-      }
+      module: 'AGENT_PORTAL',
+      section: 'AGENT_WALLET'
     },
-    { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50', module: 'REPORTS' },
-    { name: 'Sales History', path: '/sales-history', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { name: 'My Targets', path: '/targets', icon: Target, color: 'text-amber-600', bg: 'bg-amber-50', module: 'TARGETS' },
-    { name: 'My Assets', path: '/my-assets', icon: Box, color: 'text-cyan-600', bg: 'bg-cyan-50', module: 'ASSETS' },
+    { name: 'Sales Analytics', path: '/reports', icon: BarChart, color: 'text-blue-600', bg: 'bg-blue-50', module: 'AGENT_PORTAL', section: 'AGENT_REPORTS' },
+    { name: 'Sales History', path: '/sales-history', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50', module: 'AGENT_PORTAL', section: 'SALES_HISTORY' },
+    { name: 'My Targets', path: '/targets', icon: Target, color: 'text-amber-600', bg: 'bg-amber-50', module: 'AGENT_PORTAL', section: 'AGENT_TARGETS' },
+    { name: 'My Assets', path: '/my-assets', icon: Box, color: 'text-cyan-600', bg: 'bg-cyan-50', module: 'AGENT_PORTAL', section: 'AGENT_ASSETS' },
     {
       name: 'Report Damage',
       path: '/report-damage',
       icon: AlertTriangle,
       color: 'text-red-600',
       bg: 'bg-red-50',
+      module: 'AGENT_PORTAL',
+      section: 'DAMAGE_REPORT'
     },
-    { name: 'My Attendance', path: '/attendance', icon: Clock, color: 'text-teal-600', bg: 'bg-teal-50' },
-    { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50' },
-    { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50' },
+    { name: 'My Attendance', path: '/attendance', icon: Clock, color: 'text-teal-600', bg: 'bg-teal-50', module: 'AGENT_PORTAL', section: 'AGENT_ATTENDANCE' },
+    { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50', module: 'AGENT_PORTAL', section: 'AGENT_ACTIVITIES' },
+    { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50', module: 'AGENT_PORTAL', section: 'AGENT_PROFILE' },
     {
       name: 'Procurement',
       icon: ClipboardList,
@@ -194,12 +186,19 @@ export default function Sidebar({ isOpen, onClose }) {
 
     if (item.shouldShow && !item.shouldShow()) return false;
 
-    // Bypass granular checks for basic roles without custom roles, or for core agent roles
     const isBasicAgentRole = ['SALES_AGENT', 'DRIVER', 'HELPER'].includes(user?.role);
-    if (!item.module || user?.role === 'TENANT_OWNER' || (isBasicAgentRole && !user?.customRoleId) || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
-    // If it's a basic agent role WITH a custom role, still allow core modules unless explicitly handled above
-    if (isBasicAgentRole && !item.isAdmin) return true;
+    // Agents WITH a custom role → check granular AGENT_PORTAL section permissions
+    if (isBasicAgentRole && user?.customRoleId && item.module === 'AGENT_PORTAL' && item.section) {
+      const { can } = useUserStore.getState();
+      return can('AGENT_PORTAL', 'READ', item.section);
+    }
+
+    // Agents WITHOUT a custom role → full access to all non-admin items
+    if (isBasicAgentRole && !user?.customRoleId && !item.isAdmin) return true;
+
+    // Bypass granular checks for owners and bare admin roles
+    if (!item.module || user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId)) return true;
 
     // Global Bypass for Owners and Super Admins
     if (user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN') return true;
@@ -240,8 +239,9 @@ export default function Sidebar({ isOpen, onClose }) {
 
     const perms = user?.permissions?.[item.module] || [];
     const hasRead = perms.includes('READ');
-    if (!hasRead) return false;
-    return true;
+    if (hasRead) return true;
+
+    return false;
   });
 
   const [openMenus, setOpenMenus] = useState({
@@ -249,8 +249,8 @@ export default function Sidebar({ isOpen, onClose }) {
     Inventory: location.pathname.startsWith('/admin/inventory'),
     Vehicles: location.pathname.startsWith('/admin/vehicles'),
     Routes: location.pathname.startsWith('/admin/routes') || (location.pathname.startsWith('/admin/vehicles') && (
-      new URLSearchParams(location.search).get('sub') === 'route_mapping' || 
-      new URLSearchParams(location.search).get('sub') === 'sales' || 
+      new URLSearchParams(location.search).get('sub') === 'route_mapping' ||
+      new URLSearchParams(location.search).get('sub') === 'sales' ||
       new URLSearchParams(location.search).get('sub') === 'collection'
     ))
   });
@@ -387,8 +387,8 @@ export default function Sidebar({ isOpen, onClose }) {
                           } else if (item.name === 'Vehicles') {
                             isSubActive = location.pathname === '/admin/vehicles' && new URLSearchParams(location.search).get('sub') === targetSub;
                           } else if (item.name === 'Routes') {
-                            isSubActive = (location.pathname === '/admin/routes' && new URLSearchParams(location.search).get('tab') === targetTab) || 
-                                          (location.pathname === '/admin/vehicles' && new URLSearchParams(location.search).get('sub') === targetSub);
+                            isSubActive = (location.pathname === '/admin/routes' && new URLSearchParams(location.search).get('tab') === targetTab) ||
+                              (location.pathname === '/admin/vehicles' && new URLSearchParams(location.search).get('sub') === targetSub);
                           }
 
                           return (

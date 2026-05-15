@@ -3,7 +3,7 @@ import {
   Shield, Plus, Pencil, Trash2, Users, X, Loader2, Check,
   ChevronRight, ChevronDown, Key, Save, AlertTriangle, CheckCircle2, XCircle, Search,
   Truck, ShoppingCart, PieChart, Receipt, Target, Eye, EyeOff, LayoutGrid, Coins, Grid, MapPin,
-  Package, Wallet, BarChart, ClipboardList, BarChart3, Settings
+  Package, Wallet, BarChart, ClipboardList, BarChart3, Settings, Store, Smartphone
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import adminAPI from '../../services/adminService';
@@ -100,8 +100,30 @@ const ROUTE_SECTIONS_LIST = [
   { key: 'ASSIGNMENTS', label: 'Vehicle Assignment', desc: 'Assign routes to vehicles' }
 ];
 
+const AGENT_PORTAL_SECTIONS = [
+  { key: 'SALES_POS', label: 'Sales Grid', desc: 'Main billing interface' },
+  { key: 'ROUTE_PLAN', label: "Today's Plan", desc: 'Assigned routes and villages' },
+  { key: 'AGENT_INVENTORY', label: 'Vehicle & Stock', desc: 'Current vehicle inventory' },
+  { key: 'CASH_RECON', label: 'Cash Reconciliation', desc: 'Shift opening/closing' },
+  { key: 'AGENT_WALLET', label: 'Cash Wallet', desc: 'Current collection balance' },
+  { key: 'AGENT_REPORTS', label: 'Sales Analytics', desc: 'Performance metrics' },
+  { key: 'SALES_HISTORY', label: 'Sales History', desc: 'Previous orders log' },
+  { key: 'AGENT_TARGETS', label: 'My Targets', desc: 'VGE and sales targets' },
+  { key: 'AGENT_ASSETS', label: 'My Assets', desc: 'Assigned equipment' },
+  { key: 'DAMAGE_REPORT', label: 'Report Damage', desc: 'Vehicle or item damage' },
+  { key: 'AGENT_ATTENDANCE', label: 'My Attendance', desc: 'Punch-in/out logs' },
+  { key: 'AGENT_ACTIVITIES', label: 'My Activities', desc: 'System activity logs' },
+  { key: 'AGENT_PROFILE', label: 'My Profile', desc: 'Account settings' },
+];
+
+const STORE_CONTEXT_SECTIONS = [
+  { key: 'STORE_SELECTOR', label: 'Outlet Switching', desc: 'Allow switching between different stores' },
+  { key: 'GLOBAL_VISIBILITY', label: 'Global Data Access', desc: 'View data across all branches' },
+  { key: 'RESTRICT_ASSIGNED', label: 'Branch Isolation', desc: 'Restrict to only assigned store context' },
+];
+
 const PORTAL_TYPES = [
-  { key: 'ADMIN', label: 'VillagKart Admin', desc: 'Full backend access', icon: Shield, color: 'emerald' },
+  { key: 'ADMIN', label: 'Admin', desc: 'Full backend access', icon: Shield, color: 'emerald' },
   { key: 'AGENT', label: 'Agent Portal', desc: 'Sales & Field activities', icon: Users, color: 'blue' },
   { key: 'SUPERVISOR', label: 'Supervisor Portal', desc: 'Branch management', icon: Key, color: 'amber' },
   { key: 'HELPER', label: 'Helper Portal', desc: 'Logistics support', icon: Plus, color: 'rose' },
@@ -251,7 +273,7 @@ const PermissionTable = ({
                       const sections = { ...(formPerms[sectionKey] || {}) };
                       const cur = sections[mod.key] || [];
                       const next = cur.includes(action.key) ? cur.filter(a => a !== action.key) : [...cur, action.key];
-                      togglePermission(sectionKey, mod.key, action.key, true, next);
+                      togglePermission(sectionKey, mod.key, true, next);
                     } else {
                       togglePermission(mod.key, action.key);
                     }
@@ -268,7 +290,7 @@ const PermissionTable = ({
                 } else if (isGranular) {
                   const sections = { ...(formPerms[sectionKey] || {}) };
                   sections[mod.key] = allSelected ? [] : ACTIONS.map(a => a.key);
-                  togglePermission(sectionKey, mod.key, 'ALL', true, sections[mod.key]);
+                  togglePermission(sectionKey, mod.key, true, sections[mod.key]);
                 } else {
                   toggleAllForModule(mod.key);
                 }
@@ -308,6 +330,7 @@ export default function TenantPrivileges() {
   const [formName, setFormName] = useState('');
   const [formDesc, setFormDesc] = useState('');
   const [formPerms, setFormPerms] = useState({});
+  const [formPortalType, setFormPortalType] = useState('ADMIN');
 
   useEffect(() => {
     fetchRoles();
@@ -330,6 +353,7 @@ export default function TenantPrivileges() {
     setFormName('');
     setFormDesc('');
     setFormPerms({});
+    setFormPortalType('ADMIN');
     setActiveTab('permissions');
     setRoleUsers([]);
     setHeaderEditing(true);
@@ -342,6 +366,7 @@ export default function TenantPrivileges() {
     setFormName(role.name);
     setFormDesc(role.description || '');
     setFormPerms(role.permissions || {});
+    setFormPortalType(role.portalType || 'ADMIN');
     setActiveTab('permissions');
     setRoleUsers([]);
     setHeaderEditing(false);
@@ -651,6 +676,8 @@ export default function TenantPrivileges() {
         if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
         if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
         if (moduleKey === 'SETTINGS') updated.SETTINGS_TARGET_SECTIONS = [];
+        if (moduleKey === 'AGENT') updated.AGENT_PORTAL = {};
+        if (moduleKey === 'STORE') updated.STORE_CONTEXT = {};
       }
 
       return updated;
@@ -677,6 +704,8 @@ export default function TenantPrivileges() {
         if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
         if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
         if (moduleKey === 'SETTINGS') updated.SETTINGS_TARGET_SECTIONS = [];
+        if (moduleKey === 'AGENT') updated.AGENT_PORTAL = {};
+        if (moduleKey === 'STORE') updated.STORE_CONTEXT = {};
       }
 
       return updated;
@@ -700,6 +729,12 @@ export default function TenantPrivileges() {
 
     all.PROCUREMENT_SECTIONS = {};
     PROCUREMENT_SECTIONS_LIST.forEach(s => { all.PROCUREMENT_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+
+    all.AGENT_PORTAL = {};
+    AGENT_PORTAL_SECTIONS.forEach(s => { all.AGENT_PORTAL[s.key] = ACTIONS.map(a => a.key); });
+
+    all.STORE_CONTEXT = {};
+    STORE_CONTEXT_SECTIONS.forEach(s => { all.STORE_CONTEXT[s.key] = ACTIONS.map(a => a.key); });
 
     // Target Lists (Granular)
     all.ROUTE_TARGET_SECTIONS = ROUTE_SECTIONS_LIST.map(s => s.key);
@@ -742,14 +777,16 @@ export default function TenantPrivileges() {
         await adminAPI.updateRole(selectedRole.id, {
           name: formName,
           description: formDesc,
-          permissions: formPerms
+          permissions: formPerms,
+          portalType: formPortalType
         });
         toast.success('Role updated');
       } else {
         await adminAPI.createRole({
           name: formName,
           description: formDesc,
-          permissions: formPerms
+          permissions: formPerms,
+          portalType: formPortalType
         });
         toast.success('Role created');
       }
@@ -897,6 +934,42 @@ export default function TenantPrivileges() {
               </div>
             </div>
           )}
+
+          <div className="bg-white border border-gray-100 rounded-[2rem] p-6 shadow-sm flex-1">
+            <label className="text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 mb-4 block">Portal Identity</label>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {PORTAL_TYPES.map(type => {
+                const Icon = type.icon;
+                const isSelected = formPortalType === type.key;
+                return (
+                  <button
+                    key={type.key}
+                    onClick={() => {
+                      setFormPortalType(type.key);
+                      if (type.key === 'AGENT') {
+                        setOpenSections(prev => [...new Set([...prev, 'store_context', 'agent_portal'])]);
+                      }
+                    }}
+                    className={`flex items-center gap-4 p-4 rounded-[1.5rem] border transition-all text-left relative group ${isSelected
+                      ? 'bg-emerald-50 border-emerald-500 shadow-sm shadow-emerald-600/10'
+                      : 'bg-white border-gray-100 text-gray-400 hover:border-emerald-100 hover:text-gray-600'
+                      }`}
+                  >
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all shrink-0 ${isSelected ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'bg-gray-50 text-gray-400 group-hover:text-emerald-500'}`}>
+                      <Icon size={20} strokeWidth={2.5} />
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <span className={`text-[10px] font-black uppercase tracking-tight truncate ${isSelected ? 'text-gray-900' : 'text-gray-500'}`}>{type.label}</span>
+                      <span className="text-[7px] font-bold text-gray-400 uppercase tracking-widest truncate">{type.desc}</span>
+                    </div>
+                    {isSelected && (
+                      <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
 
         <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col">
@@ -915,10 +988,47 @@ export default function TenantPrivileges() {
                     {Object.keys(formPerms).length > 0 ? 'Clear All Access' : 'Grant All Access'}
                   </button>
                 </div>
-
                 <div className="grid grid-cols-1 gap-4">
+                  {/* Agent-Specific Sections (Shown at top for Agent Identity) */}
+                  {formPortalType === 'AGENT' && (
+                    <>
+
+
+                      <CollapsibleSection
+                        title="Agent Operations"
+                        desc="Field Force • POS, Cash, Inventory & Profile"
+                        icon={Smartphone}
+                        isOpen={openSections.includes('agent_portal')}
+                        onToggle={() => toggleAccordion('agent_portal')}
+                        extraHeaderAction={
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const sections = {};
+                              AGENT_PORTAL_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                              setFormPerms(prev => ({ ...prev, AGENT_PORTAL: sections }));
+                            }}
+                            className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
+                          >
+                            Grant All Agent Access
+                          </button>
+                        }
+                      >
+                        <PermissionTable
+                          modules={AGENT_PORTAL_SECTIONS}
+                          isGranular={true}
+                          sectionKey="AGENT_PORTAL"
+                          formPerms={formPerms}
+                          togglePermission={togglePermission}
+                          toggleAllForModule={toggleAllForModule}
+                        />
+                      </CollapsibleSection>
+                    </>
+                  )}
+
                   {/* Core Modules */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Core Operations"
                     desc="Staff, Vehicles, Sales & HR"
                     icon={LayoutGrid}
@@ -932,9 +1042,11 @@ export default function TenantPrivileges() {
                       toggleAllForModule={toggleAllForModule}
                     />
                   </CollapsibleSection>
+                  )}
 
-                  {/* Dashboard & Analytics */}
-                  <CollapsibleSection
+                  {/* Dashboard & Metrics */}
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Dashboard & Metrics"
                     desc="Main overview visibility & widget control"
                     icon={BarChart3}
@@ -987,9 +1099,11 @@ export default function TenantPrivileges() {
                       )}
                     </div>
                   </CollapsibleSection>
+                  )}
 
                   {/* Inventory Operations */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Inventory Management"
                     desc="Stock, Master Registry & Loading"
                     icon={Package}
@@ -1007,9 +1121,11 @@ export default function TenantPrivileges() {
                       customToggleAll={toggleAllForInventorySection}
                     />
                   </CollapsibleSection>
+                  )}
 
                   {/* Cash Operations */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Cash Flow & Safe"
                     desc="Safe Control & Daily Reconciliation"
                     icon={Coins}
@@ -1040,9 +1156,11 @@ export default function TenantPrivileges() {
                       customToggleAll={toggleAllForCashSection}
                     />
                   </CollapsibleSection>
+                  )}
 
                   {/* Expense Control */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Expense Control"
                     desc="Monitoring, Approval & Policies"
                     icon={Receipt}
@@ -1073,9 +1191,11 @@ export default function TenantPrivileges() {
                       customToggleAll={toggleAllForExpenseSection}
                     />
                   </CollapsibleSection>
+                  )}
 
                   {/* Procurement */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Procurement & Vendors"
                     desc="PO, GRN & Vendor Payments"
                     icon={ShoppingCart}
@@ -1093,9 +1213,11 @@ export default function TenantPrivileges() {
                       customToggleAll={toggleAllForProcurementSection}
                     />
                   </CollapsibleSection>
+                  )}
 
                   {/* Route Management */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Route Operations"
                     desc="Villages, Routes & Assignments"
                     icon={MapPin}
@@ -1125,9 +1247,49 @@ export default function TenantPrivileges() {
                       })}
                     </div>
                   </CollapsibleSection>
+                  )}
+
+                  {/* Admin Specific Sections (Shown at bottom for Agent Identity) */}
+                  {formPortalType !== 'AGENT' && (
+                    <>
+                      <CollapsibleSection
+                        title="Store & Outlet Context"
+                        desc="Switching, Global Visibility & Branch Isolation"
+                        icon={Store}
+                        isOpen={openSections.includes('store_context')}
+                        onToggle={() => toggleAccordion('store_context')}
+                        extraHeaderAction={
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              const sections = {};
+                              STORE_CONTEXT_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                              setFormPerms(prev => ({ ...prev, STORE_CONTEXT: sections }));
+                            }}
+                            className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
+                          >
+                            Grant All Store Access
+                          </button>
+                        }
+                      >
+                        <PermissionTable
+                          modules={STORE_CONTEXT_SECTIONS}
+                          isGranular={true}
+                          sectionKey="STORE_CONTEXT"
+                          formPerms={formPerms}
+                          togglePermission={togglePermission}
+                          toggleAllForModule={toggleAllForModule}
+                        />
+                      </CollapsibleSection>
+
+
+                    </>
+                  )}
+
 
                   {/* Business Reports */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="Business Intelligence"
                     desc="Comprehensive data analytics"
                     icon={PieChart}
@@ -1170,9 +1332,11 @@ export default function TenantPrivileges() {
                       )}
                     </div>
                   </CollapsibleSection>
+                  )}
 
                   {/* System Settings */}
-                  <CollapsibleSection
+                  {formPortalType !== 'AGENT' && (
+                    <CollapsibleSection
                     title="System & POS Settings"
                     desc="POS configurations & global settings"
                     icon={Settings}
@@ -1218,6 +1382,7 @@ export default function TenantPrivileges() {
                       )}
                     </div>
                   </CollapsibleSection>
+                  )}
                 </div>
               </div>
             ) : (

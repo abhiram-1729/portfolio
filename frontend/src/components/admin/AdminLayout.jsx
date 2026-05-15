@@ -151,7 +151,7 @@ export default function AdminLayout() {
         { to: '/admin/delivery-logistics', icon: Truck, label: 'Delivery Logistics', module: 'ADMIN' },
       ]
     },
-    // { to: '/admin/stores', icon: Store, label: 'Stores' },
+    { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
@@ -262,9 +262,19 @@ export default function AdminLayout() {
           const hasAdmin = (user?.permissions?.['STAFF_ADMIN'] || []).includes('READ');
           const hasAgent = (user?.permissions?.['STAFF_AGENT'] || []).includes('READ');
           hasModuleRead = hasAdmin || hasAgent;
+        } else if (requiredModule === 'STORE_CONTEXT') {
+          hasModuleRead = true; // Granular check handles it below
         } else {
-          hasModuleRead = (user?.permissions?.[requiredModule] || []).includes('READ');
+          const perms = user?.permissions?.[requiredModule];
+          hasModuleRead = Array.isArray(perms) ? perms.includes('READ') : false;
         }
+        // 3. Granular check for STORE_CONTEXT
+        if (requiredModule === 'STORE_CONTEXT' && sub.section) {
+          const sections = user?.permissions?.STORE_CONTEXT;
+          if (sections) return (sections[sub.section] || []).includes('READ');
+          return false;
+        }
+
         if (!hasModuleRead) return false;
 
         return true;
@@ -287,8 +297,11 @@ export default function AdminLayout() {
       const hasAdmin = (user?.permissions?.['STAFF_ADMIN'] || []).includes('READ');
       const hasAgent = (user?.permissions?.['STAFF_AGENT'] || []).includes('READ');
       hasModuleRead = hasAdmin || hasAgent;
+    } else if (item.module === 'STORE_CONTEXT') {
+      hasModuleRead = true; // Granular check handles it below
     } else {
-      hasModuleRead = (user?.permissions?.[item.module] || []).includes('READ');
+      const perms = user?.permissions?.[item.module];
+      hasModuleRead = Array.isArray(perms) ? perms.includes('READ') : false;
     }
     if (!hasModuleRead) return false;
 
@@ -330,6 +343,12 @@ export default function AdminLayout() {
         return Object.values(sections).some(perms => (perms || []).includes('READ'));
       }
     }
+    
+    if (item.module === 'STORE_CONTEXT') {
+      const sections = user?.permissions?.STORE_CONTEXT;
+      if (sections) return (sections[item.section] || []).includes('READ');
+      return false;
+    }
 
     return true;
   });
@@ -351,7 +370,7 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
     if (pathname.startsWith('/admin/attendance')) return 'STAFF';
     if (pathname.startsWith('/admin/privileges')) return 'ADMIN';
-    if (pathname.startsWith('/admin/stores')) return 'ADMIN';
+    if (pathname.startsWith('/admin/stores')) return 'STORE_CONTEXT';
     return null;
   };
 
@@ -413,6 +432,12 @@ export default function AdminLayout() {
       const sections = user?.permissions?.CASH_SECTIONS;
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
       if (user?.permissions?.CASH_TARGET_SECTIONS?.length > 0) return true;
+    }
+
+    if (location.pathname.startsWith('/admin/stores')) {
+      const sections = user?.permissions?.STORE_CONTEXT;
+      if (sections && (sections['STORE_SELECTOR'] || []).includes('READ')) return true;
+      return false;
     }
 
     if (location.pathname.startsWith('/admin/expenses')) {
