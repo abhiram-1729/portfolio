@@ -215,57 +215,57 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                   <p className="text-sm font-bold text-gray-400 mt-2">All orders have been received or closed.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto custom-scrollbar w-full">
-                  <table className="w-max min-w-full text-left">
+                <div className="overflow-x-auto w-full">
+                  <table className="w-full text-left table-auto">
                     <thead>
-                      <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 whitespace-nowrap">
-                        <th className="px-6 py-4 whitespace-nowrap">PO Details</th>
-                        <th className="px-6 py-4 whitespace-nowrap">Vendor</th>
-                        <th className="px-6 py-4 whitespace-nowrap">ETA / Delivery Date</th>
-                        <th className="px-6 py-4 text-center whitespace-nowrap">Items</th>
-                        <th className="px-6 py-4 text-center whitespace-nowrap">Delivery Status</th>
-                        <th className="px-6 py-4 text-center whitespace-nowrap">Verification Status</th>
-                        <th className="px-6 py-4 text-right whitespace-nowrap sticky right-0 bg-gray-50 z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">Action</th>
+                      <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 whitespace-nowrap">
+                        <th className="px-4 py-4">PO Details</th>
+                        <th className="px-4 py-4">Vendor</th>
+                        <th className="px-4 py-4">ETA / Delivery Date</th>
+                        <th className="px-4 py-4 text-center">Items</th>
+                        <th className="px-4 py-4 text-center">Delivery Status</th>
+                        <th className="px-4 py-4 text-center">Verification Status</th>
+                        <th className="px-4 py-4 text-right">Action</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-50">
                       {pos.map(po => (
                         <tr
                           key={po.id}
-                          className="group hover:bg-emerald-50/30 transition-all cursor-pointer"
+                          className="group hover:bg-emerald-50/30 transition-all cursor-pointer border-b border-gray-50 last:border-0"
                         >
-                          <td className="px-6 py-6" onClick={() => selectPO(po.id)}>
+                          <td className="px-4 py-4" onClick={() => selectPO(po.id)}>
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-900 group-hover:text-emerald-600 transition-colors uppercase tracking-tight">
+                              <span className="text-xs font-black text-gray-900 group-hover:text-emerald-600 transition-colors uppercase tracking-tight truncate max-w-[120px]">
                                 PO-{po.displayId}
                               </span>
-                              <span className="text-[10px] font-bold text-gray-400">₹{po.totalAmount?.toLocaleString()}</span>
+                              <span className="text-[9px] font-bold text-gray-400">₹{po.totalAmount?.toLocaleString()}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-6 whitespace-nowrap">
+                          <td className="px-4 py-4">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-900 tracking-tight">{po.vendor?.vendorName}</span>
-                              <span className="text-[10px] font-bold text-gray-400">{po.vendor?.phone || '+91 XXXXX XXXXX'}</span>
+                              <span className="text-xs font-black text-gray-900 tracking-tight truncate max-w-[150px]">{po.vendor?.vendorName}</span>
+                              <span className="text-[9px] font-bold text-gray-400">{po.vendor?.phone || '+91 XXXXX XXXXX'}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-6 whitespace-nowrap">
+                          <td className="px-4 py-4">
                             <div className="flex flex-col">
-                              <span className="text-sm font-black text-gray-900 tracking-tight">
+                              <span className="text-xs font-black text-gray-900 tracking-tight">
                                 {format(new Date(po.poDate), 'yyyy-MM-dd')}
                               </span>
-                              <span className="text-[10px] font-bold text-gray-400 uppercase">
+                              <span className="text-[9px] font-bold text-gray-400 uppercase">
                                 {format(new Date(po.poDate), 'hh:mm a')}
                               </span>
                             </div>
                           </td>
-                          <td className="px-6 py-6 text-center">
-                            <div className="inline-flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                              <PackageCheck size={14} className="text-gray-400" />
-                              <span className="text-xs font-black text-gray-900">{po.items?.length || 0}</span>
+                          <td className="px-4 py-4 text-center">
+                            <div className="inline-flex items-center gap-1.5 bg-gray-50 px-2 py-1 rounded-lg border border-gray-100">
+                              <PackageCheck size={12} className="text-gray-400" />
+                              <span className="text-[10px] font-black text-gray-900">{po.items?.length || 0}</span>
                             </div>
                           </td>
-                          <td className="px-6 py-6 text-center">
-                            <span className={`text-[10px] font-black px-4 py-1.5 rounded-full border uppercase tracking-widest ${po.status === 'DELIVERED'
+                          <td className="px-4 py-4 text-center">
+                            <span className={`text-[9px] font-black px-3 py-1 rounded-full border uppercase tracking-widest ${po.status === 'DELIVERED'
                                 ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                                 : po.status === 'ORDERED'
                                   ? 'bg-blue-50 text-blue-600 border-blue-100'
@@ -274,17 +274,16 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                               {po.status === 'ORDERED' ? 'Arrived' : po.status}
                             </span>
                           </td>
-                          <td className="px-6 py-6 text-center">
-                            <span className="text-[10px] font-black px-4 py-1.5 bg-amber-50 text-amber-600 border border-amber-100 rounded-full uppercase tracking-widest">
+                          <td className="px-4 py-4 text-center">
+                            <span className="text-[9px] font-black px-3 py-1 bg-amber-50 text-amber-600 border border-amber-100 rounded-full uppercase tracking-widest">
                               Pending
                             </span>
                           </td>
-                          <td className="px-6 py-6 text-right sticky right-0 bg-white group-hover:bg-emerald-50/50 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">
+                          <td className="px-4 py-4 text-right">
                             <button
                               onClick={() => selectPO(po.id)}
-                              className="inline-flex items-center gap-2 px-5 py-2.5 bg-white border border-gray-200 text-emerald-600 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all active:scale-95 shadow-sm"
+                              className="inline-flex items-center gap-1.5 px-4 py-2 bg-white border border-gray-200 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-widest hover:bg-emerald-600 hover:text-white hover:border-emerald-600 transition-all active:scale-95 shadow-sm"
                             >
-                              <PackageCheck size={14} strokeWidth={3} />
                               Receive
                             </button>
                           </td>
@@ -553,19 +552,19 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
               <p className="text-sm font-bold text-gray-400 mt-2">Historical records of received goods will appear here.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto custom-scrollbar w-full">
-              <table className="w-max min-w-full text-left">
+            <div className="overflow-x-auto w-full">
+              <table className="w-full text-left table-auto">
                 <thead>
-                  <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 whitespace-nowrap">
-                    <th className="px-6 py-5 whitespace-nowrap">GRN ID</th>
-                    <th className="px-6 py-5 whitespace-nowrap">Related PO</th>
-                    <th className="px-6 py-5 whitespace-nowrap">Vendor</th>
-                    <th className="px-6 py-5 whitespace-nowrap">Date & Time</th>
-                    <th className="px-6 py-5 whitespace-nowrap">Verification</th>
-                    <th className="px-6 py-5 text-center whitespace-nowrap">Alerts</th>
-                    <th className="px-6 py-5 text-center whitespace-nowrap">Accepted Qty</th>
-                    <th className="px-6 py-5 text-center whitespace-nowrap">Status</th>
-                    <th className="px-6 py-5 text-right whitespace-nowrap sticky right-0 bg-gray-50 z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">Actions</th>
+                  <tr className="text-[9px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50 whitespace-nowrap">
+                    <th className="px-4 py-4">GRN ID</th>
+                    <th className="px-4 py-4">Related PO</th>
+                    <th className="px-4 py-4">Vendor</th>
+                    <th className="px-4 py-4">Date & Time</th>
+                    <th className="px-4 py-4">Verification</th>
+                    <th className="px-4 py-4 text-center">Alerts</th>
+                    <th className="px-4 py-4 text-center">Accepted Qty</th>
+                    <th className="px-4 py-4 text-center">Status</th>
+                    <th className="px-4 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -577,67 +576,64 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                     const isFullyAccepted = totalDiscrepancies === 0;
 
                     return (
-                      <tr key={grn.id} className="group hover:bg-gray-50/50 transition-all whitespace-nowrap">
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <span className="text-sm font-black text-gray-900 uppercase tracking-tight">GRN-{grn.displayId}</span>
+                      <tr key={grn.id} className="group hover:bg-gray-50/50 transition-all border-b border-gray-50 last:border-0">
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className="text-xs font-black text-gray-900 uppercase tracking-tight">GRN-{grn.displayId}</span>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <span className="text-[11px] font-bold text-gray-500 uppercase">PO-{grn.po?.displayId}</span>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className="text-[10px] font-bold text-gray-500 uppercase">PO-{grn.po?.displayId}</span>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <span className="text-sm font-black text-gray-900 tracking-tight">{grn.po?.vendor?.vendorName}</span>
+                        <td className="px-4 py-4">
+                          <span className="text-xs font-black text-gray-900 tracking-tight truncate max-w-[150px] block">{grn.po?.vendor?.vendorName}</span>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <div className="flex flex-col">
-                            <span className="text-[11px] font-black text-gray-900 tracking-tight">{format(new Date(grn.createdAt), 'dd MMM yy, hh:mm a')}</span>
-                          </div>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className="text-[10px] font-black text-gray-900 tracking-tight">{format(new Date(grn.createdAt), 'dd MMM yy, hh:mm a')}</span>
                         </td>
-                        <td className="px-6 py-6 whitespace-nowrap">
-                          <span className={`text-[10px] font-black uppercase tracking-tight px-2 py-0.5 rounded ${isFullyAccepted ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <span className={`text-[9px] font-black uppercase tracking-tight px-2 py-0.5 rounded ${isFullyAccepted ? 'text-emerald-600 bg-emerald-50' : 'text-amber-600 bg-amber-50'}`}>
                             {isFullyAccepted ? 'Fully Accepted' : 'Partial'}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-center whitespace-nowrap">
+                        <td className="px-4 py-4 text-center whitespace-nowrap">
                           {totalDiscrepancies > 0 ? (
-                            <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-rose-50 text-rose-600 rounded-lg text-[9px] font-black border border-rose-100 uppercase">
-                              <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 bg-rose-50 text-rose-600 rounded text-[8px] font-black border border-rose-100 uppercase">
                               {totalDiscrepancies} Issue
                             </span>
                           ) : (
-                            <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">None</span>
+                            <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">None</span>
                           )}
                         </td>
-                        <td className="px-4 py-5 text-center whitespace-nowrap">
+                        <td className="px-4 py-4 text-center">
                           <span className="text-xs font-black text-gray-900">{totalAccepted}</span>
                         </td>
-                        <td className="px-6 py-6 text-center">
-                          <span className={`text-[10px] font-black uppercase px-4 py-1.5 rounded-lg border tracking-widest ${grn.status === 'COMPLETE'
+                        <td className="px-4 py-4 text-center">
+                          <span className={`text-[9px] font-black uppercase px-3 py-1 rounded-lg border tracking-widest ${grn.status === 'COMPLETE'
                               ? 'bg-emerald-50 text-emerald-600 border-emerald-100'
                               : 'bg-amber-50 text-amber-600 border-amber-100'
                             }`}>
                             {grn.status === 'COMPLETE' ? 'Completed' : 'Partial'}
                           </span>
                         </td>
-                        <td className="px-6 py-6 text-right sticky right-0 bg-white group-hover:bg-gray-50/50 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">
-                          <div className="flex justify-end gap-2">
+                        <td className="px-4 py-4 text-right">
+                          <div className="flex justify-end gap-1.5">
                             <button
                               onClick={() => handleViewReport(grn)}
-                              className="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm active:scale-95"
+                              className="px-2.5 py-1.5 bg-white border border-gray-100 rounded text-[8px] font-black text-emerald-600 uppercase tracking-widest hover:bg-emerald-50 transition-all shadow-sm active:scale-95"
                             >
                               View
                             </button>
                             <button
                               onClick={() => handlePrintReport(grn)}
-                              className="px-3 py-1.5 bg-white border border-gray-100 rounded-lg text-[9px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm active:scale-95"
+                              className="px-2.5 py-1.5 bg-white border border-gray-100 rounded text-[8px] font-black text-gray-400 uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm active:scale-95"
                             >
                               PDF
                             </button>
                             {can('PROCUREMENT', 'DELETE', 'GRN') && (
                               <button
                                 onClick={() => handleDeleteGRN(grn.id)}
-                                className="p-2 bg-rose-50 text-rose-500 rounded-lg hover:bg-rose-100 transition-all opacity-0 group-hover:opacity-100"
+                                className="p-1.5 text-rose-500 hover:text-rose-600 transition-all opacity-0 group-hover:opacity-100"
                               >
-                                <Trash2 size={12} />
+                                <Trash2 size={10} />
                               </button>
                             )}
                           </div>
@@ -741,6 +737,7 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                       <th className="px-4 py-5 text-center">Damaged</th>
                       <th className="px-4 py-5 text-center">Expiry</th>
                       <th className="px-4 py-5 text-center">Missing</th>
+                      <th className="px-8 py-5 text-right">Status</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
