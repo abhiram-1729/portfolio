@@ -74,7 +74,7 @@ export default function AdminCashManagementContent() {
   const can = useUserStore(s => s.can);
   const [searchParams, setSearchParams] = useSearchParams();
   const location = useLocation();
-  const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN' || (user?.role === 'ADMIN' && !user?.customRoleId) || user?.portalType === 'ADMIN';
+  const isGlobalRole = user?.role === 'TENANT_OWNER' || user?.role === 'SUPER_ADMIN' || (user?.role === 'ADMIN' && !user?.customRoleId);
   const storeFilterId = searchParams.get('storeId') || (!isGlobalRole ? user?.storeId : null);
   const isTenantRoute = location.pathname.includes('/tenant/');
 
@@ -154,6 +154,8 @@ export default function AdminCashManagementContent() {
 
   const denominationsList = [500, 200, 100, 50, 20, 10, 5, 2, 1];
 
+  const [headerTab, setHeaderTab] = useState('OPENING');
+
   const canViewCashSection = (sectionKey) => {
     if (isGlobalRole) return true;
     if (can('CASH', 'READ', sectionKey)) return true;
@@ -164,7 +166,14 @@ export default function AdminCashManagementContent() {
   const availableTabs = [
     { key: 'reconciliation', label: 'Daily Reconciliation', section: 'RECONCILIATION' },
     { key: 'live', label: 'Live Cash Status', section: 'LIVE_CASH' },
-    { key: 'ledger', label: 'Audit Ledger', section: 'AUDIT_LEDGER' }
+    { key: 'ledger', label: 'History', section: 'AUDIT_LEDGER' }
+  ].filter(tab => canViewCashSection(tab.section));
+
+  const availableHeaderTabs = [
+    { key: 'OPENING', section: 'CASH_OPENING' },
+    { key: 'AGENT', section: 'AGENT_CASH' },
+    { key: 'SAFE', section: 'SAFE_CONTROL' },
+    { key: 'POS HISTORY', section: 'POS_HISTORY' }
   ].filter(tab => canViewCashSection(tab.section));
 
   const handleDenominationChange = (value, denom, type = 'assign') => {
@@ -245,6 +254,25 @@ export default function AdminCashManagementContent() {
     }
   };
 
+  const [posHistory, setPosHistory] = useState([]);
+
+  const fetchPOSHistory = async () => {
+    try {
+      // Fetching last 30 days of daily reports to populate History Tracking
+      const params = {
+        storeId: storeFilterId,
+        startDate: format(new Date(new Date().setDate(new Date().getDate() - 30)), 'yyyy-MM-dd'),
+        endDate: date
+      };
+      const { data } = await adminAPI.getDailyReport(params);
+      if (data?.success && data?.data) {
+        setPosHistory(data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching POS history:', error);
+    }
+  };
+
   useEffect(() => {
     const loadStores = async () => {
       try {
@@ -263,10 +291,12 @@ export default function AdminCashManagementContent() {
     setVehicles([]);
     setStoreRegisterData(null);
     setLedgerData(null);
+    setPosHistory([]);
     
     fetchSummaries();
     fetchVehicles();
     fetchStoreRegister();
+    fetchPOSHistory();
   }, [date, storeFilterId]);
 
   useEffect(() => {
@@ -278,6 +308,12 @@ export default function AdminCashManagementContent() {
       setActiveTab(availableTabs[0].key);
     }
   }, [availableTabs, activeTab]);
+
+  useEffect(() => {
+    if (availableHeaderTabs.length > 0 && !availableHeaderTabs.some(t => t.key === headerTab)) {
+      setHeaderTab(availableHeaderTabs[0].key);
+    }
+  }, [availableHeaderTabs, headerTab]);
 
   useEffect(() => {
     if (showOpenStoreModal) {
@@ -638,7 +674,7 @@ export default function AdminCashManagementContent() {
 
   return (
     <>
-      {showDepositModal && canViewCashSection('SHIFT_DEPOSIT') ? (
+      {showDepositModal && canViewCashSection('SHIFT_DEPOSITS') ? (
         <div className="bg-white rounded-[2.5rem] border border-gray-100 overflow-hidden flex flex-col shadow-sm animate-in fade-in slide-in-from-bottom-4 duration-300 min-h-[calc(100vh-6rem)] relative z-20">
           <div className="bg-white border-b border-gray-100 sticky top-0 z-10 px-8 py-5 flex items-center justify-between shadow-sm">
             <div className="flex items-center gap-4">
@@ -766,7 +802,7 @@ export default function AdminCashManagementContent() {
                       <button onClick={() => handlePrintShiftReport(shift, shiftAgents.map(a => ({ vehicle: a.vehicle?.vehicleNumber, agentName: a.vehicle?.assignedUsers?.find(u => u.role === 'SALES_AGENT')?.name || 'N/A', closing: a.shiftDetails[shiftKey].closing })), aggregatedDenominations, totalCashCollected)} className="px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-emerald-700 bg-emerald-50 border-2 border-emerald-100 hover:bg-emerald-100 transition-all flex items-center gap-2">
                         <Printer size={18} /> Print Report
                       </button>
-                      {!isDeposited && can('CASH', 'CREATE', 'SHIFT_DEPOSIT') && (
+                      {!isDeposited && can('CASH', 'CREATE', 'SHIFT_DEPOSITS') && (
                         <button onClick={() => handleInitiateDeposit(shift)} disabled={!hasCompletions || isSubmitting} className={`px-10 py-4 rounded-2xl text-xs font-black uppercase tracking-widest text-white shadow-xl transition-all ${shift === 1 ? 'bg-amber-500 hover:bg-amber-600 shadow-amber-500/20' : 'bg-indigo-500 hover:bg-indigo-600 shadow-indigo-500/20'} disabled:opacity-50`}>
                           {isSubmitting ? <Loader2 className="animate-spin" size={18} /> : <CheckCircle2 size={18} />} Approve & Submit
                         </button>
@@ -779,22 +815,22 @@ export default function AdminCashManagementContent() {
           </div>
         </div>
       ) : (
-        <div className="p-4 sm:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-700 bg-gray-50/30 min-h-screen">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="flex items-center gap-4">
+        <div className="p-4 sm:p-10 max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-700 bg-gray-50/50 min-h-screen">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-8">
+            <div className="flex items-center gap-5">
               {searchParams.get('storeId') && stores.length > 1 && (
                 <button
                   onClick={() => setSearchParams({})}
-                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                  className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
                   title="Back to All Branches"
                 >
                   <ChevronLeft size={20} />
                 </button>
               )}
               <div>
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tight flex items-center gap-3">
-                    <Coins className="text-emerald-500" size={32} /> Cash Management
+                <div className="flex items-center gap-4 flex-wrap">
+                  <h1 className="text-4xl font-black text-gray-900 tracking-tight">
+                    Cash Management
                   </h1>
                   {stores.length > 1 && (
                     <select
@@ -806,12 +842,12 @@ export default function AdminCashManagementContent() {
                           setSearchParams({});
                         }
                       }}
-                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
+                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-4 pr-10 py-2.5 rounded-2xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm ml-1"
                       style={{
                         backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 0.35rem center',
+                        backgroundPosition: 'right 0.6rem center',
                         backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1.1rem'
+                        backgroundSize: '1.2rem'
                       }}
                     >
                       <option value="">All Branches</option>
@@ -821,58 +857,65 @@ export default function AdminCashManagementContent() {
                     </select>
                   )}
                 </div>
-                <p className="text-xs font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Daily Reconciliation & Safe Control</p>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-2">Daily Reconciliation & Safe Control</p>
               </div>
             </div>
-            <div className="flex items-center gap-3">
-              <div className="relative group">
-                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-emerald-500" size={18} />
+
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-3 px-4 py-2 bg-white rounded-2xl border border-gray-100 shadow-sm transition-all focus-within:ring-4 focus-within:ring-emerald-500/5">
+                <Calendar className="text-emerald-500" size={18} />
                 <input 
                   type="date" value={date} onChange={(e) => setDate(e.target.value)}
-                  className="bg-white border border-gray-100 pl-12 pr-6 py-3.5 rounded-2xl text-sm font-black text-gray-700 focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 outline-none transition-all shadow-sm cursor-pointer"
+                  className="bg-transparent border-none p-0 py-2 text-sm font-black text-gray-700 outline-none cursor-pointer"
                 />
               </div>
-              {can('CASH', 'CREATE', 'RECONCILIATION') && (
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={handleExportPDF}
-                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-rose-600 hover:bg-rose-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
-                    title="Export PDF"
-                  >
-                    <FileText size={18} />
-                  </button>
-                  <button
-                    onClick={handlePrint}
-                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
-                    title="Print Report"
-                  >
-                    <Printer size={18} />
-                  </button>
-                  <button
-                    onClick={handleExportExcel}
-                    className="p-3.5 bg-white border border-gray-100 text-gray-500 hover:text-emerald-600 hover:bg-emerald-50 rounded-2xl transition-all shadow-sm flex items-center gap-2 font-black text-xs uppercase"
-                    title="Export Excel"
-                  >
-                    <Download size={18} />
-                  </button>
+
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={handleExportPDF}
+                  className="p-4 bg-white border border-gray-100 text-gray-400 hover:text-gray-900 rounded-2xl transition-all shadow-sm group"
+                  title="Export PDF"
+                >
+                  <FileText size={18} className="transition-transform group-hover:scale-110" />
+                </button>
+                <button
+                  onClick={handlePrint}
+                  className="p-4 bg-white border border-gray-100 text-gray-400 hover:text-gray-900 rounded-2xl transition-all shadow-sm group"
+                  title="Print Report"
+                >
+                  <Printer size={18} className="transition-transform group-hover:scale-110" />
+                </button>
+                <button
+                  onClick={handleExportExcel}
+                  className="p-4 bg-white border border-gray-100 text-gray-400 hover:text-gray-900 rounded-2xl transition-all shadow-sm group"
+                  title="Export Excel"
+                >
+                  <Download size={18} className="transition-transform group-hover:scale-110" />
+                </button>
+                
+                {can('CASH', 'CREATE', 'FLOAT_ASSIGNMENT') && (
                   <button 
                     onClick={() => {
                       if (!storeRegisterData?.storeRegister || storeRegisterData.storeRegister.status !== 'OPEN') return toast.error('Initialize Safe first');
                       setViewingAssignFloat(true);
                     }}
-                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-600/20 active:scale-95 flex items-center gap-2"
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/10 active:scale-95 flex items-center gap-3 ml-2"
                   >
-                    <Plus size={18} strokeWidth={3} /> Assign Float
+                    <Plus size={18} strokeWidth={3} />
+                    Assign Float
                   </button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
 
-          {canViewCashSection('STORE_SAFE') || canViewCashSection('SHIFT_DEPOSIT') || canViewCashSection('LIVE_CASH') ? (
+          {canViewCashSection('SAFE_CONTROL') || canViewCashSection('SHIFT_DEPOSITS') || canViewCashSection('LIVE_CASH') || canViewCashSection('CASH_OPENING') || canViewCashSection('AGENT_CASH') || canViewCashSection('POS_HISTORY') ? (
             <StoreSafeHeader 
               storeRegisterData={storeRegisterData} summaries={summaries} user={user}
-              storeLoading={storeLoading}
+              storeLoading={storeLoading} posHistory={posHistory}
+              handleExportPDF={handleExportPDF}
+              headerTab={headerTab} setHeaderTab={setHeaderTab}
+              availableHeaderTabs={availableHeaderTabs}
               setShowOpenStoreModal={setShowOpenStoreModal} setShowDepositModal={setShowDepositModal}
               setShowSafeMovementModal={setShowSafeMovementModal} setShowBankModal={setShowBankModal}
               setShowCloseStoreModal={setShowCloseStoreModal} setShowEditStoreModal={setShowEditStoreModal}
@@ -885,24 +928,24 @@ export default function AdminCashManagementContent() {
             />
           ) : null}
 
-          {availableTabs.length > 0 && (
+          {headerTab !== 'POS HISTORY' && availableTabs.length > 0 && (
             <div className="space-y-6">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex gap-2 bg-gray-100 p-1 rounded-2xl w-fit">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex gap-2 bg-gray-100/50 p-1.5 rounded-2xl w-fit border border-gray-100">
                   {availableTabs.map(tab => (
                     <button 
                       key={tab.key} onClick={() => setActiveTab(tab.key)}
-                      className={`px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all ${activeTab === tab.key ? 'bg-white text-emerald-600 shadow-sm' : 'text-gray-400'}`}
+                      className={`px-8 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${activeTab === tab.key ? 'bg-white text-emerald-600 shadow-sm border border-gray-100' : 'text-gray-400 hover:text-gray-600'}`}
                     >
                       {tab.label}
                     </button>
                   ))}
                 </div>
-                <div className="relative w-full md:w-80">
-                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                <div className="relative w-full md:w-96 group">
+                  <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={18} />
                   <input 
                     type="text" placeholder="Search vehicle or agent..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-11 pr-4 py-3 bg-white border border-gray-100 rounded-2xl text-sm focus:ring-2 focus:ring-emerald-500/20 outline-none shadow-sm"
+                    className="w-full pl-12 pr-6 py-4 bg-white border border-gray-100 rounded-[1.5rem] text-sm font-bold placeholder:text-gray-300 focus:ring-4 focus:ring-emerald-500/5 focus:border-emerald-500 outline-none transition-all shadow-sm"
                   />
                 </div>
               </div>

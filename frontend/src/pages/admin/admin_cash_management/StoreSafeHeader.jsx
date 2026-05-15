@@ -1,456 +1,407 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Coins, AlertTriangle, User, CheckCircle2, Plus, Vault, Building2, Moon, 
-  Pencil, ShoppingCart, Clock, Smartphone, Zap, ArrowRight, AlertCircle 
+  Pencil, ShoppingCart, Clock, Smartphone, Zap, ArrowRight, AlertCircle,
+  FileText, Download, Printer, Loader2, Calendar, ArrowLeft
 } from 'lucide-react';
 
 const StoreSafeHeader = ({ 
-  storeRegisterData, summaries, user, storeLoading,
+  storeRegisterData, summaries, user, storeLoading, posHistory,
+  handleExportPDF,
   setShowOpenStoreModal, setShowDepositModal, setShowSafeMovementModal, 
   setShowBankModal, setShowCloseStoreModal, setShowEditStoreModal,
   setSafeMovementData, setBankData, setStoreDenomData,
   isShiftDeposited, setActiveTab,
   setEditingDeposit, setDepositData, setShowEditDepositModal,
-  handleDeleteDeposit, toast, can, canViewCashSection
+  handleDeleteDeposit, toast, can, canViewCashSection,
+  headerTab, setHeaderTab, availableHeaderTabs
 }) => {
+  const [showFullReport, setShowFullReport] = useState(false);
+
   if (storeLoading) {
     return (
-      <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden animate-pulse">
-        <div className="flex items-center justify-between gap-6">
-           <div className="flex items-center gap-4">
-              <div className="w-14 h-14 rounded-2xl bg-white/10" />
-              <div className="space-y-2">
-                <div className="h-4 w-32 bg-white/10 rounded" />
-                <div className="h-3 w-48 bg-white/10 rounded" />
-              </div>
-           </div>
-           <div className="h-10 w-40 bg-white/10 rounded-2xl" />
+      <div className="bg-white rounded-[2.5rem] border border-gray-100 p-8 shadow-sm animate-pulse mb-8">
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-gray-100" />
+            <div className="space-y-2">
+              <div className="h-4 w-32 bg-gray-100 rounded" />
+              <div className="h-3 w-48 bg-gray-100 rounded" />
+            </div>
+          </div>
+          <div className="flex gap-3">
+            <div className="h-12 w-40 bg-gray-100 rounded-2xl" />
+            <div className="h-12 w-40 bg-gray-100 rounded-2xl" />
+          </div>
         </div>
-        <div className="grid grid-cols-6 gap-4 mt-8">
-           {[...Array(6)].map((_, i) => (
-             <div key={i} className="h-20 bg-white/5 rounded-2xl" />
-           ))}
+        <div className="grid grid-cols-3 gap-6">
+          {[...Array(3)].map((_, i) => (
+            <div key={i} className="h-32 bg-gray-50 rounded-3xl" />
+          ))}
         </div>
       </div>
     );
   }
+
   return (
-    <div className="bg-emerald-900 rounded-[2.5rem] p-6 shadow-xl mb-6 relative overflow-hidden group">
-      <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
-        <Coins size={120} />
-      </div>
-
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 relative z-10">
-        <div className="flex items-center gap-4">
-          <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-white ${storeRegisterData?.storeRegister?.status === 'OPEN' ? 'bg-emerald-600 shadow-lg shadow-emerald-900/50' : 'bg-gray-800'}`}>
-            <Coins size={28} />
+    <div className="bg-white rounded-[2rem] border border-gray-100 p-8 shadow-sm mb-8 relative overflow-hidden group">
+      {/* Top Header Section */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10">
+        <div className="flex items-center gap-5">
+          <div className="w-16 h-16 rounded-2xl bg-[#459675] flex items-center justify-center text-white shadow-lg shadow-[#459675]/20">
+            <Coins size={32} strokeWidth={2} />
           </div>
-          <div>
-            <h2 className="text-xl font-black text-white uppercase tracking-tight">Store Cash</h2>
-            <div className="flex flex-col gap-0.5 mt-0.5">
-              <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
-                {storeRegisterData?.storeRegister?.status === 'OPEN'
-                  ? (
-                    <div className="flex flex-col gap-2">
-                      <span className="flex items-center gap-2">
-                        <span className="bg-emerald-500 w-1.5 h-1.5 rounded-full animate-pulse" />
-                        <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-widest">
-                          Active • Balance: ₹{storeRegisterData?.liveMetrics?.availableCash?.toLocaleString()} 
-                          <span className="text-white/20 mx-2">|</span>
-                          Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}
-                        </span>
-                      </span>
-
-                      {storeRegisterData.previousRegister && Math.abs(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash) > 0.01 && (
-                        <div className="px-3 py-2 bg-rose-500/20 border border-rose-500/40 rounded-xl flex items-center gap-2.5 animate-pulse">
-                          <AlertTriangle size={14} className="text-rose-400" />
-                          <div className="flex flex-col">
-                            <span className="text-[8px] font-black text-rose-300 uppercase tracking-widest">Opening Mismatch Alert</span>
-                            <span className="text-[10px] font-bold text-white leading-tight">
-                              Started with ₹{(storeRegisterData.storeRegister.openingCash - storeRegisterData.previousRegister.actualClosingCash).toFixed(2)} {storeRegisterData.storeRegister.openingCash < storeRegisterData.previousRegister.actualClosingCash ? 'less' : 'more'} than yesterday's close
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                  : storeRegisterData?.storeRegister?.status === 'CLOSED'
-                    ? (
-                      <div className="flex flex-col gap-1.5 mt-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Closed on {storeRegisterData.storeRegister.date}</span>
-                          {storeRegisterData.storeRegister.closingDifference === 0 ? (
-                            <span className="bg-emerald-400/20 text-emerald-300 text-[8px] font-black px-2 py-0.5 rounded border border-emerald-400/30 uppercase">Status: Balanced</span>
-                          ) : (
-                            <span className={`${storeRegisterData.storeRegister.closingDifference < 0 ? 'bg-rose-500/20 text-rose-300 border-rose-500/50' : 'bg-amber-500/20 text-amber-300 border-amber-500/50'} text-[8px] font-black px-2 py-0.5 rounded border uppercase`}>
-                              Status: {storeRegisterData.storeRegister.closingDifference < 0 ? 'Shortage' : 'Surplus'}
-                            </span>
-                          )}
-                        </div>
-
-                        {storeRegisterData.storeRegister.closingDifference !== 0 && (
-                          <div className={`mt-1 px-4 py-3 rounded-2xl flex items-center gap-4 border shadow-2xl animate-bounce ${storeRegisterData.storeRegister.closingDifference < 0
-                            ? 'bg-rose-600 border-rose-400 text-white'
-                            : 'bg-amber-500 border-amber-300 text-white'
-                            }`}>
-                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
-                              <AlertTriangle size={24} />
-                            </div>
-                            <div>
-                              <p className="text-[10px] font-black uppercase tracking-[0.1em] opacity-80">Variance Detected</p>
-                              <p className="text-lg font-black leading-none">
-                                {storeRegisterData.storeRegister.closingDifference < 0 ? '-' : '+'} ₹{Math.abs(storeRegisterData.storeRegister.closingDifference).toFixed(2)}
-                              </p>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )
-                    : 'Awaiting Daily Initialization'}
+          <div className="flex flex-col">
+            <h2 className="text-3xl font-black text-gray-900 uppercase tracking-tight">Store Cash</h2>
+            <div className="flex items-center gap-3 mt-1.5">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em]">
+                  {storeRegisterData?.storeRegister?.status === 'OPEN' ? 'Active' : 'Closed'}
+                </span>
               </div>
+              <span className="text-gray-200">•</span>
               {storeRegisterData?.storeRegister?.openedBy && (
-                <p className="text-[8px] font-black text-white/40 uppercase tracking-widest flex items-center gap-1.5">
-                  <User size={8} /> Opened By {storeRegisterData.storeRegister.openedBy.name}
-                  {storeRegisterData?.storeRegister?.closedBy && (
-                    <>
-                      <span className="opacity-20">|</span>
-                      <CheckCircle2 size={8} /> Closed By {storeRegisterData.storeRegister.closedBy.name}
-                    </>
-                  )}
-                </p>
+                <span className="text-[11px] font-bold text-gray-400 uppercase tracking-widest flex items-center gap-1.5">
+                  Opened by {storeRegisterData.storeRegister.openedBy.name}
+                  <span className="text-gray-200 mx-1">•</span>
+                  Opening: ₹{storeRegisterData.storeRegister.openingCash?.toLocaleString()}
+                </span>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {!storeRegisterData?.storeRegister ? (
-            can('CASH', 'CREATE', 'STORE_SAFE') && (
-              <button
-                onClick={() => setShowOpenStoreModal(true)}
-                className="bg-white hover:bg-emerald-50 text-emerald-950 px-8 py-3.5 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-2xl active:scale-95 border-b-4 border-emerald-100"
-              >
-                Initialize Store Safe
-              </button>
-            )
-          ) : storeRegisterData.storeRegister.status === 'OPEN' ? (
-            <div className="flex items-center gap-3">
-              {can('CASH', 'UPDATE', 'SHIFT_DEPOSIT') && (
-                <div className="flex flex-col gap-1.5">
-                  <button
-                    onClick={() => {
-                      const hasSubmissions = summaries.some(s => s.shiftDetails?.shift1?.closing || s.shiftDetails?.shift2?.closing);
-                      if (!hasSubmissions) {
-                        return toast.error('No agent has completed their shift yet. Shifts must be closed by agents before depositing cash.');
-                      }
-                      setShowDepositModal(true);
-                    }}
-                    className="bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-300 hover:to-orange-300 text-amber-950 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-amber-950/20 active:scale-95 flex items-center gap-2"
-                  >
-                    <Plus size={16} strokeWidth={3} />
-                    Deposit Shift Cash
-                  </button>
-                  <div className="flex items-center justify-around px-2">
-                    <div className="flex items-center gap-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${isShiftDeposited(1) ? 'bg-emerald-500' : 'bg-white/20'}`} />
-                      <span className={`text-[8px] font-black uppercase tracking-widest ${isShiftDeposited(1) ? 'text-emerald-400' : 'text-white/40'}`}>S1</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <div className={`w-1.5 h-1.5 rounded-full ${isShiftDeposited(2) ? 'bg-emerald-500' : 'bg-white/20'}`} />
-                      <span className={`text-[8px] font-black uppercase tracking-widest ${isShiftDeposited(2) ? 'text-emerald-400' : 'text-white/40'}`}>S2</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {canViewCashSection('STORE_SAFE') && can('CASH', 'CREATE', 'STORE_SAFE') && (
+        <div className="flex items-center gap-4">
+          {storeRegisterData?.storeRegister?.status === 'OPEN' && (
+            <>
+              {canViewCashSection('SHIFT_DEPOSITS') && (
                 <button
+                  onClick={() => setShowDepositModal(true)}
+                  className="min-w-[220px] bg-[#f3c455] hover:bg-[#e6b84d] text-[#1a1a1a] px-8 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest transition-all shadow-xl shadow-amber-500/10 active:scale-95 flex items-center justify-center text-center"
+                >
+                  Deposit Shift Cash
+                </button>
+              )}
+              {canViewCashSection('STORE_CLOSURE') && (
+                <button
+                  onClick={() => setShowCloseStoreModal(true)}
+                  className="min-w-[220px] bg-[#d74453] hover:bg-[#c53a47] text-white px-8 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest transition-all shadow-xl shadow-rose-500/10 active:scale-95 flex items-center justify-center text-center"
+                >
+                  Closing Store
+                </button>
+              )}
+            </>
+          )}
+          {storeRegisterData?.storeRegister?.status !== 'OPEN' && canViewCashSection('CASH_OPENING') && (
+             <button
+                onClick={() => setShowOpenStoreModal(true)}
+                className="min-w-[220px] bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/10 active:scale-95 flex items-center justify-center text-center"
+              >
+                Open Store Register
+              </button>
+          )}
+        </div>
+      </div>
+
+      {/* Internal Navigation Tabs */}
+      <div className="flex gap-2 bg-gray-100/50 p-1.5 rounded-2xl w-fit mb-12 border border-gray-100">
+        {availableHeaderTabs.map((t) => (
+          <button
+            key={t.key}
+            onClick={() => setHeaderTab(t.key)}
+            className={`px-10 py-3 rounded-xl text-[11px] font-black uppercase tracking-widest transition-all ${headerTab === t.key ? 'bg-white text-[#459675] shadow-sm' : 'text-gray-400 hover:text-gray-600'}`}
+          >
+            {t.key}
+          </button>
+        ))}
+      </div>
+
+      {/* Main Content Area based on Tab */}
+      <div className="space-y-0">
+        {headerTab === 'OPENING' && (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="bg-emerald-50/20 border border-emerald-100 p-8 rounded-[2.5rem] group relative">
+              <p className="text-[11px] font-black tracking-widest uppercase text-emerald-600/60 mb-4">Opening Cash</p>
+              <p className="text-4xl font-black text-gray-900">₹{Math.abs(storeRegisterData?.storeRegister?.openingCash || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-sky-50/20 border border-sky-100 p-8 rounded-[2.5rem]">
+              <p className="text-[11px] font-black tracking-widest uppercase text-sky-600/60 mb-4">Counter Cash (Available)</p>
+              <p className="text-4xl font-black text-gray-900">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-rose-50/20 border border-rose-100 p-8 rounded-[2.5rem]">
+              <p className="text-[11px] font-black tracking-widest uppercase text-rose-600/60 mb-4">Bank Transfer</p>
+              <p className="text-4xl font-black text-gray-900">₹{Math.abs(storeRegisterData?.liveMetrics?.bankTransferred || 0).toLocaleString()}</p>
+            </div>
+          </div>
+        )}
+
+        {headerTab === 'AGENT' && (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="bg-amber-50/30 border border-amber-100 p-10 rounded-[2.5rem]">
+              <p className="text-[11px] font-black tracking-widest uppercase text-amber-600/60 mb-4">Agent Outflow</p>
+              <p className="text-4xl font-black text-gray-900">-₹{Math.abs(storeRegisterData?.liveMetrics?.assignedOut || 0).toLocaleString()}</p>
+            </div>
+            <div className="bg-emerald-50/30 border border-emerald-100 p-10 rounded-[2.5rem]">
+              <p className="text-[11px] font-black tracking-widest uppercase text-emerald-600/60 mb-4">Agent Inflow</p>
+              <p className="text-4xl font-black text-gray-900">+₹{Math.abs(storeRegisterData?.liveMetrics?.receivedIn || 0).toLocaleString()}</p>
+            </div>
+          </div>
+        )}
+
+        {headerTab === 'SAFE' && (
+          <div className="animate-in fade-in duration-500">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-[#459675] text-white flex items-center justify-center">
+                  <Vault size={20} strokeWidth={2} />
+                </div>
+                <h3 className="text-[13px] font-black text-[#459675] uppercase tracking-[0.1em]">Store Chest(Safe)</h3>
+              </div>
+              <span className="bg-[#f2f7f5] text-[#459675] text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest border border-emerald-50">Secure</span>
+            </div>
+
+            <div className="space-y-0 mb-10">
+              <div className="flex items-center justify-between py-6 border-b border-gray-100">
+                <span className="text-[12px] font-black text-gray-400 uppercase tracking-widest">Safe Balance</span>
+                <span className="text-[16px] font-black text-gray-900 tabular-nums">₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              </div>
+              <div className="flex items-center justify-between py-6 border-b border-gray-100">
+                <span className="text-[12px] font-black text-gray-400 uppercase tracking-widest">Counter Cash (Available)</span>
+                <span className="text-[16px] font-black text-gray-900 tabular-nums">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              </div>
+              <div className="flex items-center justify-between py-6">
+                <span className="text-[14px] font-black text-[#459675] uppercase tracking-[0.1em]">Total Cash</span>
+                <span className="text-[18px] font-black text-[#459675] tabular-nums">₹{( (storeRegisterData?.liveMetrics?.safeBalance || 0) + (storeRegisterData?.liveMetrics?.availableCash || 0) ).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {can('CASH', 'CREATE', 'SAFE_CONTROL') && (
+                <button 
                   onClick={() => {
                     setSafeMovementData({ amount: '', type: 'DEPOSIT', description: '', denominations: { 500: 0, 200: 0, 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 } });
                     setShowSafeMovementModal(true);
                   }}
-                  className="bg-emerald-600 hover:bg-emerald-500 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-900/20 active:scale-95 flex items-center gap-2 border border-emerald-500/50"
+                  className="bg-[#459675] hover:bg-[#3b8064] text-white py-6 rounded-2xl text-[14px] font-black uppercase tracking-[0.1em] transition-all shadow-xl shadow-emerald-500/10 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <Vault size={16} strokeWidth={3} />
                   Move to Safe
                 </button>
               )}
-
-              {can('CASH', 'CREATE', 'STORE_SAFE') && (
-                <button
+              {can('CASH', 'CREATE', 'SAFE_CONTROL') && (
+                <button 
                   onClick={() => {
                     setBankData(prev => ({ ...prev, adminId: user?.id, depositedBy: user?.name || '' }));
                     setShowBankModal(true);
                   }}
-                  className="bg-white/10 hover:bg-white/20 text-white border border-white/10 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all active:scale-95 flex items-center gap-2 backdrop-blur-sm"
+                  className="bg-[#459675] hover:bg-[#3b8064] text-white py-6 rounded-2xl text-[14px] font-black uppercase tracking-[0.1em] transition-all shadow-xl shadow-emerald-500/10 active:scale-95 flex items-center justify-center gap-3"
                 >
-                  <Building2 size={16} strokeWidth={3} />
                   Account Transfer
                 </button>
               )}
-
-              {can('CASH', 'UPDATE', 'STORE_SAFE') && (
-                <button
-                  onClick={() => setShowCloseStoreModal(true)}
-                  className="bg-white hover:bg-rose-50 text-rose-600 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest transition-all shadow-xl active:scale-95 flex items-center gap-2"
-                >
-                  <Moon size={16} strokeWidth={3} />
-                  Closing Store
-                </button>
-              )}
             </div>
-          ) : (
-            <div className="flex items-center gap-3">
-              <div className="px-6 py-3 bg-emerald-950/50 rounded-2xl border border-emerald-800 text-emerald-300 text-xs font-black uppercase tracking-widest flex items-center gap-3">
-                Safe Closed: Diff ₹{storeRegisterData.storeRegister.closingDifference?.toFixed(2)}
-                {canViewCashSection('STORE_SAFE') && can('CASH', 'UPDATE', 'STORE_SAFE') && (
-                  <button
-                    onClick={() => {
-                      setStoreDenomData({
-                        amount: storeRegisterData.storeRegister.actualClosingCash,
-                        denominations: storeRegisterData.storeRegister.closingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                      });
-                      setShowCloseStoreModal(true);
-                    }}
-                    className="p-1 px-2 bg-emerald-800/50 hover:bg-emerald-700 text-emerald-400 hover:text-white rounded-lg transition-all text-[10px]"
-                  >
-                    Edit Closing
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        )}
 
-      {storeRegisterData?.storeRegister && (
-        <div className="space-y-6 mt-6">
-          <div className="grid grid-cols-2 lg:grid-cols-6 gap-4 relative z-10">
-            {canViewCashSection('STORE_SAFE') && (
-              <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50 group relative">
-                <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Opening Cash</p>
+        {headerTab === 'POS HISTORY' && (
+          <div className="animate-in fade-in duration-500 space-y-8">
+            {!showFullReport ? (
+              <>
                 <div className="flex items-center justify-between">
-                  <p className="text-xl font-black text-white">₹{Math.abs(storeRegisterData.storeRegister.openingCash || 0).toFixed(2)}</p>
-                  {can('CASH', 'UPDATE', 'STORE_SAFE') && (
-                    <button
-                      onClick={() => {
-                        setStoreDenomData({
-                          amount: storeRegisterData.storeRegister.openingCash,
-                          denominations: storeRegisterData.storeRegister.openingDenominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                        });
-                        setShowEditStoreModal(true);
-                      }}
-                      className="p-1.5 bg-emerald-800/50 text-emerald-400 hover:text-white rounded-lg opacity-0 group-hover:opacity-100 transition-all"
+                  <h2 className="text-2xl font-black text-gray-900 tracking-tight">History Tracking</h2>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-4 py-1 bg-white rounded-2xl border border-gray-100 shadow-sm transition-all focus-within:ring-4 focus-within:ring-emerald-500/5">
+                      <Calendar size={16} className="text-emerald-500" />
+                      <input 
+                        type="date" 
+                        className="bg-transparent border-none p-0 py-2 text-xs font-black text-gray-700 outline-none cursor-pointer uppercase tracking-widest"
+                      />
+                    </div>
+                    <button 
+                      onClick={() => setShowFullReport(true)}
+                      className="text-emerald-600 text-xs font-black uppercase tracking-widest flex items-center gap-1.5 hover:gap-2 transition-all"
                     >
-                      <Pencil size={12} />
+                      View full report <ArrowRight size={14} />
                     </button>
-                  )}
-                </div>
-              </div>
-            )}
-            {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (
-              <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
-                <p className="text-[10px] font-black tracking-widest uppercase text-amber-500 mb-1">Agent Outflow</p>
-                <p className="text-xl font-black text-amber-400">-₹{Math.abs(storeRegisterData?.liveMetrics?.assignedOut || 0).toFixed(2)}</p>
-              </div>
-            )}
-            {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (
-              <div className="bg-emerald-950/50 p-4 rounded-2xl border border-emerald-800/50">
-                <p className="text-[10px] font-black tracking-widest uppercase text-emerald-500 mb-1">Agent Inflow</p>
-                <p className="text-xl font-black text-emerald-400">+₹{Math.abs(storeRegisterData?.liveMetrics?.receivedIn || 0).toFixed(2)}</p>
-              </div>
-            )}
-            {canViewCashSection('STORE_SAFE') && (
-              <div className="bg-white/5 border border-white/10 p-4 rounded-2xl backdrop-blur-sm">
-                <p className="text-[10px] font-black tracking-widest uppercase text-rose-500 mb-1">Bank Transfer</p>
-                <p className="text-xl font-black text-rose-400">₹{Math.abs(storeRegisterData?.liveMetrics?.bankTransferred || 0).toFixed(2)}</p>
-              </div>
-            )}
-
-            {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (
-              <div className="bg-sky-500/10 border border-sky-500/20 p-4 rounded-2xl relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-2 opacity-5">
-                  <ShoppingCart size={40} className="text-sky-400" />
-                </div>
-                <p className="text-[10px] font-black tracking-widest uppercase text-sky-400 mb-1">Counter Cash (Available)</p>
-                <p className="text-xl font-black text-sky-400">₹{Math.abs(storeRegisterData?.liveMetrics?.availableCash || 0).toFixed(2)}</p>
-              </div>
-            )}
-            {canViewCashSection('STORE_SAFE') && (
-              <div className="bg-emerald-900 rounded-2xl p-4 shadow-xl border-b-4 border-emerald-950 relative overflow-hidden group">
-                <div className="absolute top-0 right-0 p-2 opacity-10 group-hover:opacity-20 transition-opacity">
-                  <Vault size={40} className="text-white" />
-                </div>
-                <div className="relative z-10">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-[10px] font-black tracking-widest uppercase text-emerald-400">Store Chest (Safe)</p>
-                    <span className="text-[8px] font-black bg-emerald-500/20 text-emerald-300 px-1.5 py-0.5 rounded uppercase tracking-tighter border border-emerald-500/30">Secure</span>
                   </div>
-                  <p className="text-xl font-black text-white tabular-nums">
-                    ₹{Math.abs(storeRegisterData?.liveMetrics?.safeBalance || 0).toFixed(2)}
-                  </p>
+                </div>
+
+                <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-gray-50">
+                          <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
+                          <th className="px-6 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total POS Cash</th>
+                          <th className="px-6 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total POS UPI</th>
+                          <th className="px-6 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Total POS Card</th>
+                          <th className="px-6 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Grand Total Sales</th>
+                          <th className="px-8 py-6 text-[10px] font-black uppercase tracking-[0.2em] text-gray-400">Comments</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {posHistory.length > 0 ? (
+                          posHistory.map((row, idx) => (
+                            <tr key={idx} className="hover:bg-gray-50/50 transition-colors group">
+                              <td className="px-8 py-6 text-sm font-black text-gray-900">{format(new Date(row.date), 'dd-MM-yyyy')}</td>
+                              <td className="px-6 py-6 text-sm font-bold text-gray-700">₹{(row.totalCash || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="px-6 py-6 text-sm font-bold text-gray-700">₹{(row.totalUpi || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="px-6 py-6 text-sm font-bold text-gray-700">₹{(row.totalCard || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="px-6 py-6 text-sm font-black text-emerald-600">₹{(row.grandTotal || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                              <td className="px-8 py-6 text-xs font-bold text-gray-400 italic">“{row.remark || 'No comments'}”</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={6} className="px-8 py-12 text-center text-gray-400 font-bold uppercase tracking-widest text-xs">
+                              No history available for this period
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div className="animate-in slide-in-from-right-8 duration-500 space-y-10">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-6">
+                    <button 
+                      onClick={() => setShowFullReport(false)}
+                      className="p-3 bg-gray-100 hover:bg-emerald-50 text-gray-400 hover:text-emerald-600 rounded-2xl transition-all"
+                    >
+                      <ArrowLeft size={20} />
+                    </button>
+                    <div>
+                      <h1 className="text-4xl font-black text-gray-900 tracking-tight">Full Report</h1>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.3em] mt-2">Billing Operator View</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-2 px-6 py-3.5 bg-white rounded-2xl border border-gray-100 shadow-sm">
+                      <Calendar size={18} className="text-emerald-500" />
+                      <span className="text-xs font-black text-gray-700 uppercase tracking-widest">Date</span>
+                    </div>
+                    <button 
+                      onClick={() => handleExportPDF && handleExportPDF()}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white px-10 py-4 rounded-2xl text-[12px] font-black uppercase tracking-widest transition-all shadow-xl shadow-emerald-500/10 active:scale-95"
+                    >
+                      Download Report
+                    </button>
+                  </div>
+                </div>
+
+                <div className="bg-white rounded-[3rem] border border-gray-100 shadow-sm overflow-hidden">
+                  <table className="w-full text-left">
+                    <thead>
+                      <tr className="border-b border-gray-50">
+                        <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
+                        <th className="px-8 py-8 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Total POS Cash</th>
+                        <th className="px-8 py-8 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Total POS UPI</th>
+                        <th className="px-8 py-8 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Total POS Card</th>
+                        <th className="px-8 py-8 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Grand Total Sales</th>
+                        <th className="px-10 py-8 text-[11px] font-black uppercase tracking-[0.2em] text-gray-400">Comments</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {posHistory.map((row, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50/30 transition-colors">
+                          <td className="px-10 py-8 text-sm font-black text-gray-900">{format(new Date(row.date), 'dd-MM-yyyy')}</td>
+                          <td className="px-8 py-8 text-sm font-bold text-gray-700">₹{(row.totalCash || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                          <td className="px-8 py-8 text-sm font-bold text-gray-700">₹{(row.totalUpi || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                          <td className="px-8 py-8 text-sm font-bold text-gray-700">₹{(row.totalCard || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                          <td className="px-8 py-8 text-sm font-black text-emerald-600">₹{(row.grandTotal || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                          <td className="px-10 py-8 text-xs font-bold text-gray-400 italic">“{row.remark || 'All clear'}”</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
           </div>
+        )}
+      </div>
 
-          {canViewCashSection('SHIFT_DEPOSIT') && (
-            <div className="bg-emerald-950/30 rounded-3xl p-5 border border-emerald-800/30 relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                  <Clock size={12} /> Today's Shift Safekeeping
-                </h3>
-                <p className="text-[9px] font-bold text-emerald-500/40 uppercase tracking-tighter">Reflecting from Collections Report</p>
-              </div>
+      {/* Today's Shift Safekeeping Section */}
+      {canViewCashSection('SHIFT_SAFEKEEPING') && (
+        <div className="pt-8 border-t border-gray-50">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.2em] flex items-center gap-2">
+              <Clock size={14} className="text-gray-300" /> Today's Shift Safekeeping
+            </h3>
+          </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                {[1, 2].map(shiftNum => {
-                  const depositRecord = storeRegisterData.storeDeposits?.find(d => d.shift === shiftNum);
-                  const expectedAmount = storeRegisterData.shiftCollections?.find(c => c.shift === shiftNum)?._sum.actualCash || 0;
-                  const isMismatched = depositRecord && Math.abs(depositRecord.amount - expectedAmount) > 0.1;
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            {[1, 2].map(shiftNum => {
+              const depositRecord = storeRegisterData.storeDeposits?.find(d => d.shift === shiftNum);
+              const expectedAmount = storeRegisterData.shiftCollections?.find(c => c.shift === shiftNum)?._sum.actualCash || 0;
+              const isMismatched = depositRecord && Math.abs(depositRecord.amount - expectedAmount) > 0.1;
 
-                  return (
-                    <div key={shiftNum} className={`p-4 rounded-2xl border transition-all ${depositRecord
-                      ? (isMismatched ? 'bg-amber-950/40 border-amber-800/50' : 'bg-emerald-900/50 border-emerald-800/50')
-                      : (expectedAmount > 0 ? 'bg-emerald-950/10 border-emerald-900/20 border-dashed border-2' : 'bg-gray-900/10 border-gray-800/20 opacity-30')
-                      }`}>
-                      <div className="flex items-start justify-between">
-                        <div className="flex items-start gap-3">
-                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black shrink-0 ${depositRecord ? 'bg-emerald-800/50 text-emerald-400' : 'bg-gray-800/30 text-gray-600'
-                            }`}>
-                            S{shiftNum}
-                          </div>
-                          <div className="flex-1">
-                            <div className="flex items-center flex-wrap gap-2">
-                              <p className="text-sm font-black text-white">
-                                ₹{(depositRecord?.amount || expectedAmount).toLocaleString()}
-                              </p>
-                              {isMismatched && (
-                                <div className="flex items-center gap-1 text-[8px] font-black bg-rose-500 text-white px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
-                                  <AlertTriangle size={8} /> Mismatch
-                                </div>
-                              )}
-                              {!depositRecord && expectedAmount > 0 && (
-                                <span className="text-[8px] bg-sky-500/20 text-sky-400 border border-sky-500/30 px-1.5 py-0.5 rounded-full uppercase font-black tracking-tighter">Draft</span>
-                              )}
-                            </div>
-                            <p className="text-[9px] font-medium text-emerald-500/60 uppercase tracking-wider mt-1 leading-relaxed">
-                              {depositRecord ? depositRecord.description : (expectedAmount > 0 ? 'Pending Safe Deposit' : 'No collections reported')}
-                            </p>
-                            {isMismatched && (
-                              <p className="text-[8px] font-bold text-rose-400 mt-1 flex items-center gap-1">
-                                <AlertCircle size={8} /> Needs Refresh: Expected ₹{expectedAmount.toLocaleString()}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        {depositRecord && (
-                          <div className="flex items-center gap-1">
-                            {can('CASH', 'UPDATE', 'SHIFT_DEPOSIT') && (
-                              <button
-                                onClick={() => {
-                                  setEditingDeposit(depositRecord);
-                                  setDepositData({
-                                    shift: depositRecord.shift,
-                                    description: depositRecord.description,
-                                    amount: depositRecord.amount,
-                                    denominations: depositRecord.denominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
-                                  });
-                                  setShowEditDepositModal(true);
-                                }}
-                                className="p-1.5 text-emerald-500/50 hover:text-sky-400 hover:bg-sky-400/10 rounded-lg transition-all"
-                              >
-                                <Pencil size={13} />
-                              </button>
-                            )}
-                            {can('CASH', 'DELETE', 'SHIFT_DEPOSIT') && (
-                              <button
-                                onClick={() => handleDeleteDeposit(depositRecord.id)}
-                                className="p-1.5 text-emerald-500/50 hover:text-rose-400 hover:bg-rose-400/10 rounded-lg transition-all"
-                              >
-                                <AlertCircle size={13} />
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {!depositRecord && expectedAmount > 0 && (
-                          <button
-                            onClick={() => setActiveTab('reconciliation')}
-                            className="bg-sky-500/20 hover:bg-sky-500/30 text-sky-400 p-1.5 rounded-xl transition-all"
-                            title="Go to Deposit"
-                          >
-                            <ArrowRight size={14} />
-                          </button>
-                        )}
-                      </div>
+              return (
+                <div 
+                  key={shiftNum} 
+                  className={`p-6 rounded-[2rem] border transition-all flex items-center justify-between group ${depositRecord
+                    ? (isMismatched ? 'bg-amber-50 border-amber-100' : 'bg-emerald-50 border-emerald-100')
+                    : (expectedAmount > 0 ? 'bg-gray-50 border-gray-100 border-dashed border-2' : 'bg-gray-50 border-gray-100 opacity-40')
+                  }`}
+                >
+                  <div className="flex items-center gap-5">
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center font-black text-lg ${depositRecord ? 'bg-white text-emerald-600 shadow-sm' : 'bg-white/50 text-gray-400'}`}>
+                      S{shiftNum}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {(canViewCashSection('STORE_SAFE') || canViewCashSection('LIVE_CASH')) && (storeRegisterData?.liveMetrics?.totalStoreSalesUPI > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCard > 0 || storeRegisterData?.liveMetrics?.totalStoreSalesCount?.HYBRID > 0) && (
-            <div className="bg-emerald-950/30 rounded-3xl p-5 border border-emerald-800/30 relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-[10px] font-black text-emerald-500 uppercase tracking-widest flex items-center gap-2">
-                  <Smartphone size={12} /> Today's Digital Collections
-                </h3>
-                <p className="text-[9px] font-bold text-emerald-500/40 uppercase tracking-tighter">From In-Store POS</p>
-              </div>
-
-              <div className="grid grid-cols-1 gap-3">
-                {storeRegisterData.liveMetrics.totalStoreSalesUPI > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-orange-500/10 rounded-2xl border border-orange-500/20">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-orange-500/20 rounded-xl flex items-center justify-center">
-                        <Smartphone size={14} className="text-orange-400" />
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <p className="text-xl font-black text-gray-900">₹{(depositRecord?.amount || expectedAmount).toLocaleString()}</p>
+                        {isMismatched && <span className="bg-rose-500 text-white text-[8px] font-black px-2 py-0.5 rounded-full uppercase">Mismatch</span>}
                       </div>
-                      <div>
-                        <p className="text-[10px] font-black text-orange-400 uppercase tracking-wider">UPI</p>
-                        <p className="text-[8px] font-bold text-emerald-500/40">{storeRegisterData.liveMetrics.totalStoreSalesCount?.UPI || 0} transaction(s)</p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-black text-white tabular-nums">₹{storeRegisterData.liveMetrics.totalStoreSalesUPI.toFixed(2)}</p>
-                  </div>
-                )}
-
-                {storeRegisterData.liveMetrics.totalStoreSalesCard > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-blue-500/10 rounded-2xl border border-blue-500/20">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-blue-500/20 rounded-xl flex items-center justify-center">
-                        <Building2 size={14} className="text-blue-400" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-blue-400 uppercase tracking-wider">Card</p>
-                        <p className="text-[8px] font-bold text-emerald-500/40">{storeRegisterData.liveMetrics.totalStoreSalesCount?.CARD || 0} transaction(s)</p>
-                      </div>
-                    </div>
-                    <p className="text-sm font-black text-white tabular-nums">₹{storeRegisterData.liveMetrics.totalStoreSalesCard.toFixed(2)}</p>
-                  </div>
-                )}
-
-                {storeRegisterData.liveMetrics.totalStoreSalesCount?.HYBRID > 0 && (
-                  <div className="flex items-center justify-between p-3 bg-amber-500/10 rounded-2xl border border-amber-500/20">
-                    <div className="flex items-center gap-3">
-                      <div className="w-8 h-8 bg-amber-500/20 rounded-xl flex items-center justify-center">
-                        <Zap size={14} className="text-amber-400" />
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-black text-amber-400 uppercase tracking-wider">Hybrid (Split)</p>
-                        <p className="text-[8px] font-bold text-emerald-500/40">{storeRegisterData.liveMetrics.totalStoreSalesCount.HYBRID} transaction(s)</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black text-white tabular-nums">₹{(storeRegisterData.liveMetrics.totalStoreSalesHybrid || 0).toFixed(2)}</p>
-                      <p className="text-[7px] font-bold text-emerald-500/40">Cash + UPI split</p>
+                      <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide">
+                        {depositRecord ? (depositRecord.description || `Consolidated deposit S${shiftNum}`) : (expectedAmount > 0 ? 'Pending Deposit' : 'No collection report')}
+                      </p>
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          )}
+
+                  <div className="flex items-center gap-2">
+                    {depositRecord ? (
+                      <div className="bg-emerald-100 text-emerald-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <CheckCircle2 size={12} /> Deposited
+                      </div>
+                    ) : expectedAmount > 0 ? (
+                      <div className="bg-amber-100 text-amber-600 px-4 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest flex items-center gap-2">
+                        <Clock size={12} /> Pending
+                      </div>
+                    ) : null}
+                    
+                    <div className="flex opacity-0 group-hover:opacity-100 transition-all">
+                      {depositRecord && can('CASH', 'UPDATE', 'SHIFT_DEPOSITS') && (
+                        <button 
+                          onClick={() => {
+                            setEditingDeposit(depositRecord);
+                            setDepositData({
+                              shift: depositRecord.shift,
+                              description: depositRecord.description,
+                              amount: depositRecord.amount,
+                              denominations: depositRecord.denominations || { "500": 0, "200": 0, "100": 0, "50": 0, "20": 0, "10": 0, "5": 0, "2": 0, "1": 0 }
+                            });
+                            setShowEditDepositModal(true);
+                          }}
+                          className="p-2.5 text-gray-400 hover:text-emerald-600 transition-all"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      )}
+                      {depositRecord && can('CASH', 'DELETE', 'SHIFT_DEPOSITS') && (
+                        <button onClick={() => handleDeleteDeposit(depositRecord.id)} className="p-2.5 text-gray-400 hover:text-rose-600 transition-all">
+                          <AlertCircle size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
         </div>
       )}
     </div>
