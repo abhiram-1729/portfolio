@@ -39,7 +39,7 @@ const MODULES = [
   { key: 'ASSETS', label: 'Assets', desc: 'Equipment tracking' },
   { key: 'EXPENSES', label: 'Expenses', desc: 'Reimbursements' },
   { key: 'NOTIFICATIONS', label: 'Notifications', desc: 'Alert management' },
-  { key: 'HR', label: 'HR', desc: 'Attendance, Leave, Payroll' },
+  { key: 'HR', label: 'Attendance', desc: 'Staff Attendance & Leave tracking' },
   { key: 'SETTINGS', label: 'Settings', desc: 'System configuration' },
 ];
 

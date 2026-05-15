@@ -368,7 +368,7 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/expenses')) return 'EXPENSES';
     if (pathname.startsWith('/admin/procurement')) return 'PROCUREMENT';
     if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
-    if (pathname.startsWith('/admin/attendance')) return 'STAFF';
+    if (pathname.startsWith('/admin/attendance')) return 'HR';
     if (pathname.startsWith('/admin/privileges')) return 'ADMIN';
     if (pathname.startsWith('/admin/stores')) return 'STORE_CONTEXT';
     return null;
