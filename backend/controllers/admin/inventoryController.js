@@ -372,7 +372,8 @@ export const createItem = async (req, res) => {
       minShopAmount,
       barcode,
       skuCode,
-      purchasePrice
+      purchasePrice,
+      minStockAlert
     } = req.body;
 
     const finalLandingPrice = landingPrice || purchasePrice;
@@ -460,6 +461,7 @@ export const createItem = async (req, res) => {
       minShopAmount: parseNumber(minShopAmount) || 0,
       barcode: barcode || null,
       skuCode: skuCode || null,
+      minStockAlert: parseNumber(minStockAlert),
       storeId: (req.body.storeId && req.body.storeId !== 'null' && req.body.storeId !== '') ? req.body.storeId : req.user.storeId
     };
 
@@ -543,7 +545,8 @@ export const updateItem = async (req, res) => {
       barcode,
       skuCode,
       storeId,
-      stock
+      stock,
+      minStockAlert
     } = req.body;
 
     // Ensure we have a valid tenantId
@@ -626,6 +629,7 @@ export const updateItem = async (req, res) => {
       brandId: finalBrandId || undefined,
       barcode: barcode === undefined ? undefined : (barcode || null),
       skuCode: skuCode === undefined ? undefined : (skuCode || null),
+      minStockAlert: parseNumber(minStockAlert),
       storeId: (storeId && storeId !== 'null' && storeId !== '') ? storeId : undefined
     };
 

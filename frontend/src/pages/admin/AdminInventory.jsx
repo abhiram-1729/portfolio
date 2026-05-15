@@ -194,7 +194,8 @@ export default function AdminInventory() {
     status: 'ACTIVE',
     barcode: '',
     skuCode: '',
-    stock: ''
+    stock: '',
+    minStockAlert: '5'
   });
 
   useEffect(() => {
@@ -805,6 +806,7 @@ export default function AdminInventory() {
       minShopAmount: item.minShopAmount?.toString() || '0',
       barcode: item.barcode || '',
       stock: (item.stock ?? item.totalStock ?? 0).toString(),
+      minStockAlert: item.minStockAlert?.toString() || '5',
       storeId: item.storeId || ''
     });
     setEditPreviewUrl(item.image || null);

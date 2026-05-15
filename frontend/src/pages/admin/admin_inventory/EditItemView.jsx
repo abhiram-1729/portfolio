@@ -282,7 +282,7 @@ const EditItemView = ({
                   <input
                     type="number"
                     className="w-full bg-gray-50 border border-gray-100 rounded-2xl px-4 py-4 text-sm font-bold text-gray-900"
-                    value={editItem.minStockAlert || '5'}
+                    value={editItem.minStockAlert}
                     onChange={(e) => setEditItem({ ...editItem, minStockAlert: e.target.value })}
                   />
                 </div>

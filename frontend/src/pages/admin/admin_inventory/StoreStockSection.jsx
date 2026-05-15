@@ -17,7 +17,16 @@ const StoreStockSection = ({
     const matchesSearch = s.product.name.toLowerCase().includes(warehouseSearch.toLowerCase()) ||
       (s.product.barcode && s.product.barcode.toLowerCase().includes(warehouseSearch.toLowerCase())) ||
       (s.product.displayId && s.product.displayId.toLowerCase().includes(warehouseSearch.toLowerCase()));
-    const matchesCategory = warehouseCategory === 'ALL' || s.product.category?.name === warehouseCategory;
+    
+    let matchesCategory = warehouseCategory === 'ALL' || s.product.category?.name === warehouseCategory;
+    
+    // Split filter logic
+    if (warehouseCategory === 'NO_STOCK') {
+      matchesCategory = s.quantity === 0;
+    } else if (warehouseCategory === 'LOW_STOCK') {
+      matchesCategory = s.quantity > 0 && s.quantity <= (s.product.minStockAlert || 0);
+    }
+    
     return matchesSearch && matchesCategory;
   });
 
@@ -105,6 +114,20 @@ const StoreStockSection = ({
             >
               All Stock
             </button>
+            <button
+              onClick={() => setWarehouseCategory('NO_STOCK')}
+              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${warehouseCategory === 'NO_STOCK' ? 'bg-rose-600 border-rose-600 text-white shadow-lg shadow-rose-500/20' : 'bg-white border-gray-100 text-rose-600/60 hover:border-rose-200 hover:text-rose-600'
+                }`}
+            >
+              No Stock ({warehouseStock.filter(s => s.quantity === 0).length})
+            </button>
+            <button
+              onClick={() => setWarehouseCategory('LOW_STOCK')}
+              className={`flex-shrink-0 whitespace-nowrap px-5 py-2.5 rounded-2xl text-[10px] uppercase tracking-widest font-black transition-all border ${warehouseCategory === 'LOW_STOCK' ? 'bg-amber-500 border-amber-500 text-white shadow-lg shadow-amber-500/20' : 'bg-white border-gray-100 text-amber-600/60 hover:border-amber-200 hover:text-amber-600'
+                }`}
+            >
+              Critical Low ({warehouseStock.filter(s => s.quantity > 0 && s.quantity <= (s.product.minStockAlert || 0)).length})
+            </button>
             {categories.map(cat => (
               <button
                 key={cat.id}
@@ -118,64 +141,92 @@ const StoreStockSection = ({
           </div>
 
           <div className="grid grid-cols-1 gap-2">
-            {paginatedStock.map((stock) => (
-              <div key={stock.id} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm hover:border-emerald-200 transition-all group flex items-center justify-between gap-4">
-                <div className="flex items-center gap-3 min-w-0 flex-1">
-                  <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors shrink-0">
-                    {stock.product.image ? (
-                      <img src={stock.product.image} className="w-full h-full object-cover rounded-xl" alt="" />
-                    ) : (
-                      <Grid size={18} />
-                    )}
+            {paginatedStock.map((stock) => {
+              const isNoStock = stock.quantity === 0;
+              const isLowStock = !isNoStock && stock.product.minStockAlert > 0 && stock.quantity <= stock.product.minStockAlert;
+              
+              return (
+                <div 
+                  key={stock.id} 
+                  className={`p-3 rounded-2xl border bg-white transition-all group flex items-center justify-between gap-4 shadow-sm hover:shadow-md ${
+                    isNoStock ? 'border-l-4 border-l-rose-500 border-gray-100' : 
+                    isLowStock ? 'border-l-4 border-l-amber-500 border-gray-100' :
+                    'border-gray-100 hover:border-emerald-200'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-gray-400 group-hover:text-emerald-600 transition-colors shrink-0">
+                      {stock.product.image ? (
+                        <img src={stock.product.image} className="w-full h-full object-cover rounded-xl" alt="" />
+                      ) : (
+                        <Grid size={18} />
+                      )}
+                    </div>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
+                        {isNoStock ? (
+                          <span className="text-[7px] font-black text-rose-600 border border-rose-200 px-1.5 py-0.5 rounded-md uppercase tracking-widest bg-rose-50">
+                            Out of Stock
+                          </span>
+                        ) : isLowStock && (
+                          <span className="text-[7px] font-black text-amber-600 border border-amber-200 px-1.5 py-0.5 rounded-md uppercase tracking-widest bg-amber-50">
+                            Critical Low
+                          </span>
+                        )}
+                        <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-md uppercase tracking-widest border ${
+                          stock.product.status === 'INACTIVE' ? 'bg-gray-50 text-gray-400 border-gray-200' : 
+                          'bg-emerald-50 text-emerald-600 border-emerald-200'
+                        }`}>
+                          {stock.product.status || 'ACTIVE'}
+                        </span>
+                      </div>
+                      <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{stock.product.category?.name || 'General'}</span>
+                    </div>
                   </div>
-                  <div className="flex flex-col min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-tight truncate">{stock.product.name}</h4>
-                      <span className={`text-[7px] font-black px-1.5 py-0.5 rounded-full uppercase tracking-widest shadow-sm ${stock.product.status === 'INACTIVE' ? 'bg-orange-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                        {stock.product.status || 'ACTIVE'}
+
+                  <div className="hidden sm:flex items-center gap-6 shrink-0">
+                    <div className="flex flex-col items-center">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Buy</span>
+                      <span className="text-[10px] font-bold text-gray-600">₹{stock.product.landingPrice || 0}</span>
+                    </div>
+                    <div className="flex flex-col items-center">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Sale</span>
+                      <span className="text-[10px] font-bold text-gray-600">₹{stock.product.price || 0}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-4 shrink-0">
+                    <div className="flex flex-col items-end border-l border-gray-100 pl-4">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">In Vehicles</span>
+                      <span className="text-[10px] font-black text-gray-600 tracking-tighter">
+                        {stock.product.vehicleStock || 0}
                       </span>
                     </div>
-                    <span className="text-[8px] font-black text-gray-400 uppercase tracking-widest leading-none">{stock.product.category?.name || 'General'}</span>
+                    <div className="flex flex-col items-end min-w-[3.5rem] border-l border-gray-100 pl-4">
+                      <span className={`text-[7px] font-black uppercase tracking-widest leading-none mb-1 ${
+                        isNoStock ? 'text-rose-600' : isLowStock ? 'text-amber-600' : 'text-gray-400'
+                      }`}>Store</span>
+                      <span className={`text-xs font-black tracking-tighter ${
+                        isNoStock ? 'text-rose-600' : isLowStock ? 'text-amber-600' : 'text-gray-900'
+                      }`}>
+                        {stock.quantity}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[3.5rem] bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Total</span>
+                      <span className="text-sm font-black text-blue-600 tracking-tighter">
+                        {stock.product.totalStock || stock.quantity}
+                      </span>
+                    </div>
+                    <div className="flex flex-col items-end min-w-[4.5rem] border-l border-gray-100 pl-4">
+                      <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Valuation</span>
+                      <span className="text-xs font-black text-emerald-600 tracking-tight">₹{(stock.quantity * (stock.product.landingPrice || 0)).toLocaleString()}</span>
+                    </div>
                   </div>
                 </div>
-
-                <div className="hidden sm:flex items-center gap-6 shrink-0">
-                  <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Buy</span>
-                    <span className="text-[10px] font-bold text-gray-600">₹{stock.product.landingPrice || 0}</span>
-                  </div>
-                  <div className="flex flex-col items-center">
-                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-tighter">Sale</span>
-                    <span className="text-[10px] font-bold text-gray-600">₹{stock.product.price || 0}</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 shrink-0">
-                  <div className="flex flex-col items-end border-l border-gray-100 pl-4">
-                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">In Vehicles</span>
-                    <span className="text-[10px] font-black text-amber-600 tracking-tighter">
-                      {stock.product.vehicleStock || 0}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end min-w-[3.5rem] border-l border-gray-100 pl-4">
-                    <span className="text-[7px] font-black text-emerald-600 uppercase tracking-widest leading-none mb-1">In Store</span>
-                    <span className={`text-xs font-black tracking-tighter ${stock.quantity > (stock.product.minStockAlert || 5) ? 'text-gray-950' : 'text-rose-600'}`}>
-                      {stock.quantity}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end min-w-[3.5rem] bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-100">
-                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Total System</span>
-                    <span className="text-sm font-black text-blue-600 tracking-tighter">
-                      {stock.product.totalStock || stock.quantity}
-                    </span>
-                  </div>
-                  <div className="flex flex-col items-end min-w-[4.5rem] border-l border-gray-100 pl-4">
-                    <span className="text-[7px] font-black text-gray-400 uppercase tracking-widest leading-none mb-1">Store Value</span>
-                    <span className="text-xs font-black text-emerald-600 tracking-tight">₹{(stock.quantity * (stock.product.landingPrice || 0)).toLocaleString()}</span>
-                  </div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
 
           {/* Pagination */}
