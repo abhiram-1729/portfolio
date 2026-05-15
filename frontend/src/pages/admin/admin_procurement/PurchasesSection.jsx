@@ -533,16 +533,16 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
             </div>
           ) : (
             <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-              <div className="overflow-x-auto custom-scrollbar">
-                <table className="w-full table-fixed border-collapse">
+              <div className="overflow-x-auto custom-scrollbar w-full">
+                <table className="w-max min-w-full text-left border-collapse">
                   <thead>
-                    <tr className="bg-gray-50/50 border-b border-gray-100">
-                      <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Invoice</th>
-                      <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">PO</th>
-                      <th className="w-[15%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Date</th>
-                      <th className="w-[25%] px-4 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Vendor</th>
-                      <th className="w-[15%] px-4 py-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Total</th>
-                      <th className="w-[15%] px-4 py-3 text-right text-[9px] font-black uppercase tracking-[0.2em] text-gray-400">Actions</th>
+                    <tr className="bg-gray-50/50 border-b border-gray-100 whitespace-nowrap">
+                      <th className="px-6 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap">Invoice</th>
+                      <th className="px-6 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap">PO</th>
+                      <th className="px-6 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap">Date</th>
+                      <th className="px-6 py-3 text-left text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap">Vendor</th>
+                      <th className="px-6 py-3 text-center text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 whitespace-nowrap">Total</th>
+                      <th className="px-6 py-3 text-right text-[9px] font-black uppercase tracking-[0.2em] text-gray-400 sticky right-0 bg-gray-50 z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-50">
@@ -573,10 +573,10 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                             <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">{p.vendor?.mobile || 'No Contact'}</span>
                           </div>
                         </td>
-                        <td className="px-4 py-3 text-center">
+                        <td className="px-6 py-4 text-center whitespace-nowrap">
                           <span className="text-[12px] font-black text-gray-900">₹{(p.totalAmount || 0).toLocaleString()}</span>
                         </td>
-                        <td className="px-4 py-3 text-right">
+                        <td className="px-6 py-4 text-right sticky right-0 bg-white group-hover:bg-emerald-50/30 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1.5">
                             {can('PROCUREMENT', 'UPDATE', 'PURCHASES') && (
                               <button

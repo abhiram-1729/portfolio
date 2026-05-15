@@ -198,17 +198,17 @@ const PurchaseOrdersSection = ({ can }) => {
             </div>
           ) : (
             <div className="flex-1 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden flex flex-col min-h-0">
-              <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1">
-              <table className="w-full text-left border-collapse">
+              <div className="overflow-x-auto overflow-y-auto custom-scrollbar flex-1 w-full">
+              <table className="w-max min-w-full text-left border-collapse">
                 <thead>
-                  <tr className="bg-emerald-50/50 border-b border-gray-50">
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest">PO Number</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest">PO ID</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Vendor</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Date</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Total Amount</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                  <tr className="bg-emerald-50/50 border-b border-gray-50 whitespace-nowrap">
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">PO Number</th>
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">PO ID</th>
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Vendor</th>
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Date</th>
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Total Amount</th>
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Status</th>
+                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right sticky right-0 bg-[#f8fafc] z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -243,7 +243,7 @@ const PurchaseOrdersSection = ({ can }) => {
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-6 text-right whitespace-nowrap">
+                      <td className="py-3 px-6 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50/50 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">
                         <div className="flex items-center justify-end gap-2">
                           <div className="flex gap-1">
                             {!['CLOSED', 'CANCELLED', 'DELIVERED'].includes(po.status) && can('PROCUREMENT', 'UPDATE', 'PO') && (

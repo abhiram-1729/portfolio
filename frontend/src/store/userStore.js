@@ -78,7 +78,11 @@ export const useUserStore = create(
         // If a specific section is provided, check its granular permissions
         if (section) {
           if (section === 'MAIN_MASTER') return true;
-          const sectionPerms = user.permissions?.[`${module}_SECTIONS`]?.[section] || [];
+          // Support both MODULE_SECTIONS pattern and direct MODULE key for newer granular modules
+          const sectionPerms = 
+            user.permissions?.[`${module}_SECTIONS`]?.[section] || 
+            user.permissions?.[module]?.[section] || 
+            [];
           return sectionPerms.includes(action);
         }
 

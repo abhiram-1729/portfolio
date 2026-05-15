@@ -79,7 +79,7 @@ export default function QCSection({ can, setHeaderExtra, storeId }) {
               <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">All QC Clear</p>
             </div>
           ) : (
-            grns.map(grn => (
+            grns.filter(g => g.displayId.toLowerCase().includes(searchTerm.toLowerCase())).map(grn => (
               <button
                 key={grn.id}
                 onClick={() => setSelectedGrn(grn)}
@@ -133,20 +133,20 @@ export default function QCSection({ can, setHeaderExtra, storeId }) {
             </div>
 
             {/* Items Table */}
-            <div className="flex-1 overflow-y-auto p-8 custom-scrollbar">
-              <table className="w-full text-left">
-                <thead>
+            <div className="flex-1 overflow-auto custom-scrollbar">
+              <table className="w-full text-left border-collapse">
+                <thead className="sticky top-0 bg-white z-20">
                   <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                    <th className="pb-4 pl-2">Product Details</th>
-                    <th className="pb-4">Received Qty</th>
-                    <th className="pb-4">Status</th>
-                    <th className="pb-4 text-right">Actions</th>
+                    <th className="py-4 pl-8">Product Details</th>
+                    <th className="py-4">Received Qty</th>
+                    <th className="py-4">Status</th>
+                    <th className="py-4 text-right pr-8 sticky right-0 bg-white z-20 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {selectedGrn.items.map((item) => (
-                    <tr key={item.id} className="group">
-                      <td className="py-6">
+                    <tr key={item.id} className="group hover:bg-gray-50/50">
+                      <td className="py-6 pl-8">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all">
                             <Package size={20} />
@@ -160,7 +160,7 @@ export default function QCSection({ can, setHeaderExtra, storeId }) {
                       <td className="py-6">
                         <span className="text-sm font-black text-gray-900">{item.receivedQty} UNITS</span>
                       </td>
-                      <td className="py-6">
+                      <td className="py-6 whitespace-nowrap">
                         <span className={`text-[10px] font-black px-3 py-1 rounded-full border uppercase tracking-widest ${
                           item.qcStatus === 'PENDING' ? 'bg-amber-50 text-amber-600 border-amber-100' :
                           item.qcStatus === 'APPROVED' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
@@ -169,7 +169,7 @@ export default function QCSection({ can, setHeaderExtra, storeId }) {
                           {item.qcStatus}
                         </span>
                       </td>
-                      <td className="py-6 text-right">
+                      <td className="py-6 text-right sticky right-0 bg-white group-hover:bg-gray-50/50 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">
                         {item.qcStatus === 'PENDING' ? (
                           <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                             <button 

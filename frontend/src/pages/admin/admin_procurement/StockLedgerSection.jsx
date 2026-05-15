@@ -67,22 +67,22 @@ const StockLedgerSection = () => {
           <p className="text-[10px] text-gray-300 mt-1">Try adjusting your search or filters</p>
         </div>
       ) : (
-        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <table className="w-full text-left">
+        <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-x-auto custom-scrollbar w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <table className="w-max min-w-full text-left border-collapse">
             <thead>
-              <tr className="bg-gray-50/50">
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Date</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400">Product</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Type</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Qty</th>
-                <th className="px-4 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Balance</th>
+              <tr className="bg-gray-50/50 whitespace-nowrap">
+                <th className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Date</th>
+                <th className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Product</th>
+                <th className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Type</th>
+                <th className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Qty</th>
+                <th className="px-6 py-3 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Balance</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
               {filteredLedger.map(entry => (
-                <tr key={entry.id} className="hover:bg-gray-50/30 transition-colors group">
-                  <td className="px-4 py-2 text-[11px] font-bold text-gray-600">{format(new Date(entry.createdAt), 'dd MMM hh:mm a')}</td>
-                  <td className="px-4 py-2 text-xs font-bold text-gray-900">{entry.product?.name}</td>
+                <tr key={entry.id} className="hover:bg-gray-50/30 transition-colors group whitespace-nowrap">
+                  <td className="px-6 py-3 text-[11px] font-bold text-gray-600 whitespace-nowrap">{format(new Date(entry.createdAt), 'dd MMM hh:mm a')}</td>
+                  <td className="px-6 py-3 text-xs font-bold text-gray-900 whitespace-nowrap">{entry.product?.name}</td>
                   <td className="px-4 py-2 text-center">
                     <span className={`text-[8px] font-black uppercase px-2 py-0.5 rounded-md ${typeColors[entry.type] || ''}`}>{entry.type.replace('_', ' ')}</span>
                   </td>

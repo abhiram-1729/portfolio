@@ -587,7 +587,7 @@ export const getAdminCashSummary = async (req, res, next) => {
 
         const orderAggregates = await prisma.order.groupBy({
             by: ['vehicleId', 'paymentMode'],
-            _sum: { totalAmount: true },
+            _sum: { totalAmount: true, cashAmount: true, upiAmount: true },
             where: {
                 tenantId: req.user.tenantId,
                 vehicleId: { in: vehicles.map(v => v.id) },
@@ -618,8 +618,18 @@ export const getAdminCashSummary = async (req, res, next) => {
             const todayCycle = ra?.route?.cycles?.find(c => c.dayOfWeek === dayName);
             const villageName = todayCycle?.villageName || ra?.route?.routeName || 'Unspecified';
 
-            const totalRealtimeCashSales = orders.filter(o => o.paymentMode === 'CASH').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
-            const totalRealtimeUpiSales = orders.filter(o => o.paymentMode === 'UPI').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
+            const totalRealtimeCashSales = orders.reduce((sum, o) => {
+                if (o.paymentMode === 'CASH') return sum + (o._sum.totalAmount || 0);
+                if (o.paymentMode === 'CASH_UPI') return sum + (o._sum.cashAmount || 0);
+                return sum;
+            }, 0);
+
+            const totalRealtimeUpiSales = orders.reduce((sum, o) => {
+                if (o.paymentMode === 'UPI') return sum + (o._sum.totalAmount || 0);
+                if (o.paymentMode === 'CASH_UPI') return sum + (o._sum.upiAmount || 0);
+                return sum;
+            }, 0);
+
             const totalRealtimeCardSales = orders.filter(o => o.paymentMode === 'CARD').reduce((sum, o) => sum + (o._sum.totalAmount || 0), 0);
             const totalRealtimeExpenses = expenses.reduce((sum, e) => sum + (e._sum.amount || 0), 0);
 

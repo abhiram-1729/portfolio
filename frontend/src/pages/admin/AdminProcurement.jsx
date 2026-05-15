@@ -122,12 +122,18 @@ export default function AdminProcurement() {
 
   const availableTabs = TABS.filter(tab => canViewSection(tab.section));
   const [headerExtra, setHeaderExtra] = React.useState(null);
+  const [hideMainHeader, setHideMainHeader] = React.useState(false);
 
   useEffect(() => {
     if (availableTabs.length > 0 && !availableTabs.some(t => t.key === activeTab)) {
       setSearchParams({ tab: availableTabs[0].key });
     }
   }, [availableTabs, activeTab, setSearchParams]);
+
+  // Reset hide header when tab changes
+  useEffect(() => {
+    setHideMainHeader(false);
+  }, [activeTab]);
 
   return (
     <div className="h-[calc(100vh-11rem)] overflow-hidden flex flex-col space-y-3">
@@ -191,72 +197,74 @@ export default function AdminProcurement() {
       ) : (
         <div key={storeId} className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-700">
           {/* Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div className="flex items-center gap-4">
-              {storeId && stores.length > 1 && (
-                <button
-                  onClick={() => setSearchParams({ tab: activeTab })}
-                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
-                  title="Back to Organizational Overview"
-                >
-                  <ChevronLeft size={20} />
-                </button>
-              )}
-              <div className="flex flex-col gap-1">
-                <div className="flex items-center gap-3 flex-wrap">
-                  <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Procurement & Payables</h2>
-                  {storeId && (
-                    <span className="text-[10px] font-black px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full uppercase tracking-widest">
-                      {stores.find(s => s.id === storeId)?.name || 'Branch'} Context
-                    </span>
-                  )}
-                  {stores.length > 1 && (
-                    <select
-                      value={storeId || ''}
-                      onChange={(e) => {
-                        if (e.target.value) {
-                          setSearchParams({ storeId: e.target.value, tab: activeTab });
-                        } else {
-                          setSearchParams({ tab: activeTab });
-                        }
-                      }}
-                      className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm"
-                      style={{
-                        backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                        backgroundPosition: 'right 0.35rem center',
-                        backgroundRepeat: 'no-repeat',
-                        backgroundSize: '1.1rem'
-                      }}
-                    >
-                      <option value="">All Branches</option>
-                      {stores.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      ))}
-                    </select>
-                  )}
+          {!hideMainHeader && (
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+              <div className="flex items-center gap-4">
+                {storeId && stores.length > 1 && (
+                  <button
+                    onClick={() => setSearchParams({ tab: activeTab })}
+                    className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
+                    title="Back to Organizational Overview"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                )}
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Procurement & Payables</h2>
+                    {storeId && (
+                      <span className="text-[10px] font-black px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full uppercase tracking-widest">
+                        {stores.find(s => s.id === storeId)?.name || 'Branch'} Context
+                      </span>
+                    )}
+                    {stores.length > 1 && (
+                      <select
+                        value={storeId || ''}
+                        onChange={(e) => {
+                          if (e.target.value) {
+                            setSearchParams({ storeId: e.target.value, tab: activeTab });
+                          } else {
+                            setSearchParams({ tab: activeTab });
+                          }
+                        }}
+                        className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-1.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm"
+                        style={{
+                          backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
+                          backgroundPosition: 'right 0.35rem center',
+                          backgroundRepeat: 'no-repeat',
+                          backgroundSize: '1.1rem'
+                        }}
+                      >
+                        <option value="">All Branches</option>
+                        {stores.map(s => (
+                          <option key={s.id} value={s.id}>{s.name}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-400 font-bold uppercase tracking-widest text-[10px]">Vendor → PO → GRN → Purchase → Stock → Payment</p>
                 </div>
-                <p className="text-sm text-gray-400 font-bold uppercase tracking-widest text-[10px]">Vendor → PO → GRN → Purchase → Stock → Payment</p>
+              </div>
+              <div className="animate-in fade-in slide-in-from-right-4 duration-500">
+                {headerExtra}
               </div>
             </div>
-            <div className="animate-in fade-in slide-in-from-right-4 duration-500">
-              {headerExtra}
-            </div>
-          </div>
+          )}
 
           {/* Tab Content */}
-          <div key={storeId} className="flex-1 flex flex-col min-h-0 animate-in fade-in duration-500 overflow-hidden">
-            {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'requisition' && canViewSection('REQUISITION') && <RequisitionSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'qc' && canViewSection('QC') && <QCSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'transfers' && canViewSection('TRANSFERS') && <TransferSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'workorders' && canViewSection('WORKORDERS') && <WorkOrderSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'ledger' && canViewSection('LEDGER') && <StockLedgerSection setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'payments' && canViewSection('PAYMENTS') && <PaymentsSection can={can} setHeaderExtra={setHeaderExtra} storeId={storeId} />}
-            {activeTab === 'reports' && canViewSection('REPORTS') && <ReportsSection setHeaderExtra={setHeaderExtra} storeId={storeId} />}
+          <div key={storeId} className={`flex-1 flex flex-col min-h-0 animate-in fade-in duration-500 overflow-hidden ${hideMainHeader ? 'mt-0' : ''}`}>
+            {activeTab === 'vendors' && canViewSection('VENDORS') && <VendorsSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'mapping' && canViewSection('MAPPING') && <MappingSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'requisition' && canViewSection('REQUISITION') && <RequisitionSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'qc' && canViewSection('QC') && <QCSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'transfers' && canViewSection('TRANSFERS') && <TransferSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'workorders' && canViewSection('WORKORDERS') && <WorkOrderSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'ledger' && canViewSection('LEDGER') && <StockLedgerSection setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'payments' && canViewSection('PAYMENTS') && <PaymentsSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
+            {activeTab === 'reports' && canViewSection('REPORTS') && <ReportsSection setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
           </div>
         </div>
       )}
