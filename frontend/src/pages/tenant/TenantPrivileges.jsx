@@ -35,6 +35,11 @@ const MODULES = [
   { key: 'STAFF_AGENT', label: 'Agent Management', desc: 'Sales Agents & Field Force' },
   { key: 'VEHICLES', label: 'Fleet Management', desc: 'Vehicles & Assets' },
   { key: 'SALES', label: 'Sales', desc: 'Order management' },
+  { key: 'CASH', label: 'Cash Flow', desc: 'Safe Control & Reconciliation' },
+  { key: 'INVENTORY', label: 'Inventory', desc: 'Stock & Warehouse' },
+  { key: 'PROCUREMENT', label: 'Procurement', desc: 'PO & Vendor Management' },
+  { key: 'REPORTS', label: 'Business Reports', desc: 'Analytics & Intelligence' },
+  { key: 'ROUTES', label: 'Route Operations', desc: 'Villages & Route Maps' },
   { key: 'TARGETS', label: 'Targets', desc: 'VGE incentives' },
   { key: 'ASSETS', label: 'Assets', desc: 'Equipment tracking' },
   { key: 'EXPENSES', label: 'Expenses', desc: 'Reimbursements' },
@@ -71,7 +76,7 @@ const CASH_SECTIONS_LIST = [
   { key: 'AUDIT_LEDGER', label: 'Audit Ledger', desc: 'Transaction history logs' }
 ];
 
-const EXPENSE_SECTIONS_LIST = [
+const EXPENSES_SECTIONS_LIST = [
   { key: 'MONITORING', label: 'Expense Monitoring', desc: 'View all expense submissions' },
   { key: 'APPROVAL', label: 'Expense Approval', desc: 'Approve, reject, and return expenses' },
   { key: 'SETTINGS', label: 'Expense Settings', desc: 'Manage categories, limits & policies' }
@@ -601,7 +606,7 @@ export default function TenantPrivileges() {
 
   const toggleExpenseSectionPermission = (sectionKey, actionKey) => {
     setFormPerms(prev => {
-      const sections = prev.EXPENSE_SECTIONS || {};
+      const sections = prev.EXPENSES_SECTIONS || {};
       const current = sections[sectionKey] || [];
       const has = current.includes(actionKey);
 
@@ -611,7 +616,7 @@ export default function TenantPrivileges() {
 
       return {
         ...prev,
-        EXPENSE_SECTIONS: {
+        EXPENSES_SECTIONS: {
           ...sections,
           [sectionKey]: nextPerms
         },
@@ -622,13 +627,13 @@ export default function TenantPrivileges() {
 
   const toggleAllForExpenseSection = (sectionKey) => {
     setFormPerms(prev => {
-      const sections = prev.EXPENSE_SECTIONS || {};
+      const sections = prev.EXPENSES_SECTIONS || {};
       const current = sections[sectionKey] || [];
       const allSelected = ACTIONS.every(a => current.includes(a.key));
 
       return {
         ...prev,
-        EXPENSE_SECTIONS: {
+        EXPENSES_SECTIONS: {
           ...sections,
           [sectionKey]: allSelected ? [] : ACTIONS.map(a => a.key)
         },
@@ -676,7 +681,7 @@ export default function TenantPrivileges() {
       if (!nextPerms.includes('READ')) {
         if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
         if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
-        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSES_SECTIONS = {};
         if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
         if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
         if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
@@ -704,7 +709,7 @@ export default function TenantPrivileges() {
         if (moduleKey === 'DASHBOARD') updated.DASHBOARD_WIDGETS = [];
         if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
         if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
-        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSES_SECTIONS = {};
         if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
         if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
         if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
@@ -729,8 +734,8 @@ export default function TenantPrivileges() {
     all.CASH_SECTIONS = {};
     CASH_SECTIONS_LIST.forEach(s => { all.CASH_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
 
-    all.EXPENSE_SECTIONS = {};
-    EXPENSE_SECTIONS_LIST.forEach(s => { all.EXPENSE_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+    all.EXPENSES_SECTIONS = {};
+    EXPENSES_SECTIONS_LIST.forEach(s => { all.EXPENSES_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
 
     all.PROCUREMENT_SECTIONS = {};
     PROCUREMENT_SECTIONS_LIST.forEach(s => { all.PROCUREMENT_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
@@ -1176,8 +1181,8 @@ export default function TenantPrivileges() {
                           onClick={(e) => {
                             e.stopPropagation();
                             const sections = {};
-                            EXPENSE_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, EXPENSES: ['READ', 'UPDATE'], EXPENSE_SECTIONS: sections }));
+                            EXPENSES_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                            setFormPerms(prev => ({ ...prev, EXPENSES: ACTIONS.map(a => a.key), EXPENSES_SECTIONS: sections }));
                           }}
                           className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
                         >
@@ -1186,9 +1191,9 @@ export default function TenantPrivileges() {
                       }
                     >
                       <PermissionTable
-                        modules={EXPENSE_SECTIONS_LIST}
+                        modules={EXPENSES_SECTIONS_LIST}
                         isGranular={true}
-                        sectionKey="EXPENSE_SECTIONS"
+                        sectionKey="EXPENSES_SECTIONS"
                         formPerms={formPerms}
                         togglePermission={togglePermission}
                         toggleAllForModule={toggleAllForModule}

@@ -302,6 +302,19 @@ export default function AdminLayout() {
     } else {
       const perms = user?.permissions?.[item.module];
       hasModuleRead = Array.isArray(perms) ? perms.includes('READ') : false;
+
+      // Fallback: If top-level READ is missing, check if any granular section has READ
+      if (!hasModuleRead) {
+        const sections = user?.permissions?.[`${item.module}_SECTIONS`];
+        if (sections && typeof sections === 'object') {
+          hasModuleRead = Object.values(sections).some(p => (p || []).includes('READ'));
+        }
+        // Also check TARGET_SECTIONS pattern
+        if (!hasModuleRead) {
+          const targets = user?.permissions?.[`${item.module}_TARGET_SECTIONS`];
+          if (Array.isArray(targets) && targets.length > 0) hasModuleRead = true;
+        }
+      }
     }
     if (!hasModuleRead) return false;
 
@@ -338,7 +351,7 @@ export default function AdminLayout() {
       }
     }
     if (item.module === 'EXPENSES') {
-      const sections = user?.permissions?.EXPENSE_SECTIONS;
+      const sections = user?.permissions?.EXPENSES_SECTIONS;
       if (sections) {
         return Object.values(sections).some(perms => (perms || []).includes('READ'));
       }
@@ -441,7 +454,7 @@ export default function AdminLayout() {
     }
 
     if (location.pathname.startsWith('/admin/expenses')) {
-      const sections = user?.permissions?.EXPENSE_SECTIONS;
+      const sections = user?.permissions?.EXPENSES_SECTIONS;
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
     }
 
@@ -627,7 +640,7 @@ export default function AdminLayout() {
                           isSidebarCollapsed ? "justify-center px-0" : "justify-between",
                           (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
                             ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
-                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Oppoeration') ||
+                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Operation') ||
                             ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
                             ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
                             ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
