@@ -8,7 +8,7 @@ import { procurementAPI } from '../../../services/procurementService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-const VendorsSection = ({ can }) => {
+const VendorsSection = ({ can, setHideMainHeader }) => {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,6 +32,15 @@ const VendorsSection = ({ can }) => {
   }, [statusFilter]);
 
   useEffect(() => { loadVendors(); }, [loadVendors]);
+  
+  useEffect(() => {
+    if (setHideMainHeader) {
+      setHideMainHeader(showForm);
+    }
+    return () => {
+      if (setHideMainHeader) setHideMainHeader(false);
+    };
+  }, [showForm, setHideMainHeader]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -96,8 +105,8 @@ const VendorsSection = ({ can }) => {
   );
 
   const renderForm = () => (
-    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
-      <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500 flex-1 flex flex-col">
+      <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => { setShowForm(false); setEditVendor(null); }}
@@ -115,8 +124,8 @@ const VendorsSection = ({ can }) => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-8 max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <form onSubmit={handleSubmit} className="p-5 space-y-4 max-w-5xl mx-auto w-full">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { name: 'vendorName', label: 'Business Name *', required: true, icon: Users },
             { name: 'mobile', label: 'Primary Contact No. *', required: true, icon: Phone },
@@ -135,7 +144,7 @@ const VendorsSection = ({ can }) => {
                   required={f.required} 
                   value={form[f.name]} 
                   onChange={e => setForm({ ...form, [f.name]: e.target.value })}
-                  className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                  className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-2 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
                   placeholder={`Enter ${f.label.toLowerCase().replace('*', '').trim()}...`}
                 />
               </div>
@@ -152,7 +161,7 @@ const VendorsSection = ({ can }) => {
                 type="number" 
                 value={form.creditDays} 
                 onChange={e => setForm({ ...form, creditDays: e.target.value })}
-                className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-2 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
                 placeholder="30"
               />
             </div>
@@ -169,7 +178,7 @@ const VendorsSection = ({ can }) => {
                   type="number" 
                   value={form.openingBalance} 
                   onChange={e => setForm({ ...form, openingBalance: e.target.value })}
-                  className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                  className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-2 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
                   placeholder="0.00"
                 />
               </div>
@@ -177,7 +186,7 @@ const VendorsSection = ({ can }) => {
           )}
         </div>
 
-        <div className="pt-8 border-t border-gray-50 flex items-center justify-end gap-3">
+        <div className="pt-4 border-t border-gray-50 flex items-center justify-end gap-3">
           <button 
             type="button" 
             onClick={() => { setShowForm(false); setEditVendor(null); }}
@@ -196,7 +205,7 @@ const VendorsSection = ({ can }) => {
   if (showForm) return renderForm();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 flex-1 flex flex-col min-h-0 overflow-y-auto pr-2 custom-scrollbar">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm flex-1 max-w-md">

@@ -963,6 +963,7 @@ export default function AdminInventory() {
       toast.success('Stock loaded successfully');
       setStockQuantities({});
       setShowLoadConfirmModal(false);
+      fetchData(); // Refresh UI state immediately
     } catch (error) {
       console.error('❌ Load Error:', error);
       const msg = error.response?.data?.message || 'Failed to load stock';
@@ -1003,6 +1004,7 @@ export default function AdminInventory() {
         toast.success('Stock returned successfully');
       }
       setStockQuantities({});
+      fetchData(); // Refresh main item master stock
       if (type === 'RETURN') fetchVehicleInventory(selectedVehicleId);
     } catch (error) {
       console.error(`❌ ${type} Error:`, error);
@@ -1475,6 +1477,7 @@ export default function AdminInventory() {
       setEditedQuantities({});
       setItemRemarks({});
       loadRefillRequests();
+      fetchData(); // Refresh main item master stock
     } catch (error) {
       console.error('Approve Error:', error);
       const msg = error.response?.data?.message || 'Failed to approve refill';
@@ -1494,6 +1497,7 @@ export default function AdminInventory() {
       });
       toast.success('Product approved successfully');
       loadRefillRequests();
+      fetchData(); // Refresh main item master stock
     } catch (error) {
       toast.error('Failed to approve product');
     } finally {

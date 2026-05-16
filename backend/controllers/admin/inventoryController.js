@@ -823,8 +823,29 @@ export const loadStock = async (req, res) => {
         const wi = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
+        
         if (wi) {
-          wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { decrement: cleanQty } }
+          });
+        } else {
+          // Fallback if no WarehouseInventory record exists (rare case)
+          // Create one so future queries find it
+          let warehouse = await tx.warehouse.findFirst({ where: { tenantId: req.user.tenantId } });
+          if (!warehouse) {
+            warehouse = await tx.warehouse.create({
+              data: { tenantId: req.user.tenantId, name: 'Main Warehouse', location: 'Default' }
+            });
+          }
+          await tx.warehouseInventory.create({
+            data: {
+              tenantId: req.user.tenantId,
+              warehouseId: warehouse.id,
+              productId: item.productId,
+              quantity: -cleanQty
+            }
+          });
         }
 
         console.log(`[LoadStock] Syncing Product.stock`);
@@ -979,15 +1000,38 @@ export const returnStock = async (req, res) => {
           quantity: cleanQty
         });
 
-        // Vehicle Stock Decrement Value
-        vehicleUpdateValues.push(`('${item.productId}'::text, ${cleanQty}::integer)`);
-
+        // 🆕 Decrement Vehicle Stock
+        await tx.vehicleStock.update({
+          where: { vehicleId_productId: { vehicleId, productId: item.productId } },
+          data: { quantity: { decrement: cleanQty } }
+        });
+        
         // 🆕 INCREMENT WarehouseInventory
         const wi = await tx.warehouseInventory.findFirst({
           where: { productId: item.productId, tenantId: req.user.tenantId }
         });
+
         if (wi) {
-          wiUpdateValues.push(`('${wi.id}'::text, ${cleanQty}::integer)`);
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { increment: cleanQty } }
+          });
+        } else {
+          // If no WarehouseInventory record exists, create one
+          let warehouse = await tx.warehouse.findFirst({ where: { tenantId: req.user.tenantId } });
+          if (!warehouse) {
+            warehouse = await tx.warehouse.create({
+              data: { tenantId: req.user.tenantId, name: 'Main Warehouse', location: 'Default' }
+            });
+          }
+          await tx.warehouseInventory.create({
+            data: {
+              tenantId: req.user.tenantId,
+              warehouseId: warehouse.id,
+              productId: item.productId,
+              quantity: cleanQty
+            }
+          });
         }
 
         // 🆕 SYNC Product.stock (Source of Truth is now the sum of all WarehouseInventory)
@@ -1772,9 +1816,27 @@ export const approveRefillRequest = async (req, res) => {
           });
         }
 
+        // 🆕 Decrement WarehouseInventory
+        const wi = await tx.warehouseInventory.findFirst({
+          where: { productId: item.productId, tenantId: request.tenantId }
+        });
+
+        if (wi) {
+          await tx.warehouseInventory.update({
+            where: { id: wi.id },
+            data: { quantity: { decrement: Math.floor(item.quantity) } }
+          });
+        }
+
+        // Sync Product.stock
+        const allWi = await tx.warehouseInventory.findMany({
+          where: { productId: item.productId, tenantId: request.tenantId }
+        });
+        const totalQty = allWi.reduce((acc, curr) => acc + curr.quantity, 0);
+
         await tx.product.update({
           where: { id: item.productId },
-          data: { stock: { decrement: Math.floor(item.quantity) } }
+          data: { stock: totalQty }
         });
       }
 
