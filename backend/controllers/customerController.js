@@ -15,7 +15,12 @@ export const registerCustomer = async (req, res, next) => {
 
     // Check if customer already exists
     const existing = await prisma.customer.findUnique({
-      where: { mobile }
+      where: { 
+        tenantId_mobile: {
+          tenantId,
+          mobile
+        }
+      }
     });
 
     if (existing) {
@@ -59,7 +64,12 @@ export const loginCustomer = async (req, res, next) => {
     }
 
     let customer = await prisma.customer.findUnique({
-      where: { mobile },
+      where: { 
+        tenantId_mobile: {
+          tenantId,
+          mobile
+        }
+      },
       include: { village: true }
     });
 
@@ -134,7 +144,12 @@ export const getCustomers = async (req, res, next) => {
           const mob = ord.mobile.trim();
           // Auto-upsert customer profile
           const cust = await prisma.customer.upsert({
-            where: { mobile: mob },
+            where: { 
+              tenantId_mobile: {
+                tenantId,
+                mobile: mob
+              }
+            },
             update: {},
             create: {
               tenant: { connect: { id: tenantId } },

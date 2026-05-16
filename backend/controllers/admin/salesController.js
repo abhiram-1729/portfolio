@@ -39,6 +39,7 @@ export const getSalesHistory = async (req, res) => {
         user: { select: { id: true, name: true, mobile: true, role: true } },
         vehicle: { select: { id: true, vehicleNumber: true, vehicleName: true, assignedUsers: { select: { id: true, name: true, mobile: true } } } },
         route: { select: { id: true, routeName: true } },
+        terminal: true,
         items: {
           include: {
             product: { select: { id: true, name: true } }
@@ -115,7 +116,12 @@ export const createManualSale = async (req, res) => {
       if (mobile && mobile.trim() !== '') {
         try {
           const cust = await tx.customer.upsert({
-            where: { mobile: mobile.trim() },
+            where: { 
+              tenantId_mobile: {
+                tenantId,
+                mobile: mobile.trim()
+              }
+            },
             update: {},
             create: {
               tenant: { connect: { id: tenantId } },
@@ -130,7 +136,14 @@ export const createManualSale = async (req, res) => {
           customerIdResolved = cust.id;
         } catch (custErr) {
           // Graceful fallback for concurrent transaction indexing races
-          const existingCust = await tx.customer.findUnique({ where: { mobile: mobile.trim() } });
+          const existingCust = await tx.customer.findUnique({ 
+            where: { 
+              tenantId_mobile: {
+                tenantId,
+                mobile: mobile.trim()
+              }
+            } 
+          });
           if (existingCust) customerIdResolved = existingCust.id;
         }
       }
@@ -224,5 +237,76 @@ export const createManualSale = async (req, res) => {
       message: error.message || 'Error creating manual sale',
       detail: error.meta?.cause || JSON.stringify(error.meta) || error.code
     });
+  }
+};
+
+export const suspendSale = async (req, res) => {
+  try {
+    const { storeId, terminalId, customerName, customerMobile, totalAmount, items } = req.body;
+    const tenantId = req.user.tenantId;
+
+    // Use relational mapping for all foreign keys to satisfy Prisma's strict validation
+    const suspendedData = {
+      tenant: { connect: { id: tenantId } },
+      customerName: customerName || 'Walk-in',
+      customerMobile: customerMobile || null,
+      totalAmount: parseFloat(totalAmount) || 0,
+      items: items || [],
+    };
+
+    if (storeId && storeId.trim() !== '') suspendedData.store = { connect: { id: storeId } };
+    if (terminalId && terminalId.trim() !== '') suspendedData.terminal = { connect: { id: terminalId } };
+    if (req.user.id) suspendedData.user = { connect: { id: req.user.id } };
+
+    const suspended = await prisma.suspendedSale.create({
+      data: suspendedData
+    });
+
+    res.status(201).json({ success: true, data: suspended });
+  } catch (error) {
+    console.error('🔥 Suspend Sale Error:', error);
+    res.status(400).json({ 
+      message: 'Error suspending sale', 
+      error: error.message
+    });
+  }
+};
+
+export const getSuspendedSales = async (req, res) => {
+  try {
+    const { storeId, terminalId } = req.query;
+    const where = { tenantId: req.user.tenantId };
+
+    if (storeId && storeId !== 'null' && storeId !== 'undefined') where.storeId = storeId;
+    if (terminalId && terminalId !== 'null' && terminalId !== 'undefined') where.terminalId = terminalId;
+
+    const suspended = await prisma.suspendedSale.findMany({
+      where,
+      orderBy: { createdAt: 'desc' }
+    });
+
+    res.json({ success: true, data: suspended });
+  } catch (error) {
+    console.error('🔥 Fetch Suspended Sales Error:', error);
+    res.status(400).json({ message: 'Error fetching suspended sales', error: error.message });
+  }
+};
+
+export const deleteSuspendedSale = async (req, res) => {
+  try {
+    const { id } = req.params;
+    // Use deleteMany to allow filtering by tenantId (since id + tenantId is not a unique index)
+    const result = await prisma.suspendedSale.deleteMany({
+      where: { id, tenantId: req.user.tenantId }
+    });
+    
+    if (result.count === 0) {
+      return res.status(404).json({ message: 'Suspended sale not found or unauthorized' });
+    }
+
+    res.json({ success: true, message: 'Suspended sale deleted' });
+  } catch (error) {
+    console.error('🔥 Delete Suspended Sale Error:', error);
+    res.status(400).json({ message: 'Error deleting suspended sale', error: error.message });
   }
 };

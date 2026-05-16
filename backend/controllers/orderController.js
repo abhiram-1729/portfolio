@@ -18,7 +18,14 @@ export const createOrderFromCart = async (req, res, next) => {
 
         let resolvedCustomerId = customerId || null;
         if (!resolvedCustomerId && mobile) {
-            let cust = await prisma.customer.findUnique({ where: { mobile } });
+            let cust = await prisma.customer.findUnique({ 
+                where: { 
+                    tenantId_mobile: {
+                        tenantId: req.user.tenantId,
+                        mobile
+                    }
+                } 
+            });
             if (!cust && customerName) {
                 cust = await prisma.customer.create({
                     data: {
@@ -536,7 +543,8 @@ export const getOrderById = async (req, res, next) => {
                 },
                 appliedPromotion: {
                     select: { name: true, code: true, type: true, discountType: true }
-                }
+                },
+                terminal: true
             },
         });
 

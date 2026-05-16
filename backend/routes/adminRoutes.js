@@ -127,6 +127,11 @@ router.put('/inventory/refills/:id/reject', inventoryCtr.rejectRefillRequest);
 router.get('/sales', salesCtr.getSalesHistory);
 router.post('/sales', salesCtr.createManualSale);
 
+// POS Suspensions
+router.get('/sales/suspended', salesCtr.getSuspendedSales);
+router.post('/sales/suspend', salesCtr.suspendSale);
+router.delete('/sales/suspended/:id', salesCtr.deleteSuspendedSale);
+
 // Reports
 router.get('/reports/daily', reportCtr.getDailyReport);
 router.get('/reports/trends', reportCtr.getTrendsReport);

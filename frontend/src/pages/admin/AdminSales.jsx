@@ -428,6 +428,7 @@ export default function AdminSales() {
         'Route Name': s.route?.routeName || 'N/A',
         'Village Name': s.villageName || 'N/A',
         'Vehicle ID': s.vehicle?.vehicleNumber || 'N/A',
+        'POS Terminal': s.terminal?.name || 'N/A',
         'Customer Mobile': s.mobile || 'N/A',
         'Description': s.remark || 'N/A',
         'Unique ID': s.id,
@@ -2106,11 +2107,16 @@ export default function AdminSales() {
                                 </td>
                                 <td className="px-6 py-4">
                                   <div className="flex flex-col min-w-[120px]">
-                                    <span className="font-bold text-gray-800 whitespace-nowrap truncate uppercase text-[10px]">
-                                      {item.user?.name || item.userName || 'System'}
-                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="font-bold text-gray-800 whitespace-nowrap truncate uppercase text-[10px]">
+                                        {item.user?.name || item.userName || 'System'}
+                                      </span>
+                                      {item.terminal && (
+                                        <span className="text-[7px] font-black bg-blue-50 text-blue-600 px-1 rounded border border-blue-100 uppercase tracking-tighter">POS</span>
+                                      )}
+                                    </div>
                                     <span className="text-[9px] text-gray-500 font-black uppercase tracking-widest whitespace-nowrap truncate">
-                                      {item.vehicle?.vehicleNumber || 'No Vehicle'}
+                                      {item.terminal?.name || item.vehicle?.vehicleNumber || 'Walk-in'}
                                     </span>
                                   </div>
                                 </td>
@@ -2345,6 +2351,12 @@ export default function AdminSales() {
                     <span className="font-bold text-gray-400">Vehicle ID:</span>
                     <span className="font-black uppercase">{viewingOrder.vehicle?.vehicleNumber || 'N/A'}</span>
                   </div>
+                  {viewingOrder.terminal && (
+                    <div className="flex justify-between border-b border-gray-50 pb-1">
+                      <span className="font-bold text-gray-400">POS Terminal:</span>
+                      <span className="font-black uppercase text-blue-600">{viewingOrder.terminal.name}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between border-b border-gray-50 pb-1">
                     <span className="font-bold text-gray-400">Village:</span>
                     <span className="font-black uppercase">{viewingOrder.villageName || 'N/A'}</span>

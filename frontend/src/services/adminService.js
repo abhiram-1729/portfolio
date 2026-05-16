@@ -81,6 +81,9 @@ export const adminAPI = {
   // Sales
   getSales: (params) => api.get('/admin/sales', { params }),
   createManualSale: (data) => api.post('/admin/sales', data),
+  getSuspendedSales: (params) => api.get('/admin/sales/suspended', { params }),
+  suspendSale: (data) => api.post('/admin/sales/suspend', data),
+  deleteSuspendedSale: (id) => api.delete(`/admin/sales/suspended/${id}`),
 
   // Activity Logs
   getActivityLogs: (params) => api.get('/admin/activities', { params }),

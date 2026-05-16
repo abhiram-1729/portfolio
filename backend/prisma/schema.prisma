@@ -84,6 +84,7 @@ model Tenant {
   workOrders               WorkOrder[]
   workOrderItems           WorkOrderItem[]
   posTerminals             POSTerminal[]
+  suspendedSales           SuspendedSale[]
 }
 
 model User {
@@ -156,6 +157,7 @@ model User {
   vehicleTrips         VehicleTrip[]
   documents            UserDocument[]
   shift                Shift?                  @relation(fields: [shiftId], references: [id])
+  suspendedSales       SuspendedSale[]
 
   @@unique([tenantId, displayId])
   @@index([tenantId])
@@ -1424,6 +1426,7 @@ model Store {
   purchaseRequisitions   PurchaseRequisition[]
   workOrders             WorkOrder[]
   posTerminals           POSTerminal[]
+  suspendedSales         SuspendedSale[]
 
   @@unique([tenantId, code])
   @@index([tenantId])
@@ -2346,7 +2349,6 @@ model WorkOrderItem {
   @@index([productId])
 }
 
-
 enum TenantStatus {
   ACTIVE
   INACTIVE
@@ -2686,19 +2688,43 @@ enum SalesChannel {
 }
 
 model POSTerminal {
-  id        String   @id @default(cuid())
-  tenantId  String   @default("VK001")
-  storeId   String
-  name      String
-  code      String
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  store     Store    @relation(fields: [storeId], references: [id])
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  orders    Order[]
+  id             String          @id @default(cuid())
+  tenantId       String          @default("VK001")
+  storeId        String
+  name           String
+  code           String
+  status         String          @default("ACTIVE")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  store          Store           @relation(fields: [storeId], references: [id])
+  tenant         Tenant          @relation(fields: [tenantId], references: [id])
+  orders         Order[]
+  suspendedSales SuspendedSale[]
 
   @@unique([storeId, code])
   @@index([tenantId])
   @@index([storeId])
+}
+
+model SuspendedSale {
+  id             String   @id @default(cuid())
+  tenantId       String   @default("VK001")
+  storeId        String?
+  terminalId     String?
+  userId         String?
+  customerName   String?
+  customerMobile String?
+  totalAmount    Float
+  items          Json
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  tenant   Tenant       @relation(fields: [tenantId], references: [id])
+  user     User?        @relation(fields: [userId], references: [id])
+  store    Store?       @relation(fields: [storeId], references: [id])
+  terminal POSTerminal? @relation(fields: [terminalId], references: [id])
+
+  @@index([tenantId])
+  @@index([storeId])
+  @@index([terminalId])
 }
