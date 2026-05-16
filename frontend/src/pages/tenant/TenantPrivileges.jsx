@@ -72,6 +72,7 @@ const CASH_SECTIONS_LIST = [
   { key: 'FLOAT_ASSIGNMENT', label: 'Assign Float', desc: 'Assign register float' },
   { key: 'SHIFT_SAFEKEEPING', label: 'Shift Safekeeping', desc: "Today's shift tracking" },
   { key: 'RECONCILIATION', label: 'Daily Reconciliation', desc: 'End of day cash audit' },
+  { key: 'AGGREGATE_SUMMARY', label: 'POS Aggregate Summary', desc: 'Consolidated revenue across all vehicles' },
   { key: 'LIVE_CASH', label: 'Live Cash Status', desc: 'Real-time register balances' },
   { key: 'AUDIT_LEDGER', label: 'Audit Ledger', desc: 'Transaction history logs' }
 ];
@@ -516,7 +517,7 @@ export default function TenantPrivileges() {
       const updatedSections = { ...sections, [sectionKey]: nextPerms };
 
       // Auto-manage top-level CASH:READ based on whether ANY section has READ
-      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'AGGREGATE_SUMMARY', 'LIVE_CASH', 'AUDIT_LEDGER'];
       const anyHasRead = validCashKeys.some(k => (updatedSections[k] || []).includes('READ'));
 
       return {
@@ -537,7 +538,7 @@ export default function TenantPrivileges() {
       const updatedSections = { ...sections, [sectionKey]: allSelected ? [] : ACTIONS.map(a => a.key) };
 
       // Auto-manage top-level CASH:READ based on whether ANY section has READ
-      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'AGGREGATE_SUMMARY', 'LIVE_CASH', 'AUDIT_LEDGER'];
       const anyHasRead = validCashKeys.some(k => (updatedSections[k] || []).includes('READ'));
 
       return {
