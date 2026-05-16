@@ -211,12 +211,7 @@ export default function AdminProcurement() {
                 )}
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-3 flex-wrap">
-                    <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">Procurement & Payables</h2>
-                    {storeId && (
-                      <span className="text-[10px] font-black px-3 py-1 bg-emerald-50 text-emerald-600 rounded-full uppercase tracking-widest">
-                        {stores.find(s => s.id === storeId)?.name || 'Branch'} Context
-                      </span>
-                    )}
+
                     {stores.length > 1 && (
                       <select
                         value={storeId || ''}
@@ -242,7 +237,7 @@ export default function AdminProcurement() {
                       </select>
                     )}
                   </div>
-                  <p className="text-sm text-gray-400 font-bold uppercase tracking-widest text-[10px]">Vendor → PO → GRN → Purchase → Stock → Payment</p>
+
                 </div>
               </div>
               <div className="animate-in fade-in slide-in-from-right-4 duration-500">

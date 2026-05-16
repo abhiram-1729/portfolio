@@ -1560,21 +1560,66 @@ export default function AdminUsers({ type }) {
           <div className="flex flex-col gap-4 bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm">
             {/* Top Row: Title & Back Button */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {storeFilterId && stores.length > 1 && (
-                  <button
-                    onClick={() => setSearchParams({})}
-                    className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-500 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all shadow-2xs active:scale-95 mt-0.5"
-                    title="Back to All Branches"
-                  >
-                    <ArrowLeft size={18} strokeWidth={2.5} />
-                  </button>
-                )}
-                <div className="text-left">
-                  <h2 className="text-xl font-black text-gray-900 tracking-tight leading-none">User Management</h2>
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
-                    {filteredUsers.length} members found
-                  </p>
+              <div className="flex flex-wrap items-center gap-6">
+                <div className="flex items-center gap-3">
+                  {storeFilterId && stores.length > 1 && (
+                    <button
+                      onClick={() => setSearchParams({})}
+                      className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-500 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all shadow-2xs active:scale-95 mt-0.5"
+                      title="Back to All Branches"
+                    >
+                      <ArrowLeft size={18} strokeWidth={2.5} />
+                    </button>
+                  )}
+                  <div className="text-left">
+                    <h2 className="text-xl font-black text-gray-900 tracking-tight leading-none">User Management</h2>
+                    <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                      {filteredUsers.length} members found
+                    </p>
+                  </div>
+                </div>
+
+                {/* Vertical Divider */}
+                <div className="hidden lg:block w-px h-8 bg-gray-100 mx-2" />
+
+                {/* Department Views Bar - MOVED HERE */}
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center bg-gray-50 p-1 rounded-2xl w-fit flex-wrap gap-1 border border-gray-100/80 shadow-2xs">
+                    <button
+                      onClick={() => setActiveTab('all')}
+                      className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeTab === 'all' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
+                    >
+                      All Members
+                    </button>
+
+                    {can('STAFF_ADMIN', 'READ') && (
+                    <button
+                      onClick={() => setActiveTab('admin')}
+                      className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeTab === 'admin' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
+                    >
+                      Admins
+                    </button>
+                    )}
+
+                    {can('STAFF_AGENT', 'READ') && (
+                    <button
+                      onClick={() => setActiveTab('agent')}
+                      className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeTab === 'agent' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
+                    >
+                      Agents
+                    </button>
+                    )}
+
+                    {relevantCustomRoles.map(role => (
+                      <button
+                        key={role.id}
+                        onClick={() => setActiveTab(role.id)}
+                        className={`px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-wider transition-all ${activeTab === role.id ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
+                      >
+                        {role.name}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
 
@@ -1608,48 +1653,7 @@ export default function AdminUsers({ type }) {
               )}
             </div>
 
-            {/* Department Views Bar */}
-            <div className="pt-3 border-t border-gray-50 flex flex-col gap-1.5 text-left">
-              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1 opacity-70">
-                Department View
-              </span>
-              <div className="flex items-center bg-gray-50 p-1.5 rounded-2xl w-fit flex-wrap gap-1 border border-gray-100/80 shadow-2xs">
-                <button
-                  onClick={() => setActiveTab('all')}
-                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'all' ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
-                >
-                  All Members
-                </button>
 
-                {can('STAFF_ADMIN', 'READ') && (
-                <button
-                  onClick={() => setActiveTab('admin')}
-                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'admin' ? 'bg-rose-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
-                >
-                  Admins
-                </button>
-                )}
-
-                {can('STAFF_AGENT', 'READ') && (
-                <button
-                  onClick={() => setActiveTab('agent')}
-                  className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === 'agent' ? 'bg-blue-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
-                >
-                  Agents
-                </button>
-                )}
-
-                {relevantCustomRoles.map(role => (
-                  <button
-                    key={role.id}
-                    onClick={() => setActiveTab(role.id)}
-                    className={`px-5 py-2 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all ${activeTab === role.id ? 'bg-emerald-600 text-white shadow-xs' : 'bg-transparent text-gray-400 hover:text-gray-700'}`}
-                  >
-                    {role.name}
-                  </button>
-                ))}
-              </div>
-            </div>
           </div>
 
           {/* Search & Actions Bar */}

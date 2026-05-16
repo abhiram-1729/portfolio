@@ -16,22 +16,12 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    if (setHeaderExtra && !showForm) {
-      const total = purchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0);
-      setHeaderExtra(
-        <div className="bg-white rounded-2xl px-6 py-3 border border-gray-100 shadow-sm flex flex-col min-w-[180px]">
-          <span className="text-[9px] font-black uppercase tracking-widest text-gray-400">Total Purchases</span>
-          <span className="text-xl font-black text-gray-900">₹{total.toLocaleString()}</span>
-        </div>
-      );
-    } else if (setHeaderExtra && showForm) {
-      setHeaderExtra(null);
-    }
-
+    // Clear header on mount/unmount
+    if (setHeaderExtra) setHeaderExtra(null);
     return () => {
       if (setHeaderExtra) setHeaderExtra(null);
     };
-  }, [purchases, showForm, setHeaderExtra]);
+  }, [setHeaderExtra]);
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
@@ -502,26 +492,34 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
     <div className="space-y-4 h-full overflow-y-auto custom-scrollbar pb-10 pr-2">
       {(!showForm && !showQuickProduct && !showQuickVendor) && (
         <>
-          <div className="flex flex-col md:flex-row gap-3 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
+          <div className="flex items-center gap-2 mb-4 animate-in fade-in slide-in-from-top-2 duration-300">
             <div className="relative flex-1 group">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={16} />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
               <input
                 type="text"
-                placeholder="Search invoice or vendor..."
+                placeholder="Search invoices..."
                 value={search}
                 onChange={e => setSearch(e.target.value)}
-                className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2.5 text-xs font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300"
+                className="w-full bg-white border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-[11px] font-black text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all placeholder:text-gray-300"
               />
             </div>
-            {can('PROCUREMENT', 'CREATE', 'PURCHASES') && (
-              <button 
-                onClick={() => { setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] }); openForm(); }}
-                disabled={formLoading}
-                className="flex items-center gap-2 bg-emerald-600 text-white px-6 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-70 disabled:cursor-not-allowed">
-                {formLoading ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} strokeWidth={3} />}
-                {formLoading ? 'Loading...' : 'New Purchase'}
-              </button>
-            )}
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="bg-white px-4 py-1.5 rounded-xl border border-gray-100 shadow-sm flex flex-col items-end">
+                <span className="text-[8px] font-black uppercase tracking-widest text-gray-400 leading-none">Total Purchases</span>
+                <span className="text-xs font-black text-gray-900 mt-0.5">₹{purchases.reduce((sum, p) => sum + (p.totalAmount || 0), 0).toLocaleString()}</span>
+              </div>
+
+              {can('PROCUREMENT', 'CREATE', 'PURCHASES') && (
+                <button 
+                  onClick={() => { setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] }); openForm(); }}
+                  disabled={formLoading}
+                  className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/10 active:scale-95 disabled:opacity-70">
+                  {formLoading ? <Loader2 size={12} className="animate-spin" /> : <Plus size={12} strokeWidth={3} />}
+                  New Purchase
+                </button>
+              )}
+            </div>
           </div>
 
           {loading ? (

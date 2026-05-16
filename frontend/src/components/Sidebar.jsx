@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, Tag, ShoppingBag, Landmark } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, Tag, ShoppingBag, Landmark, Coins } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { attendanceAPI } from '../services/api';
