@@ -65,7 +65,7 @@ const ACTION_ICONS = {
   'PURCHASE_INVOICE_CREATED': <FileText size={18} className="text-amber-500" />,
   'DEFAULT': <Layout size={18} className="text-gray-400" />
 };
-// jdjd
+// jdjdhfjdjdj
 export default function AdminActivityLogs() {
   const [logs, setLogs] = useState([]);
   const [stores, setStores] = useState([]);
