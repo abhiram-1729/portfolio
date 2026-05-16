@@ -13,7 +13,7 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private
 export const createOrderFromCart = async (req, res, next) => {
     try {
-        const { mobile, customerName, items, customerId, deliverySlot, deliveryDate, lat, lon, couponCode } = req.body;
+        const { mobile, customerName, items, customerId, deliverySlot, deliveryDate, lat, lon, couponCode, storeId, terminalId } = req.body;
         const agentId = req.user.id;
 
         let resolvedCustomerId = customerId || null;
@@ -281,7 +281,7 @@ export const createOrderFromCart = async (req, res, next) => {
             const newOrder = await tx.order.create({
                 data: {
                     tenantId: req.user.tenantId,
-                    storeId: req.user.storeId,
+                    storeId: storeId || req.user.storeId,
                     displayId: orderDisplayId,
                     customerName: customerName || null,
                     mobile: mobile || null,
@@ -296,10 +296,11 @@ export const createOrderFromCart = async (req, res, next) => {
                     coverageType: routeTag.coverageType,
                     appliedPromotion: appliedPromotionId ? { connect: { id: appliedPromotionId } } : undefined,
                     discountAmount,
-                    storeId: req.user.storeId || null,
+                    storeId: storeId || req.user.storeId || null,
                     deliveryCharge: deliveryCharge,
                     deliverySlot: deliverySlot || null,
                     deliveryDate: deliveryDate ? new Date(deliveryDate) : null,
+                    terminalId: terminalId || null,
                     items: {
                         create: orderItemsData.map(item => ({
                             ...item,
@@ -372,7 +373,7 @@ export const completePayment = async (req, res, next) => {
             await tx.payment.create({
                 data: {
                     tenantId: req.user.tenantId,
-                    storeId: req.user.storeId,
+                    storeId: order.storeId,
                     orderId: orderId,
                     paymentMode: paymentMode,
                     amount: order.totalAmount,

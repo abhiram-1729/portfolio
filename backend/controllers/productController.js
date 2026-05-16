@@ -6,13 +6,14 @@ import { logActivity } from '../utils/activityLogger.js';
 // @access  Private
 export const getProducts = async (req, res, next) => {
     try {
-        let { search, categoryId, warehouseId, vehicleId } = req.query;
+        let { search, categoryId, warehouseId, vehicleId, storeId } = req.query;
 
         // Sanitize inputs
         search = typeof search === 'string' ? search.trim() : null;
         categoryId = typeof categoryId === 'string' ? categoryId.trim() : null;
         warehouseId = typeof warehouseId === 'string' ? warehouseId.trim() : null;
         vehicleId = typeof vehicleId === 'string' ? vehicleId.trim() : null;
+        storeId = typeof storeId === 'string' ? storeId.trim() : null;
 
         const showAll = req.query.showAll === 'true';
 
@@ -49,6 +50,10 @@ export const getProducts = async (req, res, next) => {
 
         if (categoryId && categoryId !== 'all') {
             query.where.categoryId = categoryId;
+        }
+
+        if (storeId && storeId !== 'all') {
+            query.where.storeId = storeId;
         }
 
         // Filter by Warehouse

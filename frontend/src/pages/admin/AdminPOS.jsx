@@ -15,9 +15,13 @@ import {
   Gift,
   Loader2,
   X,
-  Barcode
+  Barcode,
+  Store,
+  Users,
+  Truck,
+  ArrowRight
 } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { productsAPI, ordersAPI } from '../../services/api';
 import adminAPI from '../../services/adminService';
 import { damageAPI } from '../../services/damageService';
@@ -43,22 +47,122 @@ import {
   Trash2 as Trash,
   Menu,
   LayoutGrid,
+  MapPin,
   Settings,
   Bell,
   Scan,
   History,
-  Calendar
+  Calendar,
+  RotateCcw
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { jsPDF } from 'jspdf';
 import villagKartLogo from '../../assets/VillagKart_Logo.png';
 import BarcodeScannerOverlay from '../../components/BarcodeScannerOverlay';
 import { useBarcodeScanner } from '../../hooks/useBarcodeScanner';
+import { clsx } from 'clsx';
+import { twMerge } from 'tailwind-merge';
+
+function cn(...inputs) {
+  return twMerge(clsx(inputs));
+}
 
 export default function AdminPOS() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const storeId = searchParams.get('storeId');
+  const storeName = searchParams.get('storeName');
+  const terminalId = searchParams.get('terminalId');
+  const terminalName = searchParams.get('terminalName');
+
   const { user } = useUserStore();
   const { items, addItem, removeItem, updateQuantity, clearCart, totalAmount, customerName, setCustomerName, customerMobile, setCustomerMobile } = useCartStore();
+
+  // --- STORE SELECTOR STATE ---
+  const [stores, setStores] = useState([]);
+  const [fetchingStores, setFetchingStores] = useState(false);
+  const [storeSearchTerm, setStoreSearchTerm] = useState('');
+
+  const isGlobal = useMemo(() => {
+    if (!user) return false;
+    return (
+      user.role === 'TENANT_OWNER' || 
+      user.role === 'SUPER_ADMIN' || 
+      (user.role === 'ADMIN' && !user.customRoleId) ||
+      user.portalType === 'ADMIN'
+    );
+  }, [user]);
+
+  // --- TERMINAL MANAGEMENT STATE ---
+  const [terminals, setTerminals] = useState([]);
+  const [selectedTerminal, setSelectedTerminal] = useState(null);
+  const [isManagingTerminals, setIsManagingTerminals] = useState(false);
+  const [terminalStore, setTerminalStore] = useState(null);
+  const [fetchingTerminals, setFetchingTerminals] = useState(false);
+  const [terminalSelectionStore, setTerminalSelectionStore] = useState(null);
+  const [terminalList, setTerminalList] = useState([]);
+
+  const handleOpenPOS = async (s) => {
+    try {
+      setFetchingTerminals(true);
+      const { data } = await adminAPI.getTerminals({ storeId: s.id });
+      if (data.success) {
+        if (data.data.length === 0) {
+          toast.info(`Please create at least one terminal for ${s.name}`);
+          setTerminalStore(s);
+          setIsManagingTerminals(true);
+        } else if (data.data.length === 1) {
+          const t = data.data[0];
+          navigate(`/admin/pos?storeId=${s.id}&storeName=${encodeURIComponent(s.name)}&terminalId=${t.id}&terminalName=${encodeURIComponent(t.name)}`);
+        } else {
+          setTerminalList(data.data);
+          setTerminalSelectionStore(s);
+        }
+      }
+    } catch (err) {
+      toast.error('Failed to check terminals');
+    } finally {
+      setFetchingTerminals(false);
+    }
+  };
+
+  const fetchStores = async () => {
+    try {
+      setFetchingStores(true);
+      const { data } = await adminAPI.getStores();
+      if (data.success) {
+        setStores(data.data);
+      }
+    } catch (err) {
+      console.error('Failed to fetch stores:', err);
+    } finally {
+      setFetchingStores(false);
+    }
+  };
+
+  useEffect(() => {
+    if (isGlobal) {
+      fetchStores();
+    }
+  }, [isGlobal]);
+
+  // Auto-redirect fixed-store users
+  useEffect(() => {
+    if (!storeId && !isGlobal && user?.storeId) {
+      navigate(`/admin/pos?storeId=${user.storeId}&storeName=${encodeURIComponent(user.storeName || 'My Store')}`, { replace: true });
+    }
+  }, [storeId, isGlobal, user]);
+
+
+  // --- STORE ISOLATION LOGIC ---
+  useEffect(() => {
+    // Clear cart if switching stores to prevent leakage
+    if (items.length > 0) {
+      clearCart();
+      toast.success(`Switched to ${storeName || 'Store'} context. Cart cleared.`);
+    }
+  }, [storeId]);
+
 
   const [loading, setLoading] = useState(true);
   const [products, setProducts] = useState([]);
@@ -113,7 +217,7 @@ export default function AdminPOS() {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const { data } = await productsAPI.getAll({ showAll: true });
+      const { data } = await productsAPI.getAll({ showAll: true, storeId });
       setProducts(data);
     } catch (err) {
       toast.error('Failed to load products');
@@ -126,7 +230,7 @@ export default function AdminPOS() {
   useEffect(() => {
     const fetchSettings = async () => {
       try {
-        const { data } = await adminAPI.getSettings();
+        const { data } = await adminAPI.getSettings({ storeId });
         if (data?.success) {
           setSettings(data.data);
           if (data.data.deliverySlabs) {
@@ -140,7 +244,7 @@ export default function AdminPOS() {
 
     fetchProducts();
     fetchSettings();
-  }, []);
+  }, [storeId]);
 
   const [currentTime, setCurrentTime] = useState(new Date());
   useEffect(() => {
@@ -197,6 +301,8 @@ export default function AdminPOS() {
         mobile: customerMobile || undefined,
         customerName: customerName || undefined,
         items: items.map(i => ({ productId: i.productId, quantity: i.quantity })),
+        storeId,
+        terminalId,
       });
 
       await ordersAPI.completePayment({
@@ -245,6 +351,7 @@ export default function AdminPOS() {
       formData.append('damageType', damageData.type);
       formData.append('reason', damageData.reason || `Damage reported via Admin POS for ${productToDamage.name}`);
       formData.append('responsibility', damageData.responsibility);
+      if (storeId) formData.append('storeId', storeId);
       
       damageData.images.forEach(img => {
         formData.append('images', img);
@@ -831,6 +938,29 @@ export default function AdminPOS() {
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
   const [isCartOpen, setIsCartOpen] = useState(false);
 
+  if (!storeId && isGlobal) {
+    return (
+      <StoreSelectionScreen 
+        stores={stores} 
+        fetchingStores={fetchingStores} 
+        searchTerm={storeSearchTerm} 
+        setSearchTerm={setStoreSearchTerm} 
+        navigate={navigate} 
+        storeId={storeId}
+        onRefresh={fetchStores}
+        handleOpenPOS={handleOpenPOS}
+        fetchingTerminals={fetchingTerminals}
+        isManagingTerminals={isManagingTerminals}
+        setIsManagingTerminals={setIsManagingTerminals}
+        terminalStore={terminalStore}
+        setTerminalStore={setTerminalStore}
+        terminalSelectionStore={terminalSelectionStore}
+        setTerminalSelectionStore={setTerminalSelectionStore}
+        terminalList={terminalList}
+      />
+    );
+  }
+
   return (
     <div className="flex flex-col h-screen bg-slate-50 overflow-hidden text-slate-900">
       {/* ── NEW PREMIUM HEADER ── */}
@@ -838,9 +968,9 @@ export default function AdminPOS() {
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/admin/pos')}
               className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-emerald-600 transition-all group"
-              title="Back to Dashboard"
+              title="Back to Branch Selection"
             >
               <ArrowLeft size={22} className="group-hover:-translate-x-1 transition-transform" />
             </button>
@@ -855,10 +985,21 @@ export default function AdminPOS() {
           <div className="h-8 w-px bg-slate-100 mx-2 hidden lg:block" />
 
           <div className="hidden lg:block">
-            <h2 className="text-lg font-black leading-none text-slate-800">POS Billing <Zap size={14} className="inline text-emerald-500 fill-emerald-500" /></h2>
-            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Instant Warehouse Direct Sales</p>
+            <h2 className="text-lg font-black leading-none text-slate-800">{storeName || 'POS Billing'} <Zap size={14} className="inline text-emerald-500 fill-emerald-500" /></h2>
+            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">Instant {storeName ? 'Branch' : 'Warehouse'} Direct Sales</p>
           </div>
         </div>
+
+        {/* Store Selector Button (For Global Admins) */}
+        {isGlobal && (
+          <button
+            onClick={() => navigate('/admin/pos')}
+            className="flex items-center gap-2 px-3 py-2 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 hover:bg-emerald-100 transition-all ml-4"
+          >
+            <Store size={16} />
+            <span className="text-xs font-bold uppercase tracking-wider">Switch Branch</span>
+          </button>
+        )}
 
         {/* Central Search */}
         <div className="flex-1 max-w-xl mx-8 relative hidden md:block">
@@ -1861,6 +2002,456 @@ export default function AdminPOS() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// --- FULL SCREEN STORE SELECTION VIEW ---
+function StoreSelectionScreen({ 
+  stores, 
+  fetchingStores, 
+  searchTerm, 
+  setSearchTerm, 
+  navigate, 
+  storeId, 
+  onRefresh,
+  handleOpenPOS,
+  fetchingTerminals,
+  isManagingTerminals,
+  setIsManagingTerminals,
+  terminalStore,
+  setTerminalStore,
+  terminalSelectionStore,
+  setTerminalSelectionStore,
+  terminalList
+}) {
+  const filteredStores = useMemo(() => {
+    return stores.filter(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+      s.code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (s.address && s.address.toLowerCase().includes(searchTerm.toLowerCase()))
+    );
+  }, [stores, searchTerm]);
+
+  if (terminalSelectionStore) {
+    return (
+      <TerminalSelectionScreen 
+        store={terminalSelectionStore}
+        terminals={terminalList}
+        onClose={() => setTerminalSelectionStore(null)}
+        onSelect={(t) => {
+          navigate(`/admin/pos?storeId=${terminalSelectionStore.id}&storeName=${encodeURIComponent(terminalSelectionStore.name)}&terminalId=${t.id}&terminalName=${encodeURIComponent(t.name)}`);
+          setTerminalSelectionStore(null);
+        }}
+        navigate={navigate}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 animate-in fade-in duration-500 relative">
+      {/* Top Left Back Button */}
+      <div className="absolute top-8 left-8">
+        <button 
+          onClick={() => navigate('/admin')}
+          className="p-3 bg-white hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all group shadow-sm border border-slate-100 flex items-center gap-2"
+          title="Back to Dashboard"
+        >
+          <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+          <span className="text-xs font-black uppercase tracking-wider pr-1">Dashboard</span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-5xl">
+        {/* Header Section */}
+        <div className="text-center mb-12">
+          <div className="inline-flex items-center gap-3 px-6 py-3 bg-white rounded-2xl shadow-sm border border-slate-100 mb-8 animate-in slide-in-from-top duration-700">
+            <div className="p-2 bg-emerald-600 rounded-lg text-white">
+              <Store size={20} />
+            </div>
+            <span className="text-sm font-black text-slate-800 tracking-tight uppercase">POS Control Center</span>
+          </div>
+          
+          <h1 className="text-5xl font-black text-slate-900 mb-4 tracking-tight">
+            Select <span className="text-emerald-600 underline decoration-emerald-200 underline-offset-8">Branch</span> Context
+          </h1>
+          <p className="text-slate-500 font-bold max-w-xl mx-auto">
+            Choose a branch to start your Point of Sale session. All inventory, sales records, and session data will be isolated to the selected branch.
+          </p>
+        </div>
+
+        {/* Search & Filter */}
+        <div className="relative max-w-md mx-auto mb-10 group">
+          <Search size={20} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-emerald-500 transition-colors" />
+          <input
+            type="text"
+            placeholder="Search branches by name, code or location..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-white border border-slate-100 rounded-2xl pl-12 pr-4 py-4 text-sm font-bold shadow-sm focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500/20 transition-all outline-none"
+          />
+        </div>
+
+        {/* Store Table */}
+        <div className="min-h-[400px]">
+          {fetchingStores ? (
+            <div className="flex flex-col items-center justify-center py-24">
+              <Loader2 size={48} className="text-emerald-600 animate-spin mb-6" />
+              <p className="text-lg font-black text-slate-400">Loading organization nodes...</p>
+            </div>
+          ) : filteredStores.length > 0 ? (
+            <div className="bg-white rounded-[2rem] shadow-xl shadow-slate-200/50 border border-slate-100 overflow-hidden animate-in slide-in-from-bottom duration-700">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/80 border-b border-slate-100">
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Code</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Branch Name</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest">Location</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Team</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-center">Fleet</th>
+                    <th className="px-6 py-3 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-50">
+                  {filteredStores.map(s => (
+                    <tr 
+                      key={s.id} 
+                      className="group hover:bg-emerald-50/40 transition-colors cursor-pointer whitespace-nowrap"
+                      onClick={() => navigate(`/admin/pos?storeId=${s.id}&storeName=${encodeURIComponent(s.name)}`)}
+                    >
+                      <td className="px-6 py-3">
+                        <span className="text-[11px] font-black text-slate-400 group-hover:text-emerald-600 transition-colors">{s.code}</span>
+                      </td>
+                      <td className="px-6 py-3">
+                        <h3 className="text-sm font-black text-slate-800">{s.name}</h3>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="text-xs font-bold text-slate-500 max-w-[300px] truncate block">{s.address || '---'}</span>
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <span className="text-xs font-black text-slate-600 px-2 py-0.5 bg-slate-100 rounded-md">
+                          {s._count?.users || 0}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-center">
+                        <span className="text-xs font-black text-slate-600 px-2 py-0.5 bg-slate-100 rounded-md">
+                          {s._count?.vehicles || 0}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setTerminalStore(s);
+                              setIsManagingTerminals(true);
+                            }}
+                            className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-all"
+                            title="Manage Terminals"
+                          >
+                            <Settings size={16} />
+                          </button>
+                          <button 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleOpenPOS(s);
+                            }}
+                            disabled={fetchingTerminals}
+                            className="px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-sm hover:shadow-emerald-600/20 disabled:opacity-50"
+                          >
+                            {fetchingTerminals ? 'Checking...' : 'Open POS'}
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <div className="text-center py-24 bg-white rounded-[3rem] border-2 border-dashed border-slate-200">
+              <div className="w-20 h-20 bg-orange-50 text-orange-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle size={40} />
+              </div>
+              <h3 className="text-2xl font-black text-slate-800 mb-2">No Matching Branches</h3>
+              <p className="text-slate-400 font-bold max-w-xs mx-auto">We couldn't find any branches matching your search criteria.</p>
+              <button 
+                onClick={() => setSearchTerm('')}
+                className="mt-6 text-emerald-600 font-black hover:underline underline-offset-4"
+              >
+                Clear all filters
+              </button>
+            </div>
+          )}
+        </div>
+
+        {/* Footer Navigation */}
+        <div className="mt-16 flex items-center justify-center gap-12">
+          <button 
+            onClick={() => navigate('/admin')}
+            className="flex items-center gap-2 text-sm font-black text-slate-400 hover:text-slate-800 transition-all group"
+          >
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            Back to Dashboard
+          </button>
+          <div className="w-1.5 h-1.5 rounded-full bg-slate-200" />
+          <button 
+            onClick={onRefresh}
+            className="flex items-center gap-2 text-sm font-black text-slate-400 hover:text-emerald-600 transition-all group"
+          >
+            <RotateCcw size={18} className="group-hover:rotate-180 transition-transform duration-500" />
+            Refresh Nodes
+          </button>
+        </div>
+      </div>
+
+      {/* Terminal Management Modal */}
+      {isManagingTerminals && terminalStore && (
+        <TerminalManagementModal 
+          store={terminalStore} 
+          onClose={() => {
+            setIsManagingTerminals(false);
+            setTerminalStore(null);
+          }} 
+        />
+      )}
+
+      {/* Terminal Selection View is now handled at the top of StoreSelectionScreen */}
+    </div>
+  );
+}
+
+// --- TERMINAL SELECTION SCREEN ---
+function TerminalSelectionScreen({ store, terminals, onClose, onSelect, navigate }) {
+  return (
+    <div className="min-h-screen bg-slate-50 flex flex-col items-center justify-center p-6 animate-in fade-in zoom-in duration-500 relative">
+      <div className="absolute top-8 left-8">
+        <button 
+          onClick={onClose}
+          className="p-3 bg-white hover:bg-slate-50 rounded-2xl text-slate-400 hover:text-emerald-600 transition-all group shadow-sm border border-slate-100 flex items-center gap-2"
+        >
+          <ArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+          <span className="text-xs font-black uppercase tracking-wider pr-1">Branches</span>
+        </button>
+      </div>
+
+      <div className="w-full max-w-xl">
+        <div className="bg-white rounded-[3rem] shadow-2xl shadow-slate-200/50 border border-slate-100 p-12 text-center">
+          <div className="w-24 h-24 bg-emerald-50 text-emerald-600 rounded-[2.5rem] flex items-center justify-center mx-auto mb-8 shadow-sm border border-emerald-100 animate-bounce-slow">
+            <Smartphone size={40} />
+          </div>
+          
+          <div className="mb-10">
+            <span className="px-4 py-1.5 bg-emerald-50 text-emerald-600 rounded-full text-[10px] font-black uppercase tracking-widest mb-4 inline-block">
+              Active Session Initiation
+            </span>
+            <h2 className="text-4xl font-black text-slate-900 mb-2 tracking-tight">Select POS Terminal</h2>
+            <p className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center justify-center gap-2">
+              <Store size={14} className="text-emerald-500" />
+              {store.name}
+            </p>
+          </div>
+          
+          <div className="space-y-4">
+            {terminals.map((t, idx) => (
+              <button
+                key={t.id}
+                onClick={() => onSelect(t)}
+                style={{ animationDelay: `${idx * 100}ms` }}
+                className="w-full flex items-center justify-between p-6 bg-slate-50 hover:bg-emerald-600 hover:text-white rounded-[2rem] transition-all group border border-slate-100 hover:border-emerald-500 shadow-sm hover:shadow-xl hover:shadow-emerald-200 animate-in slide-in-from-bottom-4 fill-mode-both"
+              >
+                <div className="flex items-center gap-5">
+                  <div className="w-12 h-12 bg-white text-slate-400 rounded-2xl flex items-center justify-center group-hover:text-emerald-600 transition-all group-hover:rotate-6 shadow-sm">
+                    <Smartphone size={24} />
+                  </div>
+                  <div className="text-left">
+                    <h4 className="font-black text-base uppercase tracking-tight leading-none mb-1.5">{t.name}</h4>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black opacity-40 uppercase tracking-widest">{t.code}</span>
+                      <div className="w-1 h-1 rounded-full bg-slate-300" />
+                      <span className="text-[10px] font-bold text-emerald-500 group-hover:text-emerald-200 uppercase tracking-widest">Available</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-3 bg-white/10 rounded-full opacity-0 group-hover:opacity-100 -translate-x-4 group-hover:translate-x-0 transition-all duration-300">
+                  <ArrowRight size={20} />
+                </div>
+              </button>
+            ))}
+          </div>
+
+          <div className="mt-12 pt-8 border-t border-slate-50 flex flex-col items-center gap-4">
+            <button 
+              onClick={onClose}
+              className="text-xs font-black text-slate-400 hover:text-slate-900 transition-colors uppercase tracking-[0.2em] flex items-center gap-2 group"
+            >
+              <RotateCcw size={14} className="group-hover:-rotate-90 transition-transform" />
+              Change Branch Context
+            </button>
+            <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest max-w-xs mx-auto">
+              Please select a physical counter terminal to continue to the POS interface.
+            </p>
+          </div>
+        </div>
+
+        <div className="mt-12 text-center">
+          <button 
+            onClick={() => navigate('/admin')}
+            className="text-sm font-black text-slate-400 hover:text-slate-800 transition-all flex items-center justify-center gap-2 mx-auto group"
+          >
+            <ArrowLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+            Back to Dashboard
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+
+// --- TERMINAL MANAGEMENT MODAL ---
+function TerminalManagementModal({ store, onClose }) {
+  const [terminals, setTerminals] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [newTerminal, setNewTerminal] = useState({ name: '', code: '' });
+
+  const fetchTerminals = async () => {
+    try {
+      setLoading(true);
+      const { data } = await adminAPI.getTerminals({ storeId: store.id });
+      if (data.success) {
+        setTerminals(data.data);
+      }
+    } catch (err) {
+      toast.error('Failed to load terminals');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchTerminals();
+  }, [store.id]);
+
+  const handleCreate = async (e) => {
+    e.preventDefault();
+    try {
+      setSaving(true);
+      const { data } = await adminAPI.createTerminal({ ...newTerminal, storeId: store.id });
+      if (data.success) {
+        toast.success('Terminal created');
+        setNewTerminal({ name: '', code: '' });
+        fetchTerminals();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to create terminal');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this terminal?')) return;
+    try {
+      const { data } = await adminAPI.deleteTerminal(id);
+      if (data.success) {
+        toast.success('Terminal deleted');
+        fetchTerminals();
+      }
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Delete failed');
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-300">
+        <div className="px-8 py-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+          <div>
+            <h2 className="text-xl font-black text-slate-900">POS Terminals</h2>
+            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{store.name} context</p>
+          </div>
+          <button onClick={onClose} className="p-2 hover:bg-slate-200 rounded-xl transition-colors">
+            <X size={20} className="text-slate-400" />
+          </button>
+        </div>
+
+        <div className="p-8">
+          {/* Create Form */}
+          <form onSubmit={handleCreate} className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8 p-6 bg-emerald-50 rounded-3xl border border-emerald-100">
+            <div className="sm:col-span-1">
+              <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-1.5 ml-1">Counter Code</label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. POS-01"
+                className="w-full bg-white border-none rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                value={newTerminal.code}
+                onChange={e => setNewTerminal({...newTerminal, code: e.target.value.toUpperCase()})}
+              />
+            </div>
+            <div className="sm:col-span-1">
+              <label className="block text-[10px] font-black text-emerald-700 uppercase tracking-widest mb-1.5 ml-1">Terminal Name</label>
+              <input
+                required
+                type="text"
+                placeholder="e.g. Main Desk"
+                className="w-full bg-white border-none rounded-xl px-4 py-2.5 text-sm font-bold shadow-sm focus:ring-2 focus:ring-emerald-500 outline-none"
+                value={newTerminal.name}
+                onChange={e => setNewTerminal({...newTerminal, name: e.target.value})}
+              />
+            </div>
+            <div className="sm:col-span-1 flex items-end">
+              <button
+                disabled={saving}
+                className="w-full h-[42px] bg-emerald-600 text-white rounded-xl text-xs font-black uppercase tracking-widest hover:bg-emerald-700 transition-all disabled:opacity-50"
+              >
+                {saving ? 'Creating...' : 'Add Terminal'}
+              </button>
+            </div>
+          </form>
+
+          {/* Terminals List */}
+          <div className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+            {loading ? (
+              <div className="py-12 text-center">
+                <Loader2 size={32} className="animate-spin text-slate-300 mx-auto mb-2" />
+                <p className="text-sm font-bold text-slate-400">Loading terminals...</p>
+              </div>
+            ) : terminals.length > 0 ? (
+              terminals.map(t => (
+                <div key={t.id} className="group flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl hover:border-emerald-200 hover:shadow-sm transition-all">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2.5 bg-slate-50 text-slate-400 rounded-xl">
+                      <Smartphone size={20} />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-emerald-600 bg-emerald-50 px-1.5 rounded uppercase">{t.code}</span>
+                        <h4 className="text-sm font-black text-slate-800">{t.name}</h4>
+                      </div>
+                      <p className="text-[10px] font-bold text-slate-400 uppercase tracking-tighter mt-0.5">Created {new Date(t.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => handleDelete(t.id)}
+                      className="p-2 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="py-12 text-center bg-slate-50 rounded-3xl border-2 border-dashed border-slate-200">
+                <p className="text-sm font-bold text-slate-400">No terminals found for this branch.</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

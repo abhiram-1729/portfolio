@@ -218,6 +218,12 @@ export const adminAPI = {
   saveDepreciationSchedule: (data) => api.post('/admin/assets/depreciation', data),
   getAssetAudits: (params) => api.get('/admin/assets/audits', { params }),
   createAssetAudit: (data) => api.post('/admin/assets/audits', data),
+
+  // POS Terminals
+  getTerminals: (params) => api.get('/admin/terminals', { params }),
+  createTerminal: (data) => api.post('/admin/terminals', data),
+  updateTerminal: (id, data) => api.put(`/admin/terminals/${id}`, data),
+  deleteTerminal: (id) => api.delete(`/admin/terminals/${id}`),
 };
 
 export default adminAPI;

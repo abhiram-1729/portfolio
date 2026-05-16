@@ -22,6 +22,7 @@ import * as vehicleTripCtr from '../controllers/admin/vehicleTripController.js';
 import * as fuelCtr from '../controllers/admin/fuelController.js';
 import * as maintenanceCtr from '../controllers/admin/maintenanceController.js';
 import * as vehDmgCtr from '../controllers/admin/vehicleDamageController.js';
+import * as terminalCtr from '../controllers/admin/terminalController.js';
 import { getFinanceReports } from '../controllers/cashController.js';
 import { uploadMiddleware, zipUpload } from '../middleware/uploadMiddleware.js';
 
@@ -247,5 +248,13 @@ router.get('/vehicle-damages', vehDmgCtr.getVehicleDamages);
 router.post('/vehicle-damages', uploadMiddleware.array('images', 5), vehDmgCtr.createVehicleDamage);
 router.put('/vehicle-damages/:id', uploadMiddleware.array('images', 5), vehDmgCtr.updateVehicleDamage);
 router.delete('/vehicle-damages/:id', vehDmgCtr.deleteVehicleDamage);
+
+// POS Terminals
+router.route('/terminals')
+  .get(terminalCtr.getTerminals)
+  .post(terminalCtr.createTerminal);
+router.route('/terminals/:id')
+  .put(terminalCtr.updateTerminal)
+  .delete(terminalCtr.deleteTerminal);
 
 export default router;
