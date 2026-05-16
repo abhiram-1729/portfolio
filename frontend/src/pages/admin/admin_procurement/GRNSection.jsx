@@ -8,8 +8,10 @@ import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
 
 const GRNSection = ({ can, storeId, setHideMainHeader }) => {
+  const [searchParams] = useSearchParams();
   const [view, setView] = useState('receive'); // 'receive' or 'history' or 'report'
   const [pos, setPOs] = useState([]);
   const [grns, setGRNs] = useState([]);
@@ -39,10 +41,18 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
 
   useEffect(() => { loadData(); }, [loadData]);
 
+  useEffect(() => {
+    const searchTerm = searchParams.get('search');
+    if (searchTerm && view !== 'report') {
+      setView('history');
+    }
+  }, [searchParams, view]);
+
   const handleViewReport = (grn) => {
+    if (!grn) return;
     setSelectedReport(grn);
     setView('report');
-    setHideMainHeader?.(true);
+    if (setHideMainHeader) setHideMainHeader(true);
   };
 
   const handlePrintReport = (grn) => {
@@ -568,11 +578,27 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {grns.map(grn => {
-                    const totalDamaged = grn.items?.reduce((acc, i) => acc + (i.damagedQty || 0), 0) || 0;
-                    const totalMissing = grn.items?.reduce((acc, i) => acc + (i.missingQty || 0), 0) || 0;
+                  {grns.filter(grn => {
+                    const searchTerm = searchParams.get('search')?.toLowerCase();
+                    if (!searchTerm) return true;
+                    
+                    const grnId = `GRN-${grn.displayId}`.toLowerCase();
+                    const poId = `PO-${grn.po?.displayId}`.toLowerCase();
+                    const vendor = grn.po?.vendor?.vendorName?.toLowerCase() || '';
+                    
+                    return (
+                      grnId.includes(searchTerm) ||
+                      poId.includes(searchTerm) ||
+                      vendor.includes(searchTerm) ||
+                      grn.displayId?.toString().toLowerCase().includes(searchTerm) ||
+                      grn.po?.displayId?.toString().toLowerCase().includes(searchTerm)
+                    );
+                  }).map(grn => {
+                    const items = grn.items || [];
+                    const totalDamaged = items.reduce((acc, i) => acc + (i.damagedQty || 0), 0);
+                    const totalMissing = items.reduce((acc, i) => acc + (i.missingQty || 0), 0);
                     const totalDiscrepancies = totalDamaged + totalMissing;
-                    const totalAccepted = grn.items?.reduce((acc, i) => acc + (i.receivedQty || 0) - (i.damagedQty || 0), 0) || 0;
+                    const totalAccepted = items.reduce((acc, i) => acc + (i.receivedQty || 0) - (i.damagedQty || 0), 0);
                     const isFullyAccepted = totalDiscrepancies === 0;
 
                     return (
@@ -677,15 +703,15 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-y-10 gap-x-12">
               <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">GRN ID</span>
-                <p className="text-base font-bold text-gray-900 uppercase">GRN-{selectedReport.displayId}</p>
+                <p className="text-base font-bold text-gray-900 uppercase">GRN-{selectedReport.displayId || 'N/A'}</p>
               </div>
               <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Related PO</span>
-                <p className="text-base font-bold text-gray-900 uppercase">PO-{selectedReport.po?.displayId}</p>
+                <p className="text-base font-bold text-gray-900 uppercase">PO-{selectedReport.po?.displayId || 'N/A'}</p>
               </div>
               <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Vendor</span>
-                <p className="text-base font-bold text-gray-900 uppercase">{selectedReport.po?.vendor?.vendorName}</p>
+                <p className="text-base font-bold text-gray-900 uppercase">{selectedReport.po?.vendor?.vendorName || 'N/A'}</p>
               </div>
               <div className="space-y-1.5">
                 <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider">Branch</span>

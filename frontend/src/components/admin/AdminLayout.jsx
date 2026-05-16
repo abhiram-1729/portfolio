@@ -258,7 +258,7 @@ export default function AdminLayout() {
         { to: '/admin/delivery-logistics', icon: Truck, label: 'Delivery Logistics', module: 'ADMIN' },
       ]
     },
-    { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
+    // { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
@@ -410,6 +410,19 @@ export default function AdminLayout() {
     } else {
       const perms = user?.permissions?.[item.module];
       hasModuleRead = Array.isArray(perms) ? perms.includes('READ') : false;
+
+      // Fallback: If top-level READ is missing, check if any granular section has READ
+      if (!hasModuleRead) {
+        const sections = user?.permissions?.[`${item.module}_SECTIONS`];
+        if (sections && typeof sections === 'object') {
+          hasModuleRead = Object.values(sections).some(p => (p || []).includes('READ'));
+        }
+        // Also check TARGET_SECTIONS pattern
+        if (!hasModuleRead) {
+          const targets = user?.permissions?.[`${item.module}_TARGET_SECTIONS`];
+          if (Array.isArray(targets) && targets.length > 0) hasModuleRead = true;
+        }
+      }
     }
     if (!hasModuleRead) return false;
 
@@ -446,12 +459,12 @@ export default function AdminLayout() {
       }
     }
     if (item.module === 'EXPENSES') {
-      const sections = user?.permissions?.EXPENSE_SECTIONS;
+      const sections = user?.permissions?.EXPENSES_SECTIONS;
       if (sections) {
         return Object.values(sections).some(perms => (perms || []).includes('READ'));
       }
     }
-    
+
     if (item.module === 'STORE_CONTEXT') {
       const sections = user?.permissions?.STORE_CONTEXT;
       if (sections) return (sections[item.section] || []).includes('READ');
@@ -549,7 +562,7 @@ export default function AdminLayout() {
     }
 
     if (location.pathname.startsWith('/admin/expenses')) {
-      const sections = user?.permissions?.EXPENSE_SECTIONS;
+      const sections = user?.permissions?.EXPENSES_SECTIONS;
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
     }
 
@@ -615,13 +628,11 @@ export default function AdminLayout() {
               {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
                 <Link
                   to={appendParams('/admin/pos')}
-                  className="p-2 text-gray-500 hover:text-emerald-600 transition-colors rounded-full hover:bg-emerald-50 flex items-center gap-2 pr-4 pl-3"
+                  className="bg-emerald-600 text-white flex items-center gap-2 px-3 py-1.5 rounded-xl hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20 hover:-translate-y-0.5 active:translate-y-0 group"
                   title="Point of Sale"
                 >
-                  <div className="w-8 h-8 rounded-lg bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20">
-                    <PlusCircle size={18} strokeWidth={3} />
-                  </div>
-                  <span className="text-[10px] font-black uppercase tracking-widest hidden sm:block">POS</span>
+                  <PlusCircle size={16} strokeWidth={3} className="group-hover:rotate-90 transition-transform duration-300" />
+                  <span className="text-[11px] font-black uppercase tracking-[0.1em] hidden sm:block">POS</span>
                 </Link>
               )}
 
@@ -780,7 +791,7 @@ export default function AdminLayout() {
                           isSidebarCollapsed ? "justify-center px-0" : "justify-between",
                           (location.pathname.startsWith('/admin/procurement') && item.label === 'Procurement') ||
                             ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
-                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Oppoeration') ||
+                            ((location.pathname.startsWith('/admin/users')) && item.label === 'Operation') ||
                             ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
                             ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
                             ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"

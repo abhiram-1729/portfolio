@@ -108,54 +108,56 @@ const DailyReconciliationTab = ({
       </div>
 
       {/* Aggregate Sales Summary Section - Perfectly Matched to Screenshot */}
-      <div className="pt-10 border-t border-gray-100">
-        <div className="flex items-center gap-4 mb-8">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
-            <BarChart3 size={24} />
+      {can('CASH', 'READ', 'AGGREGATE_SUMMARY') && (
+        <div className="pt-10 border-t border-gray-100">
+          <div className="flex items-center gap-4 mb-8">
+            <div className="w-12 h-12 rounded-2xl bg-emerald-50 flex items-center justify-center text-emerald-600 border border-emerald-100">
+              <BarChart3 size={24} />
+            </div>
+            <div>
+              <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Aggregate Daily Sales Summary (POS)</h3>
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Consolidated revenue across all active vehicles Today</p>
+            </div>
           </div>
-          <div>
-            <h3 className="text-[14px] font-black text-gray-900 uppercase tracking-tight">Aggregate Daily Sales Summary (POS)</h3>
-            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-[0.2em] mt-1">Consolidated revenue across all active vehicles Today</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+            {(() => {
+              const totals = filteredSummaries.reduce((acc, s) => {
+                const s1 = s.shiftDetails?.shift1?.live || {};
+                const s2 = s.shiftDetails?.shift2?.live || {};
+
+                acc.cash += (s1.cashSales || 0) + (s2.cashSales || 0);
+                acc.upi += (s1.upiSales || 0) + (s2.upiSales || 0);
+                acc.card += (s1.cardSales || 0) + (s2.cardSales || 0);
+                acc.expenses += (s1.expenses || 0) + (s2.expenses || 0);
+                return acc;
+              }, { cash: 0, upi: 0, card: 0, expenses: 0 });
+
+              const grandTotal = totals.cash + totals.upi + totals.card;
+
+              return [
+                { label: 'TOTAL POS CASH', value: totals.cash, icon: Coins, color: 'text-emerald-600' },
+                { label: 'TOTAL POS UPI', value: totals.upi, icon: Smartphone, color: 'text-emerald-600' },
+                { label: 'TOTAL POS CARD', value: totals.card, icon: CreditCard, color: 'text-emerald-600' },
+                { label: 'GRAND TOTAL SALES', value: grandTotal, icon: Zap, color: 'text-emerald-600' },
+                { label: 'EXPENSES', value: totals.expenses, icon: Coins, color: 'text-emerald-600' }
+              ].map((stat, idx) => (
+                <div key={idx} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-[1.5rem] transition-all hover:shadow-md cursor-default group">
+                  <div className="flex items-center gap-2.5 mb-4">
+                    <stat.icon size={16} className={stat.color} />
+                    <p className="text-[10px] font-black tracking-widest uppercase text-emerald-700/70">{stat.label}</p>
+                  </div>
+                  <div className="flex items-baseline">
+                    <span className="text-2xl font-black text-gray-900 tabular-nums">
+                      ₹{stat.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                </div>
+              ));
+            })()}
           </div>
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-          {(() => {
-            const totals = filteredSummaries.reduce((acc, s) => {
-              const s1 = s.shiftDetails?.shift1?.live || {};
-              const s2 = s.shiftDetails?.shift2?.live || {};
-              
-              acc.cash += (s1.cashSales || 0) + (s2.cashSales || 0);
-              acc.upi += (s1.upiSales || 0) + (s2.upiSales || 0);
-              acc.card += (s1.cardSales || 0) + (s2.cardSales || 0);
-              acc.expenses += (s1.expenses || 0) + (s2.expenses || 0);
-              return acc;
-            }, { cash: 0, upi: 0, card: 0, expenses: 0 });
-
-            const grandTotal = totals.cash + totals.upi + totals.card;
-
-            return [
-              { label: 'TOTAL POS CASH', value: totals.cash, icon: Coins, color: 'text-emerald-600' },
-              { label: 'TOTAL POS UPI', value: totals.upi, icon: Smartphone, color: 'text-emerald-600' },
-              { label: 'TOTAL POS CARD', value: totals.card, icon: CreditCard, color: 'text-emerald-600' },
-              { label: 'GRAND TOTAL SALES', value: grandTotal, icon: Zap, color: 'text-emerald-600' },
-              { label: 'EXPENSES', value: totals.expenses, icon: Coins, color: 'text-emerald-600' }
-            ].map((stat, idx) => (
-              <div key={idx} className="bg-emerald-50/50 border border-emerald-100 p-6 rounded-[1.5rem] transition-all hover:shadow-md cursor-default group">
-                <div className="flex items-center gap-2.5 mb-4">
-                  <stat.icon size={16} className={stat.color} />
-                  <p className="text-[10px] font-black tracking-widest uppercase text-emerald-700/70">{stat.label}</p>
-                </div>
-                <div className="flex items-baseline">
-                  <span className="text-2xl font-black text-gray-900 tabular-nums">
-                    ₹{stat.value.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                  </span>
-                </div>
-              </div>
-            ));
-          })()}
-        </div>
-      </div>
+      )}
     </div>
   );
 };

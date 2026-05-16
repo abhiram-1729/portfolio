@@ -298,7 +298,7 @@ export default function AdminDashboard() {
       <div className="grid grid-cols-12 gap-6">
         {[
           { key: 'totalSales',       label: 'Revenue Today',    value: `₹${stats?.totalSales?.toLocaleString() || 0}`,       icon: IndianRupee,  color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+12.5%',           detail: 'Gross Intake'    },
-          { key: 'grossMargin',      label: 'Gross Margin',     value: `${stats?.grossMargin || 0}%`,                         icon: TrendingUp,   color: 'text-blue-600',    bg: 'bg-blue-50',    trend: `₹${stats?.grossProfit?.toLocaleString()}`, detail: 'Net Efficiency'  },
+          { key: 'grossMargin',      label: 'Gross Margin',     value: `${stats?.grossMargin || 0}%`,                         icon: TrendingUp,   color: 'text-blue-600',    bg: 'bg-blue-50',    trend: `₹${stats?.grossProfit?.toLocaleString() || 0}`, detail: 'Net Efficiency'  },
           { key: 'totalOrders',      label: 'Orders Today',     value: stats?.ordersToday || 0,                               icon: ShoppingCart, color: 'text-orange-600',  bg: 'bg-orange-50',  trend: 'Processed',         detail: 'Trans. Volume'   },
           { key: 'activeVehicles',   label: 'Active Fleet',     value: stats?.activeVehicles || 0,                            icon: Truck,        color: 'text-indigo-600',  bg: 'bg-indigo-50',  trend: 'In-Transit',        detail: 'Deployment'      },
           { key: 'stockValuation',   label: 'Stock Valuation',  value: `₹${(metrics.totalStockValue || 0).toLocaleString()}`, icon: Package,      color: 'text-teal-600',    bg: 'bg-teal-50',    trend: 'Estimated',         detail: 'Assets Value'    },
@@ -441,7 +441,7 @@ export default function AdminDashboard() {
                     <div key={entry.name} className="flex items-center gap-3">
                       <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[(index + 2) % COLORS.length] }} />
                       <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{entry.name}</span>
-                      <span className="text-xs font-black text-gray-900 ml-auto">₹{entry.value.toLocaleString()}</span>
+                      <span className="text-xs font-black text-gray-900 ml-auto">₹{entry.value?.toLocaleString() || 0}</span>
                     </div>
                   ))}
                 </div>
@@ -580,7 +580,7 @@ export default function AdminDashboard() {
                       <p className="text-[8px] font-bold text-white/30 uppercase mt-0.5">{summary.status} • {format(new Date(), 'HH:mm')}</p>
                     </div>
                     <div className="text-right">
-                      <p className="text-sm font-black">₹{summary.actualCash.toLocaleString()}</p>
+                      <p className="text-sm font-black">₹{summary.actualCash?.toLocaleString() || 0}</p>
                       <div className={`flex items-center justify-end gap-1 text-[8px] font-black ${summary.difference >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
                         {summary.difference === 0 ? <UserCheck size={8} /> : null}
                         {summary.difference === 0 ? 'VERIFIED' : `DELTA: ₹${summary.difference}`}
@@ -615,7 +615,7 @@ export default function AdminDashboard() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-[11px] font-black text-gray-900 truncate uppercase tracking-tight">{agent.user?.name}</p>
-                      <span className="text-xs font-black text-gray-900 tracking-tighter">₹{agent.totalSales.toLocaleString()}</span>
+                      <span className="text-xs font-black text-gray-900 tracking-tighter">₹{agent.totalSales?.toLocaleString() || 0}</span>
                     </div>
                     <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden shadow-inner">
                       <motion.div 
@@ -658,7 +658,7 @@ export default function AdminDashboard() {
                       <p className="text-[11px] font-black text-gray-900 uppercase tracking-tight group-hover:text-emerald-600 transition-colors">{order.customerName || 'Retail Client'}</p>
                       <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{order.paymentMode}</p>
                     </div>
-                    <p className="text-sm font-black text-gray-900 tracking-tighter">₹{order.totalAmount.toLocaleString()}</p>
+                    <p className="text-sm font-black text-gray-900 tracking-tighter">₹{order.totalAmount?.toLocaleString() || 0}</p>
                   </div>
                 </div>
               ))}

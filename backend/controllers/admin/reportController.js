@@ -1,14 +1,26 @@
 import prisma from '../../utils/prisma.js';
+import { format } from 'date-fns';
 
 export const getDailyReport = async (req, res) => {
   try {
-    const { storeId } = req.query;
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const { storeId, startDate, endDate } = req.query;
+    
+    let start, end;
+    if (startDate && endDate) {
+      start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+      end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+    } else {
+      start = new Date();
+      start.setHours(0, 0, 0, 0);
+      end = new Date(start);
+      end.setHours(23, 59, 59, 999);
+    }
 
     const where = {
       tenantId: req.user.tenantId,
-      createdAt: { gte: today },
+      createdAt: { gte: start, lte: end },
       status: { not: 'CANCELLED' }
     };
 
@@ -21,25 +33,73 @@ export const getDailyReport = async (req, res) => {
     const orders = await prisma.order.findMany({
       where,
       include: { items: true },
+      orderBy: { createdAt: 'desc' }
     });
 
-    const totalOrders = orders.length;
-    const totalSales = orders.reduce((sum, o) => sum + o.totalAmount, 0);
+    const dailyGroups = {};
     const paymentSplits = { CASH: 0, UPI: 0, CARD: 0 };
-    orders.forEach(o => {
-      if (o.paymentMode) paymentSplits[o.paymentMode] = (paymentSplits[o.paymentMode] || 0) + o.totalAmount;
-    });
+    let totalSales = 0;
+    let totalProfit = 0;
 
-    const totalProfit = orders.reduce((sum, order) => {
-      return sum + order.items.reduce((itemSum, item) => {
+    orders.forEach(o => {
+      const dateKey = format(o.createdAt, 'yyyy-MM-dd');
+      if (!dailyGroups[dateKey]) {
+        dailyGroups[dateKey] = {
+          date: dateKey,
+          totalCash: 0,
+          totalUpi: 0,
+          totalCard: 0,
+          grandTotal: 0,
+          totalOrders: 0,
+          remark: ''
+        };
+      }
+      
+      const g = dailyGroups[dateKey];
+      g.totalOrders += 1;
+      g.grandTotal += o.totalAmount;
+      totalSales += o.totalAmount;
+
+      const orderProfit = o.items.reduce((itemSum, item) => {
         return itemSum + ((item.price - (item.landingPrice || 0)) * item.quantity);
       }, 0);
-    }, 0);
+      totalProfit += orderProfit;
+      
+      if (o.paymentMode === 'CASH') {
+        g.totalCash += o.totalAmount;
+        paymentSplits.CASH += o.totalAmount;
+      } else if (o.paymentMode === 'UPI') {
+        g.totalUpi += o.totalAmount;
+        paymentSplits.UPI += o.totalAmount;
+      } else if (o.paymentMode === 'CARD') {
+        g.totalCard += o.totalAmount;
+        paymentSplits.CARD += o.totalAmount;
+      } else if (o.paymentMode === 'CASH_UPI') {
+        const cashPart = o.cashAmount || 0;
+        const upiPart = o.upiAmount || 0;
+        g.totalCash += cashPart;
+        g.totalUpi += upiPart;
+        paymentSplits.CASH += cashPart;
+        paymentSplits.UPI += upiPart;
+      }
+    });
 
-    res.json({ title: 'Daily Report', date: today, totalOrders, totalSales, totalProfit, paymentSplits });
+    const historyData = Object.values(dailyGroups).sort((a, b) => b.date.localeCompare(a.date));
+
+    // Return combined object for backward compatibility and POS history UI
+    res.json({ 
+      success: true, 
+      title: 'Daily Report', 
+      date: format(start, 'yyyy-MM-dd'),
+      totalOrders: orders.length, 
+      totalSales, 
+      totalProfit, 
+      paymentSplits,
+      data: historyData 
+    });
   } catch (error) {
     console.error('[ReportController] Daily Report Error:', error);
-    res.status(500).json({ message: 'Error fetching daily report', error: error.message });
+    res.status(500).json({ success: false, message: 'Error fetching daily report', error: error.message });
   }
 };
 

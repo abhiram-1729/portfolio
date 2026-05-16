@@ -35,6 +35,11 @@ const MODULES = [
   { key: 'STAFF_AGENT', label: 'Agent Management', desc: 'Sales Agents & Field Force' },
   { key: 'VEHICLES', label: 'Fleet Management', desc: 'Vehicles & Assets' },
   { key: 'SALES', label: 'Sales', desc: 'Order management' },
+  { key: 'CASH', label: 'Cash Flow', desc: 'Safe Control & Reconciliation' },
+  { key: 'INVENTORY', label: 'Inventory', desc: 'Stock & Warehouse' },
+  { key: 'PROCUREMENT', label: 'Procurement', desc: 'PO & Vendor Management' },
+  { key: 'REPORTS', label: 'Business Reports', desc: 'Analytics & Intelligence' },
+  { key: 'ROUTES', label: 'Route Operations', desc: 'Villages & Route Maps' },
   { key: 'TARGETS', label: 'Targets', desc: 'VGE incentives' },
   { key: 'ASSETS', label: 'Assets', desc: 'Equipment tracking' },
   { key: 'EXPENSES', label: 'Expenses', desc: 'Reimbursements' },
@@ -67,11 +72,12 @@ const CASH_SECTIONS_LIST = [
   { key: 'FLOAT_ASSIGNMENT', label: 'Assign Float', desc: 'Assign register float' },
   { key: 'SHIFT_SAFEKEEPING', label: 'Shift Safekeeping', desc: "Today's shift tracking" },
   { key: 'RECONCILIATION', label: 'Daily Reconciliation', desc: 'End of day cash audit' },
+  { key: 'AGGREGATE_SUMMARY', label: 'POS Aggregate Summary', desc: 'Consolidated revenue across all vehicles' },
   { key: 'LIVE_CASH', label: 'Live Cash Status', desc: 'Real-time register balances' },
   { key: 'AUDIT_LEDGER', label: 'Audit Ledger', desc: 'Transaction history logs' }
 ];
 
-const EXPENSE_SECTIONS_LIST = [
+const EXPENSES_SECTIONS_LIST = [
   { key: 'MONITORING', label: 'Expense Monitoring', desc: 'View all expense submissions' },
   { key: 'APPROVAL', label: 'Expense Approval', desc: 'Approve, reject, and return expenses' },
   { key: 'SETTINGS', label: 'Expense Settings', desc: 'Manage categories, limits & policies' }
@@ -511,7 +517,7 @@ export default function TenantPrivileges() {
       const updatedSections = { ...sections, [sectionKey]: nextPerms };
 
       // Auto-manage top-level CASH:READ based on whether ANY section has READ
-      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'AGGREGATE_SUMMARY', 'LIVE_CASH', 'AUDIT_LEDGER'];
       const anyHasRead = validCashKeys.some(k => (updatedSections[k] || []).includes('READ'));
 
       return {
@@ -532,7 +538,7 @@ export default function TenantPrivileges() {
       const updatedSections = { ...sections, [sectionKey]: allSelected ? [] : ACTIONS.map(a => a.key) };
 
       // Auto-manage top-level CASH:READ based on whether ANY section has READ
-      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'LIVE_CASH', 'AUDIT_LEDGER'];
+      const validCashKeys = ['CASH_OPENING', 'AGENT_CASH', 'SAFE_CONTROL', 'POS_HISTORY', 'SHIFT_DEPOSITS', 'STORE_CLOSURE', 'FLOAT_ASSIGNMENT', 'SHIFT_SAFEKEEPING', 'RECONCILIATION', 'AGGREGATE_SUMMARY', 'LIVE_CASH', 'AUDIT_LEDGER'];
       const anyHasRead = validCashKeys.some(k => (updatedSections[k] || []).includes('READ'));
 
       return {
@@ -601,7 +607,7 @@ export default function TenantPrivileges() {
 
   const toggleExpenseSectionPermission = (sectionKey, actionKey) => {
     setFormPerms(prev => {
-      const sections = prev.EXPENSE_SECTIONS || {};
+      const sections = prev.EXPENSES_SECTIONS || {};
       const current = sections[sectionKey] || [];
       const has = current.includes(actionKey);
 
@@ -611,7 +617,7 @@ export default function TenantPrivileges() {
 
       return {
         ...prev,
-        EXPENSE_SECTIONS: {
+        EXPENSES_SECTIONS: {
           ...sections,
           [sectionKey]: nextPerms
         },
@@ -622,13 +628,13 @@ export default function TenantPrivileges() {
 
   const toggleAllForExpenseSection = (sectionKey) => {
     setFormPerms(prev => {
-      const sections = prev.EXPENSE_SECTIONS || {};
+      const sections = prev.EXPENSES_SECTIONS || {};
       const current = sections[sectionKey] || [];
       const allSelected = ACTIONS.every(a => current.includes(a.key));
 
       return {
         ...prev,
-        EXPENSE_SECTIONS: {
+        EXPENSES_SECTIONS: {
           ...sections,
           [sectionKey]: allSelected ? [] : ACTIONS.map(a => a.key)
         },
@@ -676,7 +682,7 @@ export default function TenantPrivileges() {
       if (!nextPerms.includes('READ')) {
         if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
         if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
-        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSES_SECTIONS = {};
         if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
         if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
         if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
@@ -704,7 +710,7 @@ export default function TenantPrivileges() {
         if (moduleKey === 'DASHBOARD') updated.DASHBOARD_WIDGETS = [];
         if (moduleKey === 'INVENTORY') updated.INVENTORY_SECTIONS = {};
         if (moduleKey === 'CASH') updated.CASH_SECTIONS = {};
-        if (moduleKey === 'EXPENSES') updated.EXPENSE_SECTIONS = {};
+        if (moduleKey === 'EXPENSES') updated.EXPENSES_SECTIONS = {};
         if (moduleKey === 'PROCUREMENT') updated.PROCUREMENT_SECTIONS = {};
         if (moduleKey === 'ROUTES') updated.ROUTE_TARGET_SECTIONS = [];
         if (moduleKey === 'REPORTS') updated.REPORT_TARGET_SECTIONS = [];
@@ -729,8 +735,8 @@ export default function TenantPrivileges() {
     all.CASH_SECTIONS = {};
     CASH_SECTIONS_LIST.forEach(s => { all.CASH_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
 
-    all.EXPENSE_SECTIONS = {};
-    EXPENSE_SECTIONS_LIST.forEach(s => { all.EXPENSE_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
+    all.EXPENSES_SECTIONS = {};
+    EXPENSES_SECTIONS_LIST.forEach(s => { all.EXPENSES_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
 
     all.PROCUREMENT_SECTIONS = {};
     PROCUREMENT_SECTIONS_LIST.forEach(s => { all.PROCUREMENT_SECTIONS[s.key] = ACTIONS.map(a => a.key); });
@@ -1176,8 +1182,8 @@ export default function TenantPrivileges() {
                           onClick={(e) => {
                             e.stopPropagation();
                             const sections = {};
-                            EXPENSE_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, EXPENSES: ['READ', 'UPDATE'], EXPENSE_SECTIONS: sections }));
+                            EXPENSES_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                            setFormPerms(prev => ({ ...prev, EXPENSES: ACTIONS.map(a => a.key), EXPENSES_SECTIONS: sections }));
                           }}
                           className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
                         >
@@ -1186,9 +1192,9 @@ export default function TenantPrivileges() {
                       }
                     >
                       <PermissionTable
-                        modules={EXPENSE_SECTIONS_LIST}
+                        modules={EXPENSES_SECTIONS_LIST}
                         isGranular={true}
-                        sectionKey="EXPENSE_SECTIONS"
+                        sectionKey="EXPENSES_SECTIONS"
                         formPerms={formPerms}
                         togglePermission={togglePermission}
                         toggleAllForModule={toggleAllForModule}
@@ -1524,70 +1530,73 @@ export default function TenantPrivileges() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {roles.map((role) => (
-          <div
-            key={role.id}
-            className="group bg-white border border-gray-100 p-8 rounded-[3rem] shadow-sm hover:shadow-xl hover:shadow-emerald-500/5 hover:-translate-y-1 transition-all duration-500"
-          >
-            <div className="flex items-start justify-between mb-6">
-              <div className="w-14 h-14 rounded-[1.5rem] bg-emerald-50 text-emerald-600 flex items-center justify-center group-hover:scale-110 transition-transform duration-500">
-                <Shield size={28} />
-              </div>
-              <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                <button
-                  onClick={() => openEditModal(role)}
-                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 shadow-sm transition-all"
-                >
-                  <Pencil size={18} strokeWidth={2.5} />
-                </button>
-                <button
-                  onClick={() => handleDelete(role.id)}
-                  disabled={deletingId === role.id}
-                  className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-rose-600 hover:border-rose-100 shadow-sm transition-all"
-                >
-                  {deletingId === role.id ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} strokeWidth={2.5} />}
-                </button>
-              </div>
-            </div>
-
-            <div className="space-y-2 mb-8">
-              <h3 className="text-xl font-black text-gray-900 tracking-tight uppercase group-hover:text-emerald-600 transition-colors">{role.name}</h3>
-              <p className="text-xs font-bold text-gray-400 line-clamp-2 uppercase tracking-widest">{role.description || 'Global Access Policy'}</p>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-gray-50/50 rounded-2xl p-4 border border-gray-50 group-hover:bg-white group-hover:border-emerald-100 transition-all">
-                <div className="flex items-center gap-2 mb-1">
-                  <Users size={12} className="text-emerald-500" />
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Active Users</span>
-                </div>
-                <span className="text-lg font-black text-gray-900">{role._count?.users || 0}</span>
-              </div>
-              <div className="bg-gray-50/50 rounded-2xl p-4 border border-gray-50 group-hover:bg-white group-hover:border-emerald-100 transition-all">
-                <div className="flex items-center gap-2 mb-1">
-                  <Key size={12} className="text-emerald-500" />
-                  <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Permissions</span>
-                </div>
-                <span className="text-lg font-black text-gray-900">{getPermCount(role.permissions)}</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => openEditModal(role)}
-              className="w-full mt-8 py-4 bg-gray-900 text-white rounded-2xl text-[9px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-all duration-500 hover:bg-emerald-600 translate-y-4 group-hover:translate-y-0"
-            >
-              Configure Privileges
-            </button>
-          </div>
-        ))}
-
-        {roles.length === 0 && (
-          <div className="col-span-full py-32 text-center bg-white rounded-[3rem] border border-dashed border-gray-200">
-            <Shield size={56} className="mx-auto text-gray-100 mb-6" />
-            <h3 className="text-2xl font-black text-gray-200 uppercase tracking-tighter">No Roles Defined</h3>
-          </div>
-        )}
+      <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50 border-b border-gray-100">
+              <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Role Identity</th>
+              <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400">Portal Type</th>
+              <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Active Users</th>
+              <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center">Permissions</th>
+              <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {roles.map((role) => (
+              <tr key={role.id} className="hover:bg-gray-50/50 transition-colors group">
+                <td className="px-6 py-3">
+                  <div className="flex flex-col">
+                    <span className="text-xs font-black text-gray-900 uppercase tracking-tight group-hover:text-emerald-600 transition-colors">{role.name}</span>
+                    <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest truncate max-w-[300px]">{role.description || 'Global Access Policy'}</span>
+                  </div>
+                </td>
+                <td className="px-6 py-3">
+                  <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-lg text-[9px] font-black uppercase tracking-widest border ${
+                    role.portalType === 'AGENT' 
+                      ? 'bg-blue-50 text-blue-700 border-blue-100' 
+                      : 'bg-emerald-50 text-emerald-700 border-emerald-100'
+                  }`}>
+                    {role.portalType === 'AGENT' ? <Users size={10} /> : <Shield size={10} />}
+                    {role.portalType || 'ADMIN'}
+                  </span>
+                </td>
+                <td className="px-6 py-3 text-center">
+                  <span className="text-xs font-black text-gray-700 bg-gray-100/50 px-2.5 py-1 rounded-lg border border-gray-200/50">{role._count?.users || 0}</span>
+                </td>
+                <td className="px-6 py-3 text-center">
+                  <span className="text-xs font-black text-emerald-600 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100/50">{getPermCount(role.permissions)}</span>
+                </td>
+                <td className="px-6 py-3">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => openEditModal(role)}
+                      className="p-2 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-xl transition-all"
+                      title="Edit Privileges"
+                    >
+                      <Pencil size={14} strokeWidth={2.5} />
+                    </button>
+                    <button
+                      onClick={() => handleDelete(role.id)}
+                      disabled={deletingId === role.id}
+                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all"
+                      title="Delete Role"
+                    >
+                      {deletingId === role.id ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={2.5} />}
+                    </button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {roles.length === 0 && (
+              <tr>
+                <td colSpan="5" className="py-20 text-center">
+                  <Shield size={40} className="mx-auto text-gray-100 mb-4" />
+                  <p className="text-[10px] font-black text-gray-300 uppercase tracking-widest">No Security Roles Defined</p>
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
     </div>
   );

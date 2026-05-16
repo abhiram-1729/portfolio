@@ -6,7 +6,7 @@ import { procurementAPI } from '../../../services/procurementService';
 import { adminAPI } from '../../../services/adminService';
 import toast from 'react-hot-toast';
 
-const MappingSection = ({ can }) => {
+const MappingSection = ({ can, setHideMainHeader }) => {
   const [vendors, setVendors] = useState([]);
   const [selectedVendor, setSelectedVendor] = useState(null);
   const [products, setProducts] = useState([]);
@@ -15,6 +15,15 @@ const MappingSection = ({ can }) => {
   const [saving, setSaving] = useState(false);
   const [vSearch, setVSearch] = useState('');
   const [pSearch, setPSearch] = useState('');
+
+  useEffect(() => {
+    if (setHideMainHeader) {
+      setHideMainHeader(!!selectedVendor);
+    }
+    return () => {
+      if (setHideMainHeader) setHideMainHeader(false);
+    };
+  }, [selectedVendor, setHideMainHeader]);
 
   useEffect(() => {
     const load = async () => {

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, Tag, ShoppingBag, Landmark } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, Tag, ShoppingBag, Landmark, Coins } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { attendanceAPI } from '../services/api';
@@ -24,6 +24,14 @@ export default function Sidebar({ isOpen, onClose }) {
     // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     // { name: 'Refill Stock', path: '/refill-stock', icon: Package, color: 'text-blue-600', bg: 'bg-blue-50' },
     { name: 'Vehicle & Stock', path: user?.assignedVehicleId ? `/agent-inventory/${user.assignedVehicleId}` : '/agent-inventory/none', icon: Truck, color: user?.assignedVehicleId ? 'text-slate-600' : 'text-rose-400', bg: user?.assignedVehicleId ? 'bg-slate-50' : 'bg-rose-50', module: 'AGENT_PORTAL', section: 'AGENT_INVENTORY' },
+    {
+      name: 'Cash Flow',
+      path: '/admin/cash',
+      icon: Coins,
+      color: 'text-amber-600',
+      module: 'CASH',
+      isAdmin: true
+    },
     {
       name: 'Inventory',
       icon: Package,
@@ -125,6 +133,14 @@ export default function Sidebar({ isOpen, onClose }) {
     { name: 'My Attendance', path: '/attendance', icon: Clock, color: 'text-teal-600', bg: 'bg-teal-50', module: 'AGENT_PORTAL', section: 'AGENT_ATTENDANCE' },
     { name: 'My Activities', path: '/activity-logs', icon: History, color: 'text-emerald-500', bg: 'bg-emerald-50', module: 'AGENT_PORTAL', section: 'AGENT_ACTIVITIES' },
     { name: 'My Profile', path: '/profile', icon: User, color: 'text-purple-600', bg: 'bg-purple-50', module: 'AGENT_PORTAL', section: 'AGENT_PROFILE' },
+    {
+      name: 'Expenses',
+      path: '/admin/expenses',
+      icon: Receipt,
+      color: 'text-rose-600',
+      module: 'EXPENSES',
+      isAdmin: true
+    },
     {
       name: 'Procurement',
       icon: ClipboardList,

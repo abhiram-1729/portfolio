@@ -13,7 +13,7 @@ export default function PunchOutModal({ onClose, onPunchOut }) {
   const [cameraError, setCameraError] = useState(null);
   const [facingMode, setFacingMode] = useState('user');
   const [locationName, setLocationName] = useState('');
-
+  // jdjdj
   const videoRef = useRef(null);
   const canvasRef = useRef(null);
   const streamRef = useRef(null);
@@ -91,9 +91,9 @@ export default function PunchOutModal({ onClose, onPunchOut }) {
     ctx.fillStyle = '#ffffff';
     ctx.font = 'bold 14px sans-serif';
     const now = new Date();
-    const timeStr = now.toLocaleString('en-IN', { 
-      dateStyle: 'medium', 
-      timeStyle: 'medium' 
+    const timeStr = now.toLocaleString('en-IN', {
+      dateStyle: 'medium',
+      timeStyle: 'medium'
     });
     ctx.fillText(`📅 ${timeStr}`, 10, canvas.height - 35);
     ctx.fillText(`📍 Punch-Out Photo Proof`, 10, canvas.height - 12);
@@ -126,7 +126,7 @@ export default function PunchOutModal({ onClose, onPunchOut }) {
     try {
       setLocationStatus('requesting');
       const pos = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, { 
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
           enableHighAccuracy: true,
           timeout: 15000,
           maximumAge: 0
@@ -135,7 +135,7 @@ export default function PunchOutModal({ onClose, onPunchOut }) {
       lat = pos.coords.latitude;
       lng = pos.coords.longitude;
       setLocationStatus('granted');
-      
+
       try {
         const res = await fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}`);
         const data = await res.json();
@@ -170,13 +170,13 @@ export default function PunchOutModal({ onClose, onPunchOut }) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/80 backdrop-blur-sm">
       <div className="z-10 w-full max-w-sm flex flex-col items-center animate-in zoom-in-95 fade-in duration-200">
-        
+
         {/* Card */}
         <div className="w-full glass rounded-[2rem] p-6 shadow-2xl shadow-orange-900/10 border border-white relative overflow-hidden bg-white">
           <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-orange-500/0 via-orange-500/40 to-orange-500/0" />
 
           {/* Close Button */}
-          <button 
+          <button
             onClick={onClose}
             className="absolute top-4 right-4 p-2 bg-slate-50 text-slate-400 hover:text-slate-600 rounded-full transition-colors"
           >
@@ -261,31 +261,29 @@ export default function PunchOutModal({ onClose, onPunchOut }) {
               <Clock size={12} className="text-orange-600" />
               <span className="text-[9px] font-black text-orange-700 uppercase tracking-widest">{formatTime(currentTime)}</span>
             </div>
-            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${
-              locationStatus === 'granted' ? 'bg-blue-50 border-blue-100' :
-              locationStatus === 'denied' ? 'bg-amber-50 border-amber-100' :
-              'bg-slate-50 border-slate-100'
-            }`}>
+            <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border ${locationStatus === 'granted' ? 'bg-blue-50 border-blue-100' :
+                locationStatus === 'denied' ? 'bg-amber-50 border-amber-100' :
+                  'bg-slate-50 border-slate-100'
+              }`}>
               <MapPin size={12} className={
                 locationStatus === 'granted' ? 'text-blue-600' :
-                locationStatus === 'denied' ? 'text-amber-600' :
-                'text-slate-400'
+                  locationStatus === 'denied' ? 'text-amber-600' :
+                    'text-slate-400'
               } />
               <div className="flex flex-col">
-                <span className={`text-[9px] font-black uppercase tracking-widest ${
-                  locationStatus === 'granted' ? 'text-blue-700' :
-                  locationStatus === 'denied' ? 'text-amber-700' :
-                  'text-slate-500'
-                }`}>
+                <span className={`text-[9px] font-black uppercase tracking-widest ${locationStatus === 'granted' ? 'text-blue-700' :
+                    locationStatus === 'denied' ? 'text-amber-700' :
+                      'text-slate-500'
+                  }`}>
                   {locationStatus === 'granted' ? 'Located' :
-                   locationStatus === 'denied' ? 'No GPS' :
-                   locationStatus === 'requesting' ? 'Locating...' :
-                   'GPS Ready'}
+                    locationStatus === 'denied' ? 'No GPS' :
+                      locationStatus === 'requesting' ? 'Locating...' :
+                        'GPS Ready'}
                 </span>
                 {locationName && (
-                   <span className="text-[8px] font-bold text-blue-600 leading-tight" title={locationName}>
-                     {locationName}
-                   </span>
+                  <span className="text-[8px] font-bold text-blue-600 leading-tight" title={locationName}>
+                    {locationName}
+                  </span>
                 )}
               </div>
             </div>

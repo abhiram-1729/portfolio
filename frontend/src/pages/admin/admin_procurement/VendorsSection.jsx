@@ -8,7 +8,7 @@ import { procurementAPI } from '../../../services/procurementService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 
-const VendorsSection = ({ can }) => {
+const VendorsSection = ({ can, setHideMainHeader }) => {
   const [vendors, setVendors] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -32,6 +32,15 @@ const VendorsSection = ({ can }) => {
   }, [statusFilter]);
 
   useEffect(() => { loadVendors(); }, [loadVendors]);
+  
+  useEffect(() => {
+    if (setHideMainHeader) {
+      setHideMainHeader(showForm);
+    }
+    return () => {
+      if (setHideMainHeader) setHideMainHeader(false);
+    };
+  }, [showForm, setHideMainHeader]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -96,8 +105,8 @@ const VendorsSection = ({ can }) => {
   );
 
   const renderForm = () => (
-    <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500">
-      <div className="p-8 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+    <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500 flex-1 flex flex-col">
+      <div className="p-4 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
         <div className="flex items-center gap-4">
           <button 
             onClick={() => { setShowForm(false); setEditVendor(null); }}
@@ -115,8 +124,8 @@ const VendorsSection = ({ can }) => {
         </div>
       </div>
 
-      <form onSubmit={handleSubmit} className="p-8 space-y-8 max-w-4xl mx-auto">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <form onSubmit={handleSubmit} className="p-5 space-y-4 max-w-5xl mx-auto w-full">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           {[
             { name: 'vendorName', label: 'Business Name *', required: true, icon: Users },
             { name: 'mobile', label: 'Primary Contact No. *', required: true, icon: Phone },
@@ -135,7 +144,7 @@ const VendorsSection = ({ can }) => {
                   required={f.required} 
                   value={form[f.name]} 
                   onChange={e => setForm({ ...form, [f.name]: e.target.value })}
-                  className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                  className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-2 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
                   placeholder={`Enter ${f.label.toLowerCase().replace('*', '').trim()}...`}
                 />
               </div>
@@ -152,7 +161,7 @@ const VendorsSection = ({ can }) => {
                 type="number" 
                 value={form.creditDays} 
                 onChange={e => setForm({ ...form, creditDays: e.target.value })}
-                className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-2 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
                 placeholder="30"
               />
             </div>
@@ -169,7 +178,7 @@ const VendorsSection = ({ can }) => {
                   type="number" 
                   value={form.openingBalance} 
                   onChange={e => setForm({ ...form, openingBalance: e.target.value })}
-                  className="w-full bg-gray-50 rounded-[1.25rem] pl-12 pr-4 py-3.5 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                  className="w-full bg-gray-50 rounded-xl pl-10 pr-4 py-2 text-sm font-bold border border-transparent focus:border-emerald-200 focus:bg-white focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
                   placeholder="0.00"
                 />
               </div>
@@ -177,7 +186,7 @@ const VendorsSection = ({ can }) => {
           )}
         </div>
 
-        <div className="pt-8 border-t border-gray-50 flex items-center justify-end gap-3">
+        <div className="pt-4 border-t border-gray-50 flex items-center justify-end gap-3">
           <button 
             type="button" 
             onClick={() => { setShowForm(false); setEditVendor(null); }}
@@ -196,25 +205,26 @@ const VendorsSection = ({ can }) => {
   if (showForm) return renderForm();
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-2 flex-1 flex flex-col min-h-0 overflow-y-auto pr-2 custom-scrollbar">
       {/* Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-2 bg-white p-2 rounded-2xl border border-gray-100 shadow-sm flex-1 max-w-md">
-          <Search size={16} className="text-gray-400 ml-2" />
+      <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
+        <div className="flex items-center gap-2 bg-white p-1.5 rounded-xl border border-gray-100 shadow-sm flex-1 max-w-sm">
+          <Search size={14} className="text-gray-400 ml-2" />
           <input placeholder="Search vendors..." value={search} onChange={e => setSearch(e.target.value)}
-            className="bg-transparent border-none focus:outline-none text-sm font-bold text-gray-700 w-full" />
+            className="bg-transparent border-none focus:outline-none text-xs font-bold text-gray-700 w-full" />
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-1.5 items-center">
           {['', 'ACTIVE', 'INACTIVE'].map(s => (
             <button key={s} onClick={() => setStatusFilter(s)}
-              className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+              className={`px-2.5 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${
                 statusFilter === s ? 'bg-slate-900 text-white' : 'bg-white text-slate-400 border border-slate-100'
               }`}>{s || 'All'}</button>
           ))}
+          <div className="w-px h-4 bg-gray-200 mx-1" />
           {can('PROCUREMENT', 'CREATE', 'VENDORS') && (
             <button onClick={() => { setShowForm(true); setEditVendor(null); setForm({ vendorName: '', mobile: '', email: '', address: '', gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0' }); }}
-              className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/20">
-              <Plus size={16} /> Add Vendor
+              className="flex items-center gap-1.5 bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/10">
+              <Plus size={14} strokeWidth={3} /> Add Vendor
             </button>
           )}
         </div>
@@ -223,68 +233,69 @@ const VendorsSection = ({ can }) => {
       {/* Loader / Empty / Table */}
       {loading ? (
         <div className="flex flex-col items-center py-24 text-gray-400 gap-3">
-          <Loader2 className="animate-spin text-emerald-600" size={40} />
-          <p className="font-black text-xs uppercase tracking-widest">Loading vendors...</p>
+          <Loader2 className="animate-spin text-emerald-600" size={32} />
+          <p className="font-black text-[10px] uppercase tracking-widest">Loading vendors...</p>
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-3xl p-16 border border-dashed border-gray-200 text-center space-y-3">
-          <Users size={48} className="mx-auto text-gray-200" />
-          <h3 className="text-lg font-black text-gray-300">No Vendors Found</h3>
+          <Users size={32} className="mx-auto text-gray-200" />
+          <h3 className="text-sm font-black text-gray-300 uppercase tracking-widest">No Vendors Found</h3>
         </div>
       ) : (
         <>
           {/* Desktop Table */}
-          <div className="hidden md:block bg-white rounded-3xl border border-gray-100 shadow-sm overflow-x-auto custom-scrollbar w-full">
-            <table className="w-max min-w-full text-left border-collapse">
+          <div className="hidden md:block bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden w-full">
+            <table className="w-full text-left border-collapse">
               <thead>
-                <tr className="bg-gray-50/50 whitespace-nowrap">
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 whitespace-nowrap">Vendor</th>
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Mobile</th>
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">GST</th>
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Credit Days</th>
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Balance</th>
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-center whitespace-nowrap">Status</th>
-                  <th className="px-6 py-3 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right sticky right-0 bg-[#f8fafc] z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">Actions</th>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400">Vendor Identity</th>
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Mobile</th>
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">GST</th>
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Credit</th>
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Balance</th>
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-center">Status</th>
+                  <th className="px-3 py-2 text-[9px] font-black uppercase tracking-widest text-gray-400 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {filtered.map(v => (
-                  <tr key={v.id} className="hover:bg-gray-50/30 transition-colors whitespace-nowrap group">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div>
-                        <span className="text-sm font-black text-gray-900">{v.vendorName}</span>
-                        {v.displayId && <span className="ml-2 text-[9px] font-black text-teal-600 bg-teal-50 px-1.5 py-0.5 rounded tracking-wider">{v.displayId}</span>}
-                        {v.contactPerson && <p className="text-[10px] text-gray-400 font-bold">{v.contactPerson}</p>}
+                  <tr key={v.id} className="hover:bg-gray-50/30 transition-colors group">
+                    <td className="px-3 py-1.5">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-gray-900 uppercase tracking-tight">{v.vendorName}</span>
+                          {v.displayId && <span className="text-[8px] font-black text-teal-600 bg-teal-50 px-1 py-0 rounded tracking-widest uppercase">{v.displayId}</span>}
+                        </div>
+                        {v.contactPerson && <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight leading-none mt-0.5">{v.contactPerson}</p>}
                       </div>
                     </td>
-                    <td className="px-5 py-3 text-center text-xs font-bold text-gray-600">{v.mobile}</td>
-                    <td className="px-5 py-3 text-center text-[10px] font-bold text-gray-400">{v.gstNumber || '—'}</td>
-                    <td className="px-5 py-3 text-center text-xs font-bold text-gray-700">{v.creditDays}d</td>
-                    <td className="px-5 py-3 text-center">
-                      <span className={`text-sm font-black ${v.currentBalance > 0 ? 'text-red-600' : v.currentBalance < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
+                    <td className="px-3 py-1.5 text-center text-[11px] font-black text-gray-700">{v.mobile}</td>
+                    <td className="px-3 py-1.5 text-center text-[9px] font-bold text-gray-400 uppercase tracking-tighter">{v.gstNumber || '—'}</td>
+                    <td className="px-3 py-1.5 text-center text-[10px] font-black text-emerald-700 bg-emerald-50/50 rounded-lg">{v.creditDays}d</td>
+                    <td className="px-3 py-1.5 text-center">
+                      <span className={`text-[11px] font-black ${v.currentBalance > 0 ? 'text-rose-600' : v.currentBalance < 0 ? 'text-emerald-600' : 'text-gray-400'}`}>
                         ₹{Math.abs(v.currentBalance).toLocaleString()}
-                        {v.currentBalance > 0 && ' DR'}
-                        {v.currentBalance < 0 && ' CR'}
+                        <span className="text-[8px] ml-0.5 font-bold uppercase">{v.currentBalance > 0 ? 'DR' : v.currentBalance < 0 ? 'CR' : ''}</span>
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-center whitespace-nowrap">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-[9px] font-black uppercase tracking-widest ${
-                        v.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border border-emerald-100' : 'bg-gray-100 text-gray-400'
+                    <td className="px-3 py-1.5 text-center">
+                      <span className={`inline-flex px-2 py-0 rounded text-[8px] font-black uppercase tracking-widest border ${
+                        v.status === 'ACTIVE' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' : 'bg-gray-50 text-gray-400 border-gray-100'
                       }`}>{v.status}</span>
                     </td>
-                    <td className="px-6 py-4 text-right sticky right-0 bg-white group-hover:bg-[#fcfdfd] transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">
-                      <div className="flex items-center justify-end gap-1.5">
-                        <button onClick={() => openLedger(v.id)} className="p-1.5 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-all" title="View Ledger"><BookOpen size={14} /></button>
+                    <td className="px-3 py-1.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openLedger(v.id)} className="p-1 text-blue-600 hover:bg-blue-50 rounded transition-all" title="View Ledger"><BookOpen size={12} /></button>
                         {can('PROCUREMENT', 'UPDATE', 'VENDORS') && (
                           <>
-                            <button onClick={() => openEdit(v)} className="p-1.5 bg-gray-50 text-gray-600 rounded-lg hover:bg-gray-100 transition-all" title="Edit"><Edit3 size={14} /></button>
+                            <button onClick={() => openEdit(v)} className="p-1 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition-all" title="Edit"><Edit3 size={12} /></button>
                             {can('PROCUREMENT', 'TOGGLE_STATUS', 'VENDORS') && (
-                              <button onClick={() => handleToggleStatus(v.id)} className="p-1.5 rounded-lg hover:bg-gray-100 transition-all" title="Toggle Status">
+                              <button onClick={() => handleToggleStatus(v.id)} className="p-1 rounded transition-all" title="Toggle Status">
                                 {v.status === 'ACTIVE' ? <ToggleRight size={14} className="text-emerald-600" /> : <ToggleLeft size={14} className="text-gray-400" />}
                               </button>
                             )}
                             {can('PROCUREMENT', 'DELETE', 'VENDORS') && (
-                              <button onClick={() => handleDeleteVendor(v.id)} className="p-1.5 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-all" title="Delete"><Trash2 size={14} /></button>
+                              <button onClick={() => handleDeleteVendor(v.id)} className="p-1 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-all" title="Delete"><Trash2 size={12} /></button>
                             )}
                           </>
                         )}

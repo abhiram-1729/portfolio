@@ -248,7 +248,7 @@ export const submitClosingCash = async (req, res, next) => {
             where: {
                 tenantId: req.user.tenantId,
                 vehicleId,
-                status: 'COMPLETED',
+                status: { in: ['COMPLETED', 'PAID'] },
                 createdAt: { gte: shiftOpening.createdAt },
             },
         });
@@ -430,7 +430,7 @@ export const getCashStatus = async (req, res, next) => {
             where: {
                 tenantId: req.user.tenantId,
                 vehicleId,
-                status: 'COMPLETED',
+                status: { in: ['COMPLETED', 'PAID'] },
                 createdAt: { gte: startOfDay, lte: endOfDay },
             },
         });
@@ -580,19 +580,17 @@ export const getAdminCashSummary = async (req, res, next) => {
 
         const dayName = format(new Date(dateString), 'EEEE').toUpperCase(); // e.g., 'MONDAY'
 
-        const startOfDayDate = new Date(dateString);
-        startOfDayDate.setHours(0, 0, 0, 0);
-        const endOfDayDate = new Date(dateString);
-        endOfDayDate.setHours(23, 59, 59, 999);
+        const startOfDayDate = new Date(`${dateString}T00:00:00`);
+        const endOfDayDate = new Date(`${dateString}T23:59:59.999`);
 
         const orderAggregates = await prisma.order.groupBy({
             by: ['vehicleId', 'paymentMode'],
             _sum: { totalAmount: true, cashAmount: true, upiAmount: true },
             where: {
                 tenantId: req.user.tenantId,
-                vehicleId: { in: vehicles.map(v => v.id) },
-                status: 'COMPLETED',
-                createdAt: { gte: startOfDayDate, lte: endOfDayDate }
+                status: { in: ['COMPLETED', 'PAID'] },
+                createdAt: { gte: startOfDayDate, lte: endOfDayDate },
+                ...(storeId && storeId !== 'undefined' && storeId !== 'null' ? { storeId } : {})
             }
         });
 
@@ -601,10 +599,10 @@ export const getAdminCashSummary = async (req, res, next) => {
             _sum: { amount: true },
             where: {
                 tenantId: req.user.tenantId,
-                vehicleId: { in: vehicles.map(v => v.id) },
                 date: dateString,
                 paymentMode: 'CASH',
-                status: { in: ['APPROVED', 'PAID'] }
+                status: { in: ['APPROVED', 'PAID'] },
+                ...(storeId && storeId !== 'undefined' && storeId !== 'null' ? { storeId } : {})
             }
         });
 
@@ -709,10 +707,49 @@ export const getAdminCashSummary = async (req, res, next) => {
             };
         });
 
-        // Filter: ONLY show vehicles that have been assigned a float today
+        // Add Store-level sales (where vehicleId is null) as a virtual record
+        const storeOrders = orderAggregates.filter(o => o.vehicleId === null);
+        const storeExpenses = expenseAggregates.filter(e => e.vehicleId === null);
+
+        if (storeOrders.length > 0 || storeExpenses.length > 0) {
+            const totalStoreCash = storeOrders.reduce((sum, o) => {
+                if (o.paymentMode === 'CASH') return sum + (o._sum.totalAmount || 0);
+                if (o.paymentMode === 'CASH_UPI') return sum + (o._sum.cashAmount || 0);
+                return sum;
+            }, 0);
+            const totalStoreUpi = storeOrders.reduce((sum, o) => {
+                if (o.paymentMode === 'UPI') return sum + (o._sum.totalAmount || 0);
+                if (o.paymentMode === 'CASH_UPI') return sum + (o._sum.upiAmount || 0);
+                return sum;
+            }, 0);
+            const totalStoreCard = storeOrders.reduce((sum, o) => {
+                if (o.paymentMode === 'CARD') return sum + (o._sum.totalAmount || 0);
+                return sum;
+            }, 0);
+            
+            const totalStoreExpenses = storeExpenses.reduce((sum, e) => sum + (e._sum.amount || 0), 0);
+
+            results.push({
+                id: 'STORE_POS',
+                vehicle: { vehicleNumber: 'STORE', vehicleName: 'Direct POS Sales', assignedUsers: [] },
+                dailySales: {
+                    cash: totalStoreCash,
+                    upi: totalStoreUpi,
+                    card: totalStoreCard,
+                    grandTotal: totalStoreCash + totalStoreUpi + totalStoreCard
+                },
+                shiftDetails: {
+                    shift1: { opening: null, closing: null, live: { cashSales: totalStoreCash, upiSales: totalStoreUpi, cardSales: totalStoreCard, expenses: totalStoreExpenses, expected: 0 } },
+                    shift2: { opening: null, closing: null, live: { cashSales: 0, upiSales: 0, cardSales: 0, expenses: 0, expected: 0 } }
+                }
+            });
+        }
+
+        // Filter: Show vehicles that have been assigned a float today OR have sales activity
         const assignedResults = results.filter(r =>
             r.shiftDetails.shift1.opening !== null ||
-            r.shiftDetails.shift2.opening !== null
+            r.shiftDetails.shift2.opening !== null ||
+            r.dailySales.grandTotal > 0
         );
 
         res.json(assignedResults);
@@ -955,7 +992,7 @@ export async function recalculateDailySummary(vehicleId, date, tenantId, storeId
             where: {
                 tenantId,
                 vehicleId,
-                status: 'COMPLETED',
+                status: { in: ['COMPLETED', 'PAID'] },
                 createdAt: { gte: startOfDay, lte: endOfDay }
             }
         });

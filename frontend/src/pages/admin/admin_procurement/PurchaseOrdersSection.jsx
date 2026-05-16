@@ -1,12 +1,15 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { 
-  Plus, Search, Loader2, ClipboardList, X, ArrowLeft, Edit3, Trash2, CheckCircle2
+  Plus, Search, Loader2, ClipboardList, X, ArrowLeft, Edit3, Trash2, CheckCircle2,
+  Truck, PackageCheck, FileText
 } from 'lucide-react';
 import { procurementAPI } from '../../../services/procurementService';
 import toast from 'react-hot-toast';
 import { format } from 'date-fns';
+import { useSearchParams } from 'react-router-dom';
 
-const PurchaseOrdersSection = ({ can }) => {
+const PurchaseOrdersSection = ({ can, setHideMainHeader }) => {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [pos, setPOs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -30,6 +33,15 @@ const PurchaseOrdersSection = ({ can }) => {
   }, [statusFilter]);
 
   useEffect(() => { loadPOs(); }, [loadPOs]);
+  
+  useEffect(() => {
+    if (setHideMainHeader) {
+      setHideMainHeader(showForm);
+    }
+    return () => {
+      if (setHideMainHeader) setHideMainHeader(false);
+    };
+  }, [showForm, setHideMainHeader]);
 
   const openForm = async () => {
     try {
@@ -161,21 +173,21 @@ const PurchaseOrdersSection = ({ can }) => {
     <div className="flex-1 flex flex-col min-h-0 space-y-4 overflow-hidden">
       {!showForm ? (
         <>
-          <div className="flex flex-col md:flex-row gap-3 items-start md:items-center justify-between">
-            <div className="flex flex-wrap items-center gap-3 flex-1 overflow-x-auto no-scrollbar">
-              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-2xl border border-gray-100 shadow-sm flex-1 md:max-w-xs focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all">
-                <Search size={14} className="text-gray-400" />
+          <div className="flex flex-col md:flex-row gap-2 items-start md:items-center justify-between shrink-0">
+            <div className="flex flex-wrap items-center gap-2 flex-1 overflow-x-auto no-scrollbar">
+              <div className="flex items-center gap-2 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm flex-1 md:max-w-xs focus-within:ring-2 focus-within:ring-emerald-500/20 focus-within:border-emerald-500 transition-all">
+                <Search size={12} className="text-gray-400" />
                 <input 
                   placeholder="Search PO # or Vendor..." 
                   value={search} 
                   onChange={e => setSearch(e.target.value)}
-                  className="bg-transparent border-none focus:outline-none text-xs font-black text-gray-700 w-full placeholder:text-gray-300" 
+                  className="bg-transparent border-none focus:outline-none text-[10px] font-black text-gray-700 w-full placeholder:text-gray-300" 
                 />
               </div>
               <div className="flex gap-1">
                 {['', 'CREATED', 'APPROVED', 'ORDERED', 'DELIVERED', 'CLOSED'].map(s => (
                   <button key={s} onClick={() => setStatusFilter(s)}
-                    className={`px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${
+                    className={`px-2 py-1 rounded-lg text-[8px] font-black uppercase tracking-widest transition-all ${
                       statusFilter === s ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/20' : 'bg-white text-slate-400 border border-slate-100 hover:border-slate-200 shadow-sm'
                     }`}>{s || 'All'}</button>
                 ))}
@@ -183,8 +195,8 @@ const PurchaseOrdersSection = ({ can }) => {
             </div>
             {can('PROCUREMENT', 'CREATE', 'PO') && (
               <button onClick={() => { setForm({ vendorId: '', poDate: format(new Date(), 'yyyy-MM-dd'), expectedDelivery: '', remarks: '', items: [] }); openForm(); }}
-                className="flex items-center gap-1.5 bg-emerald-600 text-white px-5 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 hover:-translate-y-0.5 transition-all shadow-xl shadow-emerald-600/20 active:translate-y-0">
-                <Plus size={14} strokeWidth={3} /> Create Purchase Order
+                className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[9px] uppercase tracking-widest hover:bg-emerald-700 hover:-translate-y-0.5 transition-all shadow-xl shadow-emerald-600/20 active:translate-y-0 shrink-0">
+                <Plus size={12} strokeWidth={3} /> New Order
               </button>
             )}
           </div>
@@ -202,13 +214,12 @@ const PurchaseOrdersSection = ({ can }) => {
               <table className="w-max min-w-full text-left border-collapse">
                 <thead>
                   <tr className="bg-emerald-50/50 border-b border-gray-50 whitespace-nowrap">
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">PO Number</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">PO ID</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Vendor</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Date</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Total Amount</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Status</th>
-                    <th className="py-3 px-6 text-[9px] font-black text-gray-400 uppercase tracking-widest text-right sticky right-0 bg-[#f8fafc] z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">Actions</th>
+                    <th className="py-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-widest whitespace-nowrap">PO Identification</th>
+                    <th className="py-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Vendor Partner</th>
+                    <th className="py-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Order Date</th>
+                    <th className="py-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Total Value</th>
+                    <th className="py-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-widest text-center whitespace-nowrap">Lifecycle Status</th>
+                    <th className="py-2 px-4 text-[8px] font-black text-gray-400 uppercase tracking-widest text-right sticky right-0 bg-[#f8fafc] z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)] whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
@@ -218,56 +229,59 @@ const PurchaseOrdersSection = ({ can }) => {
                     po.vendor?.vendorName.toLowerCase().includes(search.toLowerCase()) ||
                     po.displayId?.toLowerCase().includes(search.toLowerCase())
                   ).map(po => (
-                    <tr key={po.id} className="hover:bg-gray-50/50 transition-all group">
-                      <td className="py-3 px-6 whitespace-nowrap">
-                        <span className="text-sm font-black text-gray-900">PO #{po.displayId}</span>
+                    <tr key={po.id} className="hover:bg-gray-50/50 transition-all group border-b border-gray-50 last:border-0">
+                      <td className="py-1.5 px-4 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span className="text-[11px] font-black text-gray-900 uppercase tracking-tight">#{po.displayId}</span>
+                          <span className="text-[8px] font-bold text-gray-400 uppercase tracking-widest">ID: {po.id.slice(-6).toUpperCase()}</span>
+                        </div>
                       </td>
-                      <td className="py-3 px-6 whitespace-nowrap">
-                        <span className="inline-flex px-2 py-0.5 rounded-md bg-gray-50 text-[8px] font-black text-gray-400 uppercase tracking-widest border border-gray-100">
-                          {po.displayId || `PO-${po.id.slice(-6).toUpperCase()}`}
-                        </span>
+                      <td className="py-1.5 px-4 text-center whitespace-nowrap">
+                        <span className="text-[10px] font-bold text-gray-700">{po.vendor?.vendorName}</span>
                       </td>
-                      <td className="py-3 px-6 text-center whitespace-nowrap">
-                        <span className="text-xs font-bold text-gray-700">{po.vendor?.vendorName}</span>
+                      <td className="py-1.5 px-4 text-center whitespace-nowrap">
+                        <span className="text-[10px] font-bold text-gray-600">{format(new Date(po.poDate), 'dd MMM yy')}</span>
                       </td>
-                      <td className="py-3 px-6 text-center whitespace-nowrap">
-                        <span className="text-xs font-bold text-gray-600">{format(new Date(po.poDate), 'dd MMM yyyy')}</span>
+                      <td className="py-1.5 px-4 text-center whitespace-nowrap">
+                        <span className="text-[11px] font-black text-gray-900">₹{po.totalAmount.toLocaleString()}</span>
                       </td>
-                      <td className="py-3 px-6 text-center whitespace-nowrap">
-                        <span className="text-sm font-black text-gray-900">₹{po.totalAmount.toLocaleString()}</span>
-                      </td>
-                      <td className="py-3 px-6 text-center whitespace-nowrap">
-                        <div className="flex items-center justify-center">
-                          <span className={`px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${statusColors[po.status] || ''}`}>
-                            {po.status}
+                      <td className="py-1.5 px-4 text-center whitespace-nowrap">
+                        <div className="flex flex-col items-center gap-0.5">
+                          <span className={`px-2 py-0.5 rounded-full text-[7px] font-black uppercase tracking-widest border ${statusColors[po.status] || ''}`}>
+                            {po.status === 'ORDERED' ? 'ARRIVED' : po.status}
                           </span>
                         </div>
                       </td>
-                      <td className="py-3 px-6 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50/50 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">
-                        <div className="flex items-center justify-end gap-2">
+                      <td className="py-1.5 px-4 text-right whitespace-nowrap sticky right-0 bg-white group-hover:bg-gray-50/50 transition-all z-10 shadow-[-10px_0_10px_-3px_rgba(0,0,0,0.05)]">
+                        <div className="flex items-center justify-end gap-1.5">
                           <div className="flex gap-1">
                             {!['CLOSED', 'CANCELLED', 'DELIVERED'].includes(po.status) && can('PROCUREMENT', 'UPDATE', 'PO') && (
-                              <button onClick={() => handleEdit(po)} className="p-1.5 bg-gray-50 text-gray-400 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 border border-gray-100 transition-all shadow-sm" title="Edit">
-                                <Edit3 size={14} strokeWidth={2.5} />
+                              <button onClick={() => handleEdit(po)} className="p-1 bg-gray-50 text-gray-400 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 border border-gray-100 transition-all shadow-sm" title="Edit">
+                                <Edit3 size={12} strokeWidth={2.5} />
                               </button>
                             )}
                             {can('PROCUREMENT', 'DELETE', 'PO') && po.status !== 'CLOSED' && (
-                              <button onClick={() => handleDeletePO(po.id)} className="p-1.5 bg-gray-50 text-gray-400 rounded-lg hover:bg-rose-50 hover:text-rose-600 border border-gray-100 transition-all shadow-sm" title="Delete">
-                                <Trash2 size={14} strokeWidth={2.5} />
+                              <button onClick={() => handleDeletePO(po.id)} className="p-1 bg-gray-50 text-gray-400 rounded-lg hover:bg-rose-50 hover:text-rose-600 border border-gray-100 transition-all shadow-sm" title="Delete">
+                                <Trash2 size={12} strokeWidth={2.5} />
                               </button>
                             )}
                           </div>
                           
                           {can('PROCUREMENT', 'UPDATE', 'PO') && !['CLOSED', 'CANCELLED'].includes(po.status) && (
-                            <div className="flex gap-1 pl-2 border-l border-gray-100">
+                            <div className="flex gap-1 pl-1.5 border-l border-gray-100">
                               {po.status === 'CREATED' && (
-                                <button onClick={() => updateStatus(po.id, 'APPROVED')} className="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all" title="Approve">
-                                  <Loader2 className="animate-spin" size={12} />
+                                <button onClick={() => updateStatus(po.id, 'APPROVED')} className="p-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all" title="Approve">
+                                  <Loader2 className="animate-spin" size={10} />
                                 </button>
                               )}
                               {po.status === 'APPROVED' && (
-                                <button onClick={() => updateStatus(po.id, 'ORDERED')} className="p-1.5 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-all" title="Mark Ordered">
-                                  <ClipboardList size={12} />
+                                <button onClick={() => updateStatus(po.id, 'ORDERED')} className="p-1 bg-purple-50 text-purple-600 rounded-lg hover:bg-purple-100 transition-all" title="Mark Arrived">
+                                  <Truck size={12} />
+                                </button>
+                              )}
+                              {po.status === 'ORDERED' && (
+                                <button onClick={() => updateStatus(po.id, 'DELIVERED')} className="p-1 bg-orange-50 text-orange-600 rounded-lg hover:bg-orange-100 transition-all" title="Mark Delivered">
+                                  <PackageCheck size={12} />
                                 </button>
                               )}
                             </div>
@@ -296,12 +310,12 @@ const PurchaseOrdersSection = ({ can }) => {
 
           <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
             {/* Scrollable Content Area */}
-            <div className="flex-1 overflow-y-auto px-8 py-6 space-y-8 custom-scrollbar">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="flex-1 overflow-y-auto px-8 py-4 space-y-4 custom-scrollbar">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Target Vendor *</label>
                   <select value={form.vendorId} onChange={e => onVendorSelect(e.target.value)}
-                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" required>
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-3 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" required>
                     <option value="">Select Vendor</option>
                     {vendors.map(v => <option key={v.id} value={v.id}>{v.vendorName}</option>)}
                   </select>
@@ -309,17 +323,17 @@ const PurchaseOrdersSection = ({ can }) => {
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Creation Date *</label>
                   <input type="date" value={form.poDate} onChange={e => setForm({...form, poDate: e.target.value})}
-                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" required />
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-3 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" required />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Expected Delivery *</label>
                   <input type="date" value={form.expectedDelivery} onChange={e => setForm({...form, expectedDelivery: e.target.value})}
-                    className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" required />
+                    className="w-full bg-gray-50 rounded-2xl px-5 py-3 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" required />
                 </div>
               </div>
 
               <div className="space-y-6">
-                <div className="flex items-center justify-between border-b border-gray-100 pb-4">
+                <div className="flex items-center justify-between border-b border-gray-100 pb-2">
                   <div className="flex items-center gap-3">
                     <ClipboardList className="text-emerald-600" size={20} />
                     <h4 className="text-lg font-black text-gray-900 uppercase tracking-tight">Order Components</h4>
@@ -336,7 +350,7 @@ const PurchaseOrdersSection = ({ can }) => {
                 </div>
 
                 {/* Grouped Items List */}
-                <div className="space-y-8">
+                <div className="space-y-4">
                   {Object.entries(
                     mappedItems
                       .filter(item => 
@@ -360,8 +374,8 @@ const PurchaseOrdersSection = ({ can }) => {
                     }, 0);
 
                     return (
-                      <div key={category} className="bg-white rounded-[2rem] border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
-                        <div className="bg-emerald-50/50 px-8 py-4 flex items-center justify-between border-b border-emerald-100/30">
+                      <div key={category} className="bg-white rounded-3xl border border-gray-100 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                        <div className="bg-emerald-50/50 px-8 py-2 flex items-center justify-between border-b border-emerald-100/30">
                           <div className="flex items-center gap-4">
                             <div className="w-5 h-5 rounded bg-emerald-600 flex items-center justify-center">
                               <CheckCircle2 size={12} className="text-white" />
@@ -384,10 +398,10 @@ const PurchaseOrdersSection = ({ can }) => {
                           <table className="w-full">
                             <thead>
                               <tr className="border-b border-gray-50/50 bg-gray-50/30">
-                                <th className="px-8 py-4 text-left text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Procurement Item</th>
-                                <th className="px-8 py-4 text-center text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Purchase Rate</th>
-                                <th className="px-8 py-4 text-center text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Inventory Qty</th>
-                                <th className="px-8 py-4 text-right text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Valuation</th>
+                                <th className="px-8 py-2 text-left text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Procurement Item</th>
+                                <th className="px-8 py-2 text-center text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Purchase Rate</th>
+                                <th className="px-8 py-2 text-center text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Inventory Qty</th>
+                                <th className="px-8 py-2 text-right text-[8px] font-black text-gray-400 uppercase tracking-[0.2em]">Valuation</th>
                               </tr>
                             </thead>
                             <tbody className="divide-y divide-gray-50/50">
@@ -395,7 +409,7 @@ const PurchaseOrdersSection = ({ can }) => {
                                 const inForm = form.items.find(i => i.productId === item.productId);
                                 return (
                                   <tr key={item.productId} className={`transition-all duration-300 ${inForm ? 'bg-emerald-50/5' : 'bg-transparent hover:bg-gray-50/30'}`}>
-                                    <td className="px-8 py-6">
+                                    <td className="px-8 py-1.5">
                                       <div className="flex items-center gap-6">
                                         <div className="relative group/cb">
                                           <input 
@@ -416,9 +430,9 @@ const PurchaseOrdersSection = ({ can }) => {
                                         </div>
                                       </div>
                                     </td>
-                                    <td className="px-8 py-6 text-center">
-                                      <div className={`inline-flex items-center px-4 py-2 bg-white border border-gray-100 rounded-2xl shadow-sm transition-all ${inForm ? 'ring-2 ring-emerald-500/10 border-emerald-100' : 'opacity-40 grayscale pointer-events-none'}`}>
-                                        <span className="text-[10px] font-black text-gray-400 mr-2">₹</span>
+                                    <td className="px-8 py-1.5 text-center">
+                                      <div className={`inline-flex items-center px-3 py-1 bg-white border border-gray-100 rounded-xl shadow-sm transition-all ${inForm ? 'ring-2 ring-emerald-500/10 border-emerald-100' : 'opacity-40 grayscale pointer-events-none'}`}>
+                                        <span className="text-[10px] font-black text-gray-400 mr-1.5">₹</span>
                                         <input 
                                           type="number" 
                                           value={inForm ? inForm.rate : item.purchasePrice} 
@@ -428,15 +442,15 @@ const PurchaseOrdersSection = ({ can }) => {
                                         />
                                       </div>
                                     </td>
-                                    <td className="px-8 py-6 text-center">
-                                      <div className={`inline-flex items-center gap-4 px-3 py-1.5 bg-white border border-gray-100 rounded-2xl shadow-sm transition-all ${inForm ? 'ring-2 ring-emerald-500/10 border-emerald-100' : 'opacity-40 grayscale pointer-events-none'}`}>
+                                    <td className="px-8 py-1.5 text-center">
+                                      <div className={`inline-flex items-center gap-3 px-2 py-1 bg-white border border-gray-100 rounded-xl shadow-sm transition-all ${inForm ? 'ring-2 ring-emerald-500/10 border-emerald-100' : 'opacity-40 grayscale pointer-events-none'}`}>
                                         <button 
                                           type="button" 
                                           onClick={() => updateItemField(item.productId, 'quantity', Math.max(1, (parseInt(inForm?.quantity || 1) - 1)))}
                                           disabled={!inForm}
-                                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-all active:scale-90"
+                                          className="w-6 h-6 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-100 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all active:scale-90"
                                         >
-                                          <span className="text-xl font-light">-</span>
+                                          <span className="text-lg font-light">-</span>
                                         </button>
                                         <input 
                                           type="number" 
@@ -449,13 +463,13 @@ const PurchaseOrdersSection = ({ can }) => {
                                           type="button" 
                                           onClick={() => updateItemField(item.productId, 'quantity', (parseInt(inForm?.quantity || 0) + 1))}
                                           disabled={!inForm}
-                                          className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-50 border border-gray-100 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 hover:border-emerald-200 transition-all active:scale-90"
+                                          className="w-6 h-6 flex items-center justify-center rounded-lg bg-gray-50 border border-gray-100 text-gray-400 hover:text-emerald-600 hover:bg-emerald-50 transition-all active:scale-90"
                                         >
-                                          <span className="text-xl font-light">+</span>
+                                          <span className="text-lg font-light">+</span>
                                         </button>
                                       </div>
                                     </td>
-                                    <td className="px-8 py-6 text-right">
+                                    <td className="px-8 py-1.5 text-right">
                                       <span className="text-base font-black text-gray-900 tracking-tighter">
                                         ₹{((parseFloat(inForm?.quantity || 0)) * (parseFloat(inForm?.rate || 0))).toLocaleString()}
                                       </span>
@@ -476,9 +490,9 @@ const PurchaseOrdersSection = ({ can }) => {
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 flex items-center gap-2">
                   <CheckCircle2 size={12} className="text-emerald-500" /> Additional Order Remarks
                 </label>
-                <textarea rows={4} value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})}
+                <textarea rows={2} value={form.remarks} onChange={e => setForm({...form, remarks: e.target.value})}
                   placeholder="ENTER ANY SPECIAL INSTRUCTIONS OR LOGISTICS REMARKS FOR THIS ORDER..."
-                  className="w-full bg-gray-50 rounded-[2rem] px-8 py-6 text-sm font-bold border border-gray-100 focus:ring-4 focus:ring-emerald-500/10 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all resize-none shadow-inner placeholder:text-gray-300 uppercase" />
+                  className="w-full bg-gray-50 rounded-2xl px-6 py-4 text-sm font-bold border border-gray-100 focus:ring-4 focus:ring-emerald-500/10 focus:bg-white focus:border-emerald-500 focus:outline-none transition-all resize-none shadow-inner placeholder:text-gray-300 uppercase" />
               </div>
             </div>
 
