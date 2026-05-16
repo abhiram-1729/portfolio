@@ -75,6 +75,23 @@ export const useUserStore = create(
         // Standard Admins (Global, no custom role) bypass everything
         if (user.role === 'ADMIN' && !user.customRoleId) return true;
 
+        // Support for Target Sections pattern (e.g. ROUTE_TARGET_SECTIONS, REPORT_TARGET_SECTIONS)
+        // These modules treat any presence in target sections as full CRUD access for that section
+        const baseModule = module.endsWith('S') ? module.slice(0, -1) : module;
+        const targetSections = 
+          user.permissions?.[`${baseModule}_TARGET_SECTIONS`] || 
+          user.permissions?.[`${module}_TARGET_SECTIONS`] ||
+          user.permissions?.[`${baseModule}S_TARGET_SECTIONS`] ||
+          user.permissions?.[`${module}S_TARGET_SECTIONS`];
+        
+        if (targetSections && Array.isArray(targetSections)) {
+          if (section) {
+            return targetSections.includes(section);
+          }
+          // If no section, check if module itself has permission or any target section is active
+          return targetSections.length > 0 || (user.permissions?.[module] || []).includes(action);
+        }
+
         // If a specific section is provided, check its granular permissions
         if (section) {
           if (section === 'MAIN_MASTER') return true;

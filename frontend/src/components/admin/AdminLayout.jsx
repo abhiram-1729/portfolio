@@ -476,7 +476,7 @@ export default function AdminLayout() {
     if (pathname.startsWith('/admin/expenses')) return 'EXPENSES';
     if (pathname.startsWith('/admin/procurement')) return 'PROCUREMENT';
     if (pathname.startsWith('/admin/activity-logs')) return 'ADMIN';
-    if (pathname.startsWith('/admin/attendance')) return 'STAFF';
+    if (pathname.startsWith('/admin/attendance')) return 'HR';
     if (pathname.startsWith('/admin/privileges')) return 'ADMIN';
     if (pathname.startsWith('/admin/stores')) return 'STORE_CONTEXT';
     return null;
@@ -551,6 +551,10 @@ export default function AdminLayout() {
     if (location.pathname.startsWith('/admin/expenses')) {
       const sections = user?.permissions?.EXPENSE_SECTIONS;
       if (sections && Object.values(sections).some(p => (p || []).includes('READ'))) return true;
+    }
+
+    if (location.pathname.startsWith('/admin/routes')) {
+      if (user?.permissions?.ROUTE_TARGET_SECTIONS?.length > 0) return true;
     }
 
     let hasModuleRead = false;

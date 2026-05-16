@@ -39,7 +39,7 @@ const MODULES = [
   { key: 'ASSETS', label: 'Assets', desc: 'Equipment tracking' },
   { key: 'EXPENSES', label: 'Expenses', desc: 'Reimbursements' },
   { key: 'NOTIFICATIONS', label: 'Notifications', desc: 'Alert management' },
-  { key: 'HR', label: 'HR', desc: 'Attendance, Leave, Payroll' },
+  { key: 'HR', label: 'Attendance', desc: 'Staff Attendance & Leave tracking' },
   { key: 'SETTINGS', label: 'Settings', desc: 'System configuration' },
 ];
 
@@ -431,11 +431,16 @@ export default function TenantPrivileges() {
     setFormPerms(prev => {
       const current = prev.ROUTE_TARGET_SECTIONS || [];
       const has = current.includes(sectionKey);
+      const nextSections = has
+        ? current.filter(s => s !== sectionKey)
+        : [...current, sectionKey];
+
       return {
         ...prev,
-        ROUTE_TARGET_SECTIONS: has
-          ? current.filter(s => s !== sectionKey)
-          : [...current, sectionKey]
+        ROUTE_TARGET_SECTIONS: nextSections,
+        ROUTES: nextSections.length > 0
+          ? (prev.ROUTES || []).includes('READ') ? prev.ROUTES : [...(prev.ROUTES || []), 'READ']
+          : (prev.ROUTES || []).filter(a => a !== 'READ')
       };
     });
   };
