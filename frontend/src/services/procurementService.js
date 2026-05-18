@@ -7,6 +7,7 @@ export const procurementAPI = {
   updateVendor: (id, data) => api.put(`/procurement/vendors/${id}`, data),
   deleteVendor: (id) => api.delete(`/procurement/vendors/${id}`),
   toggleVendorStatus: (id) => api.put(`/procurement/vendors/${id}/toggle-status`),
+  updateVendorApproval: (id, data) => api.put(`/procurement/vendors/${id}/approval`, data),
   getVendorLedger: (id) => api.get(`/procurement/vendors/${id}/ledger`),
 
   // ─── VENDOR ITEM MAPPINGS ─────────────────────────────────────

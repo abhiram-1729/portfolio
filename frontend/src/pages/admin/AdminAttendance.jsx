@@ -143,7 +143,7 @@ export default function AdminAttendance() {
   };
 
   const renderClassifiedAttendance = () => {
-    if (!storeFilterId && activeTab === 'live') {
+    if (false && !storeFilterId && activeTab === 'live') {
       const recordsByStore = records.reduce((acc, r) => {
         if (r.storeId) {
           acc[r.storeId] = (acc[r.storeId] || 0) + 1;
@@ -308,7 +308,7 @@ export default function AdminAttendance() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div className="flex items-center gap-3">
-          {storeFilterId && stores.length > 1 && (
+          {false && storeFilterId && stores.length > 1 && (
             <button
               onClick={() => setSearchParams({})}
               className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -326,7 +326,7 @@ export default function AdminAttendance() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          {stores.length > 1 && (
+          {false && stores.length > 1 && (
             <select
               value={storeFilterId || ''}
               onChange={(e) => {

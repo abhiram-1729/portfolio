@@ -166,7 +166,7 @@ export default function AdminActivityLogs() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            {filters.storeId !== 'all' && stores.length > 1 && (
+            {false && filters.storeId !== 'all' && stores.length > 1 && (
               <button
                 onClick={() => setFilters(prev => ({ ...prev, storeId: 'all', skip: 0 }))}
                 className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-indigo-600 hover:border-indigo-100 transition-all shadow-sm active:scale-90"
@@ -317,7 +317,7 @@ export default function AdminActivityLogs() {
             </div>
 
             {/* Store/Branch Filter */}
-            {stores.length > 1 && (
+            {false && stores.length > 1 && (
               <div className="flex items-center gap-3 bg-gray-50 px-4 py-2.5 rounded-2xl border border-gray-100 focus-within:ring-2 focus-within:ring-indigo-100 transition-all">
                 <StoreIcon size={18} className="text-gray-400" />
                 <select

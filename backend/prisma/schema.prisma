@@ -85,6 +85,7 @@ model Tenant {
   workOrderItems           WorkOrderItem[]
   posTerminals             POSTerminal[]
   suspendedSales           SuspendedSale[]
+  vendorPriceHistories     VendorPriceHistory[]
 }
 
 model User {
@@ -1487,8 +1488,8 @@ model StockAuditItem {
 }
 
 model Vendor {
-  id               String              @id @default(cuid())
-  tenantId         String              @default("VK001")
+  id               String               @id @default(cuid())
+  tenantId         String               @default("VK001")
   storeId          String?
   vendorName       String
   mobile           String
@@ -1496,15 +1497,25 @@ model Vendor {
   address          String?
   gstNumber        String?
   contactPerson    String?
-  creditDays       Int                 @default(30)
-  openingBalance   Float               @default(0)
-  currentBalance   Float               @default(0)
-  status           VendorStatus        @default(ACTIVE)
-  createdAt        DateTime            @default(now())
-  updatedAt        DateTime            @updatedAt
+  creditDays       Int                  @default(30)
+  openingBalance   Float                @default(0)
+  currentBalance   Float                @default(0)
+  status           VendorStatus         @default(ACTIVE)
+  paymentTerms     String?
+  creditLimit      Float?               @default(0)
+  bankName         String?
+  accountNumber    String?
+  ifscCode         String?
+  bankBranch       String?
+  vendorCategory   String?
+  minOrderQty      Int                  @default(1)
+  approvalStatus   VendorApprovalStatus @default(PENDING)
+  isTaxable        Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
   displayId        String?
-  tenant           Tenant              @relation(fields: [tenantId], references: [id])
-  store            Store?              @relation(fields: [storeId], references: [id])
+  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+  store            Store?               @relation(fields: [storeId], references: [id])
   itemMappings     VendorItemMapping[]
   purchaseOrders   PurchaseOrder[]
   purchaseInvoices PurchaseInvoice[]
@@ -1519,22 +1530,45 @@ model Vendor {
 }
 
 model VendorItemMapping {
-  id        String   @id @default(cuid())
-  tenantId  String   @default("VK001")
-  storeId   String?
-  vendorId  String
-  productId String
-  createdAt DateTime @default(now())
-  tenant    Tenant   @relation(fields: [tenantId], references: [id])
-  store     Store?   @relation(fields: [storeId], references: [id])
-  vendor    Vendor   @relation(fields: [vendorId], references: [id])
-  product   Product  @relation(fields: [productId], references: [id])
+  id               String               @id @default(cuid())
+  tenantId         String               @default("VK001")
+  storeId          String?
+  vendorId         String
+  productId        String
+  vendorSku        String?
+  purchasePrice    Float                @default(0)
+  moq              Int                  @default(1)
+  leadTime         Int                  @default(0)
+  taxPercent       Float                @default(0)
+  lastPurchaseRate Float                @default(0)
+  isPreferred      Boolean              @default(false)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @default(now()) @updatedAt
+  tenant           Tenant               @relation(fields: [tenantId], references: [id])
+  store            Store?               @relation(fields: [storeId], references: [id])
+  vendor           Vendor               @relation(fields: [vendorId], references: [id])
+  product          Product              @relation(fields: [productId], references: [id])
+  priceHistory     VendorPriceHistory[]
 
   @@unique([vendorId, productId])
   @@index([tenantId])
   @@index([storeId])
   @@index([vendorId])
   @@index([productId])
+}
+
+model VendorPriceHistory {
+  id        String            @id @default(cuid())
+  tenantId  String            @default("VK001")
+  mappingId String
+  oldPrice  Float
+  newPrice  Float
+  changedAt DateTime          @default(now())
+  mapping   VendorItemMapping @relation(fields: [mappingId], references: [id], onDelete: Cascade)
+  tenant    Tenant            @relation(fields: [tenantId], references: [id])
+
+  @@index([mappingId])
+  @@index([tenantId])
 }
 
 model PurchaseOrder {
@@ -1585,19 +1619,20 @@ model PurchaseOrderItem {
 }
 
 model GoodsReceipt {
-  id        String             @id @default(cuid())
-  tenantId  String             @default("VK001")
-  storeId   String?
-  poId      String
-  grnDate   DateTime           @default(now())
-  status    GRNStatus          @default(PARTIAL)
-  remarks   String?
-  createdAt DateTime           @default(now())
-  displayId String?
-  tenant    Tenant             @relation(fields: [tenantId], references: [id])
-  store     Store?             @relation(fields: [storeId], references: [id])
-  po        PurchaseOrder      @relation(fields: [poId], references: [id])
-  items     GoodsReceiptItem[]
+  id               String             @id @default(cuid())
+  tenantId         String             @default("VK001")
+  storeId          String?
+  poId             String
+  grnDate          DateTime           @default(now())
+  status           GRNStatus          @default(PARTIAL)
+  remarks          String?
+  createdAt        DateTime           @default(now())
+  displayId        String?
+  tenant           Tenant             @relation(fields: [tenantId], references: [id])
+  store            Store?             @relation(fields: [storeId], references: [id])
+  po               PurchaseOrder      @relation(fields: [poId], references: [id])
+  items            GoodsReceiptItem[]
+  purchaseInvoices PurchaseInvoice[]
 
   @@unique([tenantId, displayId])
   @@index([tenantId])
@@ -1632,20 +1667,23 @@ model PurchaseInvoice {
   storeId            String?
   vendorId           String
   poId               String?
+  grnId              String?
   invoiceNumber      String
   invoiceDate        DateTime                  @default(now())
+  dueDate            DateTime?
   transportCharges   Float                     @default(0)
   otherCharges       Float                     @default(0)
   totalAmount        Float                     @default(0)
   status             PurchaseInvoiceStatus     @default(DRAFT)
   paidAmount         Float                     @default(0)
   createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  updatedAt          DateTime                  @default(now()) @updatedAt
   displayId          String?
   tenant             Tenant                    @relation(fields: [tenantId], references: [id])
   store              Store?                    @relation(fields: [storeId], references: [id])
   vendor             Vendor                    @relation(fields: [vendorId], references: [id])
   po                 PurchaseOrder?            @relation(fields: [poId], references: [id])
+  grn                GoodsReceipt?             @relation(fields: [grnId], references: [id])
   items              PurchaseInvoiceItem[]
   paymentAllocations VendorPaymentAllocation[]
 
@@ -2727,4 +2765,10 @@ model SuspendedSale {
   @@index([tenantId])
   @@index([storeId])
   @@index([terminalId])
+}
+
+enum VendorApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
 }

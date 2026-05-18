@@ -137,7 +137,7 @@ export default function AdminProcurement() {
 
   return (
     <div className="h-[calc(100vh-11rem)] overflow-hidden flex flex-col space-y-3">
-      {isGlobalRole && !storeId ? (
+      {false && isGlobalRole && !storeId ? (
         <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in duration-700 pb-20">
           <div className="flex flex-col gap-1">
             <h2 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">Procurement Analytics</h2>
@@ -200,7 +200,7 @@ export default function AdminProcurement() {
           {!hideMainHeader && (
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
               <div className="flex items-center gap-4">
-                {storeId && stores.length > 1 && (
+                {false && storeId && stores.length > 1 && (
                   <button
                     onClick={() => setSearchParams({ tab: activeTab })}
                     className="p-3 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -212,7 +212,7 @@ export default function AdminProcurement() {
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-3 flex-wrap">
 
-                    {stores.length > 1 && (
+                    {false && stores.length > 1 && (
                       <select
                         value={storeId || ''}
                         onChange={(e) => {

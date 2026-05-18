@@ -13,10 +13,10 @@ export const createPO = async (req, res) => {
       return res.status(400).json({ message: 'Vendor and at least one item are required' });
     }
 
-    // Validate vendor is active
+    // Validate vendor is active and approved
     const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
-    if (!vendor || vendor.status !== 'ACTIVE') {
-      return res.status(400).json({ message: 'Vendor is inactive or not found. Cannot create PO.' });
+    if (!vendor || vendor.status !== 'ACTIVE' || vendor.approvalStatus !== 'APPROVED') {
+      return res.status(400).json({ message: 'Vendor is inactive, pending approval, or not found. Cannot create PO.' });
     }
 
     // Validate only mapped items

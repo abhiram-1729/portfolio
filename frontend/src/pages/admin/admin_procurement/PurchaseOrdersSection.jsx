@@ -271,7 +271,7 @@ const PurchaseOrdersSection = ({ can, setHideMainHeader }) => {
                             <div className="flex gap-1 pl-1.5 border-l border-gray-100">
                               {po.status === 'CREATED' && (
                                 <button onClick={() => updateStatus(po.id, 'APPROVED')} className="p-1 bg-emerald-50 text-emerald-600 rounded-lg hover:bg-emerald-100 transition-all" title="Approve">
-                                  <Loader2 className="animate-spin" size={10} />
+                                  <CheckCircle2 size={12} />
                                 </button>
                               )}
                               {po.status === 'APPROVED' && (

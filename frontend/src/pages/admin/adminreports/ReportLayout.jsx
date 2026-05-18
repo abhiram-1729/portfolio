@@ -33,7 +33,7 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
         <div className="max-w-[1600px] mx-auto px-6 py-4 flex items-center justify-between">
           <div className="flex flex-col gap-1">
             <div className="flex items-center gap-4">
-              {stores.length > 1 && (
+              {false && stores.length > 1 && (
                 <button
                   onClick={() => {
                     if (hasStore) {
@@ -56,7 +56,7 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
             <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] ml-14">Enterprise Analytics & Sales Audit Suite</p>
           </div>
            <div className="flex flex-wrap items-center gap-3">
-              {stores.length > 1 && (
+              {false && stores.length > 1 && (
                 <select
                   value={storeFilterId || ''}
                   onChange={(e) => {
@@ -95,7 +95,7 @@ export default function ReportLayout({ title, icon: Icon = BarChart3, children, 
           </div>
         </div>
 
-        {isGlobalRole && !hasStore ? (
+        {false && isGlobalRole && !hasStore ? (
           <div className="space-y-8 animate-in fade-in duration-700">
             <div className="flex flex-col gap-1">
               <h2 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Organizational Analytics</h2>

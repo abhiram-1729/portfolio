@@ -1475,7 +1475,7 @@ export default function AdminAssets() {
   // Gatekeeper
   const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN';
   
-  if (isGlobalRole && !storeId) {
+  if (false && isGlobalRole && !storeId) {
     return (
        <div className="space-y-8 animate-in fade-in duration-500">
          <div className="flex flex-col gap-1">
@@ -1678,7 +1678,7 @@ export default function AdminAssets() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-1">
           <div className="flex items-center gap-3">
-            {storeId && stores.length > 1 && (
+            {false && storeId && stores.length > 1 && (
               <button
                 onClick={() => setSearchParams({})}
                 className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -1696,7 +1696,7 @@ export default function AdminAssets() {
           </div>
           <p className="text-sm text-gray-500">Track, assign and manage company assets</p>
         </div>
-        {stores.length > 1 && (
+        {false && stores.length > 1 && (
           <select
             value={storeId || ''}
             onChange={(e) => {

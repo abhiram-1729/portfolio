@@ -124,7 +124,20 @@ export default function AdminLayout() {
   React.useEffect(() => {
     refreshUserProfile();
   }, []);
-  const [searchParams] = useSearchParams();
+
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  React.useEffect(() => {
+    if (!searchParams.get('storeId')) {
+      setSearchParams(prev => {
+        const nextParams = new URLSearchParams(prev);
+        nextParams.set('storeId', 'cmntyd6a80000ooznlwpwffm5');
+        nextParams.set('storeName', 'Villagkart');
+        return nextParams;
+      }, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
+
   const location = useLocation();
   const [openMenus, setOpenMenus] = React.useState({
     Procurement: location.pathname.startsWith('/admin/procurement'),
@@ -258,7 +271,7 @@ export default function AdminLayout() {
         { to: '/admin/delivery-logistics', icon: Truck, label: 'Delivery Logistics', module: 'ADMIN' },
       ]
     },
-    { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
+    // { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {

@@ -663,7 +663,7 @@ export default function AdminUsers({ type }) {
 
   const renderClassifiedUsers = () => {
     // Show store selection grid if no store is selected
-    if (!storeFilterId && stores.length > 1) {
+    if (false && !storeFilterId && stores.length > 1) {
       const personnelByStore = users.reduce((acc, u) => {
         if (u.storeId && u.id !== currentUser?.id) {
           acc[u.storeId] = (acc[u.storeId] || 0) + 1;
@@ -1562,7 +1562,7 @@ export default function AdminUsers({ type }) {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-6">
                 <div className="flex items-center gap-3">
-                  {storeFilterId && stores.length > 1 && (
+                  {false && storeFilterId && stores.length > 1 && (
                     <button
                       onClick={() => setSearchParams({})}
                       className="p-2.5 bg-gray-50 border border-gray-100 rounded-xl text-gray-500 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50 transition-all shadow-2xs active:scale-95 mt-0.5"
@@ -1624,7 +1624,7 @@ export default function AdminUsers({ type }) {
               </div>
 
               {/* Branch Selector */}
-              {stores.length > 1 && (
+              {false && stores.length > 1 && (
                 <div className="flex items-center gap-2">
                   <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Branch:</span>
                   <select

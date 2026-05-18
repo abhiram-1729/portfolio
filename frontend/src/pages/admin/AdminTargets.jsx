@@ -367,7 +367,7 @@ export default function AdminTargets() {
   }
 
   // ─── Branch Overview ─────────────────
-  if (isGlobalRole && !storeId) {
+  if (false && isGlobalRole && !storeId) {
     return (
       <div key="overview" className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700 p-4 md:p-6">
         <div className="flex items-center gap-4">
@@ -444,7 +444,7 @@ export default function AdminTargets() {
     <div key={storeId || 'branch'} className="max-w-6xl mx-auto space-y-6 pb-12 px-4 md:px-6">
       <div className="flex items-center justify-between pb-4">
         <div className="flex items-center gap-4">
-          {storeId && stores.length > 1 && (
+          {false && storeId && stores.length > 1 && (
             <button 
               onClick={() => setSearchParams({})} 
               className="p-2.5 bg-white border border-gray-100 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -474,7 +474,7 @@ export default function AdminTargets() {
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {stores.length > 1 && (
+          {false && stores.length > 1 && (
             <select
               value={storeId || ''}
               onChange={(e) => {

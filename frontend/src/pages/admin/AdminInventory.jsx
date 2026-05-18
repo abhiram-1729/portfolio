@@ -1623,7 +1623,7 @@ export default function AdminInventory() {
     />
   );
   const renderClassifiedInventory = () => {
-    if (storeIdParam || storeFilterId || activeTab === 'main_master' || !isGlobalRole || stores.length <= 1) return null;
+    if (true || storeIdParam || storeFilterId || activeTab === 'main_master' || !isGlobalRole || stores.length <= 1) return null;
 
     const salesByStore = sales.reduce((acc, s) => {
       if (s.storeId) {
@@ -1725,7 +1725,7 @@ export default function AdminInventory() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-3 flex-wrap">
-                {storeFilterId && stores.length > 1 && (
+                {false && storeFilterId && stores.length > 1 && (
                   <button
                     onClick={() => {
                       const params = { tab: activeTab };
@@ -1761,7 +1761,7 @@ export default function AdminInventory() {
                     return activeTab === 'main_master' ? label : `${storePrefix}${label}`;
                   })()}
                 </h2>
-                {stores.length > 1 && (
+                {false && stores.length > 1 && (
                   <select
                     value={storeFilterId || ''}
                     onChange={(e) => {

@@ -24,6 +24,7 @@ router.route('/vendors/:id')
   .put(vendorCtr.updateVendor)
   .delete(vendorCtr.deleteVendor);
 router.put('/vendors/:id/toggle-status', vendorCtr.toggleVendorStatus);
+router.put('/vendors/:id/approval', vendorCtr.updateVendorApprovalStatus);
 router.get('/vendors/:id/ledger', vendorCtr.getVendorLedger);
 
 // ─── VENDOR ITEM MAPPINGS ─────────────────────────────────────

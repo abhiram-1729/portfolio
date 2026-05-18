@@ -6,7 +6,10 @@ import { generateId } from '../../utils/idGenerator.js';
 export const createVendor = async (req, res) => {
   try {
     const tenantId = req.user?.tenantId || getTenantId();
-    const { vendorName, mobile, email, address, gstNumber, contactPerson, creditDays, openingBalance } = req.body;
+    const { 
+      vendorName, mobile, email, address, gstNumber, contactPerson, creditDays, openingBalance,
+      paymentTerms, creditLimit, bankName, accountNumber, ifscCode, bankBranch, vendorCategory, minOrderQty, isTaxable
+    } = req.body;
 
     if (!vendorName || !mobile) {
       return res.status(400).json({ message: 'Vendor name and mobile are required' });
@@ -16,6 +19,22 @@ export const createVendor = async (req, res) => {
     const existing = await prisma.vendor.findFirst({ where: { tenantId, mobile } });
     if (existing) {
       return res.status(409).json({ message: 'A vendor with this mobile number already exists' });
+    }
+
+    // TAXABLE VENDORS VALIDATION: GST is mandatory for taxable vendors
+    const isTax = isTaxable === true || isTaxable === 'true';
+    if (isTax && (!gstNumber || !gstNumber.trim())) {
+      return res.status(400).json({ message: 'GST Identification Number is mandatory for taxable vendors' });
+    }
+
+    // DUPLICATE GST VALIDATION: Check unique GST Number within tenant
+    if (gstNumber && gstNumber.trim()) {
+      const existingGst = await prisma.vendor.findFirst({
+        where: { tenantId, gstNumber: gstNumber.trim() }
+      });
+      if (existingGst) {
+        return res.status(409).json({ message: 'A vendor with this GST Identification Number already exists' });
+      }
     }
 
     const storeId = req.body.storeId || req.user.storeId || null;
@@ -40,7 +59,17 @@ export const createVendor = async (req, res) => {
         contactPerson: contactPerson || null,
         creditDays: parseInt(creditDays) || 30,
         openingBalance: openBal,
-        currentBalance: openBal
+        currentBalance: openBal,
+        paymentTerms: paymentTerms || null,
+        creditLimit: parseFloat(creditLimit) || 0,
+        bankName: bankName || null,
+        accountNumber: accountNumber || null,
+        ifscCode: ifscCode || null,
+        bankBranch: bankBranch || null,
+        vendorCategory: vendorCategory || null,
+        minOrderQty: parseInt(minOrderQty) || 1,
+        isTaxable: isTax,
+        approvalStatus: 'PENDING'
       }
     });
 
@@ -70,7 +99,10 @@ export const createVendor = async (req, res) => {
 export const updateVendor = async (req, res) => {
   try {
     const { id } = req.params;
-    const { vendorName, mobile, email, address, gstNumber, contactPerson, creditDays } = req.body;
+    const { 
+      vendorName, mobile, email, address, gstNumber, contactPerson, creditDays,
+      paymentTerms, creditLimit, bankName, accountNumber, ifscCode, bankBranch, vendorCategory, minOrderQty, isTaxable
+    } = req.body;
 
     const vendor = await prisma.vendor.findUnique({ where: { id } });
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
@@ -85,6 +117,23 @@ export const updateVendor = async (req, res) => {
       }
     }
 
+    // TAXABLE VENDORS VALIDATION: GST is mandatory for taxable vendors
+    const isTax = isTaxable !== undefined ? (isTaxable === true || isTaxable === 'true') : vendor.isTaxable;
+    const targetGst = gstNumber !== undefined ? gstNumber : vendor.gstNumber;
+    if (isTax && (!targetGst || !targetGst.trim())) {
+      return res.status(400).json({ message: 'GST Identification Number is mandatory for taxable vendors' });
+    }
+
+    // DUPLICATE GST VALIDATION: Check unique GST Number within tenant
+    if (gstNumber && gstNumber !== vendor.gstNumber) {
+      const existingGst = await prisma.vendor.findFirst({
+        where: { tenantId: vendor.tenantId, gstNumber: gstNumber.trim(), id: { not: id } }
+      });
+      if (existingGst) {
+        return res.status(409).json({ message: 'Another vendor with this GST Identification Number already exists' });
+      }
+    }
+
     const updated = await prisma.vendor.update({
       where: { id },
       data: {
@@ -94,7 +143,16 @@ export const updateVendor = async (req, res) => {
         address: address !== undefined ? address : undefined,
         gstNumber: gstNumber !== undefined ? gstNumber : undefined,
         contactPerson: contactPerson !== undefined ? contactPerson : undefined,
-        creditDays: creditDays !== undefined ? parseInt(creditDays) : undefined
+        creditDays: creditDays !== undefined ? parseInt(creditDays) : undefined,
+        paymentTerms: paymentTerms !== undefined ? paymentTerms : undefined,
+        creditLimit: creditLimit !== undefined ? parseFloat(creditLimit) : undefined,
+        bankName: bankName !== undefined ? bankName : undefined,
+        accountNumber: accountNumber !== undefined ? accountNumber : undefined,
+        ifscCode: ifscCode !== undefined ? ifscCode : undefined,
+        bankBranch: bankBranch !== undefined ? bankBranch : undefined,
+        vendorCategory: vendorCategory !== undefined ? vendorCategory : undefined,
+        minOrderQty: minOrderQty !== undefined ? parseInt(minOrderQty) : undefined,
+        isTaxable: isTaxable !== undefined ? isTax : undefined
       }
     });
 
@@ -190,6 +248,9 @@ export const getVendorMappings = async (req, res) => {
       include: {
         product: {
           select: { id: true, name: true, price: true, purchasePrice: true, image: true, status: true }
+        },
+        priceHistory: {
+          orderBy: { changedAt: 'desc' }
         }
       }
     });
@@ -202,37 +263,123 @@ export const getVendorMappings = async (req, res) => {
 export const updateVendorMappings = async (req, res) => {
   try {
     const { vendorId } = req.params;
-    const { productIds } = req.body; // Array of product IDs to map
+    const { mappings: incomingMappings } = req.body; // Array of detailed mapping objects
     const tenantId = req.user?.tenantId || getTenantId();
     const storeId = req.body.storeId || req.user.storeId || null;
 
-    if (!Array.isArray(productIds)) {
-      return res.status(400).json({ message: 'productIds must be an array' });
+    if (!Array.isArray(incomingMappings)) {
+      return res.status(400).json({ message: 'mappings must be an array' });
     }
 
-    // Delete existing mappings
-    await prisma.vendorItemMapping.deleteMany({ where: { vendorId } });
-
-    // Create new mappings
-    if (productIds.length > 0) {
-      await prisma.vendorItemMapping.createMany({
-        data: productIds.map(productId => ({
-          tenantId,
-          storeId,
-          vendorId,
-          productId
-        }))
+    // Execute all mapping, history, and preferred vendor resets in a transaction
+    await prisma.$transaction(async (tx) => {
+      // 1. Get all current mappings for this vendor
+      const currentMappings = await tx.vendorItemMapping.findMany({
+        where: { vendorId }
       });
-    }
 
-    const mappings = await prisma.vendorItemMapping.findMany({
-      where: { vendorId },
-      include: {
-        product: { select: { id: true, name: true, price: true, purchasePrice: true } }
+      const incomingProductIds = incomingMappings.map(m => m.productId);
+
+      // 2. Identify mappings to delete (not in incoming array)
+      const toDelete = currentMappings.filter(
+        (cm) => !incomingProductIds.includes(cm.productId)
+      );
+
+      if (toDelete.length > 0) {
+        await tx.vendorItemMapping.deleteMany({
+          where: {
+            id: { in: toDelete.map((d) => d.id) }
+          }
+        });
+      }
+
+      // 3. Process each incoming mapping (create or update)
+      for (const map of incomingMappings) {
+        const existing = currentMappings.find((cm) => cm.productId === map.productId);
+        const purchasePrice = parseFloat(map.purchasePrice) || 0;
+        const moq = parseInt(map.moq) || 1;
+        const leadTime = parseInt(map.leadTime) || 0;
+        const taxPercent = parseFloat(map.taxPercent) || 0;
+        const isPreferred = !!map.isPreferred;
+
+        let mappingRecord;
+
+        if (existing) {
+          // Check if price changed to record history
+          if (existing.purchasePrice !== purchasePrice) {
+            await tx.vendorPriceHistory.create({
+              data: {
+                tenantId,
+                mappingId: existing.id,
+                oldPrice: existing.purchasePrice,
+                newPrice: purchasePrice
+              }
+            });
+          }
+
+          mappingRecord = await tx.vendorItemMapping.update({
+            where: { id: existing.id },
+            data: {
+              vendorSku: map.vendorSku || null,
+              purchasePrice,
+              moq,
+              leadTime,
+              taxPercent,
+              isPreferred
+            }
+          });
+        } else {
+          // Create new mapping
+          mappingRecord = await tx.vendorItemMapping.create({
+            data: {
+              tenantId,
+              storeId,
+              vendorId,
+              productId: map.productId,
+              vendorSku: map.vendorSku || null,
+              purchasePrice,
+              moq,
+              leadTime,
+              taxPercent,
+              isPreferred
+            }
+          });
+
+          // Insert initial price history
+          await tx.vendorPriceHistory.create({
+            data: {
+              tenantId,
+              mappingId: mappingRecord.id,
+              oldPrice: 0,
+              newPrice: purchasePrice
+            }
+          });
+        }
+
+        // CONTROL: Enforce "One preferred vendor per item"
+        if (isPreferred) {
+          await tx.vendorItemMapping.updateMany({
+            where: {
+              productId: map.productId,
+              vendorId: { not: vendorId },
+              tenantId
+            },
+            data: { isPreferred: false }
+          });
+        }
       }
     });
 
-    res.json({ message: 'Vendor item mappings updated', mappings });
+    // Return the updated mappings list
+    const mappings = await prisma.vendorItemMapping.findMany({
+      where: { vendorId },
+      include: {
+        product: { select: { id: true, name: true, price: true, purchasePrice: true } },
+        priceHistory: { orderBy: { changedAt: 'desc' } }
+      }
+    });
+
+    res.json({ message: 'Vendor item mappings updated successfully', mappings });
   } catch (error) {
     console.error('❌ Update Vendor Mappings Error:', error);
     res.status(500).json({ message: 'Error updating vendor mappings', error: error.message });
@@ -273,5 +420,30 @@ export const deleteVendor = async (req, res) => {
   } catch (error) {
     console.error('❌ Delete Vendor Error:', error);
     res.status(500).json({ message: 'Error deleting vendor', error: error.message });
+  }
+};
+
+// ─── ADMIN VENDOR APPROVAL WORKFLOW ─────────────────────────────────────
+export const updateVendorApprovalStatus = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { approvalStatus } = req.body;
+
+    if (!['PENDING', 'APPROVED', 'REJECTED'].includes(approvalStatus)) {
+      return res.status(400).json({ message: 'Invalid approval status value' });
+    }
+
+    const vendor = await prisma.vendor.findUnique({ where: { id } });
+    if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+    const updated = await prisma.vendor.update({
+      where: { id },
+      data: { approvalStatus }
+    });
+
+    res.json({ message: `Vendor approval status set to ${approvalStatus} successfully`, vendor: updated });
+  } catch (error) {
+    console.error('❌ Update Vendor Approval Status Error:', error);
+    res.status(500).json({ message: 'Error updating vendor approval status', error: error.message });
   }
 };

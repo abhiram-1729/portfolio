@@ -82,7 +82,17 @@ const prisma = basePrisma.$extends({
                     if (val.create) {
                       let nestedModel = key.charAt(0).toUpperCase() + key.slice(1);
                       if (nestedModel.endsWith('s')) nestedModel = nestedModel.slice(0, -1);
-                      if (key === 'items') nestedModel = 'OrderItem';
+                      if (key === 'items') {
+                        if (model === 'PurchaseOrder') {
+                          nestedModel = 'PurchaseOrderItem';
+                        } else if (model === 'GoodsReceipt') {
+                          nestedModel = 'GoodsReceiptItem';
+                        } else if (model === 'PurchaseInvoice') {
+                          nestedModel = 'PurchaseInvoiceItem';
+                        } else {
+                          nestedModel = 'OrderItem';
+                        }
+                      }
                       if (key === 'orderItems') nestedModel = 'OrderItem';
 
                       if (Array.isArray(val.create)) {

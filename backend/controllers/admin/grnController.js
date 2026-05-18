@@ -108,7 +108,7 @@ export const createGRN = async (req, res) => {
 // ─── GET GRNs ─────────────────────────────────────
 export const getGRNs = async (req, res) => {
   try {
-    const { poId, storeId } = req.query;
+    const { poId, storeId, approved } = req.query;
     const where = { tenantId: req.user.tenantId };
 
     if (poId) where.poId = poId;
@@ -118,17 +118,45 @@ export const getGRNs = async (req, res) => {
       where.storeId = req.user.storeId;
     }
 
+    if (approved === 'true') {
+      where.items = {
+        some: {
+          qcStatus: 'APPROVED'
+        }
+      };
+    }
+
     const grns = await prisma.goodsReceipt.findMany({
       where,
       orderBy: { createdAt: 'desc' },
       include: {
         po: {
-          select: { displayId: true, vendor: { select: { vendorName: true } } }
+          select: {
+            id: true,
+            displayId: true,
+            vendorId: true,
+            vendor: {
+              select: {
+                id: true,
+                vendorName: true,
+                status: true,
+                gstNumber: true,
+                isTaxable: true
+              }
+            },
+            items: {
+              select: {
+                productId: true,
+                rate: true,
+                quantity: true
+              }
+            }
+          }
         },
         store: { select: { name: true } },
         items: {
           include: { 
-            product: { select: { name: true, skuCode: true, brand: true, category: true } } 
+            product: { select: { id: true, name: true, skuCode: true, brand: true, category: true } } 
           }
         }
       }

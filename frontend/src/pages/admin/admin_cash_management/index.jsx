@@ -818,7 +818,7 @@ export default function AdminCashManagementContent() {
         <div className="p-4 sm:p-10 max-w-[1600px] mx-auto space-y-10 animate-in fade-in duration-700 bg-gray-50/50 min-h-screen">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-8">
             <div className="flex items-center gap-5">
-              {searchParams.get('storeId') && stores.length > 1 && (
+              {false && searchParams.get('storeId') && stores.length > 1 && (
                 <button
                   onClick={() => setSearchParams({})}
                   className="p-4 bg-white border border-gray-100 rounded-2xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm active:scale-90"
@@ -832,7 +832,7 @@ export default function AdminCashManagementContent() {
                   <h1 className="text-4xl font-black text-gray-900 tracking-tight">
                     Cash Management
                   </h1>
-                  {stores.length > 1 && (
+                  {false && stores.length > 1 && (
                     <select
                       value={searchParams.get('storeId') || ''}
                       onChange={(e) => {

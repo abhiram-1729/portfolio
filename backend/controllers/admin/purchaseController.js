@@ -8,10 +8,13 @@ import { logActivity } from '../../utils/activityLogger.js';
 export const createPurchase = async (req, res) => {
   try {
     const tenantId = req.user?.tenantId || getTenantId();
-    const { vendorId, poId, invoiceNumber, invoiceDate, items, transportCharges, otherCharges } = req.body;
+    const { vendorId, poId, grnId, invoiceNumber, invoiceDate, dueDate, items, transportCharges, otherCharges } = req.body;
 
     if (!vendorId || !invoiceNumber) {
       return res.status(400).json({ message: 'Vendor and invoice number are required' });
+    }
+    if (!grnId) {
+      return res.status(400).json({ message: 'Purchase Invoice can only be created from an APPROVED Goods Receipt Note (GRN).' });
     }
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'At least one item is required' });
@@ -23,7 +26,12 @@ export const createPurchase = async (req, res) => {
       return res.status(400).json({ message: 'Vendor is inactive or not found' });
     }
 
-    // Check for duplicate invoice
+    // CONTROL: GST validation
+    if (vendor.isTaxable && !vendor.gstNumber) {
+      return res.status(400).json({ message: `Vendor "${vendor.vendorName}" is marked as Taxable, but is missing a valid GSTIN. Please update the vendor profile.` });
+    }
+
+    // CONTROL: Invoice duplication check
     const existingInvoice = await prisma.purchaseInvoice.findFirst({
       where: { tenantId, invoiceNumber }
     });
@@ -31,6 +39,33 @@ export const createPurchase = async (req, res) => {
       return res.status(409).json({ message: 'Duplicate invoice number. An invoice with this number already exists.' });
     }
 
+    // CONTROL: GRN dependency and Quantity limit checks
+    const grn = await prisma.goodsReceipt.findUnique({
+      where: { id: grnId },
+      include: { items: { include: { product: true } } }
+    });
+
+    if (!grn) {
+      return res.status(404).json({ message: 'Selected Goods Receipt Note (GRN) not found.' });
+    }
+
+    const approvedItems = grn.items.filter(i => i.qcStatus === 'APPROVED');
+    if (approvedItems.length === 0) {
+      return res.status(400).json({ message: 'Selected GRN does not have any APPROVED items. Invoices can only be created from Approved GRNs.' });
+    }
+
+    // Verify quantities do not exceed GRN approved amounts
+    for (const item of items) {
+      const grnItem = approvedItems.find(gi => gi.productId === item.productId);
+      if (!grnItem) {
+        return res.status(400).json({ message: `Item with ID ${item.productId} is not approved in the selected GRN.` });
+      }
+      if (parseInt(item.quantity) > grnItem.receivedQty) {
+        return res.status(400).json({ message: `Invoiced quantity (${item.quantity}) for "${grnItem.product.name}" exceeds the approved GRN received quantity (${grnItem.receivedQty}).` });
+      }
+    }
+
+    const poIdToUse = poId || grn.poId;
     const storeId = req.body.storeId || req.user.storeId || null;
     const transport = parseFloat(transportCharges) || 0;
     const other = parseFloat(otherCharges) || 0;
@@ -51,9 +86,11 @@ export const createPurchase = async (req, res) => {
           storeId,
           displayId,
           vendorId,
-          poId: poId || null,
+          poId: poIdToUse || null,
+          grnId: grnId,
           invoiceNumber,
           invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
+          dueDate: dueDate ? new Date(dueDate) : null,
           transportCharges: transport,
           otherCharges: other,
           totalAmount,

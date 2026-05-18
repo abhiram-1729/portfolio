@@ -1458,7 +1458,7 @@ export default function AdminDamage() {
             <AlertTriangle size={20} className="text-red-600" strokeWidth={2.5} />
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            {storeId && stores.length > 1 && (
+            {false && storeId && stores.length > 1 && (
               <button
                 onClick={() => {
                   window.history.replaceState({}, '', window.location.pathname);
@@ -1471,7 +1471,7 @@ export default function AdminDamage() {
               </button>
             )}
             <h1 className="text-xl font-black text-gray-900 tracking-tight">Damage & Deductions</h1>
-            {stores.length > 1 && (
+            {false && stores.length > 1 && (
               <select
                 value={storeId || ''}
                 onChange={(e) => {

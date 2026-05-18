@@ -148,7 +148,7 @@ export default function AdminDashboard() {
     return widgets.includes(key);
   };
   
-  if (!storeIdParam && isGlobalRole && stores.length > 1) {
+  if (false && !storeIdParam && isGlobalRole && stores.length > 1) {
     const staffByStore = users.reduce((acc, u) => {
       if (u.storeId) acc[u.storeId] = (acc[u.storeId] || 0) + 1;
       return acc;
@@ -261,7 +261,7 @@ export default function AdminDashboard() {
       {/* Header Section */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-gray-100">
         <div className="flex items-center gap-6">
-          {isGlobalRole && stores.length > 1 && (
+          {false && isGlobalRole && stores.length > 1 && (
             <button onClick={() => setSearchParams({})} className="p-3 bg-white border border-gray-200 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm">
               <ChevronLeft size={24} />
             </button>

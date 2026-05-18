@@ -409,7 +409,7 @@ export default function AdminRoutes() {
   };
 
   const renderClassifiedRoutes = () => {
-    if (!storeId && stores.length > 1) {
+    if (false && !storeId && stores.length > 1) {
       const personnelByStore = users.reduce((acc, u) => {
         if (u.storeId && u.id !== currentUser?.id) {
           acc[u.storeId] = (acc[u.storeId] || 0) + 1;
@@ -499,7 +499,7 @@ export default function AdminRoutes() {
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
           {/* Left: Title & Subtitle */}
           <div className="flex items-start gap-3">
-            {storeId && stores.length > 1 && (
+            {false && storeId && stores.length > 1 && (
               <button
                 onClick={() => setSearchParams({})}
                 className="p-2.5 bg-gray-50 border border-gray-100/80 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 hover:bg-emerald-50/50 transition-all shadow-2xs active:scale-95 mt-0.5"
@@ -511,7 +511,7 @@ export default function AdminRoutes() {
             <div className="flex flex-col gap-1 text-left">
               <div className="flex items-center gap-3">
                 <h2 className="text-2xl font-black text-gray-900 tracking-tight leading-none">Route & Coverage</h2>
-                {stores.length > 1 && (
+                {false && stores.length > 1 && (
                   <select
                     value={storeId || ''}
                     onChange={(e) => {
