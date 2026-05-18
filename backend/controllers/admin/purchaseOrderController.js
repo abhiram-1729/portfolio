@@ -3,6 +3,56 @@ import { getTenantId } from '../../utils/tenantContext.js';
 import { generateId } from '../../utils/idGenerator.js';
 import { logActivity } from '../../utils/activityLogger.js';
 
+// ─── METADATA UTILS ────────────────────────────────
+const parsePOMetadata = (po) => {
+  if (!po) return po;
+  const metaIndex = po.remarks?.indexOf('\n[PO_METADATA]:');
+  let itemMeta = [];
+  let attachments = {};
+  let poType = 'REQUISITION';
+  let taxDiscount = '';
+  let cleanRemarks = po.remarks;
+
+  if (metaIndex !== -1 && metaIndex !== undefined && metaIndex !== null) {
+    cleanRemarks = po.remarks.slice(0, metaIndex);
+    try {
+      const parsed = JSON.parse(po.remarks.slice(metaIndex + 15));
+      if (Array.isArray(parsed)) {
+        itemMeta = parsed;
+      } else {
+        itemMeta = parsed.items || [];
+        attachments = parsed.attachments || {};
+        poType = parsed.poType || 'REQUISITION';
+        taxDiscount = parsed.taxDiscount || '';
+      }
+    } catch (e) {
+      console.error('Failed to parse PO metadata from remarks', e);
+    }
+  }
+
+  const items = po.items ? po.items.map(item => {
+    const meta = itemMeta.find(m => m.productId === item.productId);
+    return {
+      ...item,
+      tax: meta ? parseFloat(meta.tax || 0) : 0,
+      discount: meta ? parseFloat(meta.discount || 0) : 0
+    };
+  }) : [];
+
+  return {
+    ...po,
+    remarks: cleanRemarks,
+    items,
+    attachments,
+    poType,
+    taxDiscount
+  };
+};
+
+const parsePOsMetadata = (pos) => {
+  return pos.map(parsePOMetadata);
+};
+
 // ─── CREATE PO ─────────────────────────────────────
 export const createPO = async (req, res) => {
   try {
@@ -19,32 +69,67 @@ export const createPO = async (req, res) => {
       return res.status(400).json({ message: 'Vendor is inactive or not found. Cannot create PO.' });
     }
 
-    // Validate only mapped items
-    const mappedItems = await prisma.vendorItemMapping.findMany({
-      where: { vendorId },
-      select: { productId: true }
-    });
-    const mappedProductIds = new Set(mappedItems.map(m => m.productId));
+    // Validate only mapped items unless it's a Direct PO
+    const isDirect = req.body.poType === 'DIRECT';
 
-    for (const item of items) {
-      if (!mappedProductIds.has(item.productId)) {
-        return res.status(400).json({ message: `Item ${item.productId} is not mapped to this vendor` });
+    if (!isDirect) {
+      const mappedItems = await prisma.vendorItemMapping.findMany({
+        where: { vendorId },
+        select: { productId: true }
+      });
+      const mappedProductIds = new Set(mappedItems.map(m => m.productId));
+
+      for (const item of items) {
+        if (!mappedProductIds.has(item.productId)) {
+          return res.status(400).json({ message: `Item ${item.productId} is not mapped to this vendor` });
+        }
+        if (!item.quantity || item.quantity <= 0) {
+          return res.status(400).json({ message: 'All item quantities must be greater than 0' });
+        }
       }
-      if (!item.quantity || item.quantity <= 0) {
-        return res.status(400).json({ message: 'All item quantities must be greater than 0' });
+    } else {
+      // Direct PO validation: just ensure quantities are positive
+      for (const item of items) {
+        if (!item.quantity || item.quantity <= 0) {
+          return res.status(400).json({ message: 'All item quantities must be greater than 0' });
+        }
       }
     }
 
     const storeId = req.body.storeId || req.user.storeId || null;
 
-    // Calculate totals
-    const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.rate), 0);
+    // Calculate totals with item-level tax & discount
+    const totalAmount = items.reduce((sum, item) => {
+      const qty = parseInt(item.quantity) || 0;
+      const rate = parseFloat(item.rate) || 0;
+      const discount = parseFloat(item.discount || 0);
+      const tax = parseFloat(item.tax || 0);
+      const baseVal = qty * rate;
+      const discVal = baseVal * (discount / 100);
+      const taxVal = (baseVal - discVal) * (tax / 100);
+      return sum + (baseVal - discVal + taxVal);
+    }, 0);
 
     const displayId = await generateId({
       entity: 'PO',
       tenantId,
       storeId
     });
+
+    const itemMetadata = items.map(i => ({
+      productId: i.productId,
+      tax: parseFloat(i.tax || 0),
+      discount: parseFloat(i.discount || 0)
+    }));
+    const metadataPayload = {
+      items: itemMetadata,
+      attachments: req.body.attachments || {},
+      poType: req.body.poType || 'REQUISITION',
+      taxDiscount: req.body.taxDiscount || ''
+    };
+    const serializedRemarks = remarks 
+      ? `${remarks}\n[PO_METADATA]:${JSON.stringify(metadataPayload)}`
+      : `\n[PO_METADATA]:${JSON.stringify(metadataPayload)}`;
 
     const po = await prisma.purchaseOrder.create({
       data: {
@@ -54,16 +139,27 @@ export const createPO = async (req, res) => {
         vendorId,
         poDate: poDate ? new Date(poDate) : new Date(),
         expectedDelivery: expectedDelivery ? new Date(expectedDelivery) : null,
-        remarks: remarks || null,
+        remarks: serializedRemarks,
         totalAmount,
         items: {
-          create: items.map(item => ({
-            tenantId,
-            productId: item.productId,
-            quantity: parseInt(item.quantity),
-            rate: parseFloat(item.rate),
-            total: parseInt(item.quantity) * parseFloat(item.rate)
-          }))
+          create: items.map(item => {
+            const qty = parseInt(item.quantity) || 0;
+            const rate = parseFloat(item.rate) || 0;
+            const discount = parseFloat(item.discount || 0);
+            const tax = parseFloat(item.tax || 0);
+            const baseVal = qty * rate;
+            const discVal = baseVal * (discount / 100);
+            const taxVal = (baseVal - discVal) * (tax / 100);
+            const itemTotal = baseVal - discVal + taxVal;
+
+            return {
+              tenantId,
+              productId: item.productId,
+              quantity: qty,
+              rate: rate,
+              total: itemTotal
+            };
+          })
         }
       },
       include: {
@@ -81,7 +177,7 @@ export const createPO = async (req, res) => {
       metadata: { poId: po.id, totalAmount }
     });
 
-    res.status(201).json({ message: 'Purchase Order created successfully', po });
+    res.status(201).json({ message: 'Purchase Order created successfully', po: parsePOMetadata(po) });
   } catch (error) {
     console.error('❌ Create PO Error:', error);
     res.status(500).json({ message: 'Error creating purchase order', error: error.message });
@@ -122,7 +218,7 @@ export const getPOs = async (req, res) => {
       }
     });
 
-    res.json(pos);
+    res.json(parsePOsMetadata(pos));
   } catch (error) {
     res.status(500).json({ message: 'Error fetching purchase orders', error: error.message });
   }
@@ -149,7 +245,7 @@ export const getPOById = async (req, res) => {
     });
 
     if (!po) return res.status(404).json({ message: 'Purchase Order not found' });
-    res.json(po);
+    res.json(parsePOMetadata(po));
   } catch (error) {
     res.status(500).json({ message: 'Error fetching purchase order', error: error.message });
   }
@@ -206,8 +302,57 @@ export const updatePO = async (req, res) => {
     const totalAmount = items ? items.reduce((sum, item) => {
       const q = parseInt(item.quantity) || 0;
       const r = parseFloat(item.rate) || 0;
-      return sum + (q * r);
+      const discount = parseFloat(item.discount || 0);
+      const tax = parseFloat(item.tax || 0);
+      const baseVal = q * r;
+      const discVal = baseVal * (discount / 100);
+      const taxVal = (baseVal - discVal) * (tax / 100);
+      return sum + (baseVal - discVal + taxVal);
     }, 0) : existingPO.totalAmount;
+
+    let serializedRemarks = remarks;
+    if (items || req.body.attachments) {
+      const baseRemarks = remarks !== undefined ? remarks : (existingPO.remarks || '');
+      const cleanBaseRemarks = baseRemarks.includes('\n[PO_METADATA]:')
+        ? baseRemarks.slice(0, baseRemarks.indexOf('\n[PO_METADATA]:'))
+        : baseRemarks;
+
+      const finalItems = items || existingPO.items;
+      const itemMetadata = finalItems.map(i => ({
+        productId: i.productId,
+        tax: parseFloat(i.tax || 0),
+        discount: parseFloat(i.discount || 0)
+      }));
+
+      let existingAttachments = {};
+      let existingPoType = 'REQUISITION';
+      let existingTaxDiscount = '';
+      if (existingPO.remarks?.includes('\n[PO_METADATA]:')) {
+        try {
+          const parsed = JSON.parse(existingPO.remarks.slice(existingPO.remarks.indexOf('\n[PO_METADATA]:') + 15));
+          if (!Array.isArray(parsed)) {
+            existingAttachments = parsed.attachments || {};
+            existingPoType = parsed.poType || 'REQUISITION';
+            existingTaxDiscount = parsed.taxDiscount || '';
+          }
+        } catch {}
+      }
+
+      const finalAttachments = req.body.attachments 
+        ? { ...existingAttachments, ...req.body.attachments }
+        : existingAttachments;
+
+      const metadataPayload = {
+        items: itemMetadata,
+        attachments: finalAttachments,
+        poType: req.body.poType || existingPoType,
+        taxDiscount: req.body.taxDiscount !== undefined ? req.body.taxDiscount : existingTaxDiscount
+      };
+
+      serializedRemarks = cleanBaseRemarks 
+        ? `${cleanBaseRemarks}\n[PO_METADATA]:${JSON.stringify(metadataPayload)}`
+        : `\n[PO_METADATA]:${JSON.stringify(metadataPayload)}`;
+    }
 
     const po = await prisma.$transaction(async (tx) => {
       // Delete old items if items are provided
@@ -226,16 +371,26 @@ export const updatePO = async (req, res) => {
         data: {
           poDate: isValidDate ? parsedDate : existingPO.poDate,
           expectedDelivery: isValidExp ? parsedExp : (expectedDelivery === null ? null : existingPO.expectedDelivery),
-          remarks: remarks !== undefined ? remarks : existingPO.remarks,
+          remarks: serializedRemarks !== undefined ? serializedRemarks : existingPO.remarks,
           totalAmount,
           items: items ? {
-            create: items.map(item => ({
-              tenantId: existingPO.tenantId,
-              productId: item.productId,
-              quantity: parseInt(item.quantity) || 0,
-              rate: parseFloat(item.rate) || 0,
-              total: (parseInt(item.quantity) || 0) * (parseFloat(item.rate) || 0)
-            }))
+            create: items.map(item => {
+              const q = parseInt(item.quantity) || 0;
+              const r = parseFloat(item.rate) || 0;
+              const discount = parseFloat(item.discount || 0);
+              const tax = parseFloat(item.tax || 0);
+              const baseVal = q * r;
+              const discVal = baseVal * (discount / 100);
+              const taxVal = (baseVal - discVal) * (tax / 100);
+              const itemTotal = baseVal - discVal + taxVal;
+              return {
+                tenantId: existingPO.tenantId,
+                productId: item.productId,
+                quantity: q,
+                rate: r,
+                total: itemTotal
+              };
+            })
           } : undefined
         },
         include: {
@@ -254,7 +409,7 @@ export const updatePO = async (req, res) => {
       metadata: { poId: id }
     });
 
-    res.json({ message: 'Purchase Order updated successfully', po });
+    res.json({ message: 'Purchase Order updated successfully', po: parsePOMetadata(po) });
   } catch (error) {
     console.error('❌ Update PO Error:', error);
     res.status(500).json({ message: 'Error updating purchase order', error: error.message });

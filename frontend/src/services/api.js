@@ -4,7 +4,7 @@ import { useUserStore } from '../store/userStore';
 const envURL = import.meta.env.VITE_API_URL;
 const isProd = import.meta.env.PROD || (typeof window !== 'undefined' && (window.location.hostname.includes('vercel.app') || window.location.hostname !== 'localhost'));
 
-let API_URL = envURL || '';
+export let API_URL = envURL || '';
 
 // Case 1: Production logic
 if (isProd) {

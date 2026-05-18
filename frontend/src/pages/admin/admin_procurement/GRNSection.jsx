@@ -93,7 +93,7 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
     try {
       setUploading(true);
       const { data } = await adminAPI.uploadProductImage(formData);
-      setAttachments(prev => [...prev, { name: file.name, url: data.url }]);
+      setAttachments(prev => [...prev, { name: file.name, url: data.data?.url || data.url }]);
       toast.success('File uploaded successfully');
     } catch (err) {
       toast.error('Failed to upload file');
