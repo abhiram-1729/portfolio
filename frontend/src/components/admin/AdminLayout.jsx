@@ -258,7 +258,7 @@ export default function AdminLayout() {
         { to: '/admin/delivery-logistics', icon: Truck, label: 'Delivery Logistics', module: 'ADMIN' },
       ]
     },
-    // { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
+    { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
     { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
     {
@@ -1120,7 +1120,7 @@ export default function AdminLayout() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 text-white relative">
-              <button 
+              <button
                 onClick={() => setIsEditProfileOpen(false)}
                 className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
               >
@@ -1200,7 +1200,7 @@ export default function AdminLayout() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/40 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-[2rem] border border-gray-100 shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 bg-gradient-to-br from-emerald-600 to-teal-700 text-white relative">
-              <button 
+              <button
                 onClick={() => setIsEditBusinessOpen(false)}
                 className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"
               >

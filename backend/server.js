@@ -1,13 +1,16 @@
 import fs from 'fs';
 import path from 'path';
+import util from 'util';
 const logFile = fs.createWriteStream('debug.log', { flags: 'a' });
 console.log = (...args) => {
-  logFile.write(`[${new Date().toISOString()}] LOG: ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}\n`);
-  process.stdout.write(args.join(' ') + '\n');
+  const formatted = util.format(...args);
+  logFile.write(`[${new Date().toISOString()}] LOG: ${formatted}\n`);
+  process.stdout.write(formatted + '\n');
 };
 console.error = (...args) => {
-  logFile.write(`[${new Date().toISOString()}] ERR: ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}\n`);
-  process.stderr.write(args.join(' ') + '\n');
+  const formatted = util.format(...args);
+  logFile.write(`[${new Date().toISOString()}] ERR: ${formatted}\n`);
+  process.stderr.write(formatted + '\n');
 };
 
 import dotenv from 'dotenv';

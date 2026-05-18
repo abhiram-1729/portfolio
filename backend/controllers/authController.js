@@ -392,7 +392,10 @@ export const updateBusinessProfile = async (req, res, next) => {
             message: 'Business profile customized successfully'
         });
     } catch (error) {
-        console.error('[updateBusinessProfile Error]:', error);
+        console.error('[updateBusinessProfile Error]:', error.message || error);
+        if (error.stack) {
+            console.error('[updateBusinessProfile Stack]:', error.stack);
+        }
         res.status(500).json({ success: false, message: error.message || 'Internal server error updating business profile' });
     }
 };
