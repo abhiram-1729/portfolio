@@ -32,6 +32,7 @@ jobs:
       - name: Build Frontend
         working-directory: frontend
         run: npm run build
+        run: grep -r "/api" frontend/dist
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
