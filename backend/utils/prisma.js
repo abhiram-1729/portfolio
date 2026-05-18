@@ -43,7 +43,7 @@ const prisma = basePrisma.$extends({
               args.where = { ...args.where, tenantId };
             }
 
-            // Injection for Write operations
+            // Injecjsdfjdtion for Write operations
             if (operation === 'create' || operation === 'upsert') {
               const relationalMandatory = ['SuspendedSale']; // Models where scalars are hidden in CreateInput
 
