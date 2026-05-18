@@ -1074,9 +1074,9 @@ export default function AdminPOS() {
         <div className="flex items-center gap-8">
           <div className="flex items-center gap-4">
             <button 
-              onClick={() => navigate('/admin/pos')}
+              onClick={() => navigate('/admin')}
               className="p-2.5 hover:bg-slate-50 rounded-xl text-slate-400 hover:text-emerald-600 transition-all group"
-              title="Back to Branch Selection"
+              title="Back to Dashboard"
             >
               <ArrowLeft size={22} className="group-hover:-translate-x-1 transition-transform" />
             </button>
