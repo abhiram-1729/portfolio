@@ -1202,41 +1202,41 @@ export default function AdminPOS() {
             {/* Left Side: Product Section */}
             <div className="flex-[3] flex flex-col gap-6 overflow-hidden">
               {/* Categories */}
-              <div className="flex items-center gap-3 overflow-x-auto pb-2 [scrollbar-width:none] shrink-0">
+              <div className="flex items-center gap-2 overflow-x-auto pb-1 [scrollbar-width:none] shrink-0">
                 <button
                   onClick={() => setSelectedCategory('ALL')}
-                  className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all shrink-0 ${
+                  className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all shrink-0 ${
                     selectedCategory === 'ALL'
-                      ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-200'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-200'
                       : 'bg-white text-slate-400 border border-slate-100 hover:bg-slate-50'
                   }`}
                 >
-                  <LayoutGrid size={16} />
+                  <LayoutGrid size={12} strokeWidth={2.5} />
                   All Categories
                 </button>
                 {categories.filter(c => c !== 'ALL').map(cat => (
                   <button
                     key={cat}
                     onClick={() => setSelectedCategory(cat)}
-                    className={`flex items-center gap-2 px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest transition-all border shrink-0 ${
+                    className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest transition-all border shrink-0 ${
                       selectedCategory === cat
-                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-lg shadow-emerald-200'
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-md shadow-emerald-200'
                         : 'bg-white text-slate-400 border-slate-100 hover:bg-slate-50'
                     }`}
                   >
                     {cat}
                   </button>
                 ))}
-                <button className="flex items-center gap-2 px-5 py-3 rounded-2xl text-[11px] font-black uppercase tracking-widest bg-white text-slate-400 border border-slate-100 hover:bg-slate-50 transition-all shrink-0">
-                  More <ChevronLeft className="rotate-270" size={14} />
+                <button className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-[9px] font-black uppercase tracking-widest bg-white text-slate-400 border border-slate-100 hover:bg-slate-50 transition-all shrink-0">
+                  More <ChevronLeft className="rotate-270" size={12} strokeWidth={2.5} />
                 </button>
               </div>
 
               {/* Product Grid */}
-              <div className="flex-1 overflow-y-auto pr-2 grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 pb-6 scrollbar-thin scrollbar-thumb-slate-200">
+              <div className="flex-1 overflow-y-auto pr-1 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 pb-6 scrollbar-thin scrollbar-thumb-slate-200">
                 {loading ? (
-                  [...Array(10)].map((_, i) => (
-                    <div key={i} className="aspect-[4/5] bg-white rounded-3xl border border-slate-50 animate-pulse shadow-sm" />
+                  [...Array(12)].map((_, i) => (
+                    <div key={i} className="h-[300px] bg-white rounded-3xl border border-slate-50 animate-pulse shadow-sm" />
                   ))
                 ) : filteredProducts.length === 0 ? (
                   <div className="col-span-full py-20 text-center text-slate-400">
@@ -1258,113 +1258,112 @@ export default function AdminPOS() {
                             toast.error('Product out of stock');
                             return;
                           }
-                          addItem(product);
+                          if (!inCart) addItem(product);
                         }}
-                        className={`group relative bg-white rounded-[2rem] p-4 border transition-all cursor-pointer hover:shadow-2xl hover:shadow-emerald-900/5 ${inCart ? 'border-emerald-500 ring-1 ring-emerald-500' : 'border-slate-100'
-                          } ${checkoutStep === 'SUCCESS' ? 'opacity-60 cursor-not-allowed' : ''}`}
+                        className={`group relative bg-white rounded-3xl p-3 border transition-all flex flex-col justify-between h-[300px] overflow-hidden ${
+                          inCart ? 'border-emerald-500 ring-1 ring-emerald-500 bg-emerald-50/10' : 'border-slate-100 hover:border-slate-200 hover:shadow-xl hover:shadow-emerald-950/5'
+                        } ${checkoutStep === 'SUCCESS' ? 'opacity-60 cursor-not-allowed' : 'cursor-pointer'}`}
                       >
-                        {inCart && (
-                          <div className="absolute top-4 right-4 w-7 h-7 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[11px] font-black shadow-lg shadow-emerald-600/20 z-10 animate-in zoom-in">
-                            {inCart.quantity}
-                          </div>
-                        )}
-                        
-                        <div className="aspect-square rounded-2xl bg-slate-50 mb-4 overflow-hidden relative">
+                        {/* Image & Badges */}
+                        <div className="relative w-full h-[120px] rounded-2xl bg-slate-50 overflow-hidden shrink-0 mb-3">
                           {product.image ? (
-                            <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                            <img 
+                              src={product.image} 
+                              alt={product.name} 
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                            />
                           ) : (
-                            <div className="w-full h-full flex items-center justify-center text-slate-200">
-                              <Package size={40} />
+                            <div className="w-full h-full flex items-center justify-center text-slate-300">
+                              <Package size={32} />
                             </div>
                           )}
-                          
-                          <div className="absolute top-3 left-3">
-                            <span className="px-2.5 py-1 bg-white/90 backdrop-blur-sm border border-slate-100 text-[8px] font-black text-emerald-600 uppercase tracking-widest rounded-lg shadow-sm">
+
+                          {/* In-cart indicator badge */}
+                          {inCart && (
+                            <div className="absolute top-2 right-2 w-6 h-6 bg-emerald-600 text-white rounded-full flex items-center justify-center text-[10px] font-black shadow-md animate-in zoom-in">
+                              {inCart.quantity}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Info Area (Name, Damage, Price, Stock) */}
+                        <div className="flex-1 flex flex-col justify-between gap-1 mb-3">
+                          <div className="space-y-0.5">
+                            {/* Category (small single line) */}
+                            <span className="text-[8px] font-black text-emerald-600 uppercase tracking-widest block truncate" title={product.category?.name || 'General'}>
                               {product.category?.name || 'General'}
+                            </span>
+                            {/* Name */}
+                            <h4 className="text-[11px] font-black text-slate-800 leading-snug uppercase line-clamp-2 block" title={product.name}>
+                              {product.name}
+                            </h4>
+                          </div>
+
+                          {/* Price & Stock info */}
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-baseline gap-1.5">
+                              <span className="text-sm font-black text-slate-900">₹{product.price.toFixed(2)}</span>
+                              {product.mrp > product.price && (
+                                <span className="text-[10px] font-bold text-slate-400 line-through">₹{product.mrp.toFixed(2)}</span>
+                              )}
+                            </div>
+                            <span className={`text-[8px] font-black uppercase tracking-wider ${product.stock <= 0 ? 'text-rose-500' : 'text-slate-400'}`}>
+                              {product.stock <= 0 ? 'Out of Stock' : `Stock: ${product.stock} units`}
                             </span>
                           </div>
                         </div>
 
-                        <div className="space-y-1.5">
-                          <div className="flex justify-between items-start gap-2">
-                            <h4 className="text-xs font-black text-slate-900 leading-snug line-clamp-2 uppercase min-h-[2.4rem]">
-                              {product.name}
-                            </h4>
-                            <button 
+                        {/* Action Button Area */}
+                        <div className="shrink-0">
+                          {inCart ? (
+                            <div className="flex items-center justify-between bg-emerald-50 rounded-xl border border-emerald-200 p-0.5 animate-in fade-in duration-200">
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (checkoutStep === 'SUCCESS') return;
+                                  updateQuantity(inCart.productId, inCart.quantity - 1);
+                                }}
+                                className={`w-7 h-7 flex items-center justify-center bg-white rounded-lg text-slate-500 hover:bg-rose-50 hover:text-rose-600 border border-slate-100 shadow-sm transition-all ${checkoutStep === 'SUCCESS' ? 'cursor-not-allowed' : ''}`}
+                              >
+                                <Minus size={12} strokeWidth={3} />
+                              </button>
+                              <span className="text-xs font-black text-emerald-800 tabular-nums">{inCart.quantity}</span>
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (checkoutStep === 'SUCCESS') return;
+                                  updateQuantity(inCart.productId, inCart.quantity + 1);
+                                }}
+                                className={`w-7 h-7 flex items-center justify-center bg-white rounded-lg text-emerald-600 hover:bg-emerald-50 border border-slate-100 shadow-sm transition-all ${checkoutStep === 'SUCCESS' ? 'cursor-not-allowed' : ''}`}
+                              >
+                                <Plus size={12} strokeWidth={3} />
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              disabled={product.stock <= 0}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setProductToDamage(product);
-                                setIsDamageModalOpen(true);
+                                if (checkoutStep === 'SUCCESS') {
+                                  toast.error('Please click DONE to start a new sale');
+                                  return;
+                                  }
+                                addItem(product);
                               }}
-                              className="p-1.5 text-slate-200 hover:text-amber-500 hover:bg-amber-50 rounded-lg transition-all"
-                              title="Report Damage"
+                              className={`w-full py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1 border ${
+                                product.stock <= 0 
+                                  ? 'bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed' 
+                                  : 'bg-emerald-50 hover:bg-emerald-600 text-emerald-600 hover:text-white border-emerald-100 hover:border-emerald-600 shadow-sm active:scale-95'
+                              }`}
                             >
-                              <AlertTriangle size={14} />
+                              <Plus size={12} strokeWidth={3} /> Add
                             </button>
-                          </div>
-
-                          <div className="flex items-end justify-between pt-1">
-                            <div className="flex flex-col">
-                              <span className="text-lg font-black text-slate-900 tracking-tighter">₹{product.price.toFixed(2)}</span>
-                              {product.mrp > product.price && (
-                                <span className="text-[10px] font-bold text-rose-400 line-through">₹{product.mrp.toFixed(2)}</span>
-                              )}
-                              <span className={`text-[9px] font-black uppercase tracking-wider mt-1 ${product.stock <= 0 ? 'text-rose-500' : 'text-emerald-500'}`}>
-                                {product.stock <= 0 ? 'Out of Stock' : `Stock: ${product.stock}`}
-                              </span>
-                            </div>
-
-                            {inCart ? (
-                              <div className="flex items-center gap-1.5 bg-white p-1 rounded-xl border border-emerald-500 shadow-sm shadow-emerald-600/5">
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (checkoutStep === 'SUCCESS') return;
-                                    updateQuantity(inCart.productId, inCart.quantity - 1);
-                                  }}
-                                  className={`w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-all ${checkoutStep === 'SUCCESS' ? 'cursor-not-allowed' : ''}`}
-                                >
-                                  <Minus size={14} strokeWidth={3} />
-                                </button>
-                                <span className="w-6 text-center text-sm font-black text-slate-900">{inCart.quantity}</span>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (checkoutStep === 'SUCCESS') return;
-                                    updateQuantity(inCart.productId, inCart.quantity + 1);
-                                  }}
-                                  className={`w-8 h-8 flex items-center justify-center bg-slate-50 rounded-lg text-emerald-600 hover:bg-emerald-50 transition-all ${checkoutStep === 'SUCCESS' ? 'cursor-not-allowed' : ''}`}
-                                >
-                                  <Plus size={14} strokeWidth={3} />
-                                </button>
-                              </div>
-                            ) : (
-                              product.stock > 0 && (
-                                <div className="w-10 h-10 rounded-2xl bg-emerald-600 flex items-center justify-center text-white shadow-lg shadow-emerald-600/20 group-hover:scale-110 transition-all">
-                                  <Plus size={18} strokeWidth={3} />
-                                </div>
-                              )
-                            )}
-                          </div>
+                          )}
                         </div>
                       </div>
                     );
                   })
                 )}
-              </div>
-              
-              {/* Pagination Mockup */}
-              <div className="shrink-0 flex items-center justify-between px-2 pt-2 border-t border-slate-100">
-                <p className="text-[11px] font-bold text-slate-400">Showing 1 to {filteredProducts.length} of {products.length} products</p>
-                <div className="flex items-center gap-2">
-                  <button className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-50"><ChevronLeft size={16} /></button>
-                  <button className="w-8 h-8 rounded-lg bg-emerald-600 text-white font-black text-xs shadow-sm">1</button>
-                  <button className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-xs font-bold">2</button>
-                  <button className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-xs font-bold">3</button>
-                  <span className="text-slate-300 text-xs">...</span>
-                  <button className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-50 text-xs font-bold">10</button>
-                  <button className="w-8 h-8 rounded-lg border border-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-50"><ChevronRight size={16} /></button>
-                </div>
               </div>
             </div>
 

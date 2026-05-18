@@ -588,7 +588,8 @@ export default function AdminLayout() {
 
   return (
     <div className={cn(
-      "min-h-screen bg-gray-50 flex flex-col pb-20 md:pb-0 transition-all duration-300",
+      "bg-gray-50 flex flex-col transition-all duration-300",
+      isPOS ? "h-screen overflow-hidden" : "min-h-screen pb-20 md:pb-0",
       !isPOS && (isSidebarCollapsed ? "md:pl-20" : "md:pl-64")
     )}>
       {/* Header */}
@@ -983,7 +984,10 @@ export default function AdminLayout() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 p-4 md:p-8 overflow-x-hidden">
+      <main className={cn(
+        "flex-1 overflow-x-hidden",
+        isPOS ? "h-screen overflow-hidden p-0" : "p-4 md:p-8"
+      )}>
         {isAuthorizedRoute() ? (
           <Outlet />
         ) : (
