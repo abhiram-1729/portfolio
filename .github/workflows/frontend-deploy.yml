@@ -12,27 +12,80 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy Frontend
-        uses: appleboy/ssh-action@v1.0.3
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USER }}
-          key: ${{ secrets.EC2_SSH_KEY }}
+          node-version: 20
 
-          script: |
-            export PATH=$PATH:/home/ubuntu/n/bin
+      - name: Install Dependencies
+        working-directory: frontend
+        run: npm install
 
-            cd /opt/apps/villagkart/vgk_sales
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm run build
 
-            git checkout cicd
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.name: Frontend Deploy
 
-            git pull origin cicd
+on:
+  push:
+    branches:
+      - cicd
+    paths:
+      - 'frontend/**'
 
-            cd frontend
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
 
-            npm install
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
 
-            npm run build
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-            sudo systemctl reload nginx
+      - name: Install Dependencies
+        working-directory: frontend
+        run: npm install
+
+      - name: Build Frontend
+        working-directory: frontend
+        run: npm run build
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Upload to S3
+        run: |
+          aws s3 sync frontend/dist s3://vsms-frontend --delete
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E19HM0JHXQVYCA \
+            --paths "/*" }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ap-south-1
+
+      - name: Upload to S3
+        run: |
+          aws s3 sync frontend/dist s3://vsms-frontend --delete
+
+      - name: Invalidate CloudFront Cache
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id E19HM0JHXQVYCA \
+            --paths "/*"
