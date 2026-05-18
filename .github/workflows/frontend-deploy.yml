@@ -20,6 +20,11 @@ jobs:
         with:
           node-version: 20
 
+      - name: Create .env
+        working-directory: frontend
+        run: |
+          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > .env
+
       - name: Install Dependencies
         working-directory: frontend
         run: npm install
