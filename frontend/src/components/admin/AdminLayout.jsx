@@ -604,7 +604,7 @@ export default function AdminLayout() {
               >
                 <Menu size={20} className={cn("transition-transform duration-300", !isSidebarCollapsed && "rotate-180")} />
               </button>
-              <div className="flex items-center gap-3 group relative">
+              {/* <div className="flex items-center gap-3 group relative">
                 {displayStoreLogo ? (
                   <img src={displayStoreLogo} alt={displayStoreName} className="h-10 w-10 rounded-xl object-cover shadow-sm" />
                 ) : (
@@ -623,7 +623,7 @@ export default function AdminLayout() {
                   </div>
                   <h1 className="text-xl font-black text-emerald-600 leading-none">Admin Portal</h1>
                 </div>
-              </div>
+              </div> */}
             </div>
             <div className="flex items-center gap-4 relative">
               {(user?.role === 'TENANT_OWNER' || (user?.role === 'ADMIN' && !user?.customRoleId) || (user?.permissions?.SETTINGS_TARGET_SECTIONS || []).includes('POS_TERMINAL')) && (
