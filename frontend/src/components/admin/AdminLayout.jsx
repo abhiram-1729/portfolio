@@ -260,7 +260,7 @@ export default function AdminLayout() {
 
   const rawNavItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true, module: 'DASHBOARD' },
-    { to: '/admin/onboarding', icon: Lightbulb, label: 'Onboarding & Help' },
+    // { to: '/admin/onboarding', icon: Lightbulb, label: 'Onboarding & Help' },
     {
       label: 'Operation',
       icon: Users,
