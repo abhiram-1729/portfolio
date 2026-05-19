@@ -24,17 +24,17 @@ export const loginUser = async (req, res, next) => {
 
         if (user.status === 'SUSPENDED') {
             console.log('[DEBUG] Login failed: User suspended');
-            return res.status(403).json({ 
-                success: false, 
-                message: 'Account is suspended. Please contact your administrator.' 
+            return res.status(403).json({
+                success: false,
+                message: 'Account is suspended. Please contact your administrator.'
             });
         }
 
         if (user.role === 'SALES_AGENT' && user.assignedVehicle && user.assignedVehicle.status === false) {
             console.log('[DEBUG] Login failed: Vehicle inactive');
-            return res.status(403).json({ 
-                success: false, 
-                message: `Your assigned vehicle (${user.assignedVehicle.vehicleNumber}) is currently INACTIVE. Access denied.` 
+            return res.status(403).json({
+                success: false,
+                message: `Your assigned vehicle (${user.assignedVehicle.vehicleNumber}) is currently INACTIVE. Access denied.`
             });
         }
 
@@ -43,7 +43,7 @@ export const loginUser = async (req, res, next) => {
             console.log('[DEBUG] Password matched. Generating token...');
             const token = generateToken(user.id, user.role, user.assignedVehicleId, user.tenantId);
             console.log('[DEBUG] Token generated successfully');
-            
+
             res.json({
                 id: user.id,
                 tenantId: user.tenantId,
@@ -149,3 +149,4 @@ export const updatePassword = async (req, res, next) => {
         next(error);
     }
 };
+// comment
