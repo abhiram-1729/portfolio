@@ -38,7 +38,7 @@ jobs:
 
             npx prisma generate
 
-            npx prisma db push
+            DIRECT_URL="${{ secrets.DIRECT_URL }}" DATABASE_URL="${{ secrets.DATABASE_URL }}" npx prisma db push
 
             pm2 restart vsms-backend
 
