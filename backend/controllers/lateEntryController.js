@@ -7,9 +7,9 @@ export const getConfig = async (req, res, next) => {
   try {
     const tenantId = req.user.tenantId;
     const storeId = req.query.storeId || req.user.storeId || null;
-
+    // hgfxhd
     const config = await prisma.lateEntryConfig.findFirst({
-      where: { 
+      where: {
         tenantId,
         OR: [
           { storeId: storeId },
@@ -144,10 +144,10 @@ export const requestException = async (req, res, next) => {
     });
 
     if (existing) {
-      return res.status(400).json({ 
-        success: false, 
+      return res.status(400).json({
+        success: false,
         message: 'Waiver request already exists for this entry',
-        data: existing 
+        data: existing
       });
     }
 
@@ -175,15 +175,15 @@ export const requestException = async (req, res, next) => {
 export const updateLateEntry = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { 
-      userId, 
-      date, 
-      shiftStart, 
-      checkinTime, 
-      lateMinutes, 
-      penaltyApplied, 
-      penaltyValue, 
-      isWaived 
+    const {
+      userId,
+      date,
+      shiftStart,
+      checkinTime,
+      lateMinutes,
+      penaltyApplied,
+      penaltyValue,
+      isWaived
     } = req.body;
     const adminId = req.user.id;
 
