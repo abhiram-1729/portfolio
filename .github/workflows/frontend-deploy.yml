@@ -33,8 +33,9 @@ jobs:
         working-directory: frontend
         run: npm run build
 
-      - name: Verify Build (check for /api leakage)
-        run: grep -r "/api" frontend/dist || true
+      - name: Verify Backend URL
+        run: |
+            grep -r "devvsmsapi" frontend/dist || true
 
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
