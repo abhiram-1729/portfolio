@@ -213,14 +213,14 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
 
     // Total amount after discount (treated as Inclusive)
     const lineTotal = (unitCostBD * qty) * (1 - discPer / 100);
-    
+
     // Tax Amount calculated on the Inclusive Total
     const taxAmount = lineTotal * (taxPer / 100);
 
     // Base total (Before Tax) = Total - Tax
     const subtotalBT = lineTotal - taxAmount;
     const unitCostBT = qty > 0 ? subtotalBT / qty : 0;
-    
+
     const netCost = qty > 0 ? lineTotal / qty : 0;
     const profitMargin = netCost > 0 ? ((unitSellPrice - netCost) / netCost) * 100 : 0;
 
@@ -511,7 +511,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               </div>
 
               {can('PROCUREMENT', 'CREATE', 'PURCHASES') && (
-                <button 
+                <button
                   onClick={() => { setForm({ vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'), transportCharges: '0', otherCharges: '0', items: [] }); openForm(); }}
                   disabled={formLoading}
                   className="flex items-center gap-1.5 bg-emerald-600 text-white px-4 py-2 rounded-xl font-black text-[10px] uppercase tracking-widest hover:bg-emerald-700 transition-all shadow-lg shadow-emerald-600/10 active:scale-95 disabled:opacity-70">
@@ -639,8 +639,8 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Link Purchase Order (Optional)</label>
-                <select 
-                  value={form.poId} 
+                <select
+                  value={form.poId}
                   onChange={e => handlePOSelect(e.target.value)}
                   disabled={!form.vendorId}
                   className="w-full bg-emerald-50/50 rounded-xl px-4 py-3 text-sm font-bold border border-emerald-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
@@ -678,7 +678,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div className="flex flex-col">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 pl-1">Line Items</label>
-                  <div className="relative mt-2 min-w-[280px] group">
+                  <div className="relative mt-2 min-w-[780px] sm:min-w-[780px] group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
                     <input
                       type="text"
@@ -807,17 +807,17 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                     <Package size={14} className="text-emerald-600" />
                     Line Items ({form.items.length})
                   </h3>
-                  <div className="relative">
+                  <div className="relative group">
                     <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={10} />
                     <input
                       type="text"
                       placeholder="FILTER ADDED ITEMS..."
                       value={itemFilter}
                       onChange={(e) => setItemFilter(e.target.value)}
-                      className="pl-8 pr-3 py-1.5 bg-white border border-gray-200 rounded-lg text-[9px] font-black w-48 focus:ring-2 focus:ring-emerald-500 outline-none transition-all uppercase placeholder:text-gray-300"
+                      className="pl-8 pr-8 py-1.5 bg-white border border-gray-200 rounded-lg text-[9px] font-black w-72 sm:w-[720px] focus:ring-2 focus:ring-emerald-500 outline-none transition-all uppercase placeholder:text-gray-300"
                     />
                     {itemFilter && (
-                      <button onClick={() => setItemFilter('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                      <button onClick={() => setItemFilter('')} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                         <X size={10} strokeWidth={3} />
                       </button>
                     )}
@@ -1040,42 +1040,42 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="col-span-1 md:col-span-2 space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor Name *</label>
-                <input required value={quickVendorForm.vendorName} onChange={e => setQuickVendorForm({ ...quickVendorForm, vendorName: e.target.value })} 
+                <input required value={quickVendorForm.vendorName} onChange={e => setQuickVendorForm({ ...quickVendorForm, vendorName: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Mobile Number *</label>
-                <input required value={quickVendorForm.mobile} onChange={e => setQuickVendorForm({ ...quickVendorForm, mobile: e.target.value })} 
+                <input required value={quickVendorForm.mobile} onChange={e => setQuickVendorForm({ ...quickVendorForm, mobile: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Email Address</label>
-                <input type="email" value={quickVendorForm.email} onChange={e => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })} 
+                <input type="email" value={quickVendorForm.email} onChange={e => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Contact Person</label>
-                <input value={quickVendorForm.contactPerson} onChange={e => setQuickVendorForm({ ...quickVendorForm, contactPerson: e.target.value })} 
+                <input value={quickVendorForm.contactPerson} onChange={e => setQuickVendorForm({ ...quickVendorForm, contactPerson: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">GST Number</label>
-                <input value={quickVendorForm.gstNumber} onChange={e => setQuickVendorForm({ ...quickVendorForm, gstNumber: e.target.value })} 
+                <input value={quickVendorForm.gstNumber} onChange={e => setQuickVendorForm({ ...quickVendorForm, gstNumber: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Credit Days</label>
-                <input type="number" value={quickVendorForm.creditDays} onChange={e => setQuickVendorForm({ ...quickVendorForm, creditDays: e.target.value })} 
+                <input type="number" value={quickVendorForm.creditDays} onChange={e => setQuickVendorForm({ ...quickVendorForm, creditDays: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Balance (₹)</label>
-                <input type="number" value={quickVendorForm.openingBalance} onChange={e => setQuickVendorForm({ ...quickVendorForm, openingBalance: e.target.value })} 
+                <input type="number" value={quickVendorForm.openingBalance} onChange={e => setQuickVendorForm({ ...quickVendorForm, openingBalance: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
               </div>
               <div className="col-span-1 md:col-span-2 space-y-1">
                 <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Business Address</label>
-                <textarea rows="3" value={quickVendorForm.address} onChange={e => setQuickVendorForm({ ...quickVendorForm, address: e.target.value })} 
+                <textarea rows="3" value={quickVendorForm.address} onChange={e => setQuickVendorForm({ ...quickVendorForm, address: e.target.value })}
                   className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner resize-none" />
               </div>
             </div>
@@ -1107,18 +1107,18 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="col-span-1 md:col-span-2 space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Product Name *</label>
-                  <input placeholder="Enter product name" required value={quickProductForm.name} onChange={e => setQuickProductForm({ ...quickProductForm, name: e.target.value })} 
+                  <input placeholder="Enter product name" required value={quickProductForm.name} onChange={e => setQuickProductForm({ ...quickProductForm, name: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">SKU Code</label>
-                  <input placeholder="Internal identifier" value={quickProductForm.skuCode} onChange={e => setQuickProductForm({ ...quickProductForm, skuCode: e.target.value })} 
+                  <input placeholder="Internal identifier" value={quickProductForm.skuCode} onChange={e => setQuickProductForm({ ...quickProductForm, skuCode: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Barcode (EAN/UPC)</label>
                   <div className="flex gap-2">
-                    <input placeholder="Scan or type barcode" value={quickProductForm.barcode} onChange={e => setQuickProductForm({ ...quickProductForm, barcode: e.target.value })} 
+                    <input placeholder="Scan or type barcode" value={quickProductForm.barcode} onChange={e => setQuickProductForm({ ...quickProductForm, barcode: e.target.value })}
                       className="flex-1 bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
                     <button type="button" onClick={() => setShowScanner(true)} className="p-4 bg-emerald-50 text-emerald-600 rounded-2xl hover:bg-emerald-100 transition-all">
                       <ScanBarcode size={20} />
@@ -1134,7 +1134,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Category *</label>
-                  <select required value={quickProductForm.categoryId} onChange={e => setQuickProductForm({ ...quickProductForm, categoryId: e.target.value })} 
+                  <select required value={quickProductForm.categoryId} onChange={e => setQuickProductForm({ ...quickProductForm, categoryId: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
                     <option value="default">Select Category</option>
                     {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -1142,7 +1142,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Sub-Category</label>
-                  <select value={quickProductForm.subCategoryId} onChange={e => setQuickProductForm({ ...quickProductForm, subCategoryId: e.target.value })} 
+                  <select value={quickProductForm.subCategoryId} onChange={e => setQuickProductForm({ ...quickProductForm, subCategoryId: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
                     <option value="default">Select Sub-Category</option>
                     {subCategories.filter(sc => sc.categoryId === quickProductForm.categoryId).map(sc => <option key={sc.id} value={sc.id}>{sc.name}</option>)}
@@ -1157,22 +1157,22 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">MRP (₹)</label>
-                  <input type="number" step="0.01" placeholder="0.00" value={quickProductForm.mrp} onChange={e => setQuickProductForm({ ...quickProductForm, mrp: e.target.value })} 
+                  <input type="number" step="0.01" placeholder="0.00" value={quickProductForm.mrp} onChange={e => setQuickProductForm({ ...quickProductForm, mrp: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Purchase Price (₹)</label>
-                  <input type="number" step="0.01" placeholder="0.00" value={quickProductForm.purchasePrice} onChange={e => setQuickProductForm({ ...quickProductForm, purchasePrice: e.target.value })} 
+                  <input type="number" step="0.01" placeholder="0.00" value={quickProductForm.purchasePrice} onChange={e => setQuickProductForm({ ...quickProductForm, purchasePrice: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Selling Price *</label>
-                  <input type="number" step="0.01" placeholder="0.00" required value={quickProductForm.price} onChange={e => setQuickProductForm({ ...quickProductForm, price: e.target.value })} 
+                  <input type="number" step="0.01" placeholder="0.00" required value={quickProductForm.price} onChange={e => setQuickProductForm({ ...quickProductForm, price: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">GST (%)</label>
-                  <select value={quickProductForm.gst} onChange={e => setQuickProductForm({ ...quickProductForm, gst: e.target.value })} 
+                  <select value={quickProductForm.gst} onChange={e => setQuickProductForm({ ...quickProductForm, gst: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 outline-none transition-all">
                     {taxSlabs.map(s => <option key={s} value={s}>{s}%</option>)}
                   </select>
@@ -1186,7 +1186,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Unit Type</label>
-                  <select value={quickProductForm.unitId} onChange={e => setQuickProductForm({ ...quickProductForm, unitId: e.target.value })} 
+                  <select value={quickProductForm.unitId} onChange={e => setQuickProductForm({ ...quickProductForm, unitId: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 outline-none transition-all shadow-inner">
                     <option value="">Select Unit</option>
                     {units.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
@@ -1194,12 +1194,12 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Unit Value</label>
-                  <input placeholder="e.g. 500" value={quickProductForm.unitValue} onChange={e => setQuickProductForm({ ...quickProductForm, unitValue: e.target.value })} 
+                  <input placeholder="e.g. 500" value={quickProductForm.unitValue} onChange={e => setQuickProductForm({ ...quickProductForm, unitValue: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
                 </div>
                 <div className="space-y-1">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Stock (In Store)</label>
-                  <input type="number" placeholder="0" value={quickProductForm.stock} onChange={e => setQuickProductForm({ ...quickProductForm, stock: e.target.value })} 
+                  <input type="number" placeholder="0" value={quickProductForm.stock} onChange={e => setQuickProductForm({ ...quickProductForm, stock: e.target.value })}
                     className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
                 </div>
               </div>

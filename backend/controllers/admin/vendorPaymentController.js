@@ -7,7 +7,7 @@ import { logActivity } from '../../utils/activityLogger.js';
 export const createPayment = async (req, res) => {
   try {
     const tenantId = req.user?.tenantId || getTenantId();
-    const { vendorId, amount, mode, referenceNo, paymentDate, invoiceIds, remarks } = req.body;
+    const { vendorId, amount, mode, referenceNo, paymentDate, invoiceId, invoiceIds, remarks } = req.body;
 
     if (!vendorId || !amount || !mode) {
       return res.status(400).json({ message: 'Vendor, amount, and payment mode are required' });
@@ -17,7 +17,9 @@ export const createPayment = async (req, res) => {
     if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
 
     const paymentAmount = parseFloat(amount);
-    const isAdvance = !invoiceIds || !Array.isArray(invoiceIds) || invoiceIds.length === 0;
+    const targetInvoiceId = invoiceId || (invoiceIds && invoiceIds[0]) || null;
+    const resolvedInvoiceIds = targetInvoiceId ? [targetInvoiceId] : [];
+    const isAdvance = resolvedInvoiceIds.length === 0;
     const storeId = req.body.storeId || req.user.storeId || null;
 
     const payment = await prisma.$transaction(async (tx) => {
@@ -39,18 +41,19 @@ export const createPayment = async (req, res) => {
           referenceNo: referenceNo || null,
           paymentDate: paymentDate ? new Date(paymentDate) : new Date(),
           isAdvance,
-          remarks: remarks || null
+          remarks: remarks || null,
+          invoiceId: targetInvoiceId
         }
       });
 
       // Allocate to invoices if specified
-      if (!isAdvance && invoiceIds.length > 0) {
+      if (!isAdvance && resolvedInvoiceIds.length > 0) {
         let remainingAmount = paymentAmount;
 
-        for (const invoiceId of invoiceIds) {
+        for (const singleInvoiceId of resolvedInvoiceIds) {
           if (remainingAmount <= 0) break;
 
-          const invoice = await tx.purchaseInvoice.findUnique({ where: { id: invoiceId } });
+          const invoice = await tx.purchaseInvoice.findUnique({ where: { id: singleInvoiceId } });
           if (!invoice) continue;
 
           const outstanding = invoice.totalAmount - invoice.paidAmount;
@@ -62,7 +65,7 @@ export const createPayment = async (req, res) => {
             data: {
               tenantId,
               paymentId: pmt.id,
-              invoiceId,
+              invoiceId: singleInvoiceId,
               amount: allocateAmount
             }
           });
@@ -72,7 +75,7 @@ export const createPayment = async (req, res) => {
           const newStatus = newPaidAmount >= invoice.totalAmount ? 'PAID' : 'PARTIAL_PAID';
 
           await tx.purchaseInvoice.update({
-            where: { id: invoiceId },
+            where: { id: singleInvoiceId },
             data: {
               paidAmount: newPaidAmount,
               status: newStatus

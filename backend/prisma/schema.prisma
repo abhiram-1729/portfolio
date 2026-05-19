@@ -1686,6 +1686,7 @@ model PurchaseInvoice {
   grn                GoodsReceipt?             @relation(fields: [grnId], references: [id])
   items              PurchaseInvoiceItem[]
   paymentAllocations VendorPaymentAllocation[]
+  payments           VendorPayment[]
 
   @@unique([tenantId, invoiceNumber])
   @@unique([tenantId, displayId])
@@ -1788,6 +1789,8 @@ model VendorPayment {
   store       Store?                    @relation(fields: [storeId], references: [id])
   vendor      Vendor                    @relation(fields: [vendorId], references: [id])
   allocations VendorPaymentAllocation[]
+  invoiceId   String?
+  invoice     PurchaseInvoice?          @relation(fields: [invoiceId], references: [id])
 
   @@index([tenantId])
   @@index([storeId])
@@ -2609,6 +2612,7 @@ enum VendorPaymentMode {
   CASH
   BANK
   UPI
+  CHEQUE
 }
 
 enum StockMovementType {
