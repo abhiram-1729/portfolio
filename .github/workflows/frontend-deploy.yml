@@ -12,44 +12,29 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v4
+      - name: Deploy Frontend
+        uses: appleboy/ssh-action@v1.0.3
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
         with:
-          node-version: 20
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
 
-      - name: Create .env
-        working-directory: frontend
-        run: |
-          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > .env
+          script: |
+            set -e
 
-      - name: Install Dependencies
-        working-directory: frontend
-        run: npm install
+            export PATH=$PATH:/home/ubuntu/n/bin
 
-      - name: Build Frontend
-        working-directory: frontend
-        run: npm run build
+            cd /opt/apps/villagkart/cicd-test/
 
-      - name: Verify Backend URL
-        run: |
-            grep -r "devvsmsapi" frontend/dist || true
+            git checkout cicd
 
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ap-south-1
+            git pull origin cicd
 
-      - name: Upload to S3
-        run: |
-          aws s3 sync frontend/dist s3://vsms-frontend --delete
+            cd frontend
 
-      - name: Invalidate CloudFront Cache
-        run: |
-          aws cloudfront create-invalidation \
-            --distribution-id E19HM0JHXQVYCA \
-            --paths "/*"
+            npm install
+
+            npm run build
+
+            sudo systemctl reload nginx
