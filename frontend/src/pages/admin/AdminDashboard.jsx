@@ -40,6 +40,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, 
   CartesianGrid, AreaChart, Area 
 } from 'recharts';
+import DashboardLoader from '../../components/DashboardLoader';
 
 const containerVariants = {
   hidden: { opacity: 0 },
@@ -71,6 +72,8 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [liveLocations, setLiveLocations] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [progress, setProgress] = useState(0);
+  const [dataLoaded, setDataLoaded] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const storeIdParam = searchParams.get('storeId');
   const navigate = useNavigate();
@@ -86,7 +89,7 @@ export default function AdminDashboard() {
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   });
 
-  const fetchData = async () => {
+  const fetchData = async (isInitial = false) => {
     try {
       const [statsRes, cashRes, vgeRes, storesRes, usersRes, locRes] = await Promise.all([
         adminAPI.getDashboardStats({ storeId: storeIdParam }),
@@ -108,29 +111,66 @@ export default function AdminDashboard() {
       if (fetchedStores.length === 1 && !storeIdParam) {
         setSearchParams({ storeId: fetchedStores[0].id });
       }
+
+      if (isInitial) {
+        setDataLoaded(true);
+      }
     } catch (error) {
       toast.error('Failed to update operational data');
       console.error(error);
-    } finally {
-      setLoading(false);
+      if (isInitial) {
+        setDataLoaded(true); // resolve loader on error
+      }
     }
   };
 
   useEffect(() => {
     // Always refresh permissions from server before rendering widgets
     refreshUserProfile();
-    fetchData();
-    const interval = setInterval(fetchData, 60000);
+    
+    setLoading(true);
+    setProgress(0);
+    setDataLoaded(false);
+
+    fetchData(true);
+    const interval = setInterval(() => fetchData(false), 60000);
     return () => clearInterval(interval);
   }, [storeIdParam]);
 
+  useEffect(() => {
+    if (!loading) return;
+    const timer = setInterval(() => {
+      setProgress((prev) => {
+        if (prev < 90) {
+          const inc = Math.floor(Math.random() * 5) + 3;
+          return Math.min(prev + inc, 90);
+        }
+        return prev;
+      });
+    }, 120);
+    return () => clearInterval(timer);
+  }, [loading]);
+
+  useEffect(() => {
+    if (dataLoaded && loading) {
+      const finalTimer = setInterval(() => {
+        setProgress((prev) => {
+          if (prev < 100) {
+            return prev + 8;
+          }
+          clearInterval(finalTimer);
+          setTimeout(() => {
+            setLoading(false);
+          }, 150);
+          return 100;
+        });
+      }, 30);
+      return () => clearInterval(finalTimer);
+    }
+  }, [dataLoaded, loading]);
+
   if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3">
-        <Loader2 className="animate-spin text-emerald-600" size={32} />
-        <p className="text-sm text-gray-500 font-semibold uppercase tracking-widest">Initializing Control Center</p>
-      </div>
-    );
+    return <DashboardLoader message="Initializing Control Center" progress={progress} />;
   }
 
   const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN' || currentUser?.portalType === 'SUPERVISOR';
