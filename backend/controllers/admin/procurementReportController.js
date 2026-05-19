@@ -336,12 +336,188 @@ export const getProfitabilityReport = async (req, res) => {
 // ─── STOCK LEDGER (All Movements) ─────────────────────────────────────
 export const getStockLedger = async (req, res) => {
   try {
-    const { productId, type, storeId } = req.query;
+    const { productId, type, storeId, groupBy, vendorId } = req.query;
     const where = { tenantId: req.user.tenantId };
 
     if (productId) where.productId = productId;
     if (type) where.type = type;
     if (storeId && storeId !== 'undefined') where.storeId = storeId;
+
+    if (groupBy === 'vendor') {
+      const vendors = await prisma.vendor.findMany({
+        where: {
+          tenantId: req.user.tenantId,
+          ...(storeId && storeId !== 'undefined' ? { storeId } : {})
+        },
+        include: {
+          itemMappings: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  stock: true,
+                  purchasePrice: true,
+                  price: true,
+                  category: { select: { name: true } },
+                  skuCode: true
+                }
+              }
+            }
+          },
+          purchaseInvoices: {
+            where: { status: 'CONFIRMED' },
+            orderBy: { invoiceDate: 'desc' },
+            take: 1,
+            select: { invoiceDate: true }
+          }
+        }
+      });
+
+      const summary = vendors.map(v => {
+        let totalStockQty = 0;
+        let inventoryValue = 0;
+
+        v.itemMappings.forEach(m => {
+          if (m.product) {
+            const qty = m.product.stock || 0;
+            const rate = m.lastPurchaseRate > 0 ? m.lastPurchaseRate : (m.purchasePrice > 0 ? m.purchasePrice : (m.product.purchasePrice || m.product.price || 0));
+            totalStockQty += qty;
+            inventoryValue += qty * rate;
+          }
+        });
+
+        return {
+          id: v.id,
+          vendorName: v.vendorName,
+          mobile: v.mobile,
+          gstNumber: v.gstNumber,
+          status: v.status,
+          totalStockQty,
+          inventoryValue,
+          lastPurchase: v.purchaseInvoices[0]?.invoiceDate || null
+        };
+      });
+
+      return res.json(summary);
+    }
+
+    if (vendorId) {
+      const vendor = await prisma.vendor.findUnique({
+        where: { id: vendorId },
+        include: {
+          itemMappings: {
+            include: {
+              product: {
+                select: {
+                  id: true,
+                  name: true,
+                  stock: true,
+                  purchasePrice: true,
+                  price: true,
+                  skuCode: true,
+                  category: { select: { name: true } },
+                  unit: { select: { name: true } }
+                }
+              }
+            }
+          }
+        }
+      });
+
+      if (!vendor) return res.status(404).json({ message: 'Vendor not found' });
+
+      const productIds = vendor.itemMappings.map(m => m.productId);
+      const movements = await prisma.procurementStockLedger.findMany({
+        where: {
+          productId: { in: productIds },
+          tenantId: req.user.tenantId,
+          ...(storeId && storeId !== 'undefined' ? { storeId } : {})
+        },
+        orderBy: { createdAt: 'desc' },
+        take: 100,
+        include: {
+          product: {
+            select: {
+              id: true,
+              name: true,
+              skuCode: true,
+              purchasePrice: true,
+              price: true,
+              category: { select: { name: true } },
+              unit: { select: { name: true } }
+            }
+          }
+        }
+      });
+
+      // Find GoodsReceiptItems for the products to get their expiryStatus
+      const grnItems = productIds.length > 0 ? await prisma.goodsReceiptItem.findMany({
+        where: {
+          productId: { in: productIds },
+          grn: {
+            tenantId: req.user.tenantId
+          }
+        },
+        select: {
+          productId: true,
+          grnId: true,
+          expiryStatus: true
+        }
+      }) : [];
+
+      const expiryMap = {};
+      grnItems.forEach(item => {
+        expiryMap[`${item.productId}_${item.grnId}`] = item.expiryStatus;
+      });
+
+      const enrichedMovements = movements.map(m => {
+        const prod = m.product;
+        const rate = prod ? (prod.purchasePrice || prod.price || 0) : 0;
+        let expiry = 'Safe';
+        if (m.refType === 'GRN' && m.reference) {
+          expiry = expiryMap[`${m.productId}_${m.reference}`] || 'Safe';
+        }
+        return {
+          ...m,
+          vendorName: vendor.vendorName,
+          skuCode: prod?.skuCode || '—',
+          category: prod?.category?.name || 'UNCATEGORIZED',
+          unit: prod?.unit?.name || 'UNITS',
+          inventoryValue: m.balanceAfter * rate,
+          expiryStatus: expiry || 'Safe'
+        };
+      });
+
+      const products = vendor.itemMappings.map(m => {
+        const prod = m.product;
+        if (!prod) return null;
+        const rate = m.lastPurchaseRate > 0 ? m.lastPurchaseRate : (m.purchasePrice > 0 ? m.purchasePrice : (prod.purchasePrice || prod.price || 0));
+        return {
+          id: prod.id,
+          name: prod.name,
+          skuCode: prod.skuCode,
+          category: prod.category?.name || 'UNCATEGORIZED',
+          unit: prod.unit?.name || 'UNITS',
+          stock: prod.stock || 0,
+          purchasePrice: rate,
+          totalValue: (prod.stock || 0) * rate
+        };
+      }).filter(Boolean);
+
+      return res.json({
+        vendor: {
+          id: vendor.id,
+          vendorName: vendor.vendorName,
+          mobile: vendor.mobile,
+          gstNumber: vendor.gstNumber,
+          address: vendor.address,
+          status: vendor.status
+        },
+        products,
+        movements: enrichedMovements
+      });
+    }
 
     const ledger = await prisma.procurementStockLedger.findMany({
       where,
@@ -352,7 +528,53 @@ export const getStockLedger = async (req, res) => {
       }
     });
 
-    res.json(ledger);
+    const grnIds = [...new Set(ledger.filter(item => item.refType === 'GRN' && item.reference).map(item => item.reference))];
+    const invoiceIds = [...new Set(ledger.filter(item => item.refType && item.refType.startsWith('INVOICE') && item.reference).map(item => item.reference))];
+
+    const grns = grnIds.length > 0 ? await prisma.goodsReceipt.findMany({
+      where: { id: { in: grnIds } },
+      select: {
+        id: true,
+        po: {
+          select: {
+            vendor: {
+              select: { vendorName: true }
+            }
+          }
+        }
+      }
+    }) : [];
+
+    const invoices = invoiceIds.length > 0 ? await prisma.purchaseInvoice.findMany({
+      where: { id: { in: invoiceIds } },
+      select: {
+        id: true,
+        vendor: {
+          select: { vendorName: true }
+        }
+      }
+    }) : [];
+
+    const vendorMap = {};
+    grns.forEach(grn => {
+      if (grn.po?.vendor?.vendorName) {
+        vendorMap[grn.id] = grn.po.vendor.vendorName;
+      }
+    });
+    invoices.forEach(inv => {
+      if (inv.vendor?.vendorName) {
+        vendorMap[inv.id] = inv.vendor.vendorName;
+      }
+    });
+
+    const enrichedLedger = ledger.map(entry => {
+      return {
+        ...entry,
+        vendorName: entry.reference ? (vendorMap[entry.reference] || '—') : '—'
+      };
+    });
+
+    res.json(enrichedLedger);
   } catch (error) {
     res.status(500).json({ message: 'Error fetching stock ledger', error: error.message });
   }

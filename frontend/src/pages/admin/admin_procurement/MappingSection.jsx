@@ -271,7 +271,16 @@ const MappingSection = ({ can, setHideMainHeader }) => {
             {/* Product List */}
             <div className="flex-1 overflow-y-auto p-5 custom-scrollbar bg-white pb-28">
               <div className="flex flex-col gap-3 w-full max-w-6xl mx-auto">
-                {products.filter(p => p.name.toLowerCase().includes(pSearch.toLowerCase())).map(p => {
+                {products
+                  .filter(p => p.name.toLowerCase().includes(pSearch.toLowerCase()))
+                  .sort((a, b) => {
+                    const isAMapped = !!mappedItems[a.id];
+                    const isBMapped = !!mappedItems[b.id];
+                    if (isAMapped && !isBMapped) return -1;
+                    if (!isAMapped && isBMapped) return 1;
+                    return a.name.localeCompare(b.name);
+                  })
+                  .map(p => {
                   const isMapped = !!mappedItems[p.id];
                   const itemData = mappedItems[p.id];
 

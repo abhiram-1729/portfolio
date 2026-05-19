@@ -62,9 +62,9 @@ const PurchaseOrdersSection = ({ can, setHideMainHeader }) => {
         skuCode: m.product.skuCode || 'NO-SKU',
         category: m.product.category?.name || 'UNCATEGORIZED',
         weight: m.product.unitValue ? `${m.product.unitValue}${m.product.unit?.name || ''}` : '',
-        purchasePrice: m.product.purchasePrice || m.product.price || 0,
+        purchasePrice: m.lastPurchaseRate > 0 ? m.lastPurchaseRate : (m.purchasePrice > 0 ? m.purchasePrice : (m.product.purchasePrice || m.product.price || 0)),
         quantity: 0,
-        rate: m.product.purchasePrice || m.product.price || 0
+        rate: m.lastPurchaseRate > 0 ? m.lastPurchaseRate : (m.purchasePrice > 0 ? m.purchasePrice : (m.product.purchasePrice || m.product.price || 0))
       })));
     } catch { toast.error('Failed to load mapped items'); }
   };
@@ -96,7 +96,7 @@ const PurchaseOrdersSection = ({ can, setHideMainHeader }) => {
         skuCode: item.product.skuCode || 'NO-SKU',
         category: item.product.category?.name || 'UNCATEGORIZED',
         weight: item.product.unitValue ? `${item.product.unitValue}${item.product.unit?.name || ''}` : '',
-        purchasePrice: item.product.purchasePrice || item.product.price || 0
+        purchasePrice: item.lastPurchaseRate > 0 ? item.lastPurchaseRate : (item.purchasePrice > 0 ? item.purchasePrice : (item.product.purchasePrice || item.product.price || 0))
       })));
       setForm({
         id: po.id,

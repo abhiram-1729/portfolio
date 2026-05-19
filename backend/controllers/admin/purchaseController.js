@@ -13,9 +13,7 @@ export const createPurchase = async (req, res) => {
     if (!vendorId || !invoiceNumber) {
       return res.status(400).json({ message: 'Vendor and invoice number are required' });
     }
-    if (!grnId) {
-      return res.status(400).json({ message: 'Purchase Invoice can only be created from an APPROVED Goods Receipt Note (GRN).' });
-    }
+
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'At least one item is required' });
     }
@@ -40,32 +38,35 @@ export const createPurchase = async (req, res) => {
     }
 
     // CONTROL: GRN dependency and Quantity limit checks
-    const grn = await prisma.goodsReceipt.findUnique({
-      where: { id: grnId },
-      include: { items: { include: { product: true } } }
-    });
+    let poIdToUse = poId;
+    if (grnId) {
+      const grn = await prisma.goodsReceipt.findUnique({
+        where: { id: grnId },
+        include: { items: { include: { product: true } } }
+      });
 
-    if (!grn) {
-      return res.status(404).json({ message: 'Selected Goods Receipt Note (GRN) not found.' });
-    }
-
-    const approvedItems = grn.items.filter(i => i.qcStatus === 'APPROVED');
-    if (approvedItems.length === 0) {
-      return res.status(400).json({ message: 'Selected GRN does not have any APPROVED items. Invoices can only be created from Approved GRNs.' });
-    }
-
-    // Verify quantities do not exceed GRN approved amounts
-    for (const item of items) {
-      const grnItem = approvedItems.find(gi => gi.productId === item.productId);
-      if (!grnItem) {
-        return res.status(400).json({ message: `Item with ID ${item.productId} is not approved in the selected GRN.` });
+      if (!grn) {
+        return res.status(404).json({ message: 'Selected Goods Receipt Note (GRN) not found.' });
       }
-      if (parseInt(item.quantity) > grnItem.receivedQty) {
-        return res.status(400).json({ message: `Invoiced quantity (${item.quantity}) for "${grnItem.product.name}" exceeds the approved GRN received quantity (${grnItem.receivedQty}).` });
-      }
-    }
 
-    const poIdToUse = poId || grn.poId;
+      const approvedItems = grn.items.filter(i => i.qcStatus === 'APPROVED');
+      if (approvedItems.length === 0) {
+        return res.status(400).json({ message: 'Selected GRN does not have any APPROVED items. Invoices can only be created from Approved GRNs.' });
+      }
+
+      // Verify quantities do not exceed GRN approved amounts
+      for (const item of items) {
+        const grnItem = approvedItems.find(gi => gi.productId === item.productId);
+        if (!grnItem) {
+          return res.status(400).json({ message: `Item with ID ${item.productId} is not approved in the selected GRN.` });
+        }
+        if (parseInt(item.quantity) > grnItem.receivedQty) {
+          return res.status(400).json({ message: `Invoiced quantity (${item.quantity}) for "${grnItem.product.name}" exceeds the approved GRN received quantity (${grnItem.receivedQty}).` });
+        }
+      }
+      
+      poIdToUse = poId || grn.poId;
+    }
     const storeId = req.body.storeId || req.user.storeId || null;
     const transport = parseFloat(transportCharges) || 0;
     const other = parseFloat(otherCharges) || 0;
@@ -87,7 +88,7 @@ export const createPurchase = async (req, res) => {
           displayId,
           vendorId,
           poId: poIdToUse || null,
-          grnId: grnId,
+          grnId: grnId || null,
           invoiceNumber,
           invoiceDate: invoiceDate ? new Date(invoiceDate) : new Date(),
           dueDate: dueDate ? new Date(dueDate) : null,
@@ -136,19 +137,23 @@ export const createPurchase = async (req, res) => {
           });
         }
 
-        // A. Bulk Update Product Master Stock and Latest Purchase Price
+        // A. Bulk Update Product Master Stock and Prices
         const productValues = entries.map(([pId, qty]) => {
           // Find the latest price for this product in the invoice items
-          const itemPrice = items.find(i => i.productId === pId)?.price || 0;
-          return Prisma.sql`(${pId}, ${qty}::int, ${parseFloat(itemPrice)}::float)`;
+          const item = items.find(i => i.productId === pId);
+          const itemPrice = item?.price || 0;
+          const sellingPrice = item?.unitSellingPrice || 0;
+          return Prisma.sql`(${pId}, ${qty}::int, ${parseFloat(itemPrice)}::float, ${parseFloat(sellingPrice)}::float)`;
         });
 
         await tx.$executeRaw`
           UPDATE "Product"
           SET 
             stock = "Product".stock + v.qty,
-            "landingPrice" = v.l_price
-          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty, l_price)
+            "landingPrice" = v.l_price,
+            "purchasePrice" = v.l_price,
+            "price" = CASE WHEN v.s_price > 0 THEN v.s_price ELSE "Product".price END
+          FROM (VALUES ${Prisma.join(productValues)}) AS v(id, qty, l_price, s_price)
           WHERE "Product".id = v.id
         `;
 
@@ -212,6 +217,28 @@ export const createPurchase = async (req, res) => {
         await tx.purchaseOrder.update({
           where: { id: poId },
           data: { status: 'CLOSED' }
+        });
+      }
+
+      // 4. Update Vendor Item Mappings (Last Purchase Rate)
+      for (const item of items) {
+        const itemPrice = parseFloat(item.price) || 0;
+        await tx.vendorItemMapping.upsert({
+          where: {
+            vendorId_productId: { vendorId, productId: item.productId }
+          },
+          update: {
+            lastPurchaseRate: itemPrice
+          },
+          create: {
+            tenantId,
+            storeId,
+            vendorId,
+            productId: item.productId,
+            purchasePrice: itemPrice,
+            lastPurchaseRate: itemPrice,
+            isPreferred: false
+          }
         });
       }
 
@@ -391,6 +418,47 @@ export const updatePurchase = async (req, res) => {
             total: (parseInt(item.quantity) || 0) * (parseFloat(item.price) || 0)
           }))
         });
+
+        // D. Update Product Master Prices (even if quantity didn't change)
+        if (items && items.length > 0) {
+          const productPriceValues = items.map(item => {
+            const itemPrice = parseFloat(item.price) || 0;
+            const sellingPrice = parseFloat(item.unitSellingPrice) || 0;
+            return Prisma.sql`(${item.productId}, ${itemPrice}::float, ${sellingPrice}::float)`;
+          });
+          
+          await tx.$executeRaw`
+            UPDATE "Product"
+            SET 
+              "landingPrice" = v.l_price,
+              "purchasePrice" = v.l_price,
+              "price" = CASE WHEN v.s_price > 0 THEN v.s_price ELSE "Product".price END
+            FROM (VALUES ${Prisma.join(productPriceValues)}) AS v(id, l_price, s_price)
+            WHERE "Product".id = v.id
+          `;
+        }
+
+        // Update Vendor Item Mappings (Last Purchase Rate)
+        for (const item of items) {
+          const itemPrice = parseFloat(item.price) || 0;
+          await tx.vendorItemMapping.upsert({
+            where: {
+              vendorId_productId: { vendorId: vendorId || existing.vendorId, productId: item.productId }
+            },
+            update: {
+              lastPurchaseRate: itemPrice
+            },
+            create: {
+              tenantId: existing.tenantId,
+              storeId: existing.storeId,
+              vendorId: vendorId || existing.vendorId,
+              productId: item.productId,
+              purchasePrice: itemPrice,
+              lastPurchaseRate: itemPrice,
+              isPreferred: false
+            }
+          });
+        }
       }
 
       // 2. Update Invoice Metadata
