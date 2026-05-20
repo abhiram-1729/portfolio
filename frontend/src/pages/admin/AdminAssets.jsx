@@ -50,7 +50,7 @@ export default function AdminAssets() {
 
   // Transfer Form State
   const [showTransferModal, setShowTransferModal] = useState(false);
-  const [transferForm, setTransferForm] = useState({ assetId: '', assetUnitId: '', quantity: '1', fromType: 'STORE', fromId: '', toType: 'STORE', toId: '', reason: '', notes: '' });
+  const [transferForm, setTransferForm] = useState({ assetId: '', assetUnitId: '', quantity: '1', fromType: 'STORE', fromId: '', toType: 'STORE', toId: '', reason: '', notes: '', handlerId: '' });
 
   // Module 14 Enterprise states
   const [vehicles, setVehicles] = useState([]);
@@ -190,10 +190,23 @@ export default function AdminAssets() {
     e.preventDefault();
     try {
       setIsSubmitting(true);
-      await adminAPI.createAssetTransfer(transferForm);
+      
+      let finalNotes = transferForm.notes || '';
+      if (transferForm.handlerId) {
+        const handlerObj = users.find(u => u.id === transferForm.handlerId);
+        if (handlerObj) {
+          finalNotes = `[Carrier/Handler: ${handlerObj.name}] ${finalNotes}`.trim();
+        }
+      }
+
+      await adminAPI.createAssetTransfer({
+        ...transferForm,
+        notes: finalNotes
+      });
+
       toast.success('Asset transferred successfully');
       setShowTransferModal(false);
-      setTransferForm({ assetId: '', assetUnitId: '', quantity: '1', fromType: 'STORE', fromId: '', toType: 'STORE', toId: '', reason: '', notes: '' });
+      setTransferForm({ assetId: '', assetUnitId: '', quantity: '1', fromType: 'STORE', fromId: '', toType: 'STORE', toId: '', reason: '', notes: '', handlerId: '' });
       if (activeTab === 'transfers') loadTransfers();
       fetchAll();
     } catch (err) {
@@ -2840,12 +2853,7 @@ export default function AdminAssets() {
               <Plus size={16} /> Register New Asset
             </button>
           )}
-          {activeTab === 'transfers' && (
-            <button onClick={() => { setTransferForm({ assetId: '', assetUnitId: '', quantity: '1', fromType: 'STORE', fromId: storeId || '', toType: 'STORE', toId: '', reason: '', notes: '' }); setShowTransferModal(true); }}
-              className="bg-emerald-600 text-white px-4 py-2.5 rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 transition-all flex items-center gap-1.5 shrink-0">
-              <Plus size={16} /> Initiate Transfer
-            </button>
-          )}
+
           {stores.length > 1 && (
             <select
               value={storeId || ''}
@@ -3240,6 +3248,16 @@ export default function AdminAssets() {
                     {transferForm.toType === 'VEHICLE' && vehicles.map(v => <option key={v.id} value={v.id}>{v.vehicleNumber || v.plateNumber || v.name} ({v.vehicleName || 'No Name'})</option>)}
                   </select>
                 </div>
+              </div>
+
+              {/* Handled By / Carrier */}
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-400 uppercase tracking-wider">Handled By / Carrier (Middle Person)</label>
+                <select value={transferForm.handlerId} onChange={e => setTransferForm({ ...transferForm, handlerId: e.target.value })}
+                  className="w-full bg-gray-50 border border-gray-100 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-emerald-500/20">
+                  <option value="">-- Select Handler / Carrier --</option>
+                  {users.map(u => <option key={u.id} value={u.id}>{u.name} ({u.role})</option>)}
+                </select>
               </div>
 
               {/* Reason */}

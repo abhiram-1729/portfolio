@@ -479,7 +479,6 @@ export default function AdminSettings() {
       }
       setEditingAssetSubCategoryId(null);
       setNewAssetSubCategory({ name: '', parentName: '' });
-      fetchAssetCategories();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to save asset sub-category');
     } finally {
@@ -1108,7 +1107,7 @@ export default function AdminSettings() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {subCategoriesList
-                    .filter(s => s.childName.toLowerCase().includes(assetSubCategorySearch.toLowerCase()) || s.parentName.toLowerCase().includes(assetSubCategorySearch.toLowerCase()))
+                    .filter(s => (s.childName || '').toLowerCase().includes((assetSubCategorySearch || '').toLowerCase()) || (s.parentName || '').toLowerCase().includes((assetSubCategorySearch || '').toLowerCase()))
                     .map(sub => (
                     <tr key={sub.id} className="hover:bg-indigo-50 transition-all group">
                       <td className="py-5 px-8">
