@@ -1,7 +1,7 @@
 import prisma from '../utils/prisma.js';
 
 // @desc    Get active late entry config
-// @route   GET /api/late-entry/config
+// @route   GET /api/late-entry/config test
 // @access  Private
 export const getConfig = async (req, res, next) => {
   try {

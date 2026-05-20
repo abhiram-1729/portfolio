@@ -222,6 +222,7 @@ export const updatePassword = async (req, res, next) => {
         next(error);
     }
 };
+<<<<<<< HEAD
 
 import { uploadToSupabase } from '../utils/supabaseService.js';
 // jsjsjs
@@ -399,3 +400,6 @@ export const updateBusinessProfile = async (req, res, next) => {
         res.status(500).json({ success: false, message: error.message || 'Internal server error updating business profile' });
     }
 };
+=======
+// comment
+>>>>>>> cicd
