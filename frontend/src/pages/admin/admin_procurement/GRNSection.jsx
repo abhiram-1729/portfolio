@@ -102,7 +102,7 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
     try {
       const { data } = await procurementAPI.getPurchaseOrderById(poId);
       setSelectedPO(poId);
-      setPODetail(data);
+      setPODetail({ ...data, remarks: '' });
       setGRNItems(data.items.map(item => ({
         productId: item.productId,
         name: item.product?.name,
