@@ -86,6 +86,7 @@ model Tenant {
   posTerminals             POSTerminal[]
   suspendedSales           SuspendedSale[]
   vendorPriceHistories     VendorPriceHistory[]
+  assetTransferLogs        AssetTransferLog[]
 }
 
 model User {
@@ -1326,6 +1327,33 @@ model AssetAuditLog {
   @@index([assetId])
   @@index([assetUnitId])
   @@index([auditedByUserId])
+}
+
+model AssetTransferLog {
+  id             String   @id @default(cuid())
+  tenantId       String   @default("VK001")
+  assetId        String?
+  assetUnitId    String?
+  quantity       Int      @default(1)
+  fromType       String   // STORE | USER | VEHICLE
+  fromId         String
+  fromLabel      String?
+  toType         String   // STORE | USER | VEHICLE
+  toId           String
+  toLabel        String?
+  reason         String?
+  notes          String?
+  status         String   @default("COMPLETED") // COMPLETED | PENDING | CANCELLED
+  initiatedById  String?
+  unitIds        String[]
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  tenant         Tenant   @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId])
+  @@index([assetId])
+  @@index([initiatedById])
+  @@index([createdAt])
 }
 
 model LocationCheckIn {

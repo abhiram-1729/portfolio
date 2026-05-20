@@ -15,6 +15,7 @@ import * as categoryCtr from '../controllers/admin/categoryController.js';
 import * as subCategoryCtr from '../controllers/admin/subCategoryController.js';
 import * as assetCategoryCtr from '../controllers/admin/assetCategoryController.js';
 import * as assetCtr from '../controllers/admin/assetController.js';
+import * as assetTransferCtr from '../controllers/admin/assetTransferController.js';
 import * as activityCtr from '../controllers/admin/activityController.js';
 import * as adminStoreCtr from '../controllers/admin/storeController.js';
 import * as mediaCtr from '../controllers/admin/mediaController.js';
@@ -239,6 +240,10 @@ router.get('/assets/depreciation', assetCtr.getDepreciationSchedules);
 router.post('/assets/depreciation', assetCtr.saveDepreciationSchedule);
 router.get('/assets/audits', assetCtr.getAssetAudits);
 router.post('/assets/audits', assetCtr.createAssetAudit);
+
+// Asset Transfers
+router.get('/assets/transfers', assetTransferCtr.getAssetTransfers);
+router.post('/assets/transfers', assetTransferCtr.createAssetTransfer);
 
 // Organization Stores (Admin specific)
 router.route('/stores')

@@ -227,6 +227,10 @@ export const adminAPI = {
   createTerminal: (data) => api.post('/admin/terminals', data),
   updateTerminal: (id, data) => api.put(`/admin/terminals/${id}`, data),
   deleteTerminal: (id) => api.delete(`/admin/terminals/${id}`),
+
+  // Asset Transfers
+  getAssetTransfers: (params) => api.get('/admin/assets/transfers', { params }),
+  createAssetTransfer: (data) => api.post('/admin/assets/transfers', data),
 };
 
 export default adminAPI;

@@ -17,6 +17,7 @@ import dotenv from 'dotenv';
 dotenv.config();
 import app from './app.js';
 import { initCronJobs } from './utils/cronJobs.js';
+import { initAssetCronJobs } from './utils/assetCron.js';
 import { createServer } from 'http';
 import { initSocket } from './services/socketService.js';
 
@@ -28,6 +29,7 @@ const io = initSocket(server);
 server.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on port ${PORT}`);
     initCronJobs();
+    initAssetCronJobs();
 });
 
 // Graceful shutdown to free DB connections

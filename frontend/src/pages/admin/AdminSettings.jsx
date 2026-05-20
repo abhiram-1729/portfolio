@@ -56,6 +56,11 @@ export default function AdminSettings() {
   const [subCategoriesLoading, setSubCategoriesLoading] = useState(false);
   const [newSubCategory, setNewSubCategory] = useState({ name: '', categoryId: '' });
   const [editingSubCategoryId, setEditingSubCategoryId] = useState(null);
+
+  // Asset Sub-Categories State (Virtual)
+  const [editingAssetSubCategoryId, setEditingAssetSubCategoryId] = useState(null);
+  const [newAssetSubCategory, setNewAssetSubCategory] = useState({ name: '', parentName: '' });
+  const [assetSubCategorySearch, setAssetSubCategorySearch] = useState('');
   
   // Expense Categories State
   const [expenseCategories, setExpenseCategories] = useState([]);
@@ -455,11 +460,80 @@ export default function AdminSettings() {
     }
   };
 
+  const handleSaveAssetSubCategory = async (e) => {
+    e.preventDefault();
+    if (!newAssetSubCategory.parentName || !newAssetSubCategory.name) {
+      return toast.error('Please select a parent category and enter a sub-category name');
+    }
+    setSaving(true);
+    try {
+      const fullName = `${newAssetSubCategory.parentName} | ${newAssetSubCategory.name}`;
+      if (editingAssetSubCategoryId) {
+        const { data } = await adminAPI.updateAssetCategory(editingAssetSubCategoryId, { name: fullName });
+        setAssetCategories(assetCategories.map(c => c.id === editingAssetSubCategoryId ? data : c));
+        toast.success('Asset Sub-category updated');
+      } else {
+        const { data } = await adminAPI.createAssetCategory({ name: fullName, storeId: currentUser?.storeId });
+        setAssetCategories([data, ...assetCategories]);
+        toast.success('Asset Sub-category created');
+      }
+      setEditingAssetSubCategoryId(null);
+      setNewAssetSubCategory({ name: '', parentName: '' });
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to save asset sub-category');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApplyDefaultAssetHierarchy = async () => {
+    if (!confirm('This will establish standard asset categories and sub-categories. Existing ones will be skipped. Continue?')) return;
+    setSaving(true);
+    const defaults = {
+      "Electronics & POS": ["POS Billing Terminals", "Smartphones & Tablets", "Barcode Scanners", "Receipt Printers"],
+      "Logistics & Delivery": ["Delivery Trucks/Vans", "Electric Two-Wheelers", "GPS Tracker Devices", "Battery Chargers"],
+      "Warehouse & Storage": ["Storage Racks & Shelving", "Heavy Duty Pallets", "Hydraulic Pallet Jacks", "Plastic Crates"],
+      "Cold Chain Equipment": ["Deep Freezers", "Insulated Ice Boxes", "Temperature Monitors"],
+      "Furniture & Fixtures": ["Office Desks & Chairs", "Invoicing Counters", "Visitor Seating"],
+      "Safety & Security": ["CCTV Cameras", "Fire Extinguishers", "Lobby Access Controls"]
+    };
+
+    try {
+      let count = 0;
+      for (const [master, subs] of Object.entries(defaults)) {
+        // Create Master if it doesn't exist
+        let masterCat = assetCategories.find(c => c.name === master);
+        if (!masterCat) {
+          const { data } = await adminAPI.createAssetCategory({ name: master, storeId: currentUser?.storeId });
+          masterCat = data;
+          count++;
+        }
+        // Create Subs
+        for (const sub of subs) {
+          const fullName = `${master} | ${sub}`;
+          if (!assetCategories.find(c => c.name === fullName)) {
+            await adminAPI.createAssetCategory({ name: fullName, storeId: currentUser?.storeId });
+            count++;
+          }
+        }
+      }
+      toast.success(`Successfully initialized ${count} asset categories/sub-categories`);
+      fetchAssetCategories();
+    } catch (error) {
+      toast.error('Partial success. Some categories might have failed.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const hasPermission = (sectionKey) => {
     // No restriction key = always show (generic sections visible to anyone with SETTINGS access)
     if (!sectionKey) return true;
     if (sectionKey === 'EXPENSE_SETTINGS') {
       return can('EXPENSES', 'READ', 'SETTINGS') || can('EXPENSES', 'UPDATE', 'SETTINGS');
+    }
+    if (sectionKey === 'ASSET_SETTINGS') {
+      return can('ASSETS', 'READ', 'SETTINGS') || can('ASSETS', 'UPDATE', 'SETTINGS');
     }
     const targetSections = currentUser?.permissions?.SETTINGS_TARGET_SECTIONS;
     // No widget config exists at all → show everything (TENANT_OWNER / no customRole)
@@ -478,8 +552,7 @@ export default function AdminSettings() {
       items: [
         { label: 'Measurement Units', action: () => setActiveModal('UNITS') },
         { label: 'Product Categories', action: () => setActiveModal('CATEGORIES') },
-        { label: 'Sub-Category Management', action: () => setActiveModal('SUB_CATEGORIES') },
-        { label: 'Asset Type Management', action: () => setActiveModal('ASSET_CATEGORIES') }
+        { label: 'Sub-Category Management', action: () => setActiveModal('SUB_CATEGORIES') }
       ]
     },
     {
@@ -489,6 +562,15 @@ export default function AdminSettings() {
       items: [
         { label: 'Categories', action: () => setActiveModal('EXPENSES') },
         { label: 'Sub Categories', action: () => setActiveModal('SUB_EXPENSES') }
+      ]
+    },
+    {
+      sectionKey: 'POS_CONFIG',
+      title: 'Asset Management',
+      icon: Tag,
+      items: [
+        { label: 'Asset Categories', action: () => setActiveModal('ASSET_CATEGORIES') },
+        { label: 'Asset Sub-Categories', action: () => setActiveModal('ASSET_SUB_CATEGORIES') }
       ]
     },
     { 
@@ -904,6 +986,10 @@ export default function AdminSettings() {
                 <h4 className="text-xs font-black uppercase tracking-[0.2em]">Institutional Asset Registry</h4>
               </div>
               <div className="flex items-center gap-4">
+                <button onClick={handleApplyDefaultAssetHierarchy} disabled={saving}
+                  className="px-4 py-2 bg-indigo-600/10 hover:bg-indigo-600 text-indigo-400 hover:text-white rounded-xl text-[10px] font-black uppercase tracking-widest border border-indigo-500/20 transition-all flex items-center gap-2">
+                  <CheckCircle2 size={12}/> Apply Defaults
+                </button>
                 <div className="relative">
                   <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
                   <input 
@@ -914,14 +1000,17 @@ export default function AdminSettings() {
                     className="bg-indigo-900 border border-indigo-800 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-indigo-600 focus:bg-indigo-800 outline-none w-48 transition-all"
                   />
                 </div>
-                <span className="text-[10px] font-black px-4 py-1.5 bg-indigo-900 rounded-full border border-indigo-800 min-w-fit">{assetCategories.length} GROUPS</span>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-indigo-900 rounded-full border border-indigo-800 min-w-fit">{assetCategories.filter(c => !c.name.includes(' | ')).length} GROUPS</span>
               </div>
             </div>
             <div className="overflow-x-auto font-bold">
               <table className="w-full text-left">
                 <thead><tr className="bg-slate-50 border-b border-gray-100"><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Asset Grouping</th><th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Override Options</th></tr></thead>
                 <tbody className="divide-y divide-gray-50">
-                  {assetCategories.filter(c => c.name.toLowerCase().includes(assetCategorySearch.toLowerCase())).map(category => (
+                  {assetCategories
+                    .filter(c => !c.name.includes(' | '))
+                    .filter(c => c.name.toLowerCase().includes(assetCategorySearch.toLowerCase()))
+                    .map(category => (
                     <tr key={category.id} className="hover:bg-indigo-50 group">
                       <td className="py-5 px-8 text-sm font-black text-slate-700">{category.name}</td>
                       <td className="py-5 px-8 text-right"><div className="flex items-center justify-end gap-2 pr-2">
@@ -934,6 +1023,112 @@ export default function AdminSettings() {
                   ))}
                 </tbody>
               </table>
+              {assetCategories.filter(c => !c.name.includes(' | ')).length === 0 && !assetCategoriesLoading && <div className="py-20 text-center text-gray-400 text-xs font-bold font-black uppercase tracking-widest italic opacity-40">Empty Classification Registry</div>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModal === 'ASSET_SUB_CATEGORIES') {
+    const masterCategories = assetCategories.filter(c => !c.name.includes(' | '));
+    const subCategoriesList = assetCategories.filter(c => c.name.includes(' | ')).map(c => {
+      const [parent, child] = c.name.split(' | ');
+      return { ...c, parentName: parent, childName: child };
+    });
+
+    return (
+      <div className="space-y-6 pb-20 max-w-7xl mx-auto">
+        {renderHeader('Asset Sub-Categories', 'Nested Resource Classification & Mapping', Hash, 'text-indigo-600 bg-indigo-100')}
+        <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-8">
+          <div className="bg-white rounded-[2rem] p-8 border border-gray-50 shadow-xl h-fit">
+            <h4 className="text-[10px] font-black text-indigo-900 uppercase tracking-[0.2em] mb-8 flex items-center gap-3">
+              <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
+              {editingAssetSubCategoryId ? 'Modify Sub-Type' : 'Establish New Sub-Type'}
+            </h4>
+            <form onSubmit={handleSaveAssetSubCategory} className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Parent Category</label>
+                <select required value={newAssetSubCategory.parentName} onChange={e => setNewAssetSubCategory({...newAssetSubCategory, parentName: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-black text-indigo-800 appearance-none outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 focus:bg-white transition-all cursor-pointer">
+                  <option value="">Select Master Category</option>
+                  {masterCategories.map(c => <option key={c.id} value={c.name}>{c.name}</option>)}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Sub-Category Name</label>
+                <input type="text" required placeholder="e.g. Electric Two-Wheelers" value={newAssetSubCategory.name} onChange={e => setNewAssetSubCategory({...newAssetSubCategory, name: e.target.value})}
+                  className="w-full bg-slate-50 border border-slate-100 rounded-2xl px-6 py-4 text-sm font-bold focus:bg-white focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 outline-none transition-all" />
+              </div>
+              <div className="pt-4 flex flex-col gap-2">
+                <button type="submit" disabled={saving} className="w-full bg-indigo-600 text-white font-black py-5 rounded-2xl shadow-2xl shadow-indigo-500/20 hover:bg-indigo-700 transition-all text-sm uppercase tracking-widest flex items-center justify-center gap-3 disabled:opacity-50 active:scale-[0.98]">
+                  {saving ? <Loader2 size={20} className="animate-spin" /> : (editingAssetSubCategoryId ? <Save size={20} /> : <Plus size={20} />)}
+                  {saving ? 'Synchronizing...' : (editingAssetSubCategoryId ? 'Commit Update' : 'Initialize Sub-Type')}
+                </button>
+                {editingAssetSubCategoryId && (
+                  <button type="button" onClick={() => { setEditingAssetSubCategoryId(null); setNewAssetSubCategory({name:'', parentName:''}) }}
+                    className="w-full py-4 rounded-2xl text-[10px] font-black uppercase text-gray-400 hover:text-gray-900 transition-colors">
+                    Discard Selection
+                  </button>
+                )}
+              </div>
+            </form>
+          </div>
+
+          <div className="bg-white rounded-[2rem] border border-gray-50 shadow-xl overflow-hidden min-h-[500px]">
+             <div className="px-8 py-6 bg-slate-900 text-slate-100 flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <Hash size={18} className="text-indigo-400 opacity-60" />
+                <h4 className="text-xs font-black uppercase tracking-[0.2em]">Sub Category Index</h4>
+              </div>
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-indigo-400" />
+                  <input 
+                    type="text" 
+                    placeholder="Search Sub-Cats..." 
+                    value={assetSubCategorySearch}
+                    onChange={(e) => setAssetSubCategorySearch(e.target.value)}
+                    className="bg-slate-800 border border-slate-700 rounded-xl pl-9 pr-4 py-2 text-[10px] font-black uppercase tracking-widest text-white placeholder:text-slate-500 focus:bg-slate-800 outline-none w-48 transition-all"
+                  />
+                </div>
+                <span className="text-[10px] font-black px-4 py-1.5 bg-slate-800 rounded-full border border-slate-700 min-w-fit">{subCategoriesList.length} ITEMS</span>
+              </div>
+            </div>
+            <div className="overflow-x-auto font-bold">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-gray-100">
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest">Sub-Category</th>
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Parent Type</th>
+                    <th className="py-5 px-8 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {subCategoriesList
+                    .filter(s => (s.childName || '').toLowerCase().includes((assetSubCategorySearch || '').toLowerCase()) || (s.parentName || '').toLowerCase().includes((assetSubCategorySearch || '').toLowerCase()))
+                    .map(sub => (
+                    <tr key={sub.id} className="hover:bg-indigo-50 transition-all group">
+                      <td className="py-5 px-8">
+                        <span className="text-sm font-black text-slate-700">{sub.childName}</span>
+                      </td>
+                      <td className="py-5 px-8 text-center">
+                        <span className="inline-block px-3 py-1.5 bg-gray-100 text-gray-500 text-[10px] font-black rounded-lg border border-gray-200 uppercase tracking-tighter">{sub.parentName}</span>
+                      </td>
+                      <td className="py-5 px-8 text-right">
+                        <div className="flex items-center justify-end gap-2 pr-2">
+                          <button onClick={() => { setEditingAssetSubCategoryId(sub.id); setNewAssetSubCategory({ name: sub.childName, parentName: sub.parentName }) }}
+                            className="p-2 text-indigo-600 hover:bg-white hover:shadow-md rounded-xl transition-all"><Edit size={16} /></button>
+                          <button onClick={() => handleDeleteAssetCategory(sub.id)}
+                            className="p-2 text-rose-400 hover:bg-white hover:shadow-md hover:text-rose-600 rounded-xl transition-all"><Trash2 size={16} /></button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {subCategoriesList.length === 0 && !assetCategoriesLoading && <div className="py-20 text-center text-gray-400 text-xs font-bold font-black uppercase tracking-widest italic opacity-40">No Sub-Hierarchies Established</div>}
             </div>
           </div>
         </div>
