@@ -40,7 +40,9 @@ import {
   RotateCcw,
   FileText,
   Zap,
-  ShoppingBag
+  ShoppingBag,
+  CheckCircle2,
+  MessageSquare
 } from 'lucide-react';
 
 import { useUserStore } from '../../store/userStore';
@@ -207,6 +209,11 @@ export default function AdminLayout() {
         { to: '/admin/assets?tab=assign', icon: Users, label: 'Assignment', section: 'ASSIGN' },
         { to: '/admin/assets?tab=transfers', icon: Truck, label: 'Transfers', section: 'TRANSFERS' },
         { to: '/admin/assets?tab=vehicle-mapping', icon: Truck, label: 'Vehicle Mapping', section: 'VEHICLE_MAPPING' },
+        { to: '/admin/assets?tab=issues', icon: AlertTriangle, label: 'Maintenance', section: 'MAINTENANCE' },
+        { to: '/admin/assets?tab=depreciation', icon: BarChart3, label: 'Depreciation', section: 'DEPRECIATION' },
+        { to: '/admin/assets?tab=audit', icon: CheckCircle2, label: 'Asset Audit', section: 'AUDIT' },
+        { to: '/admin/assets?tab=requests', icon: MessageSquare, label: 'Requests', section: 'REQUESTS' },
+        { to: '/admin/assets?tab=reports', icon: FileText, label: 'Reports', section: 'REPORTS' },
       ]
     },
     { to: '/admin/expenses', icon: Receipt, label: 'Expenses', module: 'EXPENSES' },
