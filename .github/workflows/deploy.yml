@@ -1,0 +1,62 @@
+name: Production Deploy
+
+on:
+  push:
+    branches:
+      - cicd
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy Application
+        uses: appleboy/ssh-action@v1.2.0
+
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+
+          script: |
+            set -e
+
+            export PATH=$PATH:/home/ubuntu/n/bin
+
+            cd /opt/apps/villagkart/vgk_sales
+
+            echo "Updating repository..."
+
+            git checkout develop
+            git pull origin cicd
+
+            echo "Deploying backend..."
+
+            cd backend
+
+            npm install
+
+            npx prisma generate
+
+            DIRECT_URL="${{ secrets.DIRECT_URL }}" \
+            DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            npx prisma db push
+
+            pm2 restart vsms-backend
+            pm2 save
+
+            echo "Deploying frontend..."
+
+            cd ../frontend
+
+            npm install
+
+            npm run build
+
+            sudo systemctl reload nginx
+
+            echo "Deployment completed successfully."
