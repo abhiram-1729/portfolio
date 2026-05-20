@@ -24,72 +24,60 @@ export const getAssetTransfers = async (req, res) => {
     }
 
     if (useFallback) {
-      // Synthesize realistic, high-fidelity transfers from actual historical asset assignments!
+      // Synthesize realistic, high-fidelity transfers from actual Activity Logs!
       try {
-        const assignments = await prisma.assetAssignment.findMany({
-          where: { tenantId: req.user.tenantId },
-          include: {
-            assetUnit: {
-              include: {
-                asset: true,
-                vehicle: true
-              }
-            },
-            user: true,
-            vehicle: true
-          },
+        const logs = await prisma.activityLog.findMany({
+          where: { tenantId: req.user.tenantId, action: 'ASSET_TRANSFERRED' },
+          include: { user: true },
           orderBy: { createdAt: 'desc' },
-          take: 100
+          take: 200
         });
 
-        const synthesized = [];
-        for (const a of assignments) {
-          // 1. Handover (STORE -> USER / VEHICLE)
-          synthesized.push({
-            id: `sys-ho-${a.id}`,
-            assetName: a.assetUnit?.asset?.name || 'Unknown Asset',
-            serialNumber: a.assetUnit?.serialNumber || 'N/A',
-            quantity: a.quantity || 1,
-            fromType: 'STORE',
-            fromLabel: 'Head Office - Main Store',
-            toType: a.vehicleId ? 'VEHICLE' : 'USER',
-            toLabel: a.vehicleId 
-              ? (a.vehicle?.vehicleNumber || 'Delivery Vehicle')
-              : (a.user?.name || 'Delivery Agent'),
-            createdAt: a.assignedDate || a.createdAt,
-            status: 'COMPLETED',
-            initiatedByName: 'System Auto-Log',
-            reason: a.vehicleId ? 'Fleet Device Binding' : 'Agent Deployment Handover',
-            notes: 'Synthesized via active operational binding'
-          });
+        const users = await prisma.user.findMany({ where: { tenantId: req.user.tenantId } });
+        const vehicles = await prisma.vehicle.findMany({ where: { tenantId: req.user.tenantId } });
+        const stores = await prisma.store.findMany({ where: { tenantId: req.user.tenantId } });
+        const assets = await prisma.asset.findMany({ where: { tenantId: req.user.tenantId } });
 
-          // 2. Return if completed (USER / VEHICLE -> STORE)
-          if (a.returnDate) {
-            synthesized.push({
-              id: `sys-ret-${a.id}`,
-              assetName: a.assetUnit?.asset?.name || 'Unknown Asset',
-              serialNumber: a.assetUnit?.serialNumber || 'N/A',
-              quantity: a.quantity || 1,
-              fromType: a.vehicleId ? 'VEHICLE' : 'USER',
-              fromLabel: a.vehicleId 
-                ? (a.vehicle?.vehicleNumber || 'Delivery Vehicle')
-                : (a.user?.name || 'Delivery Agent'),
-              toType: 'STORE',
-              toLabel: 'Head Office - Main Store',
-              createdAt: a.returnDate,
-              status: 'COMPLETED',
-              initiatedByName: 'System Auto-Log',
-              reason: a.returnRemarks || 'Asset Checked In / Returned',
-              notes: 'De-allocation log'
-            });
+        const getLabel = (type, id) => {
+          if (type === 'STORE') {
+            const st = stores.find(s => s.id === id);
+            return st ? st.name : 'Store';
           }
-        }
+          if (type === 'USER') {
+            const u = users.find(u => u.id === id);
+            return u ? u.name : 'Agent';
+          }
+          if (type === 'VEHICLE') {
+            const v = vehicles.find(v => v.id === id);
+            return v ? v.vehicleNumber : 'Vehicle';
+          }
+          return 'Unknown';
+        };
 
-        // Sort by date desc
-        synthesized.sort((x, y) => new Date(y.createdAt) - new Date(x.createdAt));
+        const synthesized = logs.map(l => {
+          const meta = typeof l.metadata === 'string' ? JSON.parse(l.metadata) : (l.metadata || {});
+          const assetObj = assets.find(a => a.id === meta.assetId);
+
+          return {
+            id: `sys-act-${l.id}`,
+            assetName: assetObj ? assetObj.name : 'Unknown Asset',
+            serialNumber: 'N/A', // We can't easily resolve serial without deep querying, but bulk is fine
+            quantity: meta.unitIds ? meta.unitIds.length : (meta.quantity || 1),
+            fromType: meta.fromType || 'STORE',
+            fromLabel: getLabel(meta.fromType || 'STORE', meta.fromId),
+            toType: meta.toType || 'STORE',
+            toLabel: getLabel(meta.toType || 'STORE', meta.toId),
+            createdAt: l.createdAt,
+            status: 'COMPLETED',
+            initiatedByName: l.user?.name || 'System Admin',
+            reason: meta.reason || null,
+            notes: meta.notes || null,
+          };
+        });
+
         return res.json(synthesized);
       } catch (synthErr) {
-        console.error('❌ Failed to synthesize transfers:', synthErr);
+        console.error('❌ Failed to synthesize transfers from ActivityLog:', synthErr);
         return res.json([]);
       }
     }
