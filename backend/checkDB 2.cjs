@@ -5,11 +5,11 @@ async function main() {
   try {
     const count = await prisma.assetTransferLog.count();
     console.log('TABLE EXISTS, count:', count);
-  } catch(e) {
+  } catch (e) {
     console.log('TABLE MISSING:', e.message);
   } finally {
     await prisma.$disconnect();
   }
 }
-
+// dsa
 main();
