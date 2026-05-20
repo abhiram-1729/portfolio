@@ -402,7 +402,17 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
       )}
 
       {view === 'create-selection' && (
-        <div className="flex-1 flex flex-col items-center justify-center min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="flex-1 flex flex-col items-center justify-center min-h-[600px] animate-in fade-in slide-in-from-bottom-4 duration-500 relative">
+          <div className="absolute top-4 left-4 md:left-8">
+            <button
+              onClick={() => setView('receive')}
+              className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest hover:translate-x-[-4px] transition-all"
+            >
+              <ChevronRight size={14} className="rotate-180" strokeWidth={3} />
+              Back to Goods Receipt
+            </button>
+          </div>
+          
           <div className="text-center mb-12 space-y-3">
             <h1 className="text-4xl font-black text-gray-900 tracking-tighter uppercase">Create Goods Receipt Note</h1>
             <p className="text-sm font-bold text-gray-400">Choose the type of GRN to create.</p>
@@ -435,13 +445,22 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
       {view === 'create-direct' && (
         <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
           <div className="flex flex-col gap-6">
-            <button
-              onClick={() => setView('create-selection')}
-              className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest hover:translate-x-[-4px] transition-all w-fit"
-            >
-              <ChevronRight size={14} className="rotate-180" strokeWidth={3} />
-              Back to Type Selection
-            </button>
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setView('receive')}
+                className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest hover:translate-x-[-4px] transition-all w-fit"
+              >
+                <ChevronRight size={14} className="rotate-180" strokeWidth={3} />
+                Back to Goods Receipt
+              </button>
+              <span className="text-gray-200">|</span>
+              <button
+                onClick={() => setView('create-selection')}
+                className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest transition-all w-fit"
+              >
+                Back to Type Selection
+              </button>
+            </div>
             <div className="space-y-1">
               <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">CREATE DIRECT GRN</h2>
               <p className="text-sm font-bold text-gray-400">Record stock purchased directly from vendors or local markets.</p>
@@ -686,7 +705,7 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
             {/* Action Buttons */}
             <div className="flex items-center justify-end gap-3 pt-4">
               <button 
-                onClick={() => setView('create-selection')}
+                onClick={() => setView('receive')}
                 className="px-8 py-3 bg-white border border-gray-200 text-gray-600 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
               >
                 Cancel
@@ -799,13 +818,22 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
       {view === 'create-po' && (
         <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-right-4 duration-500">
           <div className="flex flex-col gap-6">
-            <button
-              onClick={() => { setSelectedPO(null); setPODetail(null); setEditGRN(null); setView('create-selection'); }}
-              className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest hover:translate-x-[-4px] transition-all w-fit"
-            >
-              <ChevronRight size={14} className="rotate-180" strokeWidth={3} />
-              Back to Type Selection
-            </button>
+            <div className="flex items-center gap-3">
+                <button
+                  onClick={() => { setSelectedPO(null); setPODetail(null); setEditGRN(null); setView('receive'); }}
+                  className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest hover:translate-x-[-4px] transition-all w-fit"
+                >
+                  <ChevronRight size={14} className="rotate-180" strokeWidth={3} />
+                  Back to Goods Receipt
+                </button>
+                <span className="text-gray-200">|</span>
+                <button
+                  onClick={() => { setSelectedPO(null); setPODetail(null); setEditGRN(null); setView('create-selection'); }}
+                  className="flex items-center gap-2 text-[10px] font-black text-gray-400 hover:text-emerald-600 uppercase tracking-widest transition-all w-fit"
+                >
+                  Back to Type Selection
+                </button>
+              </div>
             <div className="space-y-1">
               <h2 className="text-3xl font-black text-gray-900 tracking-tighter uppercase">CREATE PO-BASED GRN</h2>
               <p className="text-sm font-bold text-gray-400">Record received stock against approved purchase orders.</p>
@@ -1088,6 +1116,12 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                   </div>
 
                   <div className="flex items-center gap-3 w-full md:w-auto">
+                    <button 
+                      onClick={() => { setSelectedPO(null); setPODetail(null); setEditGRN(null); setView('receive'); }}
+                      className="px-8 py-4 bg-white border border-gray-200 text-gray-600 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm"
+                    >
+                      Cancel
+                    </button>
                     <button className="flex-1 md:flex-none px-8 py-4 bg-white border border-gray-200 text-gray-400 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-gray-50 transition-all shadow-sm">
                       Save Draft
                     </button>
