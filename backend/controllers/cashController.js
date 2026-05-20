@@ -731,7 +731,7 @@ export const getAdminCashSummary = async (req, res, next) => {
 
             results.push({
                 id: 'STORE_POS',
-                vehicle: { vehicleNumber: 'STORE', vehicleName: 'Direct POS Sales', assignedUsers: [] },
+                vehicle: { vehicleNumber: 'STORE', vehicleName: 'Direct POS Sales', assignedUsers: [], storeId: storeId },
                 dailySales: {
                     cash: totalStoreCash,
                     upi: totalStoreUpi,

@@ -147,9 +147,10 @@ export const getPayments = async (req, res) => {
       orderBy: { createdAt: 'desc' },
       include: {
         vendor: { select: { vendorName: true, mobile: true } },
+        invoice: { select: { invoiceNumber: true, totalAmount: true, paidAmount: true, invoiceDate: true, dueDate: true } },
         allocations: {
           include: {
-            invoice: { select: { invoiceNumber: true, totalAmount: true } }
+            invoice: { select: { invoiceNumber: true, totalAmount: true, paidAmount: true, invoiceDate: true, dueDate: true } }
           }
         }
       }

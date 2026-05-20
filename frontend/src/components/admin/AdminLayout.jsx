@@ -671,13 +671,13 @@ export default function AdminLayout() {
 
               {/* User Dropdown */}
               <div className="relative flex items-center gap-1.5" ref={userDropdownRef}>
-                {/* <button
+                <button
                   onClick={handleOpenEditProfile}
                   title="Customize Profile"
                   className="p-2 bg-gray-100 text-gray-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-xl transition-all shadow-sm flex items-center justify-center"
                 >
                   <Edit3 size={15} strokeWidth={2.5} />
-                </button> */}
+                </button>
                 <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className={cn(

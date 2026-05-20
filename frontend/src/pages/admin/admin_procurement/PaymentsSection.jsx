@@ -236,11 +236,22 @@ const PaymentsSection = ({ can, setHideMainHeader }) => {
     });
   });
 
-  // Sort by date desc
+  // Sort: Payments first (by paymentDate desc), then Invoices (by invoiceDate or dueDate desc)
   trackingItems.sort((a, b) => {
-    const dateA = a.paymentDate ? new Date(a.paymentDate) : (a.dueDate ? new Date(a.dueDate) : new Date(0));
-    const dateB = b.paymentDate ? new Date(b.paymentDate) : (b.dueDate ? new Date(b.dueDate) : new Date(0));
-    return dateB - dateA;
+    // 1. Sort by type (PAYMENT first, then INVOICE)
+    if (a.type !== b.type) {
+      return a.type === 'PAYMENT' ? -1 : 1;
+    }
+    // 2. Within each group, sort by date descending
+    if (a.type === 'PAYMENT') {
+      const dateA = a.paymentDate ? new Date(a.paymentDate) : new Date(0);
+      const dateB = b.paymentDate ? new Date(b.paymentDate) : new Date(0);
+      return dateB - dateA;
+    } else {
+      const dateA = a.raw.invoiceDate ? new Date(a.raw.invoiceDate) : (a.dueDate ? new Date(a.dueDate) : new Date(0));
+      const dateB = b.raw.invoiceDate ? new Date(b.raw.invoiceDate) : (b.dueDate ? new Date(b.dueDate) : new Date(0));
+      return dateB - dateA;
+    }
   });
 
   // Filter list

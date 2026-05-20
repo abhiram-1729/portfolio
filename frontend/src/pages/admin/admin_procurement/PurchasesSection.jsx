@@ -766,8 +766,130 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div className="flex flex-col">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 pl-1">Line Items</label>
-                  <p className="text-xs text-gray-500 font-bold mt-1 pl-1">Items are auto-fetched from the linked GRN.</p>
+                  <p className="text-xs text-gray-500 font-bold mt-1 pl-1">Items are auto-fetched from the linked GRN. You can also add products manually.</p>
                 </div>
+              </div>
+
+              {/* Manual Product Search Row */}
+              <div className="flex flex-wrap items-center gap-2 p-3 bg-emerald-50/40 border border-emerald-100 rounded-2xl">
+                {/* Barcode Scan Button */}
+                <button
+                  type="button"
+                  onClick={() => setShowScanner(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-wide hover:bg-emerald-700 transition-all shadow-sm active:scale-95 shrink-0"
+                  title="Scan Barcode"
+                >
+                  <ScanBarcode size={13} strokeWidth={2.5} />
+                  Scan
+                </button>
+
+                {/* Product Search */}
+                <div className="relative flex-1 min-w-[200px]">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" size={11} />
+                  <input
+                    type="text"
+                    placeholder="Search product by name or barcode..."
+                    value={itemSearch}
+                    onChange={e => { setItemSearch(e.target.value); setShowItemResults(true); setSelectedProduct(null); }}
+                    onFocus={() => itemSearch && setShowItemResults(true)}
+                    className="w-full pl-8 pr-3 py-2 bg-white border border-gray-200 rounded-xl text-[10px] font-bold text-gray-700 focus:ring-2 focus:ring-emerald-500 focus:border-emerald-400 outline-none transition-all placeholder:text-gray-300"
+                  />
+                  {showItemResults && itemSearch && (
+                    <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-100 rounded-xl shadow-xl z-50 max-h-48 overflow-y-auto custom-scrollbar">
+                      {products
+                        .filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()) || (p.barcode && p.barcode.includes(itemSearch)) || (p.skuCode && p.skuCode.toLowerCase().includes(itemSearch.toLowerCase())))
+                        .slice(0, 15)
+                        .map(p => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onMouseDown={e => e.preventDefault()}
+                            onClick={() => {
+                              setSelectedProduct(p);
+                              setItemSearch(p.name);
+                              setSearchPrice(String(p.purchasePrice || p.price || 0));
+                              setSearchQty('1');
+                              setShowItemResults(false);
+                            }}
+                            className="w-full text-left px-3 py-2 text-[10px] hover:bg-emerald-50 flex items-center gap-3 border-b border-gray-50 last:border-0 transition-colors"
+                          >
+                            <div className="flex-1 min-w-0">
+                              <span className="font-black text-gray-900 block truncate">{p.name}</span>
+                              <span className="text-gray-400 font-bold">{p.barcode || p.skuCode || 'NO-SKU'} · ₹{p.purchasePrice || p.price || 0}</span>
+                            </div>
+                            <span className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-lg shrink-0">Stock: {p.currentStock ?? p.stock ?? 0}</span>
+                          </button>
+                        ))
+                      }
+                      {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase()) || (p.barcode && p.barcode.includes(itemSearch)) || (p.skuCode && p.skuCode.toLowerCase().includes(itemSearch.toLowerCase()))).length === 0 && (
+                        <div className="px-3 py-4 text-center text-[10px] font-black text-gray-400">No products found</div>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Qty Input */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[9px] font-black text-gray-400 uppercase">Qty</span>
+                  <input
+                    type="number"
+                    min="1"
+                    value={searchQty}
+                    onChange={e => setSearchQty(e.target.value)}
+                    className="w-14 bg-white border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-center focus:ring-2 focus:ring-emerald-500 outline-none"
+                  />
+                </div>
+
+                {/* Price Input */}
+                <div className="flex items-center gap-1 shrink-0">
+                  <span className="text-[9px] font-black text-gray-400 uppercase">₹</span>
+                  <input
+                    type="number"
+                    min="0"
+                    value={searchPrice}
+                    onChange={e => setSearchPrice(e.target.value)}
+                    className="w-20 bg-white border border-gray-200 rounded-lg px-2 py-2 text-[10px] font-black text-center focus:ring-2 focus:ring-emerald-500 outline-none"
+                    placeholder="Price"
+                  />
+                </div>
+
+                {/* Add Button */}
+                <button
+                  type="button"
+                  disabled={!selectedProduct}
+                  onClick={() => {
+                    if (!selectedProduct) return;
+                    const newItem = {
+                      productId: selectedProduct.id,
+                      name: selectedProduct.name,
+                      skuCode: selectedProduct.skuCode || 'NO-SKU',
+                      quantity: String(searchQty || 1),
+                      maxQuantity: null,
+                      unitCostBeforeDiscount: String(searchPrice || selectedProduct.purchasePrice || selectedProduct.price || 0),
+                      discountPercent: '0',
+                      unitCostBeforeTax: String(searchPrice || selectedProduct.purchasePrice || selectedProduct.price || 0),
+                      subtotalBeforeTax: '0',
+                      taxType: (selectedProduct.gst && selectedProduct.gst > 0) ? 'GST' : 'NONE',
+                      taxPercent: String(selectedProduct.gst || '0'),
+                      netCost: String(searchPrice || selectedProduct.purchasePrice || selectedProduct.price || 0),
+                      profitMargin: '0',
+                      unitSellingPrice: String(selectedProduct.price || 0),
+                      mfgDate: '',
+                      expDate: '',
+                      total: '0'
+                    };
+                    setForm(prev => ({ ...prev, items: [...prev.items, calculateItemValues(newItem)] }));
+                    setItemSearch('');
+                    setSelectedProduct(null);
+                    setSearchQty('1');
+                    setSearchPrice('0');
+                    setShowItemResults(false);
+                    toast.success(`Added: ${selectedProduct.name}`);
+                  }}
+                  className="flex items-center gap-1.5 px-4 py-2 bg-emerald-600 text-white rounded-xl text-[9px] font-black uppercase tracking-wide hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed transition-all active:scale-95 shrink-0"
+                >
+                  <Plus size={11} strokeWidth={3} /> Add
+                </button>
               </div>
               <div className="flex items-center justify-between p-4 bg-gray-50/50 border-b border-gray-100">
                 <div className="flex items-center gap-3">
