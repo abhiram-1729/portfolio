@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, Tag, ShoppingBag, Landmark, Coins } from 'lucide-react';
+import { X, MapPin, Truck, BarChart, User, LogOut, Package, Wallet, Calendar, ChevronRight, ChevronDown, PackageSearch, Target, Box, Store, History, AlertTriangle, Link2, BookOpen, CreditCard, ClipboardList, Grid, ArrowDownCircle, ArrowUpCircle, CheckSquare, Receipt, Clock, Settings, UserPlus, Map, Tag, ShoppingBag, Landmark, Coins, Users, BarChart3, MessageSquare, FileText } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useUserStore } from '../store/userStore';
 import { attendanceAPI } from '../services/api';
@@ -61,6 +61,34 @@ export default function Sidebar({ isOpen, onClose }) {
         }
         if (user?.permissions?.INVENTORY_TARGET_SECTIONS) {
           return user.permissions.INVENTORY_TARGET_SECTIONS.includes(sub.section);
+        }
+        return true;
+      })
+    },
+    {
+      name: 'Assets',
+      icon: Box,
+      color: 'text-emerald-600',
+      module: 'ASSETS',
+      isAdmin: true,
+      subItems: [
+        { path: '/admin/assets?tab=categories', icon: Tag, name: 'Asset Types' },
+        { path: '/admin/assets?tab=master', icon: Package, name: 'Registration' },
+        { path: '/admin/assets?tab=assign', icon: Users, name: 'Assignment' },
+        { path: '/admin/assets?tab=transfers', icon: Truck, name: 'Transfers' },
+        { path: '/admin/assets?tab=vehicle-mapping', icon: Truck, name: 'Vehicle Mapping' },
+        { path: '/admin/assets?tab=issues', icon: AlertTriangle, name: 'Maintenance' },
+        { path: '/admin/assets?tab=depreciation', icon: BarChart3, name: 'Depreciation' },
+        { path: '/admin/assets?tab=audit', icon: CheckSquare, name: 'Asset Audit' },
+        { path: '/admin/assets?tab=requests', icon: MessageSquare, name: 'Requests' },
+        { path: '/admin/assets?tab=reports', icon: FileText, name: 'Reports' },
+      ].filter(sub => {
+        if (!user?.customRoleId) return true;
+        const sections = user?.permissions?.ASSETS_SECTIONS;
+        if (sections) {
+          // Simplistic mapping since we don't have exact granular keys for everything
+          if (sub.name === 'Asset Types' && sections['CATEGORIES']) return sections['CATEGORIES'].includes('READ');
+          return true; // default true if we lack granular definitions
         }
         return true;
       })
@@ -263,6 +291,7 @@ export default function Sidebar({ isOpen, onClose }) {
   const [openMenus, setOpenMenus] = useState({
     Procurement: location.pathname.startsWith('/admin/procurement'),
     Inventory: location.pathname.startsWith('/admin/inventory'),
+    Assets: location.pathname.startsWith('/admin/assets'),
     Vehicles: location.pathname.startsWith('/admin/vehicles'),
     Routes: location.pathname.startsWith('/admin/routes') || (location.pathname.startsWith('/admin/vehicles') && (
       new URLSearchParams(location.search).get('sub') === 'route_mapping' ||
@@ -321,6 +350,7 @@ export default function Sidebar({ isOpen, onClose }) {
               const isActive = location.pathname === item.path || (hasSubItems && (
                 (item.name === 'Procurement' && location.pathname.startsWith('/admin/procurement')) ||
                 (item.name === 'Inventory' && location.pathname.startsWith('/admin/inventory')) ||
+                (item.name === 'Assets' && location.pathname.startsWith('/admin/assets')) ||
                 (item.name === 'Vehicles' && location.pathname.startsWith('/admin/vehicles'))
               ));
 
@@ -400,6 +430,8 @@ export default function Sidebar({ isOpen, onClose }) {
                             isSubActive = location.pathname === '/admin/procurement' && new URLSearchParams(location.search).get('tab') === targetTab;
                           } else if (item.name === 'Inventory') {
                             isSubActive = location.pathname === '/admin/inventory' && new URLSearchParams(location.search).get('tab') === targetTab && (!targetSub || new URLSearchParams(location.search).get('sub') === targetSub);
+                          } else if (item.name === 'Assets') {
+                            isSubActive = location.pathname === '/admin/assets' && new URLSearchParams(location.search).get('tab') === targetTab;
                           } else if (item.name === 'Vehicles') {
                             isSubActive = location.pathname === '/admin/vehicles' && new URLSearchParams(location.search).get('sub') === targetSub;
                           } else if (item.name === 'Routes') {
