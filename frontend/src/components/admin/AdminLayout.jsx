@@ -81,7 +81,8 @@ export default function AdminLayout() {
     )),
     Vehicles: location.pathname.startsWith('/admin/vehicles'),
     'Return & Stock': location.search.includes('tab=return'),
-    Reports: location.pathname.startsWith('/admin/reports')
+    Reports: location.pathname.startsWith('/admin/reports'),
+    Assets: location.pathname.startsWith('/admin/assets')
   });
 
   const toggleMenu = (label) => {
@@ -197,7 +198,17 @@ export default function AdminLayout() {
     },
     { to: '/admin/cash', icon: Coins, label: 'Cash Flow', module: 'CASH' },
     { to: '/admin/targets', icon: Target, label: 'Targets', module: 'TARGETS' },
-    { to: '/admin/assets', icon: Box, label: 'Assets', module: 'ASSETS' },
+    {
+      label: 'Assets',
+      icon: Box,
+      module: 'ASSETS',
+      subItems: [
+        { to: '/admin/assets?tab=master', icon: Grid, label: 'Registration', section: 'MASTER' },
+        { to: '/admin/assets?tab=assign', icon: Users, label: 'Assignment', section: 'ASSIGN' },
+        { to: '/admin/assets?tab=transfers', icon: Truck, label: 'Transfers', section: 'TRANSFERS' },
+        { to: '/admin/assets?tab=vehicle-mapping', icon: Truck, label: 'Vehicle Mapping', section: 'VEHICLE_MAPPING' },
+      ]
+    },
     { to: '/admin/expenses', icon: Receipt, label: 'Expenses', module: 'EXPENSES' },
     {
       label: 'Procurement',
@@ -640,7 +651,8 @@ export default function AdminLayout() {
                             ((location.pathname.startsWith('/admin/inventory') || location.pathname.startsWith('/admin/damage')) && item.label === 'Inventory') ||
                             ((location.pathname.startsWith('/admin/users')) && item.label === 'Operation') ||
                             ((location.pathname.startsWith('/admin/vehicles') && ['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub'))) || location.pathname.startsWith('/admin/routes')) && (item.label === 'Routes' || item.label === 'Routes & Logistics') ||
-                            ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles')
+                            ((location.pathname.startsWith('/admin/vehicles')) && !['sales', 'collection', 'route_mapping'].includes(searchParams.get('sub')) && item.label === 'Vehicles') ||
+                            (location.pathname.startsWith('/admin/assets') && item.label === 'Assets')
                             ? "bg-emerald-50 text-emerald-700 font-black shadow-sm border-l-4 border-emerald-600 rounded-r-xl rounded-l-none"
                             : "text-gray-500 hover:bg-gray-50 hover:text-gray-900 border-l-4 border-transparent rounded-r-xl rounded-l-none"
                         )}
@@ -723,6 +735,9 @@ export default function AdminLayout() {
                                 const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
                                 isActive = searchParams.get('tab') === targetTab && (!targetSub || searchParams.get('sub') === targetSub);
                               }
+                            } else if (item.label === 'Assets') {
+                              const targetTab = new URLSearchParams(sub.to.split('?')[1]).get('tab');
+                              isActive = location.pathname === '/admin/assets' && (searchParams.get('tab') || 'master') === targetTab;
                             } else if (['Operation', 'Reports', 'Vehicles', 'Routes'].includes(item.label)) {
                               if (item.label === 'Vehicles' || item.label === 'Routes') {
                                 const targetSub = new URLSearchParams(sub.to.split('?')[1]).get('sub');
