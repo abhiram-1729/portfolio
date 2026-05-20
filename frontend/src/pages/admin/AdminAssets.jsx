@@ -2844,30 +2844,6 @@ export default function AdminAssets() {
             </button>
           )}
 
-          {stores.length > 1 && (
-            <select
-              value={storeId || ''}
-              onChange={(e) => {
-                if (e.target.value) {
-                  setSearchParams({ storeId: e.target.value });
-                } else {
-                  setSearchParams({});
-                }
-              }}
-              className="bg-emerald-50 text-emerald-700 text-[10px] font-black uppercase tracking-widest pl-3 pr-7 py-2.5 rounded-xl border-none outline-none appearance-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer shadow-sm w-fit"
-              style={{
-                backgroundImage: `url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3e%3cpath stroke='%23047857' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5.25 7.5L10 12.25L14.75 7.5'/%3e%3c/svg%3e")`,
-                backgroundPosition: 'right 0.35rem center',
-                backgroundRepeat: 'no-repeat',
-                backgroundSize: '1.1rem'
-              }}
-            >
-              <option value="">All Branches</option>
-              {stores.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-            </select>
-          )}
         </div>
       </div>
 
