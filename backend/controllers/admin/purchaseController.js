@@ -13,6 +13,10 @@ export const createPurchase = async (req, res) => {
     if (!vendorId || !invoiceNumber) {
       return res.status(400).json({ message: 'Vendor and invoice number are required' });
     }
+    
+    if (!grnId) {
+      return res.status(400).json({ message: 'Rule 1: Purchase Invoice cannot be created without a Goods Receipt Note (GRN).' });
+    }
 
     if (!items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'At least one item is required' });
@@ -38,9 +42,8 @@ export const createPurchase = async (req, res) => {
     }
 
     // CONTROL: GRN dependency and Quantity limit checks
-    let poIdToUse = poId;
-    if (grnId) {
-      const grn = await prisma.goodsReceipt.findUnique({
+    let poIdToUse = null;
+    const grn = await prisma.goodsReceipt.findUnique({
         where: { id: grnId },
         include: { items: { include: { product: true } } }
       });
@@ -65,8 +68,7 @@ export const createPurchase = async (req, res) => {
         }
       }
       
-      poIdToUse = poId || grn.poId;
-    }
+      poIdToUse = grn.poId;
     const storeId = req.body.storeId || req.user.storeId || null;
     const transport = parseFloat(transportCharges) || 0;
     const other = parseFloat(otherCharges) || 0;

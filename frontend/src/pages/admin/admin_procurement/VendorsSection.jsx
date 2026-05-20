@@ -651,7 +651,7 @@ const VendorsSection = ({ can, setHideMainHeader }) => {
   if (showForm) return renderForm();
 
   return (
-    <div className="space-y-3 flex-1 flex flex-col min-h-0 overflow-y-auto pr-2 custom-scrollbar">
+    <div className="space-y-3 flex-1 overflow-y-auto pr-2 custom-scrollbar">
       {/* Toolbar */}
       <div className="flex flex-col sm:flex-row gap-2 items-start sm:items-center justify-between">
         

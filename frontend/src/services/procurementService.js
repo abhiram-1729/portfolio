@@ -27,6 +27,7 @@ export const procurementAPI = {
   createGRN: (data) => api.post('/procurement/grn', data),
   updateGRN: (id, data) => api.put(`/procurement/grn/${id}`, data),
   deleteGRN: (id) => api.delete(`/procurement/grn/${id}`),
+  updateQCStatus: (itemId, data) => api.put(`/procurement/grn/item/${itemId}/qc`, data),
 
   // ─── PURCHASES (INVOICES) ─────────────────────────────────────
   getPurchases: (params) => api.get('/procurement/purchases', { params }),

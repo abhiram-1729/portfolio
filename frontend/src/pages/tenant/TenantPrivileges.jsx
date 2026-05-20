@@ -1012,17 +1012,24 @@ export default function TenantPrivileges() {
                         isOpen={openSections.includes('agent_portal')}
                         onToggle={() => toggleAccordion('agent_portal')}
                         extraHeaderAction={
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const sections = {};
-                              AGENT_PORTAL_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                              setFormPerms(prev => ({ ...prev, AGENT_PORTAL: sections }));
-                            }}
-                            className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
-                          >
-                            Grant All Agent Access
-                          </button>
+                          (() => {
+                            const isAllOn = AGENT_PORTAL_SECTIONS.every(s => formPerms.AGENT_PORTAL?.[s.key]?.length === ACTIONS.length);
+                            return (
+                              <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                                <ToggleSwitch
+                                  checked={isAllOn}
+                                  onChange={() => {
+                                    const sections = {};
+                                    if (!isAllOn) {
+                                      AGENT_PORTAL_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                                    }
+                                    setFormPerms(prev => ({ ...prev, AGENT_PORTAL: sections, AGENT: !isAllOn ? ['READ'] : [] }));
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()
                         }
                       >
                         <PermissionTable
@@ -1045,6 +1052,29 @@ export default function TenantPrivileges() {
                       icon={LayoutGrid}
                       isOpen={openSections.includes('core')}
                       onToggle={() => toggleAccordion('core')}
+                      extraHeaderAction={
+                        (() => {
+                          const coreModules = MODULES.filter(m => !['DASHBOARD', 'SETTINGS', 'EXPENSES'].includes(m.key));
+                          const isAllOn = coreModules.every(m => formPerms[m.key]?.length === ACTIONS.length);
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  setFormPerms(prev => {
+                                    const next = { ...prev };
+                                    coreModules.forEach(m => {
+                                      next[m.key] = isAllOn ? [] : ACTIONS.map(a => a.key);
+                                    });
+                                    return next;
+                                  });
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <PermissionTable
                         modules={MODULES.filter(m => !['DASHBOARD', 'SETTINGS', 'EXPENSES'].includes(m.key))}
@@ -1063,6 +1093,26 @@ export default function TenantPrivileges() {
                       icon={BarChart3}
                       isOpen={openSections.includes('dashboard')}
                       onToggle={() => toggleAccordion('dashboard')}
+                      extraHeaderAction={
+                        (() => {
+                          const isAllOn = formPerms.DASHBOARD?.length === ACTIONS.length && formPerms.DASHBOARD_WIDGETS?.length === DASHBOARD_WIDGETS.length;
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  setFormPerms(prev => ({
+                                    ...prev,
+                                    DASHBOARD: isAllOn ? [] : ACTIONS.map(a => a.key),
+                                    DASHBOARD_WIDGETS: isAllOn ? [] : DASHBOARD_WIDGETS.map(w => w.key)
+                                  }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <div className="space-y-6">
                         <PermissionTable
@@ -1120,6 +1170,26 @@ export default function TenantPrivileges() {
                       icon={Package}
                       isOpen={openSections.includes('inventory')}
                       onToggle={() => toggleAccordion('inventory')}
+                      extraHeaderAction={
+                        (() => {
+                          const isAllOn = INVENTORY_SECTIONS.every(s => formPerms.INVENTORY_SECTIONS?.[s.key]?.length === ACTIONS.length);
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  const sections = {};
+                                  if (!isAllOn) {
+                                    INVENTORY_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                                  }
+                                  setFormPerms(prev => ({ ...prev, INVENTORY_SECTIONS: sections, INVENTORY: !isAllOn ? ['READ'] : [] }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <PermissionTable
                         modules={INVENTORY_SECTIONS}
@@ -1143,17 +1213,24 @@ export default function TenantPrivileges() {
                       isOpen={openSections.includes('cash')}
                       onToggle={() => toggleAccordion('cash')}
                       extraHeaderAction={
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const sections = {};
-                            CASH_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, CASH: ['READ'], CASH_SECTIONS: sections }));
-                          }}
-                          className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
-                        >
-                          Grant All Cash Access
-                        </button>
+                        (() => {
+                          const isAllOn = CASH_SECTIONS_LIST.every(s => formPerms.CASH_SECTIONS?.[s.key]?.length === ACTIONS.length);
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  const sections = {};
+                                  if (!isAllOn) {
+                                    CASH_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                                  }
+                                  setFormPerms(prev => ({ ...prev, CASH_SECTIONS: sections, CASH: !isAllOn ? ['READ'] : [] }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
                       }
                     >
                       <PermissionTable
@@ -1178,17 +1255,24 @@ export default function TenantPrivileges() {
                       isOpen={openSections.includes('expenses')}
                       onToggle={() => toggleAccordion('expenses')}
                       extraHeaderAction={
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            const sections = {};
-                            EXPENSES_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                            setFormPerms(prev => ({ ...prev, EXPENSES: ACTIONS.map(a => a.key), EXPENSES_SECTIONS: sections }));
-                          }}
-                          className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
-                        >
-                          Grant All Expense Access
-                        </button>
+                        (() => {
+                          const isAllOn = EXPENSES_SECTIONS_LIST.every(s => formPerms.EXPENSES_SECTIONS?.[s.key]?.length === ACTIONS.length);
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  const sections = {};
+                                  if (!isAllOn) {
+                                    EXPENSES_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                                  }
+                                  setFormPerms(prev => ({ ...prev, EXPENSES_SECTIONS: sections, EXPENSES: !isAllOn ? ACTIONS.map(a => a.key) : [] }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
                       }
                     >
                       <PermissionTable
@@ -1212,6 +1296,26 @@ export default function TenantPrivileges() {
                       icon={ShoppingCart}
                       isOpen={openSections.includes('procurement')}
                       onToggle={() => toggleAccordion('procurement')}
+                      extraHeaderAction={
+                        (() => {
+                          const isAllOn = PROCUREMENT_SECTIONS_LIST.every(s => formPerms.PROCUREMENT_SECTIONS?.[s.key]?.length === ACTIONS.length);
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  const sections = {};
+                                  if (!isAllOn) {
+                                    PROCUREMENT_SECTIONS_LIST.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                                  }
+                                  setFormPerms(prev => ({ ...prev, PROCUREMENT_SECTIONS: sections, PROCUREMENT: !isAllOn ? ['READ'] : [] }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <PermissionTable
                         modules={PROCUREMENT_SECTIONS_LIST}
@@ -1234,6 +1338,26 @@ export default function TenantPrivileges() {
                       icon={MapPin}
                       isOpen={openSections.includes('routes')}
                       onToggle={() => toggleAccordion('routes')}
+                      extraHeaderAction={
+                        (() => {
+                          const isAllOn = ROUTE_SECTIONS_LIST.every(s => formPerms.ROUTE_TARGET_SECTIONS?.includes(s.key));
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  setFormPerms(prev => ({
+                                    ...prev,
+                                    ROUTE_TARGET_SECTIONS: isAllOn ? [] : ROUTE_SECTIONS_LIST.map(s => s.key),
+                                    ROUTES: isAllOn ? [] : ['READ']
+                                  }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
                         {ROUTE_SECTIONS_LIST.map(section => {
@@ -1270,17 +1394,24 @@ export default function TenantPrivileges() {
                         isOpen={openSections.includes('store_context')}
                         onToggle={() => toggleAccordion('store_context')}
                         extraHeaderAction={
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              const sections = {};
-                              STORE_CONTEXT_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
-                              setFormPerms(prev => ({ ...prev, STORE_CONTEXT: sections }));
-                            }}
-                            className="text-[8px] font-black text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-100 hover:bg-emerald-100 transition-all uppercase tracking-widest hidden sm:block"
-                          >
-                            Grant All Store Access
-                          </button>
+                          (() => {
+                            const isAllOn = STORE_CONTEXT_SECTIONS.every(s => formPerms.STORE_CONTEXT?.[s.key]?.length === ACTIONS.length);
+                            return (
+                              <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                                <ToggleSwitch
+                                  checked={isAllOn}
+                                  onChange={() => {
+                                    const sections = {};
+                                    if (!isAllOn) {
+                                      STORE_CONTEXT_SECTIONS.forEach(s => { sections[s.key] = ACTIONS.map(a => a.key); });
+                                    }
+                                    setFormPerms(prev => ({ ...prev, STORE_CONTEXT: sections }));
+                                  }}
+                                />
+                              </div>
+                            );
+                          })()
                         }
                       >
                         <PermissionTable
@@ -1306,6 +1437,26 @@ export default function TenantPrivileges() {
                       icon={PieChart}
                       isOpen={openSections.includes('reports')}
                       onToggle={() => toggleAccordion('reports')}
+                      extraHeaderAction={
+                        (() => {
+                          const isAllOn = formPerms.REPORTS?.length === ACTIONS.length && REPORT_SECTIONS_LIST.every(s => formPerms.REPORT_TARGET_SECTIONS?.includes(s.key));
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  setFormPerms(prev => ({
+                                    ...prev,
+                                    REPORTS: isAllOn ? [] : ACTIONS.map(a => a.key),
+                                    REPORT_TARGET_SECTIONS: isAllOn ? [] : REPORT_SECTIONS_LIST.map(s => s.key)
+                                  }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <div className="space-y-6">
                         <PermissionTable
@@ -1353,6 +1504,26 @@ export default function TenantPrivileges() {
                       icon={Settings}
                       isOpen={openSections.includes('settings')}
                       onToggle={() => toggleAccordion('settings')}
+                      extraHeaderAction={
+                        (() => {
+                          const isAllOn = formPerms.SETTINGS?.length === ACTIONS.length && SETTINGS_SECTIONS.every(s => formPerms.SETTINGS_TARGET_SECTIONS?.includes(s.key));
+                          return (
+                            <div onClick={(e) => e.stopPropagation()} className="hidden sm:flex items-center gap-2 pr-2">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">All Access</span>
+                              <ToggleSwitch
+                                checked={isAllOn}
+                                onChange={() => {
+                                  setFormPerms(prev => ({
+                                    ...prev,
+                                    SETTINGS: isAllOn ? [] : ACTIONS.map(a => a.key),
+                                    SETTINGS_TARGET_SECTIONS: isAllOn ? [] : SETTINGS_SECTIONS.map(s => s.key)
+                                  }));
+                                }}
+                              />
+                            </div>
+                          );
+                        })()
+                      }
                     >
                       <div className="space-y-4">
                         {/* SETTINGS module-level toggles */}

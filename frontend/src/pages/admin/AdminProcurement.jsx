@@ -20,7 +20,6 @@ import PaymentsSection from './admin_procurement/PaymentsSection';
 import ReportsSection from './admin_procurement/ReportsSection';
 import RequisitionSection from './admin_procurement/RequisitionSection';
 import TransferSection from './admin_procurement/TransferSection';
-import QCSection from './admin_procurement/QCSection';
 import WorkOrderSection from './admin_procurement/WorkOrderSection';
 
 const TABS = [
@@ -29,7 +28,6 @@ const TABS = [
   { key: 'requisition', label: 'Requisitions', icon: ShoppingCart, section: 'REQUISITION' },
   { key: 'po', label: 'Purchase Orders', icon: ClipboardList, section: 'PO' },
   { key: 'grn', label: 'Goods Receipt', icon: Truck, section: 'GRN' },
-  { key: 'qc', label: 'Quality Control', icon: ShieldCheck, section: 'QC' },
   { key: 'transfers', label: 'Transfers', icon: RotateCcw, section: 'TRANSFERS' },
   { key: 'workorders', label: 'Work Orders', icon: Settings2, section: 'WORKORDERS' },
   { key: 'purchases', label: 'Purchases', icon: Receipt, section: 'PURCHASES' },
@@ -253,7 +251,6 @@ export default function AdminProcurement() {
             {activeTab === 'requisition' && canViewSection('REQUISITION') && <RequisitionSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
             {activeTab === 'po' && canViewSection('PO') && <PurchaseOrdersSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
             {activeTab === 'grn' && canViewSection('GRN') && <GRNSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
-            {activeTab === 'qc' && canViewSection('QC') && <QCSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
             {activeTab === 'transfers' && canViewSection('TRANSFERS') && <TransferSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
             {activeTab === 'workorders' && canViewSection('WORKORDERS') && <WorkOrderSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}
             {activeTab === 'purchases' && canViewSection('PURCHASES') && <PurchasesSection can={can} setHeaderExtra={setHeaderExtra} setHideMainHeader={setHideMainHeader} storeId={storeId} />}

@@ -7,7 +7,7 @@ import { logActivity } from '../../utils/activityLogger.js';
 export const createGRN = async (req, res) => {
   try {
     const tenantId = req.user?.tenantId || getTenantId();
-    const { poId, items, remarks, challanId } = req.body;
+    const { poId, items, remarks } = req.body;
 
     if (!poId || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'PO ID and items are required' });
@@ -32,7 +32,7 @@ export const createGRN = async (req, res) => {
         storeId
       });
 
-      // 1. Create the GRN and Items (All items start as QC_PENDING)
+      // 1. Create the GRN and Items (All items start as APPROVED since QC is bypassed)
       const grn = await tx.goodsReceipt.create({
         data: {
           tenantId,
@@ -40,7 +40,6 @@ export const createGRN = async (req, res) => {
           displayId,
           poId,
           remarks: remarks || null,
-          challanId: challanId || null,
           items: {
             create: items.map(item => ({
               tenantId,
@@ -50,10 +49,11 @@ export const createGRN = async (req, res) => {
               damagedQty: parseInt(item.damagedQty) || 0,
               missingQty: parseInt(item.missingQty) || 0,
               expiryStatus: item.expiryStatus || 'SAFE',
-              qcStatus: 'PENDING'
+              qcStatus: 'APPROVED'
             }))
           }
-        }
+        },
+        include: { items: true }
       });
 
       // 2. Update PO Items receivedQty (Mark as building-received, but not yet saleable)
@@ -63,6 +63,51 @@ export const createGRN = async (req, res) => {
           await tx.purchaseOrderItem.updateMany({
             where: { poId, productId: item.productId },
             data: { receivedQty: { increment: qty } }
+          });
+        }
+      }
+
+      // 2.5. Automatically update Warehouse Inventory, Product Master Stock, and Stock Ledger
+      let warehouse = await tx.warehouse.findFirst({ where: { tenantId } });
+      if (!warehouse) {
+        warehouse = await tx.warehouse.create({
+          data: { tenantId, name: 'Main Warehouse', location: 'Default' }
+        });
+      }
+
+      for (const grnItem of grn.items) {
+        const qty = grnItem.receivedQty;
+        const productId = grnItem.productId;
+
+        if (qty > 0) {
+          // A. Update Warehouse Inventory
+          await tx.warehouseInventory.upsert({
+            where: { warehouseId_productId: { warehouseId: warehouse.id, productId } },
+            update: { quantity: { increment: qty } },
+            create: {
+              tenantId,
+              warehouseId: warehouse.id,
+              productId,
+              quantity: qty
+            }
+          });
+
+          // B. Update Product Master Stock
+          await tx.product.update({
+            where: { id: productId },
+            data: { stock: { increment: qty } }
+          });
+
+          // C. Log to Procurement Stock Ledger
+          await tx.procurementStockLedger.create({
+            data: {
+              tenantId,
+              productId,
+              type: 'PURCHASE',
+              quantity: qty,
+              reference: grn.id,
+              refType: 'GRN'
+            }
           });
         }
       }
@@ -89,14 +134,14 @@ export const createGRN = async (req, res) => {
       timeout: 120000
     });
 
-    res.status(201).json({ message: 'Goods received successfully. Awaiting QC approval before stock is updated.' });
+    res.status(201).json({ message: 'Goods received and approved successfully. Stock has been updated.' });
 
     logActivity({
       userId: req.user.id,
       tenantId: req.user.tenantId,
       storeId: storeId || req.user.storeId,
       action: 'GRN_CREATED',
-      details: `Received stock for PO ${po.displayId || poId}. Items marked as QC_PENDING.`,
+      details: `Received stock for PO ${po.displayId || poId}. Items automatically approved (QC bypassed).`,
       metadata: { poId, itemCount: items.length }
     });
   } catch (error) {
@@ -172,7 +217,7 @@ export const getGRNs = async (req, res) => {
 export const updateGRN = async (req, res) => {
   try {
     const { id } = req.params;
-    const { items, remarks, challanId } = req.body;
+    const { items, remarks } = req.body;
     const tenantId = req.user.tenantId;
 
     const existingGRN = await prisma.goodsReceipt.findUnique({
@@ -187,8 +232,7 @@ export const updateGRN = async (req, res) => {
       await tx.goodsReceipt.update({
         where: { id },
         data: { 
-          remarks: remarks || existingGRN.remarks,
-          challanId: challanId || existingGRN.challanId
+          remarks: remarks || existingGRN.remarks
         }
       });
 
@@ -295,8 +339,7 @@ export const updateQCStatus = async (req, res) => {
             type: 'PURCHASE',
             quantity: qty,
             reference: grnItem.grnId,
-            refType: 'GRN',
-            remarks: `QC Approved for GRN ${grnItem.grn.displayId}`
+            refType: 'GRN'
           }
         });
       }

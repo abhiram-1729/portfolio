@@ -45,7 +45,8 @@ import {
   Edit3,
   Camera,
   Check,
-  Loader2
+  Loader2,
+  ShieldCheck
 } from 'lucide-react';
 
 import { toast } from 'react-hot-toast';
@@ -670,13 +671,13 @@ export default function AdminLayout() {
 
               {/* User Dropdown */}
               <div className="relative flex items-center gap-1.5" ref={userDropdownRef}>
-                <button
+                {/* <button
                   onClick={handleOpenEditProfile}
                   title="Customize Profile"
                   className="p-2 bg-gray-100 text-gray-600 hover:text-emerald-700 hover:bg-emerald-100 rounded-xl transition-all shadow-sm flex items-center justify-center"
                 >
                   <Edit3 size={15} strokeWidth={2.5} />
-                </button>
+                </button> */}
                 <button
                   onClick={() => setIsUserDropdownOpen(!isUserDropdownOpen)}
                   className={cn(
@@ -769,13 +770,13 @@ export default function AdminLayout() {
                       <h2 className="text-base font-black text-gray-900 leading-tight truncate" title={displayStoreName}>
                         {displayStoreName}
                       </h2>
-                      <button
+                      {/* <button
                         onClick={handleOpenEditBusiness}
                         className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-emerald-600 shrink-0"
                         title="Customize Brand Name & Logo"
                       >
                         <Edit3 size={12} strokeWidth={2.5} />
-                      </button>
+                      </button> */}
                     </div>
                     <p className="text-[9px] font-bold text-emerald-600 uppercase tracking-widest">Admin Portal</p>
                   </div>
@@ -971,7 +972,7 @@ export default function AdminLayout() {
                   <span className="text-[9px] font-bold text-gray-400 uppercase tracking-widest truncate">{user?.role}</span>
                 </div>
               )}
-              {!isSidebarCollapsed && (
+              {/* {!isSidebarCollapsed && (
                 <button
                   onClick={handleOpenEditProfile}
                   title="Customize Profile"
@@ -979,7 +980,7 @@ export default function AdminLayout() {
                 >
                   <Edit3 size={13} strokeWidth={2.5} />
                 </button>
-              )}
+              )} */}
             </div>
             <button
               onClick={handleLogout}

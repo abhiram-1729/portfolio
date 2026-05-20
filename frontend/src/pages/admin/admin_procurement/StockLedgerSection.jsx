@@ -14,6 +14,7 @@ const StockLedgerSection = ({ setHeaderExtra, setHideMainHeader, storeId }) => {
   const [selectedVendorId, setSelectedVendorId] = useState(null);
   const [detailData, setDetailData] = useState(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [detailError, setDetailError] = useState(null);
   const [detailTab, setDetailTab] = useState('movements'); // 'movements' or 'products'
 
   // Detailed View Filter/Search States
@@ -52,12 +53,14 @@ const StockLedgerSection = ({ setHeaderExtra, setHideMainHeader, storeId }) => {
       const loadDetails = async () => {
         try {
           setDetailLoading(true);
+          setDetailError(null);
           const { data } = await procurementAPI.getStockLedger({ vendorId: selectedVendorId, storeId });
           setDetailData(data);
           // Reset detailed search/filters when loading new vendor
           setDetailSearchQuery('');
           setDetailFilter('ALL');
         } catch (err) {
+          setDetailError('Failed to load vendor details');
           toast.error('Failed to load vendor details');
         } finally {
           setDetailLoading(false);
@@ -218,7 +221,7 @@ const StockLedgerSection = ({ setHeaderExtra, setHideMainHeader, storeId }) => {
   if (selectedVendorId) {
     // ─── VENDOR DETAILS RENDERING ─────────────────────────────────────
     return (
-      <div className="space-y-6">
+      <div className="space-y-6 flex-1 min-h-0 overflow-y-auto pr-2 pb-4 custom-scrollbar">
         {/* Detail Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -249,11 +252,17 @@ const StockLedgerSection = ({ setHeaderExtra, setHideMainHeader, storeId }) => {
           )}
         </div>
 
-        {detailLoading ? (
+        {detailLoading || (!detailData && !detailError) ? (
           <div className="flex items-center justify-center py-32"><Loader2 className="animate-spin text-emerald-600" size={40} /></div>
-        ) : !detailData ? (
+        ) : detailError ? (
           <div className="bg-white rounded-3xl p-16 border border-dashed border-gray-200 text-center">
-            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">Failed to load details</h3>
+            <h3 className="text-sm font-black text-gray-400 uppercase tracking-widest">{detailError}</h3>
+            <button 
+              onClick={() => { setSelectedVendorId(null); setDetailData(null); setDetailError(null); }}
+              className="mt-4 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded-xl transition-all active:scale-95 shadow-lg shadow-emerald-600/10"
+            >
+              Go Back
+            </button>
           </div>
         ) : (
           <div className="space-y-6">
@@ -448,7 +457,7 @@ const StockLedgerSection = ({ setHeaderExtra, setHideMainHeader, storeId }) => {
 
   // ─── VENDOR SUMMARY LIST RENDERING ────────────────────────────────
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 flex-1 min-h-0 overflow-y-auto pr-2 pb-4 custom-scrollbar">
       {/* Title Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import {
   Receipt, Plus, Search, Loader2, X, Package, Edit3, Trash2, ArrowLeft, Check, FileUp,
-  Barcode, ScanBarcode
+  Barcode, ScanBarcode, Users, Phone, Mail, User, Clock, DollarSign, Building2, Tag,
+  ToggleLeft, ToggleRight, ShieldAlert, CreditCard, Hash, ChevronLeft, ChevronRight,
+  ShieldCheck, FileText, MapPin
 } from 'lucide-react';
 import BarcodeScannerOverlay from '../../../components/BarcodeScannerOverlay';
 import * as XLSX from 'xlsx';
@@ -25,7 +27,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
   const [vendors, setVendors] = useState([]);
   const [products, setProducts] = useState([]);
   const [form, setForm] = useState({
-    vendorId: '', poId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'),
+    vendorId: '', grnId: '', invoiceNumber: '', invoiceDate: format(new Date(), 'yyyy-MM-dd'),
     transportCharges: '0', otherCharges: '0', items: []
   });
   const [showQuickVendor, setShowQuickVendor] = useState(false);
@@ -38,8 +40,12 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [quickVendorForm, setQuickVendorForm] = useState({
     vendorName: '', mobile: '', email: '', address: '',
-    gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0'
+    gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0',
+    paymentTerms: 'Net 30', creditLimit: '0',
+    bankName: '', accountNumber: '', ifscCode: '', bankBranch: '',
+    vendorCategory: 'RAW_MATERIAL', minOrderQty: '1', isTaxable: false
   });
+  const [activeVendorTab, setActiveVendorTab] = useState('general');
   const [quickProductForm, setQuickProductForm] = useState({
     name: '', description: '', mrp: '', price: '', landingPrice: '',
     purchasePrice: '', discount: '0', discountType: 'RUPEE', categoryId: 'default',
@@ -56,6 +62,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
   const [taxSlabs, setTaxSlabs] = useState([0, 5, 12, 18, 28]);
   const [actionLoading, setActionLoading] = useState({ id: null, type: null });
   const [purchaseOrders, setPurchaseOrders] = useState([]);
+  const [grns, setGrns] = useState([]);
   const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
@@ -73,14 +80,15 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
     setFormLoading(true);
     // We always refetch products to ensure latest prices/taxes are used
     try {
-      const [v, p, c, u, sc, s, po] = await Promise.all([
+      const [v, p, c, u, sc, s, po, g] = await Promise.all([
         procurementAPI.getVendors({ status: 'ACTIVE' }),
         adminAPI.getItems(),
         adminAPI.getCategories(),
         adminAPI.getUnits(),
         adminAPI.getSubCategories(),
         adminAPI.getSettings(),
-        procurementAPI.getPurchaseOrders({ status: 'APPROVED,ORDERED,DELIVERED' })
+        procurementAPI.getPurchaseOrders({ status: 'APPROVED,ORDERED,DELIVERED' }),
+        procurementAPI.getGRNs({ status: 'APPROVED,PARTIAL' })
       ]);
       setVendors(v.data);
       setProducts(p.data.filter(x => x.status === 'ACTIVE'));
@@ -88,6 +96,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
       setUnits(u.data || []);
       setSubCategories(sc.data || []);
       setPurchaseOrders(po.data || []);
+      setGrns(g.data || g);
 
       if (s.data?.success && s.data?.data?.taxRates) {
         const rates = s.data.data.taxRates.split(',').map(r => parseFloat(r.trim())).filter(r => !isNaN(r));
@@ -98,17 +107,79 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
     finally { setFormLoading(false); }
   };
 
+  const handleOpenVendorModal = () => {
+    setActiveVendorTab('general');
+    setQuickVendorForm({
+      vendorName: '', mobile: '', email: '', address: '',
+      gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0',
+      paymentTerms: 'Net 30', creditLimit: '0',
+      bankName: '', accountNumber: '', ifscCode: '', bankBranch: '',
+      vendorCategory: 'RAW_MATERIAL', minOrderQty: '1', isTaxable: false
+    });
+    setShowQuickVendor(true);
+  };
+
+  const nextVendorTab = () => {
+    const sequence = ['general', 'commercial', 'regulation', 'settlement'];
+    const idx = sequence.indexOf(activeVendorTab);
+    if (idx < sequence.length - 1) {
+      setActiveVendorTab(sequence[idx + 1]);
+    }
+  };
+
+  const prevVendorTab = () => {
+    const sequence = ['general', 'commercial', 'regulation', 'settlement'];
+    const idx = sequence.indexOf(activeVendorTab);
+    if (idx > 0) {
+      setActiveVendorTab(sequence[idx - 1]);
+    }
+  };
+
+  const isVendorTabIncomplete = (tabId) => {
+    if (tabId === 'regulation') {
+      return quickVendorForm.isTaxable && (!quickVendorForm.gstNumber || quickVendorForm.gstNumber.trim().length !== 15);
+    }
+    return false;
+  };
+
   const handleQuickVendor = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
+
+    if (!quickVendorForm.vendorName || !quickVendorForm.mobile) {
+      setActiveVendorTab('general');
+      return toast.error('Vendor name and mobile are required');
+    }
+
+    if (quickVendorForm.isTaxable && (!quickVendorForm.gstNumber || !quickVendorForm.gstNumber.trim())) {
+      setActiveVendorTab('regulation');
+      toast.error('GST Identification Number is mandatory for taxable vendors.');
+      return;
+    }
+
+    if (quickVendorForm.gstNumber && quickVendorForm.gstNumber.trim() && quickVendorForm.gstNumber.trim().length !== 15) {
+      setActiveVendorTab('regulation');
+      toast.error('GST Identification Number must be exactly 15 characters.');
+      return;
+    }
+
     try {
       const { data } = await procurementAPI.createVendor(quickVendorForm);
-      toast.success('Vendor added');
+      toast.success('Vendor added successfully');
       const v = await procurementAPI.getVendors({ status: 'ACTIVE' });
       setVendors(v.data);
       setForm(prev => ({ ...prev, vendorId: data.id }));
       setShowQuickVendor(false);
-      setQuickVendorForm({ vendorName: '', mobile: '', email: '', address: '', gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0' });
-    } catch (err) { toast.error(err.response?.data?.message || 'Error adding vendor'); }
+      setActiveVendorTab('general');
+      setQuickVendorForm({
+        vendorName: '', mobile: '', email: '', address: '',
+        gstNumber: '', contactPerson: '', creditDays: '30', openingBalance: '0',
+        paymentTerms: 'Net 30', creditLimit: '0',
+        bankName: '', accountNumber: '', ifscCode: '', bankBranch: '',
+        vendorCategory: 'RAW_MATERIAL', minOrderQty: '1', isTaxable: false
+      });
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Error adding vendor');
+    }
   };
 
   const handleQuickProduct = async (e) => {
@@ -158,27 +229,38 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
     setForm(prev => ({ ...prev, items: [...prev.items, calculateItemValues(newItem)] }));
   };
 
-  const handlePOSelect = (poId) => {
-    if (!poId) {
-      setForm(prev => ({ ...prev, poId: '' }));
+  const handleGRNSelect = (grnId) => {
+    if (!grnId) {
+      setForm(prev => ({ ...prev, grnId: '', items: [] }));
       return;
     }
 
-    const po = purchaseOrders.find(o => o.id === poId);
-    if (!po) return;
+    const grn = grns.find(g => g.id === grnId);
+    if (!grn) return;
 
-    // Map PO items to Purchase Invoice items
-    const mappedItems = po.items.map(item => {
+    // Only map APPROVED items from the GRN
+    const approvedItems = grn.items.filter(i => i.qcStatus === 'APPROVED');
+    
+    if (approvedItems.length === 0) {
+      toast.error('Selected GRN does not have any approved items.');
+      setForm(prev => ({ ...prev, grnId: '', items: [] }));
+      return;
+    }
+
+    // Map GRN items to Purchase Invoice items
+    const mappedItems = approvedItems.map(item => {
       const prod = products.find(p => p.id === item.productId);
-      const cost = item.rate || prod?.purchasePrice || prod?.price || 0;
-      const qty = item.quantity || 1;
+      const cost = item.product?.purchasePrice || prod?.purchasePrice || prod?.price || 0;
+      // Auto-fetch Received Qty as the invoice quantity (max allowed)
+      const qty = item.receivedQty || 1;
       const taxRate = prod?.gst || 0;
 
       return {
         productId: item.productId,
-        name: prod?.name || 'Unknown Product',
-        skuCode: prod?.skuCode || 'NO-SKU',
+        name: prod?.name || item.product?.name || 'Unknown Product',
+        skuCode: prod?.skuCode || item.product?.skuCode || 'NO-SKU',
         quantity: String(qty),
+        maxQuantity: qty, // Store max allowed for frontend validation
         unitCostBeforeDiscount: String(cost),
         discountPercent: '0',
         unitCostBeforeTax: String(cost),
@@ -188,20 +270,20 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
         netCost: String(cost),
         profitMargin: '0',
         unitSellingPrice: String(prod?.price || cost),
-        mfgDate: '',
-        expDate: '',
+        mfgDate: item.mfgDate ? format(new Date(item.mfgDate), 'yyyy-MM-dd') : '',
+        expDate: item.expiryDate ? format(new Date(item.expiryDate), 'yyyy-MM-dd') : '',
         total: String(qty * cost)
       };
     });
 
     setForm(prev => ({
       ...prev,
-      poId,
-      vendorId: po.vendorId,
+      grnId,
+      vendorId: grn.po?.vendorId || prev.vendorId,
       items: mappedItems.map(i => calculateItemValues(i))
     }));
 
-    toast.success(`Loaded items from PO #${po.displayId}`);
+    toast.success(`Loaded approved items from GRN #${grn.displayId}`);
   };
 
   const calculateItemValues = (item) => {
@@ -270,10 +352,14 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
     try {
       await openForm();
       const { data } = await procurementAPI.getPurchaseById(purchase.id);
+      // Look up GRN to find max quantities (React state for grns might not be synchronously available here)
+      // So we default maxQuantity to current quantity below.
+
+
       setForm({
         id: data.id,
         vendorId: data.vendorId || '',
-        poId: data.poId || '',
+        grnId: data.grnId || '',
         invoiceNumber: data.invoiceNumber || '',
         invoiceDate: format(new Date(data.invoiceDate), 'yyyy-MM-dd'),
         transportCharges: String(data.transportCharges || 0),
@@ -283,6 +369,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
           name: i.product?.name || 'Unknown',
           skuCode: i.product?.skuCode || 'NO-SKU',
           quantity: String(i.quantity),
+          maxQuantity: i.quantity, // Default to current quantity if we don't have the GRN details
           unitCostBeforeDiscount: String(i.unitCostBeforeDiscount),
           discountPercent: String(i.discountPercent),
           unitCostBeforeTax: String(i.unitCostBeforeTax),
@@ -432,8 +519,8 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!form.vendorId || !form.invoiceNumber || form.items.length === 0) {
-      return toast.error('Fill all required fields');
+    if (!form.vendorId || !form.invoiceNumber || !form.grnId || form.items.length === 0) {
+      return toast.error('Vendor, Invoice Number, and GRN are required');
     }
     if (form.items.some(i => !i.productId || !i.quantity || i.quantity <= 0)) {
       return toast.error('Please select a product and valid quantity for all items');
@@ -629,7 +716,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="space-y-1">
                 <div className="flex items-center justify-between">
                   <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor *</label>
-                  <button type="button" onClick={() => setShowQuickVendor(true)} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-100"><Plus size={10} /> Add New</button>
+                  <button type="button" onClick={handleOpenVendorModal} className="text-[9px] font-black text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded flex items-center gap-1 hover:bg-emerald-100"><Plus size={10} /> Add New</button>
                 </div>
                 <select value={form.vendorId} onChange={e => setForm({ ...form, vendorId: e.target.value })} required
                   className="w-full bg-gray-50 rounded-xl px-4 py-3 text-sm font-bold border-none focus:ring-2 focus:ring-emerald-500 focus:outline-none">
@@ -638,15 +725,16 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                 </select>
               </div>
               <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Link Purchase Order (Optional)</label>
+                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Link GRN (Mandatory) *</label>
                 <select
-                  value={form.poId}
-                  onChange={e => handlePOSelect(e.target.value)}
+                  required
+                  value={form.grnId}
+                  onChange={e => handleGRNSelect(e.target.value)}
                   disabled={!form.vendorId}
                   className="w-full bg-emerald-50/50 rounded-xl px-4 py-3 text-sm font-bold border border-emerald-100 focus:ring-2 focus:ring-emerald-500 focus:outline-none text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed">
-                  <option value="">{form.vendorId ? 'No PO Linked' : 'Select Vendor First'}</option>
-                  {form.vendorId && purchaseOrders.filter(po => po.vendorId === form.vendorId).map(po => (
-                    <option key={po.id} value={po.id}>PO #{po.displayId} ({po.vendor?.vendorName})</option>
+                  <option value="">{form.vendorId ? 'Select Approved GRN' : 'Select Vendor First'}</option>
+                  {form.vendorId && grns.filter(g => g.po?.vendorId === form.vendorId || g.vendorId === form.vendorId).map(g => (
+                    <option key={g.id} value={g.id}>GRN #{g.displayId} ({format(new Date(g.createdAt), 'dd MMM')})</option>
                   ))}
                 </select>
               </div>
@@ -678,127 +766,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
                 <div className="flex flex-col">
                   <label className="text-[10px] font-black uppercase tracking-[0.2em] text-gray-400 pl-1">Line Items</label>
-                  <div className="relative mt-2 min-w-[780px] sm:min-w-[780px] group">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-emerald-500 transition-colors" size={14} />
-                    <input
-                      type="text"
-                      placeholder="Search & add product..."
-                      className="w-full bg-gray-50 border border-gray-100 rounded-xl pl-9 pr-4 py-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-inner"
-                      value={itemSearch}
-                      onChange={e => {
-                        setItemSearch(e.target.value);
-                        setShowItemResults(true);
-                        if (!e.target.value) {
-                          setSelectedProduct(null);
-                          setSearchPrice('0');
-                        }
-                      }}
-                      onFocus={() => setShowItemResults(true)}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowScanner(true)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-emerald-600 transition-colors"
-                      title="Scan Barcode"
-                    >
-                      <ScanBarcode size={16} />
-                    </button>
-                    {showItemResults && itemSearch && (
-                      <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-gray-100 rounded-2xl shadow-2xl z-50 max-h-60 overflow-y-auto custom-scrollbar animate-in fade-in slide-in-from-top-2">
-                        {products.filter(p =>
-                          p.name.toLowerCase().includes(itemSearch.toLowerCase()) ||
-                          p.skuCode?.toLowerCase().includes(itemSearch.toLowerCase()) ||
-                          p.barcode?.toLowerCase().includes(itemSearch.toLowerCase())
-                        ).slice(0, 10).map(p => (
-                          <button
-                            key={p.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedProduct(p);
-                              setSearchPrice(String(p.purchasePrice || p.price || 0));
-                              setItemSearch(p.name);
-                              setShowItemResults(false);
-                              setSearchQty('1');
-                            }}
-                            className="w-full text-left px-4 py-3 hover:bg-emerald-50 border-b border-gray-50 last:border-0 flex items-center justify-between group transition-colors"
-                          >
-                            <div className="flex flex-col">
-                              <span className="text-xs font-black text-gray-900 group-hover:text-emerald-700">{p.name}</span>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className="text-[8px] font-black bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">Store: {p.warehouseStock || 0}</span>
-                                <span className="text-[8px] font-black bg-amber-50 text-amber-600 px-1.5 py-0.5 rounded border border-amber-100">Veh: {p.vehicleStock || 0}</span>
-                                <span className="text-[8px] font-black bg-blue-50 text-blue-600 px-1.5 py-0.5 rounded border border-blue-100">Total: {p.totalStock || 0}</span>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end">
-                              <span className="text-xs font-black text-emerald-600">₹{p.purchasePrice || p.price}</span>
-                              <Plus size={12} className="text-emerald-400 mt-1" />
-                            </div>
-                          </button>
-                        ))}
-                        {products.filter(p => p.name.toLowerCase().includes(itemSearch.toLowerCase())).length === 0 && (
-                          <div className="p-4 text-center text-gray-400 text-[10px] font-bold">No products found</div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="flex items-end gap-2">
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[8px] font-bold uppercase text-gray-400 pl-1">Qty</label>
-                    <input
-                      type="number"
-                      placeholder="Qty"
-                      className="w-16 bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-inner"
-                      value={searchQty}
-                      onChange={e => setSearchQty(e.target.value)}
-                    />
-                  </div>
-                  <div className="flex flex-col gap-1">
-                    <label className="text-[8px] font-bold uppercase text-gray-400 pl-1">Price</label>
-                    <input
-                      type="number"
-                      placeholder="Price"
-                      className="w-24 bg-gray-50 border border-gray-100 rounded-xl px-2 py-2 text-xs font-black focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all shadow-inner"
-                      value={searchPrice}
-                      onChange={e => setSearchPrice(e.target.value)}
-                    />
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (!selectedProduct) return toast.error('Please select a product first');
-                      const newItem = calculateItemValues({
-                        productId: selectedProduct.id,
-                        quantity: searchQty,
-                        unitCostBeforeDiscount: searchPrice,
-                        discountPercent: '0',
-                        unitCostBeforeTax: searchPrice,
-                        subtotalBeforeTax: '0',
-                        taxType: 'NONE',
-                        taxPercent: '0',
-                        netCost: searchPrice,
-                        total: '0',
-                        profitMargin: '0',
-                        unitSellingPrice: String(selectedProduct.price || 0),
-                        mfgDate: '',
-                        expDate: ''
-                      });
-                      setForm(prev => ({
-                        ...prev,
-                        items: [...prev.items, newItem]
-                      }));
-                      setSelectedProduct(null);
-                      setItemSearch('');
-                      setSearchQty('1');
-                      setSearchPrice('0');
-                    }}
-                    className="bg-emerald-600 text-white p-2.5 rounded-xl hover:bg-emerald-700 transition-all active:scale-95 shadow-lg shadow-emerald-200"
-                    title="Add to List"
-                  >
-                    <Check size={16} strokeWidth={3} />
-                  </button>
+                  <p className="text-xs text-gray-500 font-bold mt-1 pl-1">Items are auto-fetched from the linked GRN.</p>
                 </div>
               </div>
               <div className="flex items-center justify-between p-4 bg-gray-50/50 border-b border-gray-100">
@@ -832,7 +800,7 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                     onChange={handleExcelUpload}
                   />
                   <label
-                    for="excel-upload"
+                    htmlFor="excel-upload"
                     className="text-[9px] font-black text-amber-600 flex items-center gap-1.5 bg-amber-50/50 px-3 py-1.5 rounded-lg hover:bg-amber-100 transition-all cursor-pointer border border-amber-100"
                   >
                     <FileUp size={10} strokeWidth={3} /> Bulk
@@ -900,7 +868,15 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
                                   <input
                                     type="number"
                                     value={item.quantity || ''}
-                                    onChange={e => updateItem(originalIdx, 'quantity', e.target.value)}
+                                    onChange={e => {
+                                      const val = e.target.value;
+                                      if (val !== '' && parseFloat(val) > parseFloat(item.maxQuantity)) {
+                                        toast.error(`Quantity cannot exceed GRN approved quantity (${item.maxQuantity})`);
+                                        updateItem(originalIdx, 'quantity', String(item.maxQuantity));
+                                      } else {
+                                        updateItem(originalIdx, 'quantity', val);
+                                      }
+                                    }}
                                     className="w-10 bg-white border border-gray-200 rounded px-1 py-0.5 text-[8px] font-black text-center focus:ring-1 focus:ring-emerald-500 outline-none"
                                   />
                                   <span className="text-[6px] font-black text-gray-400 uppercase">{p.unit?.type || 'pcs'}</span>
@@ -1022,66 +998,441 @@ const PurchasesSection = ({ can, setHeaderExtra }) => {
         </div>
       )}
 
-      {/* Quick Vendor Modal */}
-      {/* Quick Vendor Form (Inline) */}
+      {/* Quick Vendor Modal (Wizard UI) */}
       {showQuickVendor && (
-        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm p-8 space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="flex items-center gap-4 border-b border-gray-100 pb-6">
-            <button type="button" onClick={() => setShowQuickVendor(false)} className="p-3 bg-gray-50 text-gray-400 hover:text-emerald-600 rounded-2xl transition-all active:scale-90">
-              <ArrowLeft size={24} />
-            </button>
-            <div>
-              <h3 className="text-2xl font-black text-gray-900 uppercase tracking-tight">Add New Vendor</h3>
-              <p className="text-[10px] font-black text-emerald-600 uppercase tracking-widest mt-1">Vendor Master Registration</p>
+        <div className="bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden animate-in fade-in slide-in-from-right-4 duration-500 flex flex-col">
+          {/* Header */}
+          <div className="p-5 border-b border-gray-50 flex items-center justify-between bg-gray-50/30">
+            <div className="flex items-center gap-4">
+              <button 
+                type="button"
+                onClick={() => { setShowQuickVendor(false); }}
+                className="p-2.5 hover:bg-white rounded-xl transition-all text-gray-400 hover:text-emerald-600 shadow-sm border border-transparent hover:border-emerald-100"
+              >
+                <ArrowLeft size={20} />
+              </button>
+              <div>
+                <h3 className="text-xl font-black text-gray-900 tracking-tight">Onboard New Vendor</h3>
+                <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Registering a new supply chain partner</p>
+              </div>
+            </div>
+            <div className="w-12 h-12 bg-emerald-50 rounded-2xl flex items-center justify-center text-emerald-600 shadow-inner">
+              <Users size={24} />
             </div>
           </div>
 
-          <form onSubmit={handleQuickVendor} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="col-span-1 md:col-span-2 space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Vendor Name *</label>
-                <input required value={quickVendorForm.vendorName} onChange={e => setQuickVendorForm({ ...quickVendorForm, vendorName: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Mobile Number *</label>
-                <input required value={quickVendorForm.mobile} onChange={e => setQuickVendorForm({ ...quickVendorForm, mobile: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Email Address</label>
-                <input type="email" value={quickVendorForm.email} onChange={e => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Contact Person</label>
-                <input value={quickVendorForm.contactPerson} onChange={e => setQuickVendorForm({ ...quickVendorForm, contactPerson: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">GST Number</label>
-                <input value={quickVendorForm.gstNumber} onChange={e => setQuickVendorForm({ ...quickVendorForm, gstNumber: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Credit Days</label>
-                <input type="number" value={quickVendorForm.creditDays} onChange={e => setQuickVendorForm({ ...quickVendorForm, creditDays: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Opening Balance (₹)</label>
-                <input type="number" value={quickVendorForm.openingBalance} onChange={e => setQuickVendorForm({ ...quickVendorForm, openingBalance: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner" />
-              </div>
-              <div className="col-span-1 md:col-span-2 space-y-1">
-                <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1">Business Address</label>
-                <textarea rows="3" value={quickVendorForm.address} onChange={e => setQuickVendorForm({ ...quickVendorForm, address: e.target.value })}
-                  className="w-full bg-gray-50 rounded-2xl px-5 py-4 text-sm font-bold border border-transparent focus:bg-white focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10 outline-none transition-all shadow-inner resize-none" />
-              </div>
+          {/* Tab Navigation Menu */}
+          <div className="px-6 pt-4 border-b border-gray-100/80 bg-slate-50/40 flex gap-2 overflow-x-auto scrollbar-none">
+            {[
+              { id: 'general', label: '1. General Details', icon: User },
+              { id: 'commercial', label: '2. Commercials', icon: DollarSign },
+              { id: 'regulation', label: '3. Regulation & Tax', icon: ShieldCheck },
+              { id: 'settlement', label: '4. Bank Details', icon: Building2 }
+            ].map(tab => {
+              const Icon = tab.icon;
+              const isActive = activeVendorTab === tab.id;
+              const isIncomplete = isVendorTabIncomplete(tab.id);
+
+              return (
+                <button
+                  key={tab.id}
+                  type="button"
+                  onClick={() => setActiveVendorTab(tab.id)}
+                  className={`flex items-center gap-2 px-4 py-3 rounded-t-xl text-[10px] font-black uppercase tracking-wider transition-all border-b-2 outline-none whitespace-nowrap ${
+                    isActive 
+                      ? 'border-emerald-600 text-emerald-600 bg-white shadow-sm shadow-emerald-50/30' 
+                      : 'border-transparent text-gray-400 hover:text-slate-600 bg-transparent'
+                  }`}
+                >
+                  <Icon size={12} className={isActive ? 'text-emerald-600' : 'text-gray-300'} />
+                  <span>{tab.label}</span>
+                  {isIncomplete && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-ping" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Form Body */}
+          <form onSubmit={handleQuickVendor} className="p-6 flex-1 overflow-y-auto custom-scrollbar flex flex-col justify-between">
+            <div className="space-y-6 max-w-5xl mx-auto w-full">
+              {/* SECTION 1: General Info */}
+              {activeVendorTab === 'general' && (
+                <div className="bg-slate-50/40 rounded-2xl p-5 border border-slate-100 space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <User size={16} className="text-emerald-600" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">General & Contact Details</h4>
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Business Name *</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Users size={16} />
+                        </div>
+                        <input 
+                          required 
+                          value={quickVendorForm.vendorName} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, vendorName: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none animate-in" 
+                          placeholder="Enter business entity name..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Primary Contact No. *</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Phone size={16} />
+                        </div>
+                        <input 
+                          required 
+                          value={quickVendorForm.mobile} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, mobile: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none animate-in" 
+                          placeholder="Enter 10-digit mobile number..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">POC Name</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <User size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.contactPerson} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, contactPerson: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none animate-in" 
+                          placeholder="Enter point of contact name..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Official Email ID</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Mail size={16} />
+                        </div>
+                        <input 
+                          type="email"
+                          value={quickVendorForm.email} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, email: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none animate-in" 
+                          placeholder="name@business.com"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Vendor Category *</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Tag size={16} />
+                        </div>
+                        <select 
+                          required
+                          value={quickVendorForm.vendorCategory} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, vendorCategory: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-10 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none appearance-none cursor-pointer animate-in"
+                        >
+                          <option value="RAW_MATERIAL">Raw Materials</option>
+                          <option value="PACKAGING">Packaging Materials</option>
+                          <option value="FINISHED_GOODS">Finished Goods</option>
+                          <option value="LOGISTICS">Logistics & Freight</option>
+                          <option value="SERVICES">Consulting / Services</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Business Address</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <MapPin size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.address} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, address: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none animate-in" 
+                          placeholder="Enter official street address..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 2: Commercial Terms */}
+              {activeVendorTab === 'commercial' && (
+                <div className="bg-slate-50/40 rounded-2xl p-5 border border-slate-100 space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <DollarSign size={16} className="text-emerald-600" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Commercial & Credit Terms</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Credit Cycle Days</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Clock size={16} />
+                        </div>
+                        <input 
+                          type="number" 
+                          value={quickVendorForm.creditDays} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, creditDays: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="30"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Credit Limit (₹)</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <DollarSign size={16} />
+                        </div>
+                        <input 
+                          type="number" 
+                          value={quickVendorForm.creditLimit} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, creditLimit: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="50000"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Payment terms *</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <FileText size={16} />
+                        </div>
+                        <select 
+                          required
+                          value={quickVendorForm.paymentTerms} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, paymentTerms: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-10 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none appearance-none cursor-pointer"
+                        >
+                          <option value="Net 30">Net 30 Days</option>
+                          <option value="Net 15">Net 15 Days</option>
+                          <option value="COD">Cash on Delivery (COD)</option>
+                          <option value="Advance">100% Advance Payment</option>
+                          <option value="Due on Receipt">Due on Receipt</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Min. Order Qty (MOQ)</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Tag size={16} />
+                        </div>
+                        <input 
+                          type="number" 
+                          value={quickVendorForm.minOrderQty} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, minOrderQty: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="1"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group md:col-span-4">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Opening Account Balance (₹)</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <DollarSign size={16} />
+                        </div>
+                        <input 
+                          type="number" 
+                          value={quickVendorForm.openingBalance} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, openingBalance: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="0.00"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 3: Regulation & Tax */}
+              {activeVendorTab === 'regulation' && (
+                <div className="bg-slate-50/40 rounded-2xl p-5 border border-slate-100 space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <ShieldCheck size={16} className="text-emerald-600" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Regulation & Taxation Compliance</h4>
+                  </div>
+
+                  <div className="flex flex-col md:flex-row gap-6 items-start md:items-center">
+                    <div className="flex items-center gap-3 bg-white p-3 rounded-xl border border-slate-100/80 shadow-sm min-w-[200px]">
+                      <span className="text-xs font-black uppercase tracking-wider text-slate-700">Taxable Supplier</span>
+                      <button
+                        type="button"
+                        onClick={() => setQuickVendorForm({ ...quickVendorForm, isTaxable: !quickVendorForm.isTaxable })}
+                        className="focus:outline-none"
+                      >
+                        {quickVendorForm.isTaxable ? (
+                          <ToggleRight size={32} className="text-emerald-600" />
+                        ) : (
+                          <ToggleLeft size={32} className="text-gray-300" />
+                        )}
+                      </button>
+                    </div>
+
+                    <div className="flex-1 space-y-2 group w-full">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">
+                        GST Identification Number {quickVendorForm.isTaxable && <span className="text-rose-500 font-black">* (Mandatory)</span>}
+                      </label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <ShieldAlert size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.gstNumber} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, gstNumber: e.target.value.toUpperCase() })}
+                          maxLength={15}
+                          className={`w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border transition-all outline-none ${
+                            quickVendorForm.isTaxable && !quickVendorForm.gstNumber
+                              ? 'border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/5'
+                              : 'border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5'
+                          }`}
+                          placeholder="Enter 15-character GSTIN (e.g. 29GGGGG1314R1Z5)..."
+                        />
+                      </div>
+                      {quickVendorForm.isTaxable && !quickVendorForm.gstNumber && (
+                        <p className="text-[9px] font-black text-rose-500 uppercase tracking-wider pl-1 flex items-center gap-1">
+                          <ShieldAlert size={10} /> Valid GST Identification Number is strictly required for taxable suppliers.
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* SECTION 4: Bank Details */}
+              {activeVendorTab === 'settlement' && (
+                <div className="bg-slate-50/40 rounded-2xl p-5 border border-slate-100 space-y-4 animate-in fade-in duration-300">
+                  <div className="flex items-center gap-2 border-b border-slate-100 pb-2">
+                    <Building2 size={16} className="text-emerald-600" />
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-700">Settlement & Bank Accounts</h4>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Bank Name</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Building2 size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.bankName} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, bankName: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="e.g. State Bank of India..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Account Number</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <CreditCard size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.accountNumber} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, accountNumber: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="Enter bank account number..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">IFSC Code</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <Hash size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.ifscCode} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, ifscCode: e.target.value.toUpperCase() })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="e.g. SBIN0001234..."
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 group">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-gray-400 pl-1 group-focus-within:text-emerald-500 transition-colors">Bank Branch</label>
+                      <div className="relative">
+                        <div className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-300 group-focus-within:text-emerald-500 transition-colors">
+                          <MapPin size={16} />
+                        </div>
+                        <input 
+                          value={quickVendorForm.bankBranch} 
+                          onChange={e => setQuickVendorForm({ ...quickVendorForm, bankBranch: e.target.value })}
+                          className="w-full bg-white rounded-xl pl-10 pr-4 py-2.5 text-xs font-bold border border-gray-100 focus:border-emerald-200 focus:ring-4 focus:ring-emerald-500/5 transition-all outline-none" 
+                          placeholder="e.g. Bangalore MG Road..."
+                        />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-            <div className="flex gap-4 pt-4">
-              <button type="button" onClick={() => setShowQuickVendor(false)} className="flex-1 py-4 text-[11px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 rounded-2xl transition-all">Cancel</button>
-              <button className="flex-[2] bg-emerald-600 text-white py-4 rounded-2xl text-[11px] font-black uppercase tracking-widest shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all">Register Vendor</button>
+
+            {/* Wizard Form Controls */}
+            <div className="pt-6 border-t border-gray-50 flex items-center justify-between gap-3 max-w-5xl mx-auto w-full">
+              {/* Left Action - Previous / Cancel */}
+              <div className="flex gap-2">
+                <button 
+                  type="button" 
+                  onClick={() => setShowQuickVendor(false)}
+                  className="px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-gray-400 hover:bg-gray-50 transition-all border border-transparent hover:border-gray-100"
+                >
+                  Cancel
+                </button>
+                {activeVendorTab !== 'general' && (
+                  <button
+                    type="button"
+                    onClick={prevVendorTab}
+                    className="flex items-center gap-1.5 px-6 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest text-slate-600 bg-slate-100 hover:bg-slate-200 transition-all"
+                  >
+                    <ChevronLeft size={12} strokeWidth={3} /> Back
+                  </button>
+                )}
+              </div>
+
+              {/* Right Action - Next / Submit */}
+              <div>
+                {activeVendorTab !== 'settlement' ? (
+                  <button
+                    type="button"
+                    onClick={nextVendorTab}
+                    className="flex items-center gap-1.5 px-8 py-3.5 bg-slate-900 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-lg shadow-slate-900/10 hover:bg-slate-800 transition-all"
+                  >
+                    Next Section <ChevronRight size={12} strokeWidth={3} />
+                  </button>
+                ) : (
+                  <button 
+                    type="submit"
+                    className="flex items-center gap-1.5 px-12 py-3.5 bg-emerald-600 text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] shadow-xl shadow-emerald-600/20 hover:bg-emerald-700 transition-all"
+                  >
+                    Confirm & Register
+                  </button>
+                )}
+              </div>
             </div>
           </form>
         </div>

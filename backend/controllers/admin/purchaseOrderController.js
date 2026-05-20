@@ -7,16 +7,20 @@ import { logActivity } from '../../utils/activityLogger.js';
 export const createPO = async (req, res) => {
   try {
     const tenantId = req.user?.tenantId || getTenantId();
-    const { vendorId, items, poDate, expectedDelivery, remarks } = req.body;
+    const { vendorId, items, poDate, expectedDelivery, remarks, isDirectGRN } = req.body;
 
     if (!vendorId || !items || !Array.isArray(items) || items.length === 0) {
       return res.status(400).json({ message: 'Vendor and at least one item are required' });
     }
 
-    // Validate vendor is active and approved
+    // Validate vendor is active
     const vendor = await prisma.vendor.findUnique({ where: { id: vendorId } });
-    if (!vendor || vendor.status !== 'ACTIVE' || vendor.approvalStatus !== 'APPROVED') {
-      return res.status(400).json({ message: 'Vendor is inactive, pending approval, or not found. Cannot create PO.' });
+    if (!vendor || vendor.status !== 'ACTIVE') {
+      return res.status(400).json({ message: 'Vendor is inactive or not found. Cannot create PO.' });
+    }
+    
+    if (!isDirectGRN && vendor.approvalStatus !== 'APPROVED') {
+      return res.status(400).json({ message: 'Vendor is pending approval. Cannot create standard PO.' });
     }
 
     // Validate only mapped items
@@ -27,7 +31,7 @@ export const createPO = async (req, res) => {
     const mappedProductIds = new Set(mappedItems.map(m => m.productId));
 
     for (const item of items) {
-      if (!mappedProductIds.has(item.productId)) {
+      if (!isDirectGRN && !mappedProductIds.has(item.productId)) {
         return res.status(400).json({ message: `Item ${item.productId} is not mapped to this vendor` });
       }
       if (!item.quantity || item.quantity <= 0) {
@@ -45,6 +49,26 @@ export const createPO = async (req, res) => {
       tenantId,
       storeId
     });
+
+    if (isDirectGRN) {
+      for (const item of items) {
+        if (!mappedProductIds.has(item.productId)) {
+          await prisma.vendorItemMapping.upsert({
+            where: { vendorId_productId: { vendorId, productId: item.productId } },
+            update: { lastPurchaseRate: parseFloat(item.rate) || 0 },
+            create: {
+              tenantId,
+              storeId,
+              vendorId,
+              productId: item.productId,
+              purchasePrice: parseFloat(item.rate) || 0,
+              lastPurchaseRate: parseFloat(item.rate) || 0,
+              isPreferred: false
+            }
+          });
+        }
+      }
+    }
 
     const po = await prisma.purchaseOrder.create({
       data: {
