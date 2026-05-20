@@ -13,6 +13,12 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useSearchParams } from 'react-router-dom';
 
+// Strip [PO_METADATA]:... suffix from PO remarks before display
+const cleanRemarks = (remarks) => {
+  if (!remarks) return '';
+  return remarks.replace(/\n?\[PO_METADATA\][:\s][\s\S]*$/g, '').trim();
+};
+
 const GRNSection = ({ can, storeId, setHideMainHeader }) => {
   const [searchParams] = useSearchParams();
   const [view, setView] = useState('receive'); // 'receive', 'history', 'report', 'create-selection', 'create-direct', 'create-po'
@@ -1003,7 +1009,7 @@ const GRNSection = ({ can, storeId, setHideMainHeader }) => {
                   <label className="text-[10px] font-black text-gray-900 uppercase tracking-widest">Notes</label>
                   <textarea
                     placeholder="Add any remarks about the delivery..."
-                    value={poDetail?.remarks || ''}
+                    value={cleanRemarks(poDetail?.remarks)}
                     onChange={(e) => setPODetail({ ...poDetail, remarks: e.target.value })}
                     className="w-full h-32 bg-gray-50 border border-gray-100 rounded-[1.5rem] p-4 text-xs font-bold text-gray-900 focus:ring-1 focus:ring-emerald-500 outline-none placeholder:text-gray-300 resize-none"
                   />
