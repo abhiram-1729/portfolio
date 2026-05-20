@@ -3,7 +3,7 @@ name: Production Deploy
 on:
   push:
     branches:
-      - cicd
+      - develop
 
 concurrency:
   group: production-deploy
@@ -32,7 +32,7 @@ jobs:
             echo "Updating repository..."
 
             git checkout develop
-            git pull origin cicd
+            git pull origin develop
 
             echo "Deploying backend..."
 
