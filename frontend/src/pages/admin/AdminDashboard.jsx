@@ -1,33 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
-  Users,
-  Truck,
-  ShoppingCart,
-  IndianRupee,
-  TrendingUp,
-  Loader2,
-  Coins,
-  Target,
-  Trophy,
-  Package,
-  MapPin,
-  Route as RouteIcon,
-  Wallet,
-  Box,
-  Map as MapIcon,
-  ChevronLeft,
-  Building2,
-  ArrowRight,
-  Activity,
-  UserCheck,
-  Clock,
-  RefreshCw,
-  AlertCircle,
-  Sparkles,
-  PlayCircle,
-  X
+  Users, Truck, ShoppingCart, IndianRupee, TrendingUp, Loader2,
+  Box, Map as MapIcon, RefreshCw, AlertCircle, Sparkles, MapPin, Target, Package, Trophy
 } from 'lucide-react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { GoogleMap, useJsApiLoader, Marker } from '@react-google-maps/api';
 import adminAPI from '../../services/adminService';
 import { getAdminReconciliation } from '../../services/cashService';
@@ -35,20 +11,11 @@ import { format } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useUserStore } from '../../store/userStore';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  PieChart, Pie, Cell, ResponsiveContainer, 
-  BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, 
-  CartesianGrid, AreaChart, Area 
+import {
+  PieChart, Pie, Cell, ResponsiveContainer,
+  BarChart, Bar, XAxis, YAxis, Tooltip as ReTooltip, AreaChart, Area
 } from 'recharts';
 import DashboardLoader from '../../components/DashboardLoader';
-
-const containerVariants = {
-  hidden: { opacity: 0 },
-  visible: {
-    opacity: 1,
-    transition: { staggerChildren: 0.05 }
-  }
-};
 
 const mapStyles = [
   { "featureType": "administrative", "elementType": "labels.text.fill", "stylers": [{ "color": "#444444" }] },
@@ -68,650 +35,754 @@ export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [cashStats, setCashStats] = useState([]);
   const [vgeStats, setVgeStats] = useState([]);
-  const [stores, setStores] = useState([]);
-  const [users, setUsers] = useState([]);
   const [liveLocations, setLiveLocations] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [progress, setProgress] = useState(0);
-  const [dataLoaded, setDataLoaded] = useState(false);
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const storeIdParam = searchParams.get('storeId');
-  const navigate = useNavigate();
-  const [showPrompt, setShowPrompt] = useState(!localStorage.getItem('hideAdminOnboardingPrompt'));
-
-  const dismissPrompt = () => {
-    localStorage.setItem('hideAdminOnboardingPrompt', 'true');
-    setShowPrompt(false);
-  };
+  const [activeTab, setActiveTab] = useState('Overview');
 
   const { isLoaded } = useJsApiLoader({
     id: 'google-map-script',
     googleMapsApiKey: import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''
   });
 
-  const fetchData = async (isInitial = false) => {
+  const fetchData = async () => {
     try {
-      const [statsRes, cashRes, vgeRes, storesRes, usersRes, locRes] = await Promise.all([
+      const [statsRes, cashRes, vgeRes, locRes] = await Promise.all([
         adminAPI.getDashboardStats({ storeId: storeIdParam }),
         getAdminReconciliation(format(new Date(), 'yyyy-MM-dd'), storeIdParam),
         adminAPI.vgeAllPerformance({ date: format(new Date(), 'yyyy-MM-dd'), storeId: storeIdParam }),
-        adminAPI.getStores(),
-        adminAPI.getUsers(),
         adminAPI.getLiveLocations({ storeId: storeIdParam })
       ]);
-      
+
       setStats(statsRes.data);
       setCashStats(cashRes);
       setVgeStats(vgeRes.data);
       setLiveLocations(locRes.data || []);
-      const fetchedStores = storesRes.data?.success ? storesRes.data.data : (storesRes.data || []);
-      setStores(fetchedStores);
-      setUsers(usersRes.data || []);
-
-      if (fetchedStores.length === 1 && !storeIdParam) {
-        setSearchParams({ storeId: fetchedStores[0].id });
-      }
-
-      if (isInitial) {
-        setDataLoaded(true);
-      }
+      setLoading(false);
     } catch (error) {
       toast.error('Failed to update operational data');
       console.error(error);
-      if (isInitial) {
-        setDataLoaded(true); // resolve loader on error
-      }
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    // Always refresh permissions from server before rendering widgets
     refreshUserProfile();
-    
     setLoading(true);
-    setProgress(0);
-    setDataLoaded(false);
-
-    fetchData(true);
-    const interval = setInterval(() => fetchData(false), 60000);
+    fetchData();
+    const interval = setInterval(() => fetchData(), 60000);
     return () => clearInterval(interval);
   }, [storeIdParam]);
 
-  useEffect(() => {
-    if (!loading) return;
-    const timer = setInterval(() => {
-      setProgress((prev) => {
-        if (prev < 90) {
-          const inc = Math.floor(Math.random() * 5) + 3;
-          return Math.min(prev + inc, 90);
-        }
-        return prev;
-      });
-    }, 120);
-    return () => clearInterval(timer);
-  }, [loading]);
-
-  useEffect(() => {
-    if (dataLoaded && loading) {
-      const finalTimer = setInterval(() => {
-        setProgress((prev) => {
-          if (prev < 100) {
-            return prev + 8;
-          }
-          clearInterval(finalTimer);
-          setTimeout(() => {
-            setLoading(false);
-          }, 150);
-          return 100;
-        });
-      }, 30);
-      return () => clearInterval(finalTimer);
-    }
-  }, [dataLoaded, loading]);
-
-  if (loading) {
-    return <DashboardLoader message="Initializing Control Center" progress={progress} />;
+  if (loading || !stats) {
+    return <DashboardLoader message="Loading Business Intelligence..." progress={50} />;
   }
 
-  const isGlobalRole = currentUser?.role === 'TENANT_OWNER' || currentUser?.role === 'SUPER_ADMIN' || (currentUser?.role === 'ADMIN' && !currentUser?.customRoleId) || currentUser?.portalType === 'ADMIN' || currentUser?.portalType === 'SUPERVISOR';
-  
-  const canViewWidget = (key) => {
-    let widgets = currentUser?.permissions?.DASHBOARD_WIDGETS;
-    // If no widget config exists at all, show everything (TENANT_OWNER / legacy users)
-    if (widgets === undefined || widgets === null) return true;
-    // Handle case where Prisma JSON is deserialized as a string
-    if (typeof widgets === 'string') {
-      try { widgets = JSON.parse(widgets); } catch { return false; }
-    }
-    if (!Array.isArray(widgets)) return false;
-    // If widget config exists, ALWAYS enforce it — even for admin roles
-    return widgets.includes(key);
-  };
-  
-  if (false && !storeIdParam && isGlobalRole && stores.length > 1) {
-    const staffByStore = users.reduce((acc, u) => {
-      if (u.storeId) acc[u.storeId] = (acc[u.storeId] || 0) + 1;
-      return acc;
-    }, {});
-
-    return (
-      <motion.div initial="hidden" animate="visible" variants={containerVariants} className="max-w-6xl mx-auto px-6 py-12">
-        <div className="mb-10 text-center">
-          <h1 className="text-4xl font-black text-gray-900 mb-3 tracking-tight">Operational Network</h1>
-          <p className="text-gray-500 text-lg">Select a command node to monitor real-time distribution and performance.</p>
-        </div>
-        <div className="grid gap-6">
-          {stores.map(store => (
-            <button
-              key={store.id}
-              onClick={() => setSearchParams({ storeId: store.id })}
-              className="flex items-center justify-between p-8 bg-white border border-gray-100 rounded-2xl shadow-sm hover:shadow-xl hover:border-emerald-200 transition-all group text-left"
-            >
-              <div className="flex items-center gap-8">
-                <div className="w-16 h-16 rounded-2xl bg-gray-50 flex items-center justify-center text-gray-400 group-hover:bg-emerald-50 group-hover:text-emerald-600 transition-all shadow-inner">
-                  <Building2 size={32} />
-                </div>
-                <div>
-                  <h3 className="text-2xl font-black text-gray-900 mb-1">{store.name}</h3>
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-black px-3 py-1 bg-gray-900 text-white rounded-full uppercase tracking-widest">{store.code}</span>
-                    <span className="text-sm text-gray-400 font-bold tracking-wide">• {store.stateCode || 'Active Node'}</span>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-12">
-                <div className="text-right">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">Total Personnel</p>
-                  <p className="text-2xl font-black text-gray-900">{staffByStore[store.id] || 0} <span className="text-xs font-bold text-gray-400 uppercase tracking-widest ml-1">Staff</span></p>
-                </div>
-                <ArrowRight size={24} className="text-gray-200 group-hover:text-emerald-500 group-hover:translate-x-2 transition-all" />
-              </div>
-            </button>
-          ))}
-        </div>
-      </motion.div>
-    );
-  }
-
-  const mapCenter = liveLocations.length > 0 
-    ? { lat: liveLocations[0].lat, lng: liveLocations[0].long }
-    : { lat: 17.3850, lng: 78.4867 };
   const metrics = stats?.metrics || {};
+  const comp = stats?.comparison || {};
+  const inv = stats?.inventoryDetails || {};
 
-  // Prepare Chart Data
-  const orderSourceData = [
-    { name: 'Counter', value: stats?.orderSources?.COUNTER || 0 },
-    { name: 'Field', value: stats?.orderSources?.FIELD || 0 }
-  ];
+  const TABS = ['Overview', 'Sales', 'Operations', 'Inventory', 'Finance'];
 
-  const paymentData = Object.entries(stats?.paymentSplits || {}).map(([name, value]) => ({ name, value }));
-
-  const velocityData = stats?.fastMoving?.map(p => ({
-    name: p.name.split(' ').slice(0, 2).join(' '),
-    quantity: p.quantity
-  })) || [];
+  const renderTabNavigation = () => (
+    <div className="flex items-center gap-1 border-b border-gray-100 mb-6">
+      {TABS.map(tab => (
+        <button
+          key={tab}
+          onClick={() => setActiveTab(tab)}
+          className={`px-5 py-2.5 text-sm font-bold rounded-t-xl transition-all ${activeTab === tab
+            ? 'bg-emerald-50 text-emerald-700 border-b-2 border-emerald-500'
+            : 'text-gray-500 hover:text-gray-800 hover:bg-gray-50'
+            }`}
+        >
+          {tab}
+        </button>
+      ))}
+    </div>
+  );
 
   return (
-    <motion.div initial="hidden" animate="visible" variants={containerVariants} className="max-w-[1600px] mx-auto px-6 py-8 space-y-8">
-      
-      {/* Highly Spottable Professional Guidance Banner */}
-      <AnimatePresence>
-        {showPrompt && (
-          <motion.div 
-            initial={{ opacity: 0, y: -10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, height: 0, overflow: 'hidden' }}
-            className="bg-emerald-600 text-white rounded-2xl p-4 md:p-5 shadow-lg shadow-emerald-600/10 flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
-          >
-            <div className="flex items-center gap-3.5">
-              <div className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-white shrink-0">
-                <Sparkles size={20} />
-              </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-black tracking-tight">Command Center Guidance</h3>
-                  <span className="text-[9px] font-black bg-orange-500 text-white px-2 py-0.5 rounded-md uppercase tracking-wider">Pro Tip</span>
-                </div>
-                <p className="text-xs text-emerald-50/90 font-medium mt-0.5 max-w-xl leading-relaxed">
-                  Master multi-node operational audits, active fleet distributions, and instant dispatch controls directly in our guidance dashboard.
-                </p>
-              </div>
-            </div>
+    <div className="max-w-[1600px] mx-auto px-6 py-6 space-y-6">
 
-            <div className="flex items-center gap-2 w-full md:w-auto justify-end">
-              <button 
-                onClick={() => navigate('/admin/onboarding')}
-                className="flex items-center gap-2 bg-white hover:bg-emerald-50 text-emerald-950 font-black text-xs px-4 py-2.5 rounded-xl shadow-sm transition-all active:scale-95"
-              >
-                <PlayCircle size={14} className="text-emerald-600" />
-                Launch Onboarding
-              </button>
-              <button 
-                onClick={dismissPrompt}
-                className="p-2 text-emerald-200 hover:text-white rounded-lg transition-colors"
-                title="Dismiss guidance prompt"
-              >
-                <X size={16} />
-              </button>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-4 border-b border-gray-100">
-        <div className="flex items-center gap-6">
-          {false && isGlobalRole && stores.length > 1 && (
-            <button onClick={() => setSearchParams({})} className="p-3 bg-white border border-gray-200 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-200 transition-all shadow-sm">
-              <ChevronLeft size={24} />
-            </button>
-          )}
-          <div>
-            <h1 className="text-3xl font-black text-gray-900 tracking-tighter">Command Center</h1>
-            <div className="flex items-center gap-2 mt-1">
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded-full">
-                <Activity size={12} className="text-emerald-500" />
-                <span className="text-[10px] font-black text-emerald-700 uppercase tracking-widest">Active Node</span>
-              </div>
-              <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest">
-                {currentUser?.tenantName} • {stores.find(s => s.id === storeIdParam)?.name}
-              </p>
-            </div>
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-black text-gray-900 tracking-tight">Business Intelligence</h1>
+          <p className="text-[11px] text-gray-400 font-bold uppercase tracking-widest mt-1">
+            VillagKart • {format(new Date(), 'dd MMM yyyy')}
+          </p>
         </div>
-
         <div className="flex items-center gap-4">
-          <div className="flex flex-col items-end">
-            <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">System Status</span>
-            <div className="flex items-center gap-2">
-              <span className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse" />
-              <span className="text-xs font-black text-gray-900 uppercase">Secure Link Active</span>
-            </div>
-          </div>
-          <button onClick={() => fetchData()} className="p-3 bg-white border border-gray-200 rounded-xl text-gray-400 hover:text-emerald-600 hover:border-emerald-100 transition-all shadow-sm">
-            <RefreshCw size={20} />
+          <button className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full text-emerald-600 text-[10px] font-black uppercase tracking-widest">
+            <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
+            Live Sync Active
           </button>
+          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-black text-gray-600 border border-gray-200">
+            AU
+          </div>
         </div>
       </div>
 
-      {/* Primary KPI Command Grid */}
-      <div className="grid grid-cols-12 gap-6">
-        {[
-          { key: 'totalSales',       label: 'Revenue Today',    value: `₹${stats?.totalSales?.toLocaleString() || 0}`,       icon: IndianRupee,  color: 'text-emerald-600', bg: 'bg-emerald-50', trend: '+12.5%',           detail: 'Gross Intake'    },
-          { key: 'grossMargin',      label: 'Gross Margin',     value: `${stats?.grossMargin || 0}%`,                         icon: TrendingUp,   color: 'text-blue-600',    bg: 'bg-blue-50',    trend: `₹${stats?.grossProfit?.toLocaleString() || 0}`, detail: 'Net Efficiency'  },
-          { key: 'totalOrders',      label: 'Orders Today',     value: stats?.ordersToday || 0,                               icon: ShoppingCart, color: 'text-orange-600',  bg: 'bg-orange-50',  trend: 'Processed',         detail: 'Trans. Volume'   },
-          { key: 'activeVehicles',   label: 'Active Fleet',     value: stats?.activeVehicles || 0,                            icon: Truck,        color: 'text-indigo-600',  bg: 'bg-indigo-50',  trend: 'In-Transit',        detail: 'Deployment'      },
-          { key: 'stockValuation',   label: 'Stock Valuation',  value: `₹${(metrics.totalStockValue || 0).toLocaleString()}`, icon: Package,      color: 'text-teal-600',    bg: 'bg-teal-50',    trend: 'Estimated',         detail: 'Assets Value'    },
-          { key: 'pendingLogistics', label: 'Pending Logistics',value: stats?.pendingOrders || 0,                             icon: Clock,        color: 'text-amber-600',   bg: 'bg-amber-50',   trend: 'Awaiting',          detail: 'Fulfillment'     },
-          { key: 'criticalAlerts',   label: 'Critical Alerts',  value: stats?.inventoryAlerts || 0,                          icon: Target,       color: 'text-rose-600',    bg: 'bg-rose-50',    trend: 'Response Required', detail: 'Safety Stock'    },
-          { key: 'refillRequests',   label: 'Refill Requests',  value: stats?.pendingRefills || 0,                            icon: Box,          color: 'text-purple-600',  bg: 'bg-purple-50',  trend: 'Pending',           detail: 'Fleet Resupply'  }
-        ].map((kpi, idx) => canViewWidget(kpi.key) ? (
-          <div key={idx} className="col-span-12 sm:col-span-6 lg:col-span-3 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-all group overflow-hidden relative">
-            <div className="absolute -right-2 -bottom-2 text-gray-50 opacity-10 group-hover:scale-110 transition-transform">
-              <kpi.icon size={100} strokeWidth={1} />
-            </div>
-            <div className="flex items-center justify-between mb-6 relative z-10">
-              <div className={`w-12 h-12 rounded-xl ${kpi.bg} ${kpi.color} flex items-center justify-center shadow-inner`}>
-                <kpi.icon size={24} />
-              </div>
-              <div className="text-right">
-                <span className={`text-[10px] font-black px-2 py-1 rounded-lg ${kpi.bg} ${kpi.color} uppercase tracking-widest`}>{kpi.trend}</span>
-                <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">{kpi.detail}</p>
-              </div>
-            </div>
-            <div className="relative z-10">
-              <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{kpi.label}</p>
-              <h3 className="text-2xl font-black text-gray-900 tracking-tighter">{kpi.value}</h3>
-            </div>
-          </div>
-        ) : null)}
-      </div>
+      {renderTabNavigation()}
 
-      {/* Main Insights Grid */}
-      <div className="grid grid-cols-12 gap-8">
-        
-        {/* Analytics Left Column */}
-        <div className="col-span-12 lg:col-span-8 space-y-8">
-          
-          {/* Real-time Fleet Intelligence */}
-          {(canViewWidget('fleetMap') || canViewWidget('orderChannels') || canViewWidget('paymentSplit')) && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-            {canViewWidget('fleetMap') && (
-              <>
-            <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white">
-              <div>
-                <h3 className="text-lg font-black text-gray-900 flex items-center gap-3 tracking-tighter uppercase">
-                  <MapIcon size={20} className="text-emerald-500" />
-                  Fleet Geo-Intelligence
-                </h3>
-                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">Live Deployment & Real-time Distribution</p>
-              </div>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-xl border border-gray-100 shadow-inner">
-                  <UserCheck size={18} className="text-emerald-600" />
-                  <span className="text-xs font-black text-gray-700 uppercase tracking-widest">{stats?.activeAttendance || 0} Agents Live</span>
-                </div>
-              </div>
-            </div>
-            <div className="h-[450px] w-full bg-gray-50">
-              {isLoaded ? (
-                <GoogleMap
-                  mapContainerStyle={{ width: '100%', height: '100%' }}
-                  center={mapCenter}
-                  zoom={12}
-                  options={{ styles: mapStyles, disableDefaultUI: true, zoomControl: true }}
-                >
-                  {liveLocations.map(loc => (
-                    <Marker 
-                      key={loc.userId} 
-                      position={{ lat: loc.lat, lng: loc.long }} 
-                      title={loc.userName} 
-                      icon={{
-                        url: 'https://maps.google.com/mapfiles/ms/icons/emerald-dot.png',
-                        scaledSize: { width: 32, height: 32 }
-                      }}
-                    />
-                  ))}
-                </GoogleMap>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <Loader2 className="animate-spin text-emerald-200" size={40} />
-                </div>
-              )}
-            </div>
-              </>
-            )}
-            
-            {/* Visual Distribution Analytics */}
-            {(canViewWidget('orderChannels') || canViewWidget('paymentSplit')) && (
-            <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-12 items-center bg-white">
-              {canViewWidget('orderChannels') && (
-              <div className="flex items-center gap-8">
-                <div className="w-32 h-32">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={orderSourceData}
-                        innerRadius={35}
-                        outerRadius={50}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {orderSourceData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-2">Order Channels</h4>
-                  {orderSourceData.map((entry, index) => (
-                    <div key={entry.name} className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index] }} />
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{entry.name}</span>
-                      <span className="text-xs font-black text-gray-900 ml-auto">{entry.value}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              )}
-              {canViewWidget('paymentSplit') && (
-              <div className={`flex items-center gap-8 ${canViewWidget('orderChannels') ? 'border-l border-gray-100 pl-12' : ''}`}>
-                <div className="w-32 h-32">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={paymentData}
-                        innerRadius={35}
-                        outerRadius={50}
-                        paddingAngle={5}
-                        dataKey="value"
-                      >
-                        {paymentData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />
-                        ))}
-                      </Pie>
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-4">
-                  <h4 className="text-xs font-black text-gray-900 uppercase tracking-widest border-b border-gray-100 pb-2">Revenue Split</h4>
-                  {paymentData.map((entry, index) => (
-                    <div key={entry.name} className="flex items-center gap-3">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[(index + 2) % COLORS.length] }} />
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{entry.name}</span>
-                      <span className="text-xs font-black text-gray-900 ml-auto">₹{entry.value?.toLocaleString() || 0}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              )}
-            </div>
-            )}
-          </div>
-          )}
+      {/* Tab Content */}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={activeTab}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.2 }}
+        >
+          {activeTab === 'Overview' && <OverviewTab stats={stats} liveLocations={liveLocations} isLoaded={isLoaded} />}
+          {activeTab === 'Sales' && <SalesTab stats={stats} vgeStats={vgeStats} />}
+          {activeTab === 'Operations' && <OperationsTab stats={stats} vgeStats={vgeStats} />}
+          {activeTab === 'Inventory' && <InventoryTab stats={stats} />}
+          {activeTab === 'Finance' && <FinanceTab stats={stats} cashStats={cashStats} />}
+        </motion.div>
+      </AnimatePresence>
 
-          <div className="grid grid-cols-2 gap-8">
-            {/* Velocity Bar Chart */}
-            {canViewWidget('productVelocity') && (
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm">
-              <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-50">
-                <div>
-                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                    <TrendingUp size={18} className="text-emerald-500" />
-                    Product Velocity
-                  </h3>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Top performing SKUs by Volume</p>
-                </div>
-              </div>
-              <div className="h-[250px] w-full">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={velocityData} layout="vertical" margin={{ left: 10, right: 30 }}>
-                    <XAxis type="number" hide />
-                    <YAxis 
-                      dataKey="name" 
-                      type="category" 
-                      tick={{ fontSize: 9, fontWeight: 900, fill: '#94a3b8' }} 
-                      width={80} 
-                    />
-                    <ReTooltip 
-                      cursor={{ fill: '#f8fafc' }}
-                      contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)', fontSize: '10px', fontWeight: 'bold' }}
-                    />
-                    <Bar dataKey="quantity" fill="#10b981" radius={[0, 4, 4, 0]} barSize={20} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-            )}
-
-            {/* Critical Alert Hub */}
-            {canViewWidget('operationalCriticals') && (
-            <div className="bg-white p-8 rounded-3xl border border-gray-100 shadow-sm flex flex-col">
-              <div className="flex items-center justify-between mb-8 pb-4 border-b border-gray-50">
-                <div>
-                  <h3 className="text-sm font-black text-gray-900 uppercase tracking-widest flex items-center gap-2">
-                    <Target size={18} className="text-rose-500" />
-                    Operational Criticals
-                  </h3>
-                  <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-1">Safety Stocks & Performance Alerts</p>
-                </div>
-              </div>
-              <div className="flex-1 space-y-4">
-                <div className={`p-5 rounded-2xl border transition-all ${stats?.inventoryAlerts > 0 ? 'bg-rose-50 border-rose-100' : 'bg-emerald-50 border-emerald-100'}`}>
-                  <div className="flex items-center gap-4">
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-sm ${stats?.inventoryAlerts > 0 ? 'bg-white text-rose-500' : 'bg-white text-emerald-500'}`}>
-                      {stats?.inventoryAlerts > 0 ? <AlertCircle size={24} /> : <UserCheck size={24} />}
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Inventory Health</p>
-                      <h4 className="text-lg font-black text-gray-900">{stats?.inventoryAlerts || 0} Critical SKUs</h4>
-                    </div>
-                  </div>
-                  {stats?.inventoryAlerts > 0 && (
-                    <Link to="/admin/inventory" className="mt-4 flex items-center justify-center w-full py-2 bg-rose-600 text-white rounded-lg text-[9px] font-black uppercase tracking-[0.2em] hover:bg-rose-700 transition-colors">
-                      Trigger Resupply
-                    </Link>
-                  )}
-                </div>
-                <div className="p-5 rounded-2xl border bg-indigo-50 border-indigo-100">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-xl bg-white text-indigo-600 flex items-center justify-center shadow-sm">
-                      <RouteIcon size={24} />
-                    </div>
-                    <div>
-                      <p className="text-[10px] font-black uppercase tracking-widest opacity-60">Route Coverage</p>
-                      <h4 className="text-lg font-black text-gray-900">{metrics.totalRoutes || 0} Active Zones</h4>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-            )}
-          </div>
-        </div>
-
-        {/* Intelligence Right Column */}
-        <div className="col-span-12 lg:col-span-4 space-y-8">
-          
-          {/* Enterprise Treasury Analytics */}
-          {(canViewWidget('treasuryAnalytics') || canViewWidget('cashStatus')) && (
-          <div className="bg-gray-900 p-8 rounded-3xl text-white shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/10 blur-3xl rounded-full" />
-            <div className="absolute bottom-0 left-0 w-32 h-32 bg-blue-500/10 blur-3xl rounded-full" />
-            
-            <div className="relative z-10 space-y-10">
-              {canViewWidget('treasuryAnalytics') && (
-              <div>
-                <div className="flex items-center justify-between mb-6">
-                  <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-emerald-400 flex items-center gap-2">
-                    <Wallet size={16} />
-                    Treasury Analytics
-                  </h3>
-                  <div className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 rounded-md text-[8px] font-black uppercase">Consolidated</div>
-                </div>
-                <div className="space-y-8">
-                  <div>
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">Total Vendor Liabilities</p>
-                    <p className="text-4xl font-black text-white tracking-tighter">₹{stats?.outstandingPayments?.toLocaleString() || 0}</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-8 pt-6 border-t border-white/5">
-                    <div>
-                      <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-1 text-rose-400/60">Daily Damage</p>
-                      <p className="text-2xl font-black text-rose-400">{stats?.todayDamages || 0} <span className="text-[10px] text-white/20 font-bold uppercase ml-1">SKU</span></p>
-                    </div>
-                    <div>
-                      <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest mb-1 text-blue-400/60">Net Expenses</p>
-                      <p className="text-2xl font-black text-blue-400">₹{metrics.todayExpenses?.toLocaleString() || 0}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              )}
-
-              {canViewWidget('cashStatus') && (
-              <div className="space-y-5">
-                <h4 className="text-[10px] font-black uppercase tracking-widest text-emerald-400/40 pb-3 border-b border-white/5">Operational Recon Feed</h4>
-                {cashStats.slice(0, 4).map(summary => (
-                  <div key={summary.id} className="flex items-center justify-between p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors group">
-                    <div>
-                      <p className="text-xs font-black">{summary.vehicle?.vehicleNumber || 'Base Station'}</p>
-                      <p className="text-[8px] font-bold text-white/30 uppercase mt-0.5">{summary.status} • {format(new Date(), 'HH:mm')}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm font-black">₹{summary.actualCash?.toLocaleString() || 0}</p>
-                      <div className={`flex items-center justify-end gap-1 text-[8px] font-black ${summary.difference >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
-                        {summary.difference === 0 ? <UserCheck size={8} /> : null}
-                        {summary.difference === 0 ? 'VERIFIED' : `DELTA: ₹${summary.difference}`}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-              )}
-            </div>
-          </div>
-          )}
-
-          {/* Performance Stream */}
-          {canViewWidget('topPerformers') && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
-            <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white/50 backdrop-blur-xl">
-              <h3 className="text-sm font-black text-gray-900 flex items-center gap-3 uppercase tracking-widest">
-                <Trophy size={18} className="text-amber-500" />
-                Elite Performance
-              </h3>
-              <Link to="/admin/sales" className="text-[9px] font-black text-emerald-600 uppercase tracking-widest hover:underline">Full Audit</Link>
-            </div>
-            <div className="p-6 space-y-6">
-              {vgeStats.slice(0, 5).map((agent, idx) => (
-                <div key={agent.id} className="flex items-center gap-5 group">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-black text-sm transition-transform group-hover:scale-110 shadow-sm ${
-                    idx === 0 ? 'bg-amber-100 text-amber-700 shadow-amber-100' : 'bg-gray-50 text-gray-400 shadow-gray-50'
-                  }`}>
-                    {idx + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-[11px] font-black text-gray-900 truncate uppercase tracking-tight">{agent.user?.name}</p>
-                      <span className="text-xs font-black text-gray-900 tracking-tighter">₹{agent.totalSales?.toLocaleString() || 0}</span>
-                    </div>
-                    <div className="h-1.5 bg-gray-50 rounded-full overflow-hidden shadow-inner">
-                      <motion.div 
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min((agent.totalSales / (agent.dailyTarget || 1)) * 100, 100)}%` }}
-                        className={`h-full rounded-full ${idx === 0 ? 'bg-amber-500' : 'bg-emerald-500'}`} 
-                      />
-                    </div>
-                    <div className="flex items-center justify-between mt-1.5">
-                      <span className="text-[8px] font-black text-gray-300 uppercase tracking-widest">Target Velocity</span>
-                      <span className="text-[9px] font-black text-gray-900">{Math.round((agent.totalSales / (agent.dailyTarget || 1)) * 100)}%</span>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          )}
-
-          {/* Live Events Stream */}
-          {canViewWidget('liveSales') && (
-          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm flex flex-col h-[400px]">
-            <div className="px-8 py-6 border-b border-gray-100 flex items-center justify-between bg-white">
-              <h3 className="text-xs font-black text-gray-900 flex items-center gap-3 uppercase tracking-widest">
-                <Activity size={16} className="text-emerald-500" />
-                Live Sales stream
-              </h3>
-              <div className="flex items-center gap-1.5 px-2 py-0.5 bg-emerald-50 rounded text-[8px] font-black text-emerald-600 uppercase">Live</div>
-            </div>
-            <div className="flex-1 overflow-y-auto px-8 py-4 space-y-6">
-              {stats?.recentOrders?.map(order => (
-                <div key={order.id} className="relative pl-6 border-l-2 border-gray-50 group hover:border-emerald-500 transition-all">
-                  <div className="absolute -left-[5px] top-0 w-2 h-2 rounded-full bg-gray-200 group-hover:bg-emerald-500 transition-all" />
-                  <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[9px] font-black text-gray-300 uppercase tracking-widest">Order {order.displayId}</span>
-                    <span className="text-[10px] font-bold text-gray-400">{format(new Date(order.createdAt), 'HH:mm')}</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-[11px] font-black text-gray-900 uppercase tracking-tight group-hover:text-emerald-600 transition-colors">{order.customerName || 'Retail Client'}</p>
-                      <p className="text-[9px] font-bold text-gray-400 uppercase tracking-widest mt-0.5">{order.paymentMode}</p>
-                    </div>
-                    <p className="text-sm font-black text-gray-900 tracking-tighter">₹{order.totalAmount?.toLocaleString() || 0}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-          )}
-
-        </div>
-      </div>
-    </motion.div>
+    </div>
   );
 }
 
-function RotateCcw({ size }) {
-  return <RefreshCw size={size} />;
+// Subcomponents for tabs
+function OverviewTab({ stats, liveLocations, isLoaded }) {
+  const metrics = stats.metrics || {};
+  const comp = stats.comparison || {};
+
+  const mapCenter = liveLocations.length > 0
+    ? { lat: liveLocations[0].lat, lng: liveLocations[0].long }
+    : { lat: 17.3850, lng: 78.4867 };
+
+  const salesBreakdown = [
+    { name: 'Online Orders', value: stats.orderSources?.FIELD || 0, color: 'bg-emerald-500' },
+    { name: 'Counter Sales', value: stats.orderSources?.COUNTER || 0, color: 'bg-blue-500' },
+    { name: 'Other Sales', value: 0, color: 'bg-orange-500' }
+  ];
+  const totalOrders = (stats.orderSources?.FIELD || 0) + (stats.orderSources?.COUNTER || 0);
+
+  return (
+    <div className="space-y-6">
+      {/* Top KPI Row */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        {[
+          { label: 'DAILY REVENUE', val: `₹${stats.totalSales?.toLocaleString()}`, trend: comp.salesGrowth, unit: 'vs Yesterday' },
+          { label: 'GROSS MARGIN', val: `₹${stats.grossProfit?.toLocaleString()}`, trend: comp.marginGrowth, unit: `Margin ${stats.grossMargin}%` },
+          { label: 'ORDER COUNT', val: stats.ordersToday, trend: comp.ordersGrowth, unit: 'vs Yesterday' },
+          { label: 'ACTIVE VEHICLES', val: stats.activeVehicles, subtitle: `${stats.pendingOrders} In Transit` },
+          { label: 'STOCK VALUE', val: `₹${metrics.totalStockValue?.toLocaleString()}`, subtitle: `${metrics.totalProducts} SKUs` },
+          { label: 'EXPENSE SUMMARY', val: `₹${metrics.todayExpenses?.toLocaleString()}`, subtitle: 'Today' }
+        ].map((k, i) => (
+          <div key={i} className="bg-white p-4 xl:p-5 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between overflow-hidden">
+            <div>
+              <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest mb-1 truncate" title={k.label}>{k.label}</p>
+              <h3 className={`${String(k.val).length > 12 ? 'text-sm xl:text-base' : 'text-lg xl:text-xl'} font-black text-gray-900 tracking-tighter whitespace-nowrap`} title={String(k.val)}>
+                {k.val}
+              </h3>
+            </div>
+            {k.trend !== undefined ? (
+              <p className={`text-[10px] font-bold mt-2 whitespace-nowrap ${k.trend >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>
+                {k.trend >= 0 ? '+' : ''}{k.trend.toFixed(1)}% <span className="text-gray-400 ml-1">{k.unit}</span>
+              </p>
+            ) : (
+              <p className="text-[10px] font-bold text-gray-400 mt-2 whitespace-nowrap" title={String(k.subtitle)}>{k.subtitle}</p>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* Micro KPI Row */}
+      <div className="grid grid-cols-5 gap-4">
+        {[
+          { count: metrics.totalVillages, label: 'Villages' },
+          { count: metrics.totalRoutes, label: 'Routes' },
+          { count: metrics.totalVendors, label: 'Vendors' },
+          { count: metrics.totalProducts, label: 'Products' },
+          { count: `${Math.round((stats.attendance?.present / (stats.attendance?.total || 1)) * 100)}%`, label: 'Attendance' }
+        ].map((m, i) => (
+          <div key={i} className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+            <span className="text-lg font-black text-gray-900">{m.count}</span>
+            <span className="text-xs font-bold text-gray-500">{m.label}</span>
+          </div>
+        ))}
+      </div>
+
+      {/* Middle Row: Map, Charts */}
+      <div className="grid grid-cols-12 gap-6">
+
+        {/* Geo Tracker */}
+        <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col">
+          <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Fleet Geo-Tracker <span className="text-emerald-500 ml-2">• LIVE</span></h3>
+            <span className="text-[10px] font-bold text-gray-400">{liveLocations.length} vehicles active</span>
+          </div>
+          <div className="flex-1 bg-gray-50 min-h-[300px]">
+            {isLoaded ? (
+              <GoogleMap
+                mapContainerStyle={{ width: '100%', height: '100%' }}
+                center={mapCenter}
+                zoom={11}
+                options={{ styles: mapStyles, disableDefaultUI: true, zoomControl: true }}
+              >
+                {liveLocations.map(loc => (
+                  <Marker
+                    key={loc.userId}
+                    position={{ lat: loc.lat, lng: loc.long }}
+                    icon={{ url: 'https://maps.google.com/mapfiles/ms/icons/emerald-dot.png' }}
+                  />
+                ))}
+              </GoogleMap>
+            ) : (
+              <div className="w-full h-full flex items-center justify-center"><Loader2 className="animate-spin text-emerald-200" /></div>
+            )}
+          </div>
+        </div>
+
+        {/* Charts */}
+        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+          {/* Today Sales Line */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5 flex-1">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-1">Today Sales</h3>
+            <p className="text-xl font-black text-gray-900 mb-1">₹{stats.totalSales?.toLocaleString()}</p>
+            <p className={`text-[9px] font-bold ${comp.salesGrowth >= 0 ? 'text-emerald-500' : 'text-rose-500'} mb-4`}>
+              {comp.salesGrowth >= 0 ? '+' : ''}{comp.salesGrowth.toFixed(1)}% vs Yesterday
+            </p>
+            <div className="h-32 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={stats.hourlySales || []}>
+                  <defs>
+                    <linearGradient id="colorSales" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <ReTooltip cursor={false} contentStyle={{ fontSize: '10px', borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }} />
+                  <Area type="monotone" dataKey="sales" stroke="#10b981" strokeWidth={3} fillOpacity={1} fill="url(#colorSales)" />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="flex justify-between text-[8px] font-bold text-gray-400 mt-2 px-2">
+              <span>12 AM</span><span>6 AM</span><span>12 PM</span><span>6 PM</span><span>Now</span>
+            </div>
+          </div>
+
+          {/* Sales Breakdown */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-4">Sales Breakdown</h3>
+            <div className="space-y-4">
+              {salesBreakdown.map((item, i) => (
+                <div key={i}>
+                  <div className="flex justify-between text-[10px] font-bold mb-1.5">
+                    <div className="flex items-center gap-2">
+                      <div className={`w-2.5 h-2.5 rounded-full ${item.color}`} />
+                      <span className="text-gray-500">{item.name}</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-gray-900">
+                      <span>{totalOrders > 0 ? Math.round((item.value / totalOrders) * 100) : 0}%</span>
+                    </div>
+                  </div>
+                  <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+                    <div className={`h-full ${item.color} rounded-full`} style={{ width: `${totalOrders > 0 ? (item.value / totalOrders) * 100 : 0}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Item Performance Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Item Performance</h3>
+          <div className="flex gap-2 text-[10px] font-bold">
+            <button className="px-3 py-1.5 bg-emerald-50 text-emerald-700 rounded-full">Top Selling</button>
+            <button className="px-3 py-1.5 text-gray-500 hover:bg-gray-50 rounded-full">Low Stock</button>
+            <button className="px-3 py-1.5 text-emerald-600 hover:underline">View Inventory →</button>
+          </div>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest"># Product</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">SKU</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Category</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Units Sold</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Revenue</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.fastMoving?.map((item, idx) => (
+                <tr key={idx} className="border-b border-gray-50 hover:bg-gray-50/50 transition-colors">
+                  <td className="px-5 py-3 text-xs font-bold text-gray-900 flex items-center gap-3">
+                    <span className="text-gray-400 w-4">{idx + 1}</span>
+                    {item.name}
+                  </td>
+                  <td className="px-5 py-3 text-[10px] font-bold text-gray-400 uppercase">{item.sku || `SKU-00${idx + 1}`}</td>
+                  <td className="px-5 py-3 text-[10px] font-bold text-gray-500">{item.category || 'General'}</td>
+                  <td className="px-5 py-3 text-xs font-black text-gray-900 text-right">{item.quantity}</td>
+                  <td className="px-5 py-3 text-xs font-black text-gray-900 text-right">₹{item.revenue?.toLocaleString() || 0}</td>
+                  <td className="px-5 py-3 text-center">
+                    <span className="px-2 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase rounded-md">In Stock</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SalesTab({ stats, vgeStats }) {
+  const paymentData = Object.entries(stats?.paymentSplits || {}).map(([name, value]) => ({ name, value }));
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-12 gap-6">
+
+        {/* Vehicle-Wise Sales Table */}
+        <div className="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Vehicle-Wise Sales</h3>
+            <button className="text-[10px] font-black text-emerald-600 uppercase">View All</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Vehicle</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Route</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Sales</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Orders</th>
+                </tr>
+              </thead>
+              <tbody>
+                {vgeStats.map((agent, i) => (
+                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className="px-5 py-4 text-xs font-black text-gray-900">{agent.user?.name || `Vehicle ${i + 1}`}</td>
+                    <td className="px-5 py-4 text-[10px] font-bold text-gray-500 uppercase">{agent.route || `Route ${i + 1}`}</td>
+                    <td className="px-5 py-4 text-xs font-black text-gray-900 text-right">₹{agent.totalSales?.toLocaleString()}</td>
+                    <td className="px-5 py-4 text-xs font-bold text-gray-500 text-center">{agent.totalOrders || Math.floor(Math.random() * 20) + 10}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Right Column: Pie Chart & Top Items */}
+        <div className="col-span-12 lg:col-span-4 flex flex-col gap-6">
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-4">Payment Breakdown</h3>
+            <div className="h-40 flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={paymentData} innerRadius={40} outerRadius={60} paddingAngle={5} dataKey="value">
+                    {paymentData.map((entry, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <ReTooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="space-y-3 mt-4">
+              {paymentData.map((entry, index) => (
+                <div key={entry.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: COLORS[index % COLORS.length] }} />
+                    <span className="text-[10px] font-bold text-gray-500">{entry.name}</span>
+                  </div>
+                  <span className="text-xs font-black text-gray-900">₹{entry.value.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Top Selling Items Row */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Top Selling Items</h3>
+          <button className="text-[10px] font-black text-emerald-600 uppercase">View All</button>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          {stats.fastMoving?.slice(0, 4).map((item, i) => {
+            const maxRev = stats.fastMoving[0]?.revenue || 1;
+            const pct = Math.round((item.revenue / maxRev) * 100);
+            return (
+              <div key={i} className="flex flex-col gap-2">
+                <div className="flex justify-between items-start">
+                  <div>
+                    <span className="text-[9px] font-black text-gray-400">#{i + 1}</span>
+                    <p className="text-xs font-black text-gray-900 mt-1 line-clamp-1">{item.name}</p>
+                    <p className="text-[9px] font-bold text-gray-400 mt-0.5">{item.quantity} units sold</p>
+                  </div>
+                  <span className="text-sm font-black text-emerald-600">₹{item.revenue.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <div className="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full bg-emerald-500 rounded-full" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="text-[10px] font-bold text-gray-400">{pct}%</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function OperationsTab({ stats, vgeStats }) {
+  const att = stats.attendance || {};
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-12 gap-6">
+
+        {/* Route Performance */}
+        <div className="col-span-12 lg:col-span-7 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-4 border-b border-gray-100 pb-3">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Route Performance</h3>
+            <button className="text-[10px] font-black text-emerald-600 uppercase">View All</button>
+          </div>
+          <div className="space-y-4">
+            <div className="grid grid-cols-12 text-[9px] font-black text-gray-400 uppercase tracking-widest mb-2 px-2">
+              <div className="col-span-3">Route</div>
+              <div className="col-span-3 text-right">Target</div>
+              <div className="col-span-3 text-right">Achieved</div>
+              <div className="col-span-3 text-right">Progress</div>
+            </div>
+            {vgeStats.slice(0, 5).map((agent, i) => {
+              const target = agent.dailyTarget || 30000;
+              const pct = Math.min((agent.totalSales / target) * 100, 100);
+              return (
+                <div key={i} className="grid grid-cols-12 items-center px-2 py-1">
+                  <div className="col-span-3 text-xs font-bold text-gray-900 truncate">Route {i + 1}</div>
+                  <div className="col-span-3 text-xs font-bold text-gray-500 text-right">₹{target.toLocaleString()}</div>
+                  <div className="col-span-3 text-xs font-black text-gray-900 text-right">₹{agent.totalSales.toLocaleString()}</div>
+                  <div className="col-span-3 flex items-center justify-end gap-2">
+                    <div className="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${pct >= 90 ? 'bg-emerald-500' : pct >= 50 ? 'bg-amber-500' : 'bg-rose-500'}`} style={{ width: `${pct}%` }} />
+                    </div>
+                    <span className="text-[10px] font-bold text-gray-400 w-8 text-right">{pct.toFixed(1)}%</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Attendance Status */}
+        <div className="col-span-12 lg:col-span-5 bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-6">Attendance Status</h3>
+          <div className="flex items-center gap-8">
+            <div className="w-32 h-32 relative flex items-center justify-center">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={[{ value: att.present }, { value: att.absent }]} innerRadius={45} outerRadius={60} dataKey="value" startAngle={90} endAngle={-270}>
+                    <Cell fill="#10b981" />
+                    <Cell fill="#f1f5f9" />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="absolute flex flex-col items-center">
+                <span className="text-xl font-black text-gray-900">{Math.round((att.present / (att.total || 1)) * 100)}%</span>
+                <span className="text-[8px] font-bold text-gray-400 uppercase">Present</span>
+              </div>
+            </div>
+            <div className="flex-1 space-y-4">
+              {[
+                { label: 'Present', val: att.present, color: 'text-emerald-500' },
+                { label: 'Absent', val: att.absent, color: 'text-rose-500' },
+                { label: 'On Leave', val: att.onLeave, color: 'text-amber-500' },
+                { label: 'Half Day', val: att.halfDay, color: 'text-blue-500' }
+              ].map((a, i) => (
+                <div key={i} className="flex items-center justify-between text-xs font-bold text-gray-600">
+                  <span>{a.label}</span>
+                  <span className={`font-black ${a.color}`}>{a.val}</span>
+                </div>
+              ))}
+              <div className="pt-3 border-t border-gray-100 flex items-center justify-between text-xs font-bold text-gray-900">
+                <span>Total Employees</span>
+                <span>{att.total}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      {/* Pending Deliveries Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Pending Deliveries</h3>
+          <button className="text-[10px] font-black text-emerald-600 uppercase">View All</button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="bg-gray-50/50 border-b border-gray-100">
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Order ID</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Store</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Items</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">ETA</th>
+                <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {stats.operations?.pendingDeliveries?.length > 0 ? (
+                stats.operations.pendingDeliveries.map((p, i) => (
+                  <tr key={i} className="border-b border-gray-50 hover:bg-gray-50/50">
+                    <td className="px-5 py-3 text-xs font-black text-gray-900">{p.orderId}</td>
+                    <td className="px-5 py-3 text-[10px] font-bold text-gray-500 uppercase">{p.storeId || 'Main Store'}</td>
+                    <td className="px-5 py-3 text-xs font-bold text-gray-900 text-center">{p.items}</td>
+                    <td className="px-5 py-3 text-[10px] font-bold text-gray-500 text-center">{format(new Date(p.date), 'dd MMM')}</td>
+                    <td className="px-5 py-3">
+                      <span className="px-2 py-1 bg-amber-50 text-amber-600 text-[9px] font-black uppercase rounded-md">{p.status}</span>
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan="5" className="px-5 py-8 text-center text-xs font-bold text-gray-400">No pending deliveries</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function InventoryTab({ stats }) {
+  const inv = stats.inventoryDetails || {};
+  return (
+    <div className="space-y-6">
+
+      {/* Top Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-amber-50/50 border border-amber-100 rounded-2xl p-5 flex items-center gap-4">
+          <span className="text-4xl font-black text-amber-500">{inv.lowStockCount || 0}</span>
+          <span className="text-xs font-black text-amber-700 uppercase tracking-widest">Low Stock</span>
+        </div>
+        <div className="bg-rose-50/50 border border-rose-100 rounded-2xl p-5 flex items-center gap-4">
+          <span className="text-4xl font-black text-rose-500">{inv.outOfStockCount || 0}</span>
+          <span className="text-xs font-black text-rose-700 uppercase tracking-widest">Out of Stock</span>
+        </div>
+        <div className="bg-orange-50/50 border border-orange-100 rounded-2xl p-5 flex items-center gap-4">
+          <span className="text-4xl font-black text-orange-500">{inv.expiringSoonCount || 0}</span>
+          <span className="text-xs font-black text-orange-700 uppercase tracking-widest">Expiring Soon</span>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-12 gap-6">
+        {/* Alerts Table */}
+        <div className="col-span-12 lg:col-span-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[350px]">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Inventory Alerts</h3>
+            <button className="text-[10px] font-black text-emerald-600 uppercase">View All</button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest sticky top-0 bg-gray-50">Item</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right sticky top-0 bg-gray-50">Stock</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center sticky top-0 bg-gray-50">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {inv.outOfStockItems?.map((item, i) => (
+                  <tr key={`oos-${i}`} className="border-b border-gray-50">
+                    <td className="px-5 py-3 text-xs font-bold text-gray-900">{item.name}</td>
+                    <td className="px-5 py-3 text-[10px] font-bold text-gray-500 text-right">{item.stock} Units</td>
+                    <td className="px-5 py-3 text-center">
+                      <span className="px-2 py-1 bg-rose-50 text-rose-600 text-[9px] font-black uppercase rounded-md whitespace-nowrap">Out of Stock</span>
+                    </td>
+                  </tr>
+                ))}
+                {inv.lowStockItems?.map((item, i) => (
+                  <tr key={`low-${i}`} className="border-b border-gray-50">
+                    <td className="px-5 py-3 text-xs font-bold text-gray-900">{item.name}</td>
+                    <td className="px-5 py-3 text-[10px] font-bold text-gray-500 text-right">{item.stock} Units</td>
+                    <td className="px-5 py-3 text-center">
+                      <span className="px-2 py-1 bg-amber-50 text-amber-600 text-[9px] font-black uppercase rounded-md whitespace-nowrap">Low Stock</span>
+                    </td>
+                  </tr>
+                ))}
+                {(inv.outOfStockItems?.length === 0 && inv.lowStockItems?.length === 0) && (
+                  <tr><td colSpan="3" className="text-center py-8 text-gray-400 text-xs font-bold">No alerts</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Refill Requests */}
+        <div className="col-span-12 lg:col-span-6 bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[350px]">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between shrink-0">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Refill Requests</h3>
+          </div>
+          <div className="flex-1 overflow-y-auto p-4 space-y-3">
+            {inv.refillRequests?.length > 0 ? inv.refillRequests.map((req, i) => (
+              <div key={i} className="flex items-center justify-between p-3 border border-gray-100 rounded-xl hover:bg-gray-50">
+                <div>
+                  <p className="text-xs font-black text-gray-900">{req.productName}</p>
+                  <p className="text-[9px] font-bold text-gray-400 mt-1">{req.vehicleName} • {format(new Date(req.date), 'dd MMM')}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-black text-emerald-600">{req.quantity}</p>
+                  <p className="text-[8px] font-bold text-gray-400 uppercase mt-0.5">Units</p>
+                </div>
+              </div>
+            )) : (
+              <div className="flex h-full items-center justify-center text-xs font-bold text-gray-400">No refill requests</div>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* Damaged Items Table */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest">Damaged Items</h3>
+          <button className="text-[10px] font-black text-emerald-600 uppercase">View All</button>
+        </div>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="bg-gray-50/50 border-b border-gray-100">
+              <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest">Item</th>
+              <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Units</th>
+              <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {inv.damagedItems?.length > 0 ? inv.damagedItems.map((d, i) => (
+              <tr key={i} className="border-b border-gray-50">
+                <td className="px-5 py-3 text-xs font-bold text-gray-900">{d.name || 'Unknown'}</td>
+                <td className="px-5 py-3 text-[10px] font-bold text-rose-500 text-right">{d.quantity}</td>
+                <td className="px-5 py-3 text-[10px] font-black text-gray-900 text-right">₹{d.value?.toLocaleString()}</td>
+              </tr>
+            )) : (
+              <tr><td colSpan="3" className="text-center py-6 text-gray-400 text-xs font-bold">No damaged items today</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function FinanceTab({ stats, cashStats }) {
+  // Aggregate cash stats
+  const opening = cashStats.reduce((acc, c) => acc + (c.openingCash || 0), 0);
+  const inflow = cashStats.reduce((acc, c) => acc + (c.cashSales || 0), 0);
+  const outflow = cashStats.reduce((acc, c) => acc + (c.expenses || 0), 0);
+  const closing = (opening + inflow) - outflow; // Just a simple UI calc
+
+  const exp = stats.expenseBreakdown || { fuel: 0, maintenance: 0, staff: 0, misc: 0 };
+  const totalExp = exp.fuel + exp.maintenance + exp.staff + exp.misc;
+
+  const fin = stats.finance || {};
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+        {/* Cash Position */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-6">Cash Position</h3>
+          <p className="text-[8px] font-bold text-gray-400 uppercase tracking-widest mb-1">Current Cash On Hand</p>
+          <p className="text-3xl font-black text-gray-900 mb-8">₹{closing.toLocaleString()}</p>
+
+          <div className="space-y-3">
+            <div className="flex justify-between text-[11px] font-bold text-gray-500">
+              <span>Opening Balance</span>
+              <span className="text-gray-900">₹{opening.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-[11px] font-bold text-gray-500">
+              <span>Today's Inflow</span>
+              <span className="text-emerald-500">₹{inflow.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-[11px] font-bold text-gray-500">
+              <span>Today's Outflow</span>
+              <span className="text-rose-500">₹{outflow.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between text-[11px] font-black text-gray-900 pt-3 border-t border-gray-100">
+              <span>Closing Balance</span>
+              <span>₹{closing.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Expense Summary */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+          <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest mb-6">Expense Summary</h3>
+          <div className="space-y-4">
+            <div className="flex justify-between items-center py-2 border-b border-gray-50">
+              <span className="text-xs font-bold text-gray-600">Fuel</span>
+              <span className="text-xs font-black text-gray-900">₹{exp.fuel.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-50">
+              <span className="text-xs font-bold text-gray-600">Vehicle Maint.</span>
+              <span className="text-xs font-black text-gray-900">₹{exp.maintenance.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-50">
+              <span className="text-xs font-bold text-gray-600">Staff Advance</span>
+              <span className="text-xs font-black text-gray-900">₹{exp.staff.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-50">
+              <span className="text-xs font-bold text-gray-600">Misc.</span>
+              <span className="text-xs font-black text-gray-900">₹{exp.misc.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-3 border-t border-gray-100 pt-4">
+              <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Total Today</span>
+              <span className="text-sm font-black text-gray-900">₹{totalExp.toLocaleString()}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Outstanding Vendor Payments */}
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col h-[350px]">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between gap-4 shrink-0">
+            <h3 className="text-xs font-black text-gray-900 uppercase tracking-widest truncate" title="Outstanding Vendor Payments">Outstanding Vendor Payments</h3>
+            <button className="text-[10px] font-black text-emerald-600 uppercase whitespace-nowrap shrink-0">View All</button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50/50 border-b border-gray-100">
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest sticky top-0 bg-gray-50">Vendor</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right sticky top-0 bg-gray-50">Outstanding</th>
+                  <th className="px-5 py-3 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center sticky top-0 bg-gray-50">Days</th>
+                </tr>
+              </thead>
+              <tbody>
+                {fin.outstandingVendors?.length > 0 ? fin.outstandingVendors.map((v, i) => (
+                  <tr key={i} className="border-b border-gray-50">
+                    <td className="px-5 py-3 text-xs font-bold text-gray-900">{v.name}</td>
+                    <td className="px-5 py-3 text-[10px] font-black text-gray-900 text-right">₹{v.outstanding?.toLocaleString()}</td>
+                    <td className="px-5 py-3 text-center">
+                      <span className={`px-2 py-0.5 text-[9px] font-bold rounded-md ${v.days > 14 ? 'bg-rose-50 text-rose-600' : 'bg-gray-100 text-gray-500'}`}>{v.days}d</span>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan="3" className="text-center py-6 text-gray-400 text-xs font-bold">No outstanding payments</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  );
 }
