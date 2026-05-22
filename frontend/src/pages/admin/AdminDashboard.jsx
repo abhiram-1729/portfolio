@@ -118,9 +118,6 @@ export default function AdminDashboard() {
             <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-pulse" />
             Live Sync Active
           </button>
-          <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center text-xs font-black text-gray-600 border border-gray-200">
-            AU
-          </div>
         </div>
       </div>
 
