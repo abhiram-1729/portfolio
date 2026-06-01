@@ -2,9 +2,10 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import { useUserStore } from '../store/userStore';
-import { Lock, Phone, ArrowLeft, Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 import toast from 'react-hot-toast';
 import logo from '../assets/VillagKart_Logo.png';
+import illustration from '../assets/login_illustration.png';
 
 export default function Login() {
   const [mobile, setMobile] = useState('');
@@ -41,131 +42,124 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-6 bg-slate-50 relative overflow-hidden">
-      {/* Soft Immersive Background Effects */}
-      <div className="absolute top-0 left-0 w-full h-full overflow-hidden z-0 pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[50vw] h-[50vw] rounded-full bg-emerald-100/60 blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40vw] h-[40vw] rounded-full bg-orange-100/40 blur-[100px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] opacity-[0.03]" />
-      </div>
-
-      <div className="z-10 w-full max-w-sm flex flex-col items-center animate-slide-up">
-        {/* Logo Section */}
-        <div className="mb-10 flex flex-col items-center gap-5">
-          <div className="relative group">
-            <div className="absolute -inset-6 bg-emerald-500/10 blur-2xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-            <img
-              src={logo}
-              alt="VillagKart Logo"
-              className="h-28 w-auto object-contain drop-shadow-md relative z-10 transition-transform duration-500 group-hover:scale-105"
-            />
-          </div>
-          <div className="text-center">
-            <h1 className="text-[2.5rem] font-black text-emerald-950 tracking-tighter leading-none">
-              VillagKart
-            </h1>
-            <p className="text-emerald-600 text-[0.75rem] font-black tracking-[0.4em] uppercase mt-3">
-              Sales Ecosystem
-            </p>
-          </div>
+    <div 
+      className="min-h-screen flex flex-col lg:flex-row relative"
+      style={{ 
+        background: 'linear-gradient(225.21deg, #F7F7FA 51.74%, rgba(232, 249, 231, 0.851054) 63.27%, rgba(215, 251, 210, 0.680549) 73.64%, rgba(198, 253, 190, 0.516864) 83.6%, rgba(182, 255, 170, 0.36) 93.14%)',
+        fontFamily: '"Segoe UI", sans-serif'
+      }}
+    >
+      {/* Left Column - Visuals */}
+      <div className="hidden lg:flex lg:w-1/2 flex-col px-12 xl:px-32 py-12 relative overflow-hidden h-screen">
+        {/* Logo */}
+        <div className="flex items-center z-10">
+          <img src={logo} alt="VillagKart Logo" className="h-14 xl:h-16 w-auto mix-blend-multiply" />
         </div>
 
-        {/* Login Card */}
-        <div className="w-full glass rounded-[2.5rem] p-8 shadow-2xl shadow-emerald-900/5 border border-white relative overflow-hidden bg-white/80 backdrop-blur-2xl">
-          <div className="absolute top-0 inset-x-0 h-1.5 bg-gradient-to-r from-emerald-500/0 via-emerald-500/20 to-emerald-500/0" />
+        {/* Text and Illustration */}
+        <div className="mt-20 xl:mt-24 z-10 font-semibold text-[32px] xl:text-[36px] leading-[1.4] xl:leading-[1.58] text-[#161616] max-w-[600px]">
+          Welcome Back!<br />
+          Please login to your account
+        </div>
 
-          <div className="mb-8">
-            <h2 className="text-2xl font-black text-emerald-900 text-center tracking-tight">Sign In</h2>
-            <p className="text-center text-emerald-600/60 text-sm font-bold mt-1 uppercase tracking-wider">Access Secured</p>
+        {/* Illustration container locked to bottom */}
+        <div className="absolute bottom-0 left-0 w-full flex justify-center z-10 px-12">
+          <img 
+            src={illustration} 
+            alt="Shopping Illustration" 
+            className="w-full max-w-[90%] object-contain mix-blend-multiply drop-shadow-md"
+          />
+        </div>
+
+        {/* Soft Background shapes matching mockup style */}
+        <div className="absolute top-[35%] left-[10%] w-24 h-24 border border-rose-300 rounded-full opacity-50 pointer-events-none"></div>
+        <div className="absolute top-[40%] right-[20%] w-16 h-16 border border-orange-300 rounded-full opacity-50 pointer-events-none"></div>
+        <div className="absolute bottom-[30%] right-[10%] w-32 h-32 border border-orange-200 rounded-full opacity-50 pointer-events-none"></div>
+      </div>
+
+      {/* Right Column - Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center lg:justify-start px-8 lg:px-24 relative bg-transparent h-screen">
+        <div 
+          className="flex flex-col justify-center animate-in fade-in slide-in-from-bottom-4 duration-500 w-full max-w-[397px] lg:ml-auto xl:mr-32"
+          style={{ minHeight: '424px' }}
+        >
+          
+          <div className="mb-8 text-left">
+            <h2 className="text-[32px] font-semibold text-[#161616] tracking-tight">
+              Hey Welcome Admin<span className="text-[#2d9a40] font-bold">!</span>
+            </h2>
           </div>
 
           <form onSubmit={handleLogin} className="flex flex-col gap-5">
-            {/* Error Popup Alert */}
             {loginError && (
-              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-2xl flex items-start gap-3 animate-in fade-in zoom-in duration-200 shadow-sm">
-                <div className="mt-0.5 bg-red-100 p-1 rounded-full text-red-500">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>
-                </div>
-                <div className="flex-1">
-                  <p className="text-[13px] font-black tracking-tight leading-tight mb-0.5">Access Denied</p>
-                  <p className="text-[11px] font-semibold opacity-90 leading-tight">{loginError}</p>
-                </div>
+              <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-lg text-sm font-medium">
+                {loginError}
               </div>
             )}
 
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-400 group-focus-within:bg-emerald-600 group-focus-within:text-white transition-all duration-300">
-                <Phone size={18} strokeWidth={2.5} />
-              </div>
+            <div className="flex flex-col gap-1.5">
+              <label htmlFor="mobile-input" className="text-sm font-medium text-gray-700">
+                Enter your Email Address here
+              </label>
               <input
                 id="mobile-input"
-                type="tel"
-                placeholder="Mobile Number"
+                type="text"
+                placeholder="Email Address"
                 value={mobile}
                 onChange={(e) => {
                   setMobile(e.target.value);
                   setLoginError(null);
                 }}
-                className={`w-full pl-16 pr-4 py-4 rounded-[1.25rem] border ${loginError ? 'border-red-300 bg-red-50/30' : 'border-emerald-100 bg-white/50'} hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium`}
+                className={`w-full px-4 py-3 rounded-lg border ${loginError ? 'border-red-300' : 'border-gray-200'} focus:outline-none focus:border-[#2d9a40] transition-colors text-gray-800 placeholder-gray-400`}
               />
             </div>
 
-            <div className="relative group">
-              <div className="absolute left-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-400 group-focus-within:bg-emerald-600 group-focus-within:text-white transition-all duration-300">
-                <Lock size={18} strokeWidth={2.5} />
+            <div className="flex flex-col gap-1.5 relative">
+              <label htmlFor="password-input" className="text-sm font-medium text-gray-700">
+                Password
+              </label>
+              <div className="relative">
+                <input
+                  id="password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  placeholder="********"
+                  value={password}
+                  onChange={(e) => {
+                    setPassword(e.target.value);
+                    setLoginError(null);
+                  }}
+                  className={`w-full pl-4 pr-12 py-3 rounded-lg border ${loginError ? 'border-red-300' : 'border-gray-200'} focus:outline-none focus:border-[#2d9a40] transition-colors text-gray-800 placeholder-gray-400`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 p-1"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
               </div>
-              <input
-                id="password-input"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="Password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setLoginError(null);
-                }}
-                className={`w-full pl-16 pr-12 py-4 rounded-[1.25rem] border ${loginError ? 'border-red-300 bg-red-50/30' : 'border-emerald-100 bg-white/50'} hover:bg-white focus:bg-white focus:outline-none focus:ring-4 focus:ring-emerald-500/10 focus:border-emerald-500 transition-all font-bold text-emerald-950 text-[1.05rem] placeholder-slate-950/40 placeholder:font-medium`}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 transition-all duration-300"
-              >
-                {showPassword ? <EyeOff size={18} strokeWidth={2.5} /> : <Eye size={18} strokeWidth={2.5} />}
-              </button>
+            </div>
+
+            <div className="flex justify-end mt-1">
+              <a href="#" className="text-[13px] font-medium text-gray-800 hover:text-[#2d9a40] transition-colors">
+                Forgot Password?
+              </a>
             </div>
 
             <button
-              id="login-btn"
               type="submit"
               disabled={loading}
-              className="mt-4 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-black text-lg py-4 rounded-2xl active:scale-[0.98] transition-all shadow-xl shadow-emerald-600/20 flex items-center justify-center disabled:opacity-70 group relative overflow-hidden"
+              className="mt-2 w-full bg-[#2d9a40] hover:bg-[#258034] text-white font-medium text-lg py-3 rounded-lg transition-colors flex items-center justify-center disabled:opacity-70 disabled:cursor-not-allowed"
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-orange-400 to-orange-600 opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
-              <span className="relative z-10 font-black tracking-tight flex items-center gap-2">
-                {loading ? (
-                  <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                ) : (
-                  'Login'
-                )}
-              </span>
+              {loading ? (
+                <div className="w-6 h-6 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+              ) : (
+                'Login'
+              )}
             </button>
           </form>
 
-          <div className="mt-8 flex justify-center">
-            <Link 
-              to="/home" 
-              className="flex items-center gap-2 text-emerald-600 hover:text-emerald-800 font-black text-xs uppercase tracking-[0.2em] transition-all group"
-            >
-              <ArrowLeft size={14} strokeWidth={3} className="group-hover:-translate-x-1 transition-transform" />
-              Back to Home
-            </Link>
-          </div>
         </div>
-
-        {/* Footer Info */}
-        <p className="mt-8 text-emerald-800/40 text-[10px] font-black uppercase tracking-[0.4em]">
-          VillagKart System v1.0
-        </p>
       </div>
     </div>
   );
