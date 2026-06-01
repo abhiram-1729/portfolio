@@ -4,7 +4,7 @@ import {
   Loader2, ArrowLeft, User, Smartphone, Shield, Coins, Package, Info, MapPin, Printer, Clock, 
   CreditCard, Wallet, CalendarClock, Map, Building2, Tag, CheckCircle2, AlertCircle, RefreshCw, 
   FileText, Edit3, Trash2, RotateCcw, XCircle, Minus, Plus, AlertTriangle, Lock, Unlock, BarChart3,
-  FileSpreadsheet, Upload
+  FileSpreadsheet, Upload, PieChart
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { useSearchParams, useNavigate, useLocation } from 'react-router-dom';
@@ -224,6 +224,24 @@ export default function AdminSales() {
   useEffect(() => {
     setCurrentPage(1);
   }, [searchQuery, filterDate, storeFilterId]);
+
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    const action = searchParams.get('action');
+    const view = searchParams.get('view');
+
+    if (tab) setActiveTab(tab);
+    else if (!action) setActiveTab('sales');
+
+    if (view === 'analytics') setViewMode('analytics');
+    else setViewMode('list');
+
+    if (action === 'create') setShowCreateSale(true);
+    else setShowCreateSale(false);
+
+    if (action === 'import') setShowBulkUploadModal(true);
+    else setShowBulkUploadModal(false);
+  }, [searchParams]);
 
   // Aggregated Customer List for the "Customer" Tab
   const customerList = React.useMemo(() => {
@@ -1177,7 +1195,7 @@ export default function AdminSales() {
           <p className="text-sm font-medium text-gray-500">View and manage all transaction history</p>
         </div>
 
-        {can('SALES', 'CREATE') && !viewingOrder && !showCreateSale && (
+        {can('SALES', 'CREATE') && !viewingOrder && !showCreateSale && activeTab !== 'customers' && (
           <div className="flex items-center gap-2 no-print">
             <button
               onClick={() => setShowCreateSale(true)}
@@ -1237,39 +1255,57 @@ export default function AdminSales() {
       {!viewingOrder && !showCreateSale && (
         <div className="flex flex-col gap-3 mb-4">
           <div className="flex items-center gap-2 bg-gray-50/50 p-1.5 rounded-2xl border border-gray-100 w-fit no-print">
-            <button
-              onClick={() => { setActiveTab('sales'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
-                activeTab === 'sales' 
-                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
-                  : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
-              }`}
-            >
-              <ShoppingCart size={16} />
-              Sales List
-            </button>
-            <button
-              onClick={() => { setActiveTab('customers'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
-                activeTab === 'customers' 
-                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
-                  : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
-              }`}
-            >
-              <User size={16} />
-              Customer Data
-            </button>
-            <button
-              onClick={() => { setActiveTab('analytics'); setCurrentPage(1); }}
-              className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
-                activeTab === 'analytics' 
-                  ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
-                  : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
-              }`}
-            >
-              <BarChart3 size={16} />
-              Analytics
-            </button>
+            {activeTab !== 'customers' ? (
+              <>
+                <button
+                  onClick={() => { setActiveTab('sales'); setCurrentPage(1); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                    activeTab === 'sales' 
+                      ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                      : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+                  }`}
+                >
+                  <ShoppingCart size={16} />
+                  Sales List
+                </button>
+                <button
+                  onClick={() => { setActiveTab('analytics'); setCurrentPage(1); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                    activeTab === 'analytics' 
+                      ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                      : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+                  }`}
+                >
+                  <BarChart3 size={16} />
+                  Analytics
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={() => { setViewMode('list'); setCurrentPage(1); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                    viewMode === 'list' 
+                      ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                      : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+                  }`}
+                >
+                  <User size={16} />
+                  Customer List
+                </button>
+                <button
+                  onClick={() => { setViewMode('analytics'); setCurrentPage(1); }}
+                  className={`flex items-center gap-2 px-6 py-2.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${
+                    viewMode === 'analytics' 
+                      ? 'bg-white text-emerald-600 shadow-sm border border-emerald-100' 
+                      : 'text-gray-500 hover:text-emerald-600 hover:bg-gray-100/50 border border-transparent'
+                  }`}
+                >
+                  <PieChart size={16} />
+                  Analytics
+                </button>
+              </>
+            )}
           </div>
 
           {activeTab === 'sales' && viewMode === 'list' && (

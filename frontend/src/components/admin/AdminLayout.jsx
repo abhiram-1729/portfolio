@@ -48,7 +48,8 @@ import {
   Loader2,
   ShieldCheck,
   CheckCircle2,
-  MessageSquare
+  MessageSquare,
+  Upload
 } from 'lucide-react';
 
 import { toast } from 'react-hot-toast';
@@ -277,7 +278,26 @@ export default function AdminLayout() {
     },
     // { to: '/admin/stores', icon: Store, label: 'Stores', module: 'STORE_CONTEXT', section: 'STORE_SELECTOR' },
     { to: '/admin/privileges', icon: Shield, label: 'Role Privileges' },
-    { to: '/admin/sales', icon: ShoppingCart, label: 'Sales History', module: 'SALES' },
+    {
+      label: 'Sales Management',
+      icon: ShoppingCart,
+      module: 'SALES',
+      subItems: [
+        { to: '/admin/sales?tab=sales', icon: ClipboardList, label: 'Sales List' },
+        { to: '/admin/sales?action=create', icon: PlusCircle, label: 'Create Sale' },
+        { to: '/admin/sales?action=import', icon: Upload, label: 'Bulk Import' },
+        { to: '/admin/sales?tab=analytics', icon: BarChart3, label: 'Analytics' }
+      ]
+    },
+    {
+      label: 'Customer Data',
+      icon: Users,
+      module: 'SALES',
+      subItems: [
+        { to: '/admin/sales?tab=customers', icon: Users, label: 'Customer List' },
+        { to: '/admin/sales?tab=customers&view=analytics', icon: PieChart, label: 'Analytics' }
+      ]
+    },
     {
       label: 'Inventory',
       icon: Package,
